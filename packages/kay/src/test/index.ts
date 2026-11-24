@@ -10,6 +10,8 @@ export interface TestAppOptions extends Omit<BuildOptions, 'compile' | 'static'>
   lang?: string | undefined
   security?: ServerOptions['security']
   trustedOrigins?: string[] | undefined
+  trustProxy?: boolean | undefined
+  maxRequestBodySize?: number | undefined
 }
 
 export interface TestApp {
@@ -40,6 +42,8 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     lang: options.lang,
     security: options.security,
     trustedOrigins: options.trustedOrigins,
+    trustProxy: options.trustProxy,
+    maxRequestBodySize: options.maxRequestBodySize,
     plugins: options.plugins,
   })
 

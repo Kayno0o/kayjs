@@ -13,7 +13,7 @@ export interface CookieOptions {
 export interface Cookies {
   get(name: string): string | undefined
   set(name: string, value: string, options?: CookieOptions): void
-  delete(name: string, options?: Pick<CookieOptions, 'path' | 'domain'>): void
+  delete(name: string, options?: Pick<CookieOptions, 'path' | 'domain' | 'secure'>): void
   all(): Record<string, string>
 }
 
@@ -39,7 +39,12 @@ export function parseCookieHeader(header: string | null): Map<string, string> {
   return map
 }
 
-function serializeCookie(name: string, value: string, options: CookieOptions = {}): string {
+function serializeCookie(name: string, value: string, options: CookieOptions = {}, defaultSecure = false): string {
+  const secure = options.secure ?? defaultSecure
+  const sameSite = options.sameSite ?? 'lax'
+  if (sameSite === 'none' && !secure)
+    throw new Error(`kay: Cookie "${name}" with sameSite: "none" requires secure: true`)
+
   let out = `${name}=${encodeURIComponent(value)}`
   out += `; Path=${options.path ?? '/'}`
   if (options.domain !== undefined)
@@ -50,9 +55,8 @@ function serializeCookie(name: string, value: string, options: CookieOptions = {
     out += `; Expires=${options.expires.toUTCString()}`
   if (options.httpOnly ?? true)
     out += '; HttpOnly'
-  if (options.secure)
+  if (secure)
     out += '; Secure'
-  const sameSite = options.sameSite ?? 'lax'
   out += `; SameSite=${sameSite[0]!.toUpperCase()}${sameSite.slice(1)}`
   return out
 }
@@ -60,9 +64,11 @@ function serializeCookie(name: string, value: string, options: CookieOptions = {
 export class CookieStore implements Cookies {
   readonly #values: Map<string, string>
   readonly #headers: string[] = []
+  readonly #isHttps: boolean
 
-  constructor(cookieHeader: string | null) {
+  constructor(cookieHeader: string | null, isHttps = false) {
     this.#values = parseCookieHeader(cookieHeader)
+    this.#isHttps = isHttps
   }
 
   get(name: string): string | undefined {
@@ -70,13 +76,14 @@ export class CookieStore implements Cookies {
   }
 
   set(name: string, value: string, options?: CookieOptions): void {
+    const serialized = serializeCookie(name, value, options, this.#isHttps)
     this.#values.set(name, value)
-    this.#headers.push(serializeCookie(name, value, options))
+    this.#headers.push(serialized)
   }
 
-  delete(name: string, options?: Pick<CookieOptions, 'path' | 'domain'>): void {
+  delete(name: string, options?: Pick<CookieOptions, 'path' | 'domain' | 'secure'>): void {
     this.#values.delete(name)
-    this.#headers.push(serializeCookie(name, '', { ...options, maxAge: 0, expires: new Date(0) }))
+    this.#headers.push(serializeCookie(name, '', { ...options, maxAge: 0, expires: new Date(0) }, this.#isHttps))
   }
 
   all(): Record<string, string> {

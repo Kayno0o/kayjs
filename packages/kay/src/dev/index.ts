@@ -6,15 +6,20 @@ import { existsSync, rmSync, statSync, watch } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { build, createBuildCache } from '../build/index'
 import { loadConfig } from '../plugins/index'
-import { createServer } from '../server/index'
+import { DEFAULT_MAX_REQUEST_BODY_SIZE } from '../server/http'
+import { createServer, withCspHashes } from '../server/index'
 
 export interface DevServerOptions {
   root: string
   port?: number | undefined
+  hostname?: string | undefined
   routesDir?: string | undefined
+  maxRequestBodySize?: number | undefined
 }
 
-const DEV_RELOAD_SCRIPT = `<script>(()=>{const stem=u=>u.replace(/-[a-z0-9]+\\.css$/i,'');const s=new EventSource('/_kay/dev-events');s.onmessage=(e)=>{if(e.data.startsWith('css:')){const urls=JSON.parse(e.data.slice(4));const byStem=new Map(urls.map(u=>[stem(u),u]));const old=[...document.querySelectorAll('link[rel="stylesheet"][href^="/_kay/"]')];if(old.length===0){location.reload();return;}const next=[];for(const o of old){const m=byStem.get(stem(o.getAttribute('href')||''));if(m)next.push(m);}if(next.length===0){location.reload();return;}let left=next.length;for(const u of next){const l=document.createElement('link');l.rel='stylesheet';l.href=u;const done=()=>{if(--left===0)for(const o of old)o.remove();};l.onload=done;l.onerror=done;document.head.appendChild(l);}}else{location.reload();}};})();</script>`
+const DEV_RELOAD_JS = `(()=>{const stem=u=>u.replace(/-[a-z0-9]+\\.css$/i,'');const s=new EventSource('/_kay/dev-events');s.onmessage=(e)=>{if(e.data.startsWith('css:')){const urls=JSON.parse(e.data.slice(4));const byStem=new Map(urls.map(u=>[stem(u),u]));const old=[...document.querySelectorAll('link[rel="stylesheet"][href^="/_kay/"]')];if(old.length===0){location.reload();return;}const next=[];for(const o of old){const m=byStem.get(stem(o.getAttribute('href')||''));if(m)next.push(m);}if(next.length===0){location.reload();return;}let left=next.length;for(const u of next){const l=document.createElement('link');l.rel='stylesheet';l.href=u;const done=()=>{if(--left===0)for(const o of old)o.remove();};l.onload=done;l.onerror=done;document.head.appendChild(l);}}else{location.reload();}};})();`
+const DEV_RELOAD_SCRIPT = `<script>${DEV_RELOAD_JS}</script>`
+const DEV_RELOAD_SCRIPT_HASH = `'sha256-${new Bun.CryptoHasher('sha256').update(DEV_RELOAD_JS).digest('base64')}'`
 
 function renderErrorOverlay(errText: string): string {
   const escaped = errText
@@ -35,6 +40,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   const configPath = join(root, 'kay.config.ts')
   const devRoot = join(root, '.kay-dev')
   const port = options.port ?? 3000
+  const hostname = options.hostname ?? '127.0.0.1'
   const buildCache = createBuildCache()
 
   let buildNum = 0
@@ -195,13 +201,18 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
     }
   }, 15_000)
 
+  const maxRequestBodySize = options.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
+
   const server = Bun.serve({
     port,
-    idleTimeout: 0,
-    async fetch(request) {
+    hostname,
+    idleTimeout: 30,
+    maxRequestBodySize,
+    async fetch(request, srv) {
       const url = new URL(request.url)
 
       if (url.pathname === '/_kay/dev-events') {
+        srv.timeout(request, 0)
         let ctrl: ReadableStreamDefaultController<Uint8Array> | undefined
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
@@ -237,20 +248,28 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
         })
       }
 
-      const res = await currentApp!.handle(request)
+      const remoteIp = srv.requestIP(request)?.address
+      const res = await currentApp!.handle(request, remoteIp)
       const ct = res.headers.get('content-type') ?? ''
+      if (ct.includes('text/event-stream'))
+        srv.timeout(request, 0)
       if (ct.includes('text/html')) {
         const html = await res.text()
         const injected = html.includes('</body>')
           ? html.replace('</body>', `${DEV_RELOAD_SCRIPT}</body>`)
           : html + DEV_RELOAD_SCRIPT
-        return new Response(injected, { status: res.status, headers: res.headers })
+        const headers = new Headers(res.headers)
+        const existingCsp = headers.get('content-security-policy')
+        if (existingCsp !== null)
+          headers.set('content-security-policy', withCspHashes(existingCsp, { scriptHashes: [DEV_RELOAD_SCRIPT_HASH] }))
+        return new Response(injected, { status: res.status, headers })
       }
       return res
     },
   })
 
-  const url = `http://localhost:${server.port}`
+  const displayHost = hostname === '0.0.0.0' ? '127.0.0.1' : hostname
+  const url = `http://${displayHost}:${server.port}`
   console.log(`[kay dev] listening on ${url}`)
 
   return {

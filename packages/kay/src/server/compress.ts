@@ -2,6 +2,7 @@
 // Never imports `node:zlib` so server RSS stays minimal.
 
 export type CompressionEncoding = 'zstd' | 'gzip'
+export type PrecompressedEncoding = 'br' | 'gzip'
 
 export const MIN_COMPRESS_BYTES = 256
 const DEFAULT_MAX_CACHE_BYTES = 2 * 1024 * 1024
@@ -74,6 +75,73 @@ export function pickEncoding(acceptEncoding: string | null): CompressionEncoding
   if (zstdQ <= 0 && gzipQ <= 0)
     return undefined
   return zstdQ >= gzipQ ? 'zstd' : 'gzip'
+}
+
+export function pickPrecompressedEncoding(
+  acceptEncoding: string | null,
+  available: { br?: boolean, gz?: boolean },
+): PrecompressedEncoding | undefined {
+  if (!acceptEncoding || (!available.br && !available.gz))
+    return undefined
+
+  if (!acceptEncoding.includes(';')) {
+    const lower = acceptEncoding.toLowerCase()
+    if (available.br && hasToken(lower, 'br'))
+      return 'br'
+    if (available.gz && hasToken(lower, 'gzip'))
+      return 'gzip'
+    return undefined
+  }
+
+  let brQ = -1
+  let gzipQ = -1
+  const parts = acceptEncoding.split(',')
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]!.trim()
+    if (!part)
+      continue
+    const semi = part.indexOf(';')
+    const name = (semi === -1 ? part : part.slice(0, semi)).trim().toLowerCase()
+    if (name !== 'br' && name !== 'gzip')
+      continue
+    let q = 1
+    if (semi !== -1) {
+      const m = /;\s*q\s*=\s*([0-9.]+)/i.exec(part.slice(semi))
+      if (m !== null) {
+        const parsed = Number(m[1])
+        if (!Number.isNaN(parsed))
+          q = parsed
+      }
+    }
+    if (name === 'br')
+      brQ = q
+    else
+      gzipQ = q
+  }
+
+  const effBr = available.br ? brQ : -1
+  const effGz = available.gz ? gzipQ : -1
+  if (effBr <= 0 && effGz <= 0)
+    return undefined
+  return effBr >= effGz ? 'br' : 'gzip'
+}
+
+export function toWeakEtag(etag: string): string {
+  return etag.startsWith('W/') || etag.startsWith('w/') ? etag : `W/${etag}`
+}
+
+function hasNoTransform(cacheControl: string | null | undefined): boolean {
+  return Boolean(cacheControl && /\bno-transform\b/i.test(cacheControl))
+}
+
+function isStreamingBody(res: Response): boolean {
+  // Check transfer-encoding or Bun's unmaterialized ReadableStream representation BEFORE touching `res.body`.
+  const te = res.headers.get('transfer-encoding')
+  if (te && te.toLowerCase().includes('chunked'))
+    return true
+  if (typeof Bun !== 'undefined')
+    return Bun.inspect(res).includes('ReadableStream {')
+  return true
 }
 
 function hasToken(haystack: string, token: string): boolean {
@@ -170,7 +238,8 @@ export function compressedHtmlResponse(
   request: Request,
   cache: CompressionCache | undefined,
 ): Response {
-  if (cache !== undefined && request.method !== 'HEAD') {
+  const noTransform = hasNoTransform(baseHeaders['cache-control'] ?? baseHeaders['Cache-Control'])
+  if (cache !== undefined && !noTransform && request.method !== 'HEAD') {
     const enc = pickEncoding(request.headers.get('accept-encoding'))
     if (enc !== undefined && html.length >= MIN_COMPRESS_BYTES) {
       const staticKey = `s:${Bun.hash.wyhash(html).toString(36)}:${html.length}`
@@ -180,16 +249,17 @@ export function compressedHtmlResponse(
         compressed = cache.compress(bytes, enc, staticKey)
       }
       if (compressed !== undefined) {
-        return new Response(compressed, {
-          status,
-          headers: { ...baseHeaders, 'content-encoding': enc, 'vary': 'Accept-Encoding' },
-        })
+        const headers: Record<string, string> = { ...baseHeaders, 'content-encoding': enc, 'vary': 'Accept-Encoding' }
+        const etag = headers.etag ?? headers.ETag
+        if (etag !== undefined)
+          headers.etag = toWeakEtag(etag)
+        return new Response(compressed, { status, headers })
       }
     }
   }
   return new Response(request.method === 'HEAD' ? null : html, {
     status,
-    headers: cache !== undefined ? { ...baseHeaders, vary: 'Accept-Encoding' } : baseHeaders,
+    headers: cache !== undefined && !noTransform ? { ...baseHeaders, vary: 'Accept-Encoding' } : baseHeaders,
   })
 }
 
@@ -200,11 +270,18 @@ export async function maybeCompressResponse(
 ): Promise<Response> {
   if (cache === undefined)
     return res
-  if (res.status === 204 || res.status === 304 || (res.status >= 300 && res.status < 400))
+  if (res.status === 204 || res.status === 206 || res.status === 304 || (res.status >= 300 && res.status < 400))
     return res
   if (res.headers.has('content-encoding'))
     return res
+  if (hasNoTransform(res.headers.get('cache-control')))
+    return res
   if (!isCompressibleType(res.headers.get('content-type')))
+    return res
+
+  const cl = res.headers.get('content-length')
+  // Never buffer streaming responses that have no Content-Length (e.g. chunked streams, ReadableStream)
+  if (cl === null && isStreamingBody(res))
     return res
 
   const enc = request.method === 'HEAD' ? undefined : pickEncoding(request.headers.get('accept-encoding'))
@@ -216,7 +293,6 @@ export async function maybeCompressResponse(
     return res
   }
 
-  const cl = res.headers.get('content-length')
   if (cl !== null && Number(cl) < MIN_COMPRESS_BYTES) {
     try {
       appendVaryAcceptEncoding(res.headers)
@@ -237,5 +313,8 @@ export async function maybeCompressResponse(
 
   headers.set('content-encoding', enc)
   headers.delete('content-length')
+  const etag = headers.get('etag')
+  if (etag !== null)
+    headers.set('etag', toWeakEtag(etag))
   return new Response(compressed, { status: res.status, statusText: res.statusText, headers })
 }

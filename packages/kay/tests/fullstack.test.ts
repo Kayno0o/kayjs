@@ -286,11 +286,9 @@ describe('Kay v2 Milestone 2 full-stack features', () => {
     expect(preRes.status).toBe(200)
     expect(await preRes.text()).toContain('Slug is hello-world')
 
+    // Unlisted param on a prerendered dynamic route returns 404 (#3526 box 10)
     const dynRes = await app.get('/posts/other-post')
-    expect(dynRes.status).toBe(200)
-    const dynHtml = await dynRes.text()
-    expect(dynHtml).toContain('<title>Post: other-post</title>')
-    expect(dynHtml).toContain('Slug is other-post')
+    expect(dynRes.status).toBe(404)
 
     // 3. Catch-all [...path] route
     const docsRes = await app.get('/docs/guide/getting-started')
@@ -407,19 +405,35 @@ describe('Kay v2 Milestone 2 full-stack features', () => {
   })
 
   test('static export (--static) writes static HTML, client assets, and .br/.gz sidecars directly into outDir', async () => {
-    await build({ root: fixtureDir, outDir: 'dist-static', static: true })
-    const homeHtmlPath = join(fixtureDir, 'dist-static/index.html')
-    expect(existsSync(join(fixtureDir, 'dist-static/server'))).toBe(false)
-    expect(existsSync(homeHtmlPath)).toBe(true)
-    expect(existsSync(join(fixtureDir, 'dist-static/posts/hello-world/index.html'))).toBe(true)
-    expect(existsSync(`${homeHtmlPath}.br`)).toBe(true)
-    expect(existsSync(`${homeHtmlPath}.gz`)).toBe(true)
+    const staticDir = mkdtempSync(join(tmpdir(), 'kay-v2-static-only-'))
+    try {
+      mkdirSync(join(staticDir, 'src/routes/posts'), { recursive: true })
+      writeFileSync(join(staticDir, 'src/routes/index.tsx'), 'export default function Home() { return <main><h1>Static Home</h1></main> }')
+      writeFileSync(join(staticDir, 'src/routes/posts/[slug].tsx'), `
+        export const prerender = true
+        export function paths() { return ['/posts/hello-world'] }
+        export default function Post({ params }: { params: { slug: string } }) {
+          return <article>Slug is {params.slug}</article>
+        }
+      `)
+      await build({ root: staticDir, outDir: 'dist-static', static: true })
+      const homeHtmlPath = join(staticDir, 'dist-static/index.html')
+      expect(existsSync(join(staticDir, 'dist-static/server'))).toBe(false)
+      expect(existsSync(homeHtmlPath)).toBe(true)
+      expect(existsSync(join(staticDir, 'dist-static/posts/hello-world/index.html'))).toBe(true)
+      expect(existsSync(`${homeHtmlPath}.br`)).toBe(true)
+      expect(existsSync(`${homeHtmlPath}.gz`)).toBe(true)
+    }
+    finally {
+      rmSync(staticDir, { recursive: true, force: true })
+    }
   })
 
   test('progressive form action redirects 303 back to referer behind HTTPS proxy or trustedOrigins, never open-redirects', async () => {
     const app = await testApp({
       root: fixtureDir,
       outDir: 'dist-proxy',
+      trustProxy: true,
       trustedOrigins: ['https://trusted.example'],
     })
     const notesHtml = await (await app.get('/notes')).text()

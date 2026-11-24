@@ -2,10 +2,20 @@
 
 import type { Cookies } from './cookies'
 import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
+import { DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit } from './http'
 import { isTrustedOrigin, verifyOrigin } from './security'
 import { validateSchema } from './standard-schema'
 
 export const ACTION_ERROR_COOKIE = '__kay_action_err'
+
+const MAX_FLASH_COOKIE_BYTES = 3500
+const MAX_FLASH_FIELD_CHARS = 512
+const SENSITIVE_FIELD_RE = /password|passwd|pwd|secret|token|pin|cvv|cvc|iban|ssn|card|credit|auth|key|otp|code|routing|account|bank|tax/i
+
+export interface ActionOptions {
+  /** Explicit allowlist of form field names permitted in the progressive-form validation error flash cookie. */
+  flashFields?: readonly string[] | undefined
+}
 
 export interface ActionErrorFlash {
   action: string
@@ -24,6 +34,7 @@ export interface ActionContext {
   params: Record<string, string>
   cookies: Cookies
   locals: Record<string, unknown>
+  ip?: string | undefined
   redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => Response
   deny: (status: number, message: string, fieldErrors?: Record<string, string>) => Response
 }
@@ -37,6 +48,7 @@ export interface ServerAction<Input, Output> {
   readonly __kayAction: true
   readonly url: string
   readonly schema: StandardSchemaV1 | undefined
+  readonly flashFields: readonly string[] | undefined
   readonly handler: (input: never, ctx: ActionContext) => Output | Response | Promise<Output | Response>
   toString(): string
 }
@@ -49,19 +61,23 @@ export function actionHash(relFile: string, exportName: string): string {
 export function action<S extends StandardSchemaV1, Output>(
   schema: S,
   handler: (input: InferOutput<S>, ctx: ActionContext) => Output | Response | Promise<Output | Response>,
+  options?: ActionOptions,
 ): ServerAction<InferInput<S>, Exclude<Output, Response>>
 export function action<Output>(
   handler: (ctx: ActionContext) => Output | Response | Promise<Output | Response>,
+  options?: ActionOptions,
 ): ServerAction<void, Exclude<Output, Response>>
 export function action(
   schemaOrHandler: StandardSchemaV1 | ((ctx: ActionContext) => unknown),
-  maybeHandler?: (input: never, ctx: ActionContext) => unknown,
+  maybeHandlerOrOpts?: ((input: never, ctx: ActionContext) => unknown) | ActionOptions,
+  maybeOpts?: ActionOptions,
 ): ServerAction<unknown, unknown> {
   const hasSchema = typeof schemaOrHandler !== 'function'
   const schema = hasSchema ? schemaOrHandler : undefined
   const handler = hasSchema
-    ? maybeHandler!
+    ? (maybeHandlerOrOpts as (input: never, ctx: ActionContext) => unknown)
     : ((_input: never, ctx: ActionContext) => (schemaOrHandler as (c: ActionContext) => unknown)(ctx))
+  const options = hasSchema ? maybeOpts : (maybeHandlerOrOpts as ActionOptions | undefined)
 
   const fn = (async () => {
     throw new Error('kay: server action cannot be called directly without a request context; invoke it from an island or via HTTP POST')
@@ -70,6 +86,7 @@ export function action(
   Object.defineProperties(fn, {
     __kayAction: { value: true, enumerable: false },
     schema: { value: schema, enumerable: false },
+    flashFields: { value: options?.flashFields, enumerable: false },
     handler: { value: handler, enumerable: false },
     url: { value: '', writable: true, enumerable: true },
     toString: {
@@ -87,13 +104,24 @@ export function isServerAction(value: unknown): value is ServerAction<unknown, u
   return typeof value === 'function' && (value as { __kayAction?: boolean }).__kayAction === true
 }
 
-async function parseActionBody(request: Request): Promise<unknown> {
-  const contentType = request.headers.get('content-type') ?? ''
+class PayloadTooLargeError extends Error {
+  constructor() {
+    super('Payload Too Large')
+  }
+}
+
+async function parseActionBody(request: Request, maxRequestBodySize: number): Promise<unknown> {
+  const checked = await enforceRequestBodyLimit(request, maxRequestBodySize)
+  if (!checked.ok)
+    throw new PayloadTooLargeError()
+  const boundedReq = checked.request
+
+  const contentType = boundedReq.headers.get('content-type') ?? ''
   if (contentType.includes('application/json'))
-    return request.json()
+    return boundedReq.json()
 
   if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
-    const fd = await request.formData()
+    const fd = await boundedReq.formData()
     const out: Record<string, unknown> = {}
     for (const [key, val] of fd.entries()) {
       if (key in out) {
@@ -110,13 +138,67 @@ async function parseActionBody(request: Request): Promise<unknown> {
   return undefined
 }
 
+function encodedFlashSize(flash: ActionErrorFlash): number {
+  return Buffer.byteLength(encodeURIComponent(JSON.stringify(flash)), 'utf8')
+}
+
+function buildActionErrorFlash(
+  actionUrl: string,
+  fieldErrors: Record<string, string>,
+  rawBody: unknown,
+  flashFields?: readonly string[],
+): string {
+  const safeErrors: Record<string, string> = {}
+  const base: ActionErrorFlash = {
+    action: actionUrl,
+    error: 'Validation failed',
+    fieldErrors: safeErrors,
+  }
+  for (const [k, msg] of Object.entries(fieldErrors)) {
+    const trimmed = msg.length > 256 ? msg.slice(0, 256) : msg
+    safeErrors[k] = trimmed
+    if (encodedFlashSize(base) > MAX_FLASH_COOKIE_BYTES) {
+      delete safeErrors[k]
+      break
+    }
+  }
+
+  const allowSet = flashFields !== undefined ? new Set(flashFields) : undefined
+  const values: Record<string, string> = {}
+  if (rawBody !== null && typeof rawBody === 'object') {
+    for (const [k, v] of Object.entries(rawBody as Record<string, unknown>)) {
+      if (typeof v !== 'string' || v.length > MAX_FLASH_FIELD_CHARS)
+        continue
+      if (allowSet !== undefined) {
+        if (!allowSet.has(k))
+          continue
+      }
+      else if (SENSITIVE_FIELD_RE.test(k)) {
+        continue
+      }
+      values[k] = v
+      const candidate: ActionErrorFlash = { ...base, values }
+      if (encodedFlashSize(candidate) > MAX_FLASH_COOKIE_BYTES)
+        delete values[k]
+    }
+  }
+
+  const finalFlash: ActionErrorFlash = {
+    ...base,
+    ...(Object.keys(values).length > 0 ? { values } : {}),
+  }
+  return JSON.stringify(finalFlash)
+}
+
 export async function executeAction(
   act: ServerAction<unknown, unknown>,
   request: Request,
   ctx: ActionContext,
   trustedOrigins?: ReadonlySet<string>,
+  trustProxy = false,
+  maxRequestBodySize = DEFAULT_MAX_REQUEST_BODY_SIZE,
 ): Promise<Response> {
-  const originCheck = verifyOrigin(request, trustedOrigins)
+  const originCheck = verifyOrigin(request, trustedOrigins, trustProxy)
   if (!originCheck.ok) {
     return Response.json(
       { ok: false, status: 403, error: originCheck.reason },
@@ -131,15 +213,17 @@ export async function executeAction(
   if (act.schema !== undefined) {
     let rawBody: unknown
     try {
-      rawBody = await parseActionBody(request)
+      rawBody = await parseActionBody(request, maxRequestBodySize)
     }
-    catch {
+    catch (err) {
+      if (err instanceof PayloadTooLargeError)
+        return Response.json({ ok: false, status: 413, error: 'Payload Too Large' }, { status: 413 })
       return Response.json({ ok: false, status: 400, error: 'Invalid request body' }, { status: 400 })
     }
 
     const checked = await validateSchema(act.schema, rawBody)
     if (!checked.ok) {
-      // Zero-JS progressive HTML <form> submit: flash fieldErrors + submitted string values and redirect 303 back to trusted Referer
+      // Zero-JS progressive HTML <form> submit: flash fieldErrors + safe submitted values (<4KB) and redirect 303 back to trusted Referer
       if (!wantsJson) {
         const referer = request.headers.get('referer')
         if (referer) {
@@ -150,21 +234,9 @@ export async function executeAction(
           catch {
             refUrl = undefined
           }
-          if (refUrl !== undefined && isTrustedOrigin(refUrl.origin, request, trustedOrigins)) {
-            const values: Record<string, string> = {}
-            if (rawBody !== null && typeof rawBody === 'object') {
-              for (const [k, v] of Object.entries(rawBody as Record<string, unknown>)) {
-                if (typeof v === 'string' && !/password|secret|token/i.test(k) && v.length <= 512)
-                  values[k] = v
-              }
-            }
-            const flash: ActionErrorFlash = {
-              action: act.url,
-              error: 'Validation failed',
-              fieldErrors: checked.fieldErrors,
-              ...(Object.keys(values).length > 0 ? { values } : {}),
-            }
-            ctx.cookies.set(ACTION_ERROR_COOKIE, JSON.stringify(flash), {
+          if (refUrl !== undefined && isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy)) {
+            const serializedFlash = buildActionErrorFlash(act.url, checked.fieldErrors, rawBody, act.flashFields)
+            ctx.cookies.set(ACTION_ERROR_COOKIE, serializedFlash, {
               httpOnly: true,
               sameSite: 'lax',
               maxAge: 60,
@@ -195,7 +267,7 @@ export async function executeAction(
       catch {
         refUrl = undefined
       }
-      if (refUrl !== undefined && isTrustedOrigin(refUrl.origin, request, trustedOrigins))
+      if (refUrl !== undefined && isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy))
         return Response.redirect(refUrl.href, 303)
     }
   }

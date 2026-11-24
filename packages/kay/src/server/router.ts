@@ -84,7 +84,12 @@ export class Router<T> {
           break
         }
         else if (seg.startsWith(':')) {
-          params[seg.slice(1)] = decodeSegment(parts[j]!)
+          const rawSeg = parts[j]!
+          if (/%2f/i.test(rawSeg)) {
+            matched = false
+            break
+          }
+          params[seg.slice(1)] = decodeSegment(rawSeg)
         }
         else if (seg !== parts[j]) {
           matched = false

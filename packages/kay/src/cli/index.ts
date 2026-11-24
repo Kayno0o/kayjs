@@ -13,22 +13,35 @@ const args = Bun.argv.slice(2)
 const cmd = args[0]
 
 function flagValue(name: string): string | undefined {
-  const idx = args.indexOf(name)
-  if (idx === -1)
-    return undefined
-  const next = args[idx + 1]
-  return next !== undefined && !next.startsWith('-') ? next : ''
+  const prefix = `${name}=`
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!
+    if (a.startsWith(prefix))
+      return a.slice(prefix.length)
+    if (a === name) {
+      const next = args[i + 1]
+      return next !== undefined && !next.startsWith('-') ? next : ''
+    }
+  }
+  return undefined
 }
 
 function hasFlag(name: string): boolean {
   return args.includes(name)
 }
 
+function resolveHostname(): string {
+  const hostFlag = flagValue('--host')
+  if (hostFlag !== undefined)
+    return hostFlag === '' ? '0.0.0.0' : hostFlag
+  return process.env.HOST || '127.0.0.1'
+}
+
 const dirArg = args.slice(1).find((a, i, arr) => {
   if (a.startsWith('-'))
     return false
   const prev = arr[i - 1]
-  if (prev === '--port' || prev === '--compile' || prev === '--template')
+  if (prev === '--port' || prev === '--host' || prev === '--compile' || prev === '--template')
     return false
   return true
 })
@@ -72,14 +85,15 @@ else if (cmd === 'start') {
   process.env.NODE_ENV ??= 'production'
   const config = await loadConfig(root)
   const port = Number(flagValue('--port') || process.env.PORT || config.port || 3000)
-  const hostname = process.env.HOST || undefined
+  const hostname = resolveHostname()
   const app = await createServer({ root })
   const server = app.serve(port, hostname)
-  console.log(`kay server listening on http://${hostname ?? 'localhost'}:${server.port}`)
+  console.log(`kay server listening on http://${hostname}:${server.port}`)
 }
 else if (cmd === 'dev') {
   const port = Number(flagValue('--port') || process.env.PORT || 3000)
-  await devServer({ root, port })
+  const hostname = resolveHostname()
+  await devServer({ root, port, hostname })
 }
 else {
   // Check plugin-registered CLI commands from kay.config.ts
@@ -98,10 +112,12 @@ Commands:
   kay new <dir> [--template minimal|fullstack|blog|app] [--force]
                                        Scaffold a new Kay project
   kay check [dir]                      Validate routes, compiler rules, and TypeScript types
-  kay dev [dir] [--port 3000]          Run dev server with fast reload
+  kay dev [dir] [--port 3000] [--host [addr]]
+                                       Run dev server with fast reload (binds 127.0.0.1 by default)
   kay build [dir] [--static] [--compile [out]]
                                        Build production app, static site, or single executable
-  kay start [dir] [--port 3000]        Serve the built production app`)
+  kay start [dir] [--port 3000] [--host [addr]]
+                                       Serve the built production app (binds 127.0.0.1 by default)`)
     process.exit(cmd === '--help' || cmd === '-h' || cmd === undefined ? 0 : 1)
   }
 }

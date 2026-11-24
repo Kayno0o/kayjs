@@ -5,7 +5,9 @@ import type { KayPlugin, ServerErrorInfo } from '../plugins/index'
 import type { Cookies } from './cookies'
 import type { SecurityHeadersOptions } from './security'
 import { CookieStore } from './cookies'
-import { buildSecurityHeaderEntries } from './security'
+import { buildSecurityHeaderEntries, getClientIp, isHttpsRequest } from './security'
+
+export const DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 1024
 
 export interface ServerOptions {
   root: string
@@ -15,6 +17,8 @@ export interface ServerOptions {
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
+  trustProxy?: boolean | undefined
+  maxRequestBodySize?: number | undefined
   compress?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
@@ -26,6 +30,7 @@ export interface RequestContext {
   params: Record<string, string>
   cookies: Cookies
   locals: Record<string, unknown>
+  ip?: string | undefined
   json: (data: unknown, init?: ResponseInit) => Response
   text: (body: string, init?: ResponseInit) => Response
   redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => Response
@@ -35,7 +40,7 @@ export interface RequestContext {
 export type Middleware = (ctx: RequestContext, next: () => Promise<Response>) => Response | Promise<Response>
 
 export interface KayApp {
-  handle: (request: Request) => Promise<Response>
+  handle: (request: Request, remoteIp?: string) => Promise<Response>
   serve: (port?: number, hostname?: string) => ReturnType<typeof Bun.serve>
 }
 
@@ -53,6 +58,8 @@ export interface EmbeddedServerConfig {
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
+  trustProxy?: boolean | undefined
+  maxRequestBodySize?: number | undefined
   compress?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
@@ -102,21 +109,129 @@ export function extractRenderedIslands(html: string): { hasIslands: boolean, eag
   return { hasIslands, eagerChunks: [...eager] }
 }
 
-export function makeRequestContext(request: Request, params: Record<string, string>): { ctx: RequestContext, cookieStore: CookieStore } {
+export interface RequestContextOptions {
+  trustProxy?: boolean | undefined
+  remoteIp?: string | undefined
+}
+
+export function makeRequestContext(
+  request: Request,
+  params: Record<string, string>,
+  opts?: RequestContextOptions,
+): { ctx: RequestContext, cookieStore: CookieStore } {
   const url = new URL(request.url)
-  const cookieStore = new CookieStore(request.headers.get('cookie'))
+  const trustProxy = opts?.trustProxy === true
+  const isHttps = isHttpsRequest(request, trustProxy)
+  const cookieStore = new CookieStore(request.headers.get('cookie'), isHttps)
+  const ip = getClientIp(request, trustProxy, opts?.remoteIp)
   const ctx: RequestContext = {
     request,
     url,
     params,
     cookies: cookieStore,
     locals: {},
-    json: (data, init) => Response.json(data, init),
-    text: (body, init) => new Response(body, { ...init, headers: { 'content-type': 'text/plain; charset=utf-8', ...init?.headers } }),
+    ip,
+    json: (data, init) => {
+      const payload = JSON.stringify(data)
+      const headers = new Headers(init?.headers)
+      if (!headers.has('content-type'))
+        headers.set('content-type', 'application/json; charset=utf-8')
+      if (!headers.has('content-length'))
+        headers.set('content-length', String(Buffer.byteLength(payload, 'utf8')))
+      return new Response(payload, { ...init, headers })
+    },
+    text: (body, init) => {
+      const headers = new Headers(init?.headers)
+      if (!headers.has('content-type'))
+        headers.set('content-type', 'text/plain; charset=utf-8')
+      if (!headers.has('content-length'))
+        headers.set('content-length', String(Buffer.byteLength(body, 'utf8')))
+      return new Response(body, { ...init, headers })
+    },
     redirect: (location, status = 302) => new Response(null, { status, headers: { location } }),
     deny: (status, message, fieldErrors) => Response.json({ ok: false, status, error: message, fieldErrors }, { status }),
   }
   return { ctx, cookieStore }
+}
+
+/** Enforces `maxBytes` on incoming request bodies (both Content-Length and streaming body reads). */
+export async function enforceRequestBodyLimit(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true, request: Request } | { ok: false }> {
+  if (request.method === 'GET' || request.method === 'HEAD' || !Number.isFinite(maxBytes) || maxBytes <= 0)
+    return { ok: true, request }
+
+  const clHeader = request.headers.get('content-length')
+  if (clHeader !== null) {
+    const cl = Number(clHeader)
+    if (Number.isFinite(cl) && cl > maxBytes)
+      return { ok: false }
+  }
+
+  // Capture headers BEFORE accessing request.body so Bun preserves FormData multipart boundaries.
+  const headers = new Headers(request.headers)
+  const body = request.body
+  if (body === null)
+    return { ok: true, request }
+
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done)
+        break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => {})
+        return { ok: false }
+      }
+      chunks.push(value)
+    }
+  }
+  finally {
+    reader.releaseLock()
+  }
+
+  const combined = new Uint8Array(total)
+  let offset = 0
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i]!
+    combined.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return {
+    ok: true,
+    request: new Request(request.url, {
+      method: request.method,
+      headers,
+      body: combined,
+    }),
+  }
+}
+
+export function applyHstsHeader(
+  res: Response,
+  request: Request,
+  hstsValue: string | undefined,
+  trustProxy: boolean,
+): Response {
+  if (hstsValue === undefined || process.env.NODE_ENV !== 'production' || !isHttpsRequest(request, trustProxy))
+    return res
+  if (res.headers.has('strict-transport-security'))
+    return res
+  try {
+    res.headers.set('strict-transport-security', hstsValue)
+    return res
+  }
+  catch {
+    const headers = new Headers(res.headers)
+    headers.set('strict-transport-security', hstsValue)
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+  }
 }
 
 export function finalizeResponse(

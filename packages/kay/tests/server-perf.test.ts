@@ -178,15 +178,15 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     expect(headRes.headers.get('content-encoding')).toBeNull()
     expect(await headRes.text()).toBe('')
 
-    // 2. Client JS asset -> compressed with zstd & cached
+    // 2. Client JS asset -> served directly from precompressed sidecar (.br/.gz) with immutable cache-control
     expect(manifest.runtimeScript).toBeDefined()
     const jsRes = await app.handle(new Request(`http://localhost${manifest.runtimeScript}`, {
       headers: { 'accept-encoding': 'zstd, gzip' },
     }))
     expect(jsRes.status).toBe(200)
-    expect(jsRes.headers.get('content-encoding')).toBe('zstd')
+    expect(jsRes.headers.get('content-encoding')).toBe('gzip')
     expect(jsRes.headers.get('cache-control')).toContain('immutable')
-    const jsText = new TextDecoder().decode(Bun.zstdDecompressSync(new Uint8Array(await jsRes.arrayBuffer())))
+    const jsText = new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await jsRes.arrayBuffer())))
     expect(jsText).toContain('kay-island')
 
     // 3. Public files: text compressed + 304 ETag works; binary stays uncompressed

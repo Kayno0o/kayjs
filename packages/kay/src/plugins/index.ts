@@ -36,11 +36,16 @@ export interface CheckPluginContext {
   error(message: string): void
 }
 
+export interface PluginRouteOptions {
+  /** Enable CSRF Origin/Sec-Fetch-Site verification on unsafe methods (default: true). Set `false` to opt out (e.g. webhooks). */
+  csrf?: boolean | undefined
+}
+
 export interface ServerPluginAPI {
   /** Register global middleware that runs before route handlers. */
   use(middleware: Middleware): void
   /** Register a custom HTTP route (e.g. GET /sitemap.xml, POST /auth/callback). */
-  route(method: string, path: string, handler: (ctx: RequestContext) => Response | Promise<Response>): void
+  route(method: string, path: string, handler: (ctx: RequestContext) => Response | Promise<Response>, options?: PluginRouteOptions): void
   /** Rewrite an incoming pathname before route matching (e.g. strip /fr locale prefix). */
   rewrite(fn: (pathname: string, ctx: RequestContext) => string | undefined): void
 }
@@ -88,6 +93,8 @@ export interface KayConfig {
   assetPrefix?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
+  trustProxy?: boolean | undefined
+  maxRequestBodySize?: number | undefined
   compress?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
