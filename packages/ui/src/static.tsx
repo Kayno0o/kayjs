@@ -2,7 +2,7 @@
 // Zero-JS static & native-platform primitives (`0 KB` client JS!).
 // Emit only semantic `data-ui`, `data-part`, `data-variant`, `data-tone`, `data-layout` attributes.
 
-import type { KayChild } from 'kay'
+import type { Html, KayChild } from 'kay'
 
 export type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger'
 export type ButtonVariant = 'solid' | 'outline' | 'ghost'
@@ -84,14 +84,152 @@ export interface FieldProps {
   children?: KayChild | undefined
 }
 
+interface FieldControlWiring {
+  id: string
+  describedBy: string | undefined
+  invalid: boolean
+  required: boolean
+}
+
+function escapeAttrValue(str: string): string {
+  return str
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+function mergeTokenAttr(existing: string | null | undefined, addition: string): string {
+  const tokens = (existing ?? '').split(/\s+/).filter(Boolean)
+  for (const tok of addition.split(/\s+/).filter(Boolean)) {
+    if (!tokens.includes(tok))
+      tokens.push(tok)
+  }
+  return tokens.join(' ')
+}
+
+function wireFieldHtml(html: string, wiring: FieldControlWiring): string {
+  let matched = false
+  const patchTag = (full: string, tag: string, rawAttrs: string, selfClose: string): string => {
+    const lowerTag = tag.toLowerCase()
+    if (lowerTag === 'input' && /\btype\s*=\s*(?:"hidden"|'hidden'|hidden\b)/i.test(rawAttrs))
+      return full
+    if (matched)
+      return full
+    matched = true
+
+    let attrs = rawAttrs
+    if (!/\bid\s*=/i.test(attrs))
+      attrs += ` id="${escapeAttrValue(wiring.id)}"`
+
+    if (wiring.describedBy) {
+      const descRe = /(\baria-describedby\s*=\s*")([^"]*)(")/i
+      if (descRe.test(attrs))
+        attrs = attrs.replace(descRe, (_, p1: string, cur: string, p3: string) => `${p1}${escapeAttrValue(mergeTokenAttr(cur, wiring.describedBy!))}${p3}`)
+      else
+        attrs += ` aria-describedby="${escapeAttrValue(wiring.describedBy)}"`
+    }
+
+    if (wiring.invalid && !/\baria-invalid\s*=/i.test(attrs))
+      attrs += ' aria-invalid="true"'
+
+    if (wiring.required) {
+      if ((lowerTag === 'input' || lowerTag === 'textarea' || lowerTag === 'select') && !/\brequired(?:\s|=|$)/i.test(attrs))
+        attrs += ' required'
+      if (!/\baria-required\s*=/i.test(attrs))
+        attrs += ' aria-required="true"'
+    }
+
+    return `<${tag}${attrs}${selfClose}>`
+  }
+
+  const nativePatched = html.replace(/<(input|textarea|select)\b([^>]*?)(\/?)>/gi, patchTag)
+  if (matched)
+    return nativePatched
+
+  // Fallback for custom controls (e.g. role="combobox" / role="textbox")
+  return html.replace(/<([a-z][\w-]*)\b([^>]*\brole\s*=\s*["'](?:combobox|textbox|listbox|spinbutton)["'][^>]*?)(\/?)>/i, patchTag)
+}
+
+function wireFieldElement(el: Element, wiring: FieldControlWiring): void {
+  if (!el.hasAttribute('id'))
+    el.setAttribute('id', wiring.id)
+  if (wiring.describedBy)
+    el.setAttribute('aria-describedby', mergeTokenAttr(el.getAttribute('aria-describedby'), wiring.describedBy))
+  if (wiring.invalid && !el.hasAttribute('aria-invalid'))
+    el.setAttribute('aria-invalid', 'true')
+  if (wiring.required) {
+    const tag = el.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT')
+      el.setAttribute('required', '')
+    if (!el.hasAttribute('aria-required'))
+      el.setAttribute('aria-required', 'true')
+  }
+}
+
+function findFieldControlInNode(node: Node): Element | null {
+  if (node.nodeType === 1) {
+    const el = node as Element
+    const tag = el.tagName
+    if ((tag === 'INPUT' && el.getAttribute('type')?.toLowerCase() !== 'hidden') || tag === 'TEXTAREA' || tag === 'SELECT')
+      return el
+    const found = el.querySelector('input:not([type="hidden"]), textarea, select, [role="combobox"], [role="textbox"]')
+    if (found !== null)
+      return found
+  }
+  else if (node.nodeType === 11) {
+    const frag = node as DocumentFragment
+    return frag.querySelector('input:not([type="hidden"]), textarea, select, [role="combobox"], [role="textbox"]')
+  }
+  return null
+}
+
+const RAW_HTML_BRAND = Symbol.for('kay.html')
+
+function wireFieldChildren(children: KayChild, wiring: FieldControlWiring): KayChild {
+  if (children == null || typeof children === 'boolean' || typeof children === 'string' || typeof children === 'number')
+    return children
+  if (Array.isArray(children)) {
+    let done = false
+    return children.map((child) => {
+      if (done)
+        return child
+      const next = wireFieldChildren(child, wiring)
+      if (next !== child)
+        done = true
+      return next
+    })
+  }
+  if (typeof children === 'object' && '__html' in children && (children as unknown as Record<symbol, unknown>)[RAW_HTML_BRAND] === true) {
+    const src = (children as Html).__html
+    const patched = wireFieldHtml(src, wiring)
+    return patched === src ? children : ({ [RAW_HTML_BRAND]: true, __html: patched } as unknown as Html)
+  }
+  if (typeof Node !== 'undefined' && children instanceof Node) {
+    const ctrl = findFieldControlInNode(children)
+    if (ctrl !== null)
+      wireFieldElement(ctrl, wiring)
+    return children
+  }
+  return children
+}
+
 export function Field({ id, label, hint, error, required, class: cls, children }: FieldProps) {
+  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
+  const wiredChildren = wireFieldChildren(children, {
+    id,
+    describedBy,
+    invalid: Boolean(error),
+    required: Boolean(required),
+  })
+
   return (
     <div data-ui="field" data-invalid={error ? 'true' : undefined} class={cls}>
       <label data-part="label" for={id}>
         {label}
         {required && <span aria-hidden="true"> *</span>}
       </label>
-      {children}
+      {wiredChildren}
       {hint && !error && <p data-part="hint" id={`${id}-hint`}>{hint}</p>}
       {error && <p data-part="error" id={`${id}-error`} role="alert">{error}</p>}
     </div>

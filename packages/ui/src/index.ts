@@ -1,8 +1,20 @@
 // @kayjs/ui — Platform-first headless primitives + pure CSS Style Grammars.
 // Zero JS recipes, zero Tailwind lock-in, zero custom compiler syntax.
 
-export { createDataTable, createDialog, createTabs, toast } from './behaviors'
-export type { DataTableOptions, DataTableState, DialogBehavior, TabsBehavior, ToastItem } from './behaviors'
+export {
+  createDataTable,
+  createDialog,
+  createTabs,
+  findFirstEnabledIndex,
+  findLastEnabledIndex,
+  findNextEnabledIndex,
+  handleListKeyDown,
+  isDialogBackdropClick,
+  nextUiId,
+  syncDialogOpen,
+  toast,
+} from './behaviors'
+export type { DataTableOptions, DataTableState, DialogBehavior, ListNavigationOptions, TabsBehavior, ToastItem } from './behaviors'
 export { CommandPalette } from './CommandPalette'
 export type { CommandItem, CommandPaletteProps } from './CommandPalette'
 export { DataTable } from './DataTable'

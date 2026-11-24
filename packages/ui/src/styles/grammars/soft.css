@@ -10,11 +10,13 @@
     --ui-surface: light-dark(#ffffff, #191c22);
     --ui-surface-2: light-dark(#eef1f6, #232831);
     --ui-ink: light-dark(#181c24, #eef1f6);
-    --ui-muted: light-dark(#646c7a, #949dad);
-    --ui-accent: light-dark(#4f46e5, #818cf8);
-    --ui-success: light-dark(#15803d, #4ade80);
-    --ui-warning: light-dark(#b45309, #fbbf24);
-    --ui-danger: light-dark(#dc2626, #f87171);
+    --ui-muted: light-dark(#5d6573, #949dad);
+    --ui-line-strong: light-dark(#7c8494, #6d7585);
+    --ui-accent: light-dark(#4f46e5, #919bfa);
+    --ui-on-accent: light-dark(#ffffff, #101216);
+    --ui-success: light-dark(#116630, #4ade80);
+    --ui-warning: light-dark(#8f420a, #fbbf24);
+    --ui-danger: light-dark(#b91c1c, #f87171);
     --ui-font-body: ui-sans-serif, system-ui, -apple-system, sans-serif;
     --ui-radius: 12px;
     --ui-pill: 999px;
@@ -41,15 +43,15 @@
     &:disabled { opacity: 0.45; cursor: not-allowed; }
     &[data-tone="accent"] {
       background: var(--ui-accent);
-      color: #fff;
-      &:hover:not(:disabled) { background: var(--ui-accent); color: #fff; filter: brightness(1.06); }
+      color: var(--ui-on-accent);
+      &:hover:not(:disabled) { background: var(--ui-accent); color: var(--ui-on-accent); filter: brightness(1.06); }
     }
     &[data-tone="danger"] {
       background: var(--ui-danger);
-      color: #fff;
-      &:hover:not(:disabled) { background: var(--ui-danger); color: #fff; filter: brightness(1.06); }
+      color: var(--ui-on-accent);
+      &:hover:not(:disabled) { background: var(--ui-danger); color: var(--ui-on-accent); filter: brightness(1.06); }
     }
-    &[data-variant="outline"] { background: transparent; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ui-ink) 18%, transparent); }
+    &[data-variant="outline"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ui-line-strong); }
     &[data-variant="ghost"] { background: transparent; }
     &[data-size="sm"] { font-size: 0.8rem; padding: 0.45rem 0.9rem; }
     &[data-size="lg"] { font-size: 1rem; padding: 0.85rem 1.5rem; }
@@ -101,7 +103,7 @@
       font: 400 0.95rem/1.4 var(--ui-font-body);
       color: var(--ui-ink);
       background: var(--ui-surface-2);
-      border: 1.5px solid transparent;
+      border: 1.5px solid var(--ui-line-strong);
       border-radius: 10px;
       padding: 0.6rem 0.9rem;
     }
@@ -154,7 +156,8 @@
     background: var(--ui-surface);
     color: var(--ui-ink);
     box-shadow: 0 20px 50px rgb(0 0 0 / 0.2);
-    padding: 1.5rem;
+    padding: 0;
+    & > [data-part="panel"] { padding: 1.5rem; }
     & [data-part="title"] { margin: 0 0 0.5rem; font-size: 1.2rem; font-weight: 700; }
   }
 
@@ -235,6 +238,9 @@
     background: var(--ui-surface);
     color: var(--ui-ink);
     box-shadow: 0 20px 50px rgb(0 0 0 / 0.2);
+    padding: 0;
+  }
+  dialog[data-ui="drawer"] > [data-part="panel"] {
     padding: 1.5rem;
   }
   dialog[data-ui="command"] {

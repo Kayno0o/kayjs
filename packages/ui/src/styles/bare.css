@@ -26,6 +26,21 @@
     outline-offset: 2px;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --ui-motion: 0.01ms;
+    }
+    [data-ui],
+    [data-ui] *,
+    [data-ui] *::before,
+    [data-ui] *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   /* Touch-friendly targets & iOS 16px input floor on small viewports */
   @media (max-width: 600px) {
     [data-ui="button"],
@@ -89,6 +104,14 @@
   }
 
   /* Native top-layer & overlay positioning */
+  dialog[data-ui="dialog"],
+  dialog[data-ui="drawer"],
+  dialog[data-ui="command"] {
+    padding: 0;
+  }
+  dialog[data-ui="drawer"] > [data-part="panel"] {
+    min-block-size: 100%;
+  }
   dialog[data-ui="dialog"],
   dialog[data-ui="command"] {
     margin: auto;

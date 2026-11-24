@@ -17,6 +17,7 @@ export interface DataTableProps {
   searchable?: boolean | undefined
   selectable?: boolean | undefined
   placeholder?: string | undefined
+  searchLabel?: string | undefined
 }
 
 export function DataTable({
@@ -27,6 +28,7 @@ export function DataTable({
   searchable = true,
   selectable = false,
   placeholder = 'Filter rows...',
+  searchLabel = 'Search',
 }: DataTableProps) {
   const table = createDataTable({
     rows: () => rows,
@@ -42,6 +44,7 @@ export function DataTable({
           <input
             data-part="search"
             type="search"
+            aria-label={searchLabel}
             placeholder={placeholder}
             value={table.query.value}
             onInput={(e) => {

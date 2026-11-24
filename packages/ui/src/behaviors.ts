@@ -5,6 +5,148 @@ import type { ReadonlySignal, Signal } from 'kay'
 import type { Tone } from './static'
 import { computed, selector, signal } from 'kay'
 
+// ---- Stable unique IDs for ARIA wiring ----
+
+let uiIdSeq = 0
+
+export function nextUiId(prefix: string): string {
+  return `${prefix}-${++uiIdSeq}`
+}
+
+// ---- Shared listbox / menu keyboard navigation ----
+
+export function findFirstEnabledIndex<T>(items: readonly T[], isDisabled?: (item: T) => boolean): number {
+  for (let i = 0; i < items.length; i++) {
+    if (!isDisabled?.(items[i]!))
+      return i
+  }
+  return -1
+}
+
+export function findLastEnabledIndex<T>(items: readonly T[], isDisabled?: (item: T) => boolean): number {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (!isDisabled?.(items[i]!))
+      return i
+  }
+  return -1
+}
+
+export function findNextEnabledIndex<T>(
+  items: readonly T[],
+  current: number,
+  delta: 1 | -1,
+  isDisabled?: (item: T) => boolean,
+): number {
+  const len = items.length
+  if (len === 0)
+    return -1
+  let idx = current < 0 || current >= len ? (delta === 1 ? -1 : len) : current
+  for (let step = 0; step < len; step++) {
+    idx = (idx + delta + len) % len
+    if (!isDisabled?.(items[idx]!))
+      return idx
+  }
+  return -1
+}
+
+export interface ListNavigationOptions<T> {
+  items: () => readonly T[]
+  activeIndex: Signal<number>
+  isDisabled?: ((item: T) => boolean) | undefined
+  onSelect: (item: T, index: number) => void
+  onClose: (returnFocus?: boolean) => void
+  selectOnSpace?: boolean | undefined
+}
+
+/** Shared keyboard handler for ARIA menu / listbox / combobox popups (ArrowUp/Down, Home/End, Enter/Space, Escape, Tab). */
+export function handleListKeyDown<T>(e: KeyboardEvent, opts: ListNavigationOptions<T>): boolean {
+  const list = opts.items()
+  if (e.key === 'Escape') {
+    opts.onClose(true)
+    return true
+  }
+  if (e.key === 'Tab') {
+    // Close without preventing default so focus naturally moves on without trapping.
+    opts.onClose(false)
+    return true
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    opts.activeIndex.value = findNextEnabledIndex(list, opts.activeIndex.value, 1, opts.isDisabled)
+    return true
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    opts.activeIndex.value = findNextEnabledIndex(list, opts.activeIndex.value, -1, opts.isDisabled)
+    return true
+  }
+  if (e.key === 'Home') {
+    e.preventDefault()
+    opts.activeIndex.value = findFirstEnabledIndex(list, opts.isDisabled)
+    return true
+  }
+  if (e.key === 'End') {
+    e.preventDefault()
+    opts.activeIndex.value = findLastEnabledIndex(list, opts.isDisabled)
+    return true
+  }
+  if (e.key === 'Enter' || (opts.selectOnSpace !== false && e.key === ' ')) {
+    const idx = opts.activeIndex.value
+    const active = idx >= 0 && idx < list.length ? list[idx] : undefined
+    if (active !== undefined && !opts.isDisabled?.(active)) {
+      e.preventDefault()
+      opts.onSelect(active, idx)
+      return true
+    }
+  }
+  return false
+}
+
+// ---- Shared native <dialog> sync & backdrop click helpers ----
+
+/** Syncs a native `<dialog>` element's modal state, handling initial `open={signal(true)}` on mount/hydration. */
+export function syncDialogOpen(
+  el: HTMLDialogElement | undefined,
+  isOpen: Signal<boolean>,
+  wantOpen: boolean,
+  onOpened?: () => void,
+): void {
+  if (el === undefined)
+    return
+  if (wantOpen) {
+    if (!el.open) {
+      try {
+        el.showModal()
+        onOpened?.()
+      }
+      catch {
+        // In real browsers, showModal() throws InvalidStateError until the element is connected to the document.
+        // Deferring to a microtask runs right after mount() appends the node into its container.
+        queueMicrotask(() => {
+          if (isOpen.peek() && !el.open && el.isConnected) {
+            el.showModal()
+            onOpened?.()
+          }
+        })
+      }
+    }
+  }
+  else if (el.open) {
+    el.close()
+  }
+}
+
+/** Returns true only when a click on `<dialog>` targeted the backdrop outside its inner panel. */
+export function isDialogBackdropClick(e: MouseEvent, dialogEl: HTMLDialogElement | undefined): boolean {
+  if (dialogEl === undefined || e.target !== dialogEl)
+    return false
+  const rect = dialogEl.getBoundingClientRect()
+  const hasLayout = rect.width > 0 || rect.height > 0
+  if (!hasLayout)
+    return true
+  return e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom
+}
+
 // ---- Dialog behavior ----
 
 export interface DialogBehavior {

@@ -15,13 +15,14 @@
     --ui-subtext: light-dark(#3a4458, #aab2c3);
     --ui-muted: light-dark(#566176, #7f889c);
     --ui-line: color-mix(in srgb, var(--ui-ink) 12%, transparent);
-    --ui-line-strong: color-mix(in srgb, var(--ui-ink) 22%, transparent);
-    --ui-accent: light-dark(#95580a, #f5b83d);
-    --ui-accent-fill: light-dark(#9a5c00, #f5b83d);
+    --ui-line-strong: light-dark(#6e788a, #656e82);
+    --ui-accent: light-dark(#8a4f06, #f5b83d);
+    --ui-accent-fill: light-dark(#8a4f06, #f5b83d);
+    --ui-on-accent: light-dark(#ffffff, #090c13);
     --ui-info: light-dark(#24648c, #7cc4e8);
     --ui-success: light-dark(#1f6f4a, #7fd8a6);
-    --ui-warning: light-dark(#95580a, #e6c07b);
-    --ui-danger: light-dark(#b42318, #ff6b6b);
+    --ui-warning: light-dark(#8a4f06, #e6c07b);
+    --ui-danger: light-dark(#a81f15, #ff6b6b);
     --ui-font-display: 'Chakra Petch', 'Space Grotesk', system-ui, sans-serif;
     --ui-font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --ui-font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
@@ -139,15 +140,15 @@
     &[data-tone="accent"] {
       background: var(--ui-accent-fill);
       border-color: var(--ui-accent-fill);
-      color: light-dark(#ffffff, #090c13);
+      color: var(--ui-on-accent);
       font-weight: 600;
-      &:hover:not(:disabled) { background: var(--ui-accent-fill); border-color: var(--ui-accent-fill); color: light-dark(#ffffff, #090c13); filter: brightness(1.06); }
+      &:hover:not(:disabled) { background: var(--ui-accent-fill); border-color: var(--ui-accent-fill); color: var(--ui-on-accent); filter: brightness(1.06); }
     }
     &[data-tone="danger"] {
-      background: color-mix(in srgb, var(--ui-danger) 15%, var(--ui-surface));
+      background: color-mix(in srgb, var(--ui-danger) 12%, var(--ui-surface));
       border-color: color-mix(in srgb, var(--ui-danger) 55%, transparent);
       color: var(--ui-danger);
-      &:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-danger) 24%, var(--ui-surface)); border-color: var(--ui-danger); color: var(--ui-danger); }
+      &:hover:not(:disabled) { background: var(--ui-danger); border-color: var(--ui-danger); color: var(--ui-on-accent); }
     }
     &[data-variant="ghost"] {
       background: transparent;
@@ -331,8 +332,9 @@
     border-radius: var(--ui-radius);
     background: var(--ui-surface);
     color: var(--ui-ink);
-    padding: 1.35rem;
+    padding: 0;
     font-family: var(--ui-font-body);
+    & > [data-part="panel"] { padding: 1.35rem; }
     & [data-part="title"] {
       margin: 0 0 0.6rem;
       font: 600 1.25rem/1.25 var(--ui-font-display);
@@ -435,22 +437,27 @@
     background: var(--ui-surface);
     color: var(--ui-ink);
     font-family: var(--ui-font-body);
-    padding: 1.25rem;
+    padding: 0;
   }
   dialog[data-ui="drawer"] {
     border-radius: 0;
+    & > [data-part="panel"] { padding: 1.25rem; }
   }
   dialog[data-ui="command"] {
     padding: 0;
     & [data-part="input"] {
       width: 100%;
       border: 0;
-      border-bottom: 1px solid var(--ui-line);
+      border-bottom: 1px solid var(--ui-line-strong);
       background: var(--ui-paper);
       color: var(--ui-ink);
       padding: 0.72rem 0.95rem;
       font: 400 0.9rem/1.35 var(--ui-font-body);
-      &:focus { outline: none; }
+      &:focus-visible {
+        outline: 2px solid var(--ui-accent);
+        outline-offset: -2px;
+        border-bottom-color: var(--ui-accent);
+      }
     }
     & [data-part="list"] { padding: 0.3rem; }
     & [data-part="item"] {
