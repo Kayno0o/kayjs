@@ -76,11 +76,16 @@ export function definePlugin(plugin: KayPlugin): KayPlugin {
   return plugin
 }
 
-export async function loadConfig(root: string): Promise<KayConfig> {
+let configReloadSeq = 0
+
+export async function loadConfig(root: string, options?: { fresh?: boolean }): Promise<KayConfig> {
   const absRoot = resolve(root)
   const configPath = join(absRoot, 'kay.config.ts')
   if (!existsSync(configPath))
     return {}
-  const mod = await import(configPath) as { default?: KayConfig }
+  const spec = options?.fresh || process.env.KAY_DEV === '1'
+    ? `${configPath}?v=${++configReloadSeq}-${Date.now()}`
+    : configPath
+  const mod = await import(spec) as { default?: KayConfig }
   return mod.default ?? {}
 }

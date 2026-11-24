@@ -6,13 +6,27 @@
 import type { BunPlugin } from 'bun'
 import type { IslandBinding, ModuleAnalysis } from '../compiler/index'
 import type { BuildPluginContext, KayPlugin } from '../plugins/index'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
 import { loadConfig } from '../plugins/index'
 import { actionHash } from '../server/action'
 import { compileExecutable } from './compile'
+
+export interface BuildCache {
+  analyses: Map<string, { mtimeMs: number, size: number, code: string, analysis: ModuleAnalysis }>
+  domCompiled: Map<string, { mtimeMs: number, size: number, code: string }>
+  ssrCompiled: Map<string, { mtimeMs: number, size: number, key: string, code: string }>
+}
+
+export function createBuildCache(): BuildCache {
+  return {
+    analyses: new Map(),
+    domCompiled: new Map(),
+    ssrCompiled: new Map(),
+  }
+}
 
 export interface BuildOptions {
   root: string
@@ -22,6 +36,8 @@ export interface BuildOptions {
   minify?: boolean | undefined
   assetPrefix?: string | undefined
   plugins?: KayPlugin[] | undefined
+  /** Reusable incremental cache for `kay dev` (skips re-parsing/re-compiling unchanged files). */
+  cache?: BuildCache | undefined
   /** Export a static site into dist/static (prerenders all static + paths() routes). */
   static?: boolean | undefined
   /** Run build-time prerendering for routes exporting `prerender = true` (default: true; disabled in `kay dev`). */
@@ -246,17 +262,48 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const hasErrorFile = existsSync(errorSrc)
   const hasNotFoundFile = existsSync(notFoundSrc)
 
-  // Analyze every reachable .tsx and .ts file once
+  // Analyze every reachable .tsx and .ts file once (reusing BuildCache across `kay dev` rebuilds when mtime+size match)
+  const cache = options.cache
   const analyses = new Map<string, ModuleAnalysis>()
   const sources = new Map<string, string>()
+  const fileStamps = new Map<string, { mtimeMs: number, size: number }>()
+
+  function getFileStamp(file: string): { mtimeMs: number, size: number } | undefined {
+    const existing = fileStamps.get(file)
+    if (existing !== undefined)
+      return existing
+    if (cache === undefined)
+      return undefined
+    try {
+      const st = statSync(file)
+      const stamp = { mtimeMs: st.mtimeMs, size: st.size }
+      fileStamps.set(file, stamp)
+      return stamp
+    }
+    catch {
+      return undefined
+    }
+  }
 
   function loadAnalysis(file: string): ModuleAnalysis {
     const existing = analyses.get(file)
     if (existing !== undefined)
       return existing
-    const code = readFileSync(file, 'utf8')
+    const stamp = getFileStamp(file)
+    const cached = stamp !== undefined ? cache?.analyses.get(file) : undefined
+    let code: string
+    let analysis: ModuleAnalysis
+    if (cached !== undefined && cached.mtimeMs === stamp!.mtimeMs && cached.size === stamp!.size) {
+      code = cached.code
+      analysis = cached.analysis
+    }
+    else {
+      code = readFileSync(file, 'utf8')
+      analysis = analyzeModule(file, code)
+      if (cache !== undefined && stamp !== undefined)
+        cache.analyses.set(file, { mtimeMs: stamp.mtimeMs, size: stamp.size, code, analysis })
+    }
     sources.set(file, code)
-    const analysis = analyzeModule(file, code)
     analyses.set(file, analysis)
     for (const imp of analysis.imports) {
       const target = resolveImportPath(file, imp.source)
@@ -461,8 +508,17 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
           let compiled = compiledDomCache.get(args.path)
           if (compiled === undefined) {
-            const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
-            compiled = applyTransforms(compileDom(args.path, raw, { analysis: analyses.get(args.path) }).code, args.path, 'client')
+            const stamp = getFileStamp(args.path)
+            const cachedDom = stamp !== undefined ? cache?.domCompiled.get(args.path) : undefined
+            if (cachedDom !== undefined && cachedDom.mtimeMs === stamp!.mtimeMs && cachedDom.size === stamp!.size) {
+              compiled = cachedDom.code
+            }
+            else {
+              const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
+              compiled = applyTransforms(compileDom(args.path, raw, { analysis: analyses.get(args.path) }).code, args.path, 'client')
+              if (cache !== undefined && stamp !== undefined)
+                cache.domCompiled.set(args.path, { mtimeMs: stamp.mtimeMs, size: stamp.size, code: compiled })
+            }
             compiledDomCache.set(args.path, compiled)
           }
           return { contents: compiled, loader: 'tsx' }
@@ -575,10 +631,10 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           })
         }
         b.onLoad({ filter: /\.tsx$/ }, (args) => {
-          const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
           const analysis = analyses.get(args.path)
           const rawBindings = pageIslandBindings.get(args.path)
           let islandMap: Map<string, IslandBinding> | undefined
+          let islandKey = analysis?.isInteractive ? '1' : '0'
           if (rawBindings !== undefined) {
             islandMap = new Map()
             for (const [localName, target] of rawBindings) {
@@ -589,15 +645,24 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
                   chunk,
                   defaultHydrate: target.defaultHydrate,
                 })
+                islandKey += `|${localName}=${chunk}:${target.defaultHydrate ?? ''}`
               }
             }
           }
+          const stamp = getFileStamp(args.path)
+          const cachedSsr = stamp !== undefined ? cache?.ssrCompiled.get(args.path) : undefined
+          if (cachedSsr !== undefined && cachedSsr.mtimeMs === stamp!.mtimeMs && cachedSsr.size === stamp!.size && cachedSsr.key === islandKey)
+            return { contents: cachedSsr.code, loader: 'tsx' }
+          const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
           const compiled = compileSsr(args.path, raw, {
             analysis,
             islands: islandMap,
             isIsland: analysis?.isInteractive,
           })
-          return { contents: applyTransforms(compiled.code, args.path, 'server'), loader: 'tsx' }
+          const outCode = applyTransforms(compiled.code, args.path, 'server')
+          if (cache !== undefined && stamp !== undefined)
+            cache.ssrCompiled.set(args.path, { mtimeMs: stamp.mtimeMs, size: stamp.size, key: islandKey, code: outCode })
+          return { contents: outCode, loader: 'tsx' }
         })
       },
     }
