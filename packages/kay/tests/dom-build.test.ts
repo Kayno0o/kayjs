@@ -134,12 +134,17 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     writeFileSync(join(dir, 'src/components/MixedBranches.tsx'), `
       import { signal } from 'kay'
 
+      function Pair(props: { on: { value: boolean } }) {
+        return props.on.value ? <><b>B</b><u>U</u></> : <i>I</i>
+      }
+
       export function MixedBranches({ initialArmed = false }: { initialArmed?: boolean }) {
         const armed = signal(initialArmed)
         const svgMode = signal(initialArmed)
         const numMode = signal(initialArmed)
         const nullMode = signal(initialArmed)
         const sibMode = signal(initialArmed)
+        const fragMode = signal(initialArmed)
 
         return (
           <div>
@@ -158,6 +163,10 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
             <button id="sib" onClick={() => { sibMode.value = !sibMode.value }}>
               Prefix {sibMode.value ? 'Remove' : <b>x</b>}
             </button>
+            <button id="frag-toggle" onClick={() => { fragMode.value = !fragMode.value }}>frag</button>
+            <p id="frag-and">{fragMode.value && <><b>B</b><u>U</u></>}<span>end</span></p>
+            <p id="frag-tern">{fragMode.value ? <><b>B</b><u>U</u></> : <i>I</i>}<span>end</span></p>
+            <p id="frag-ins"><Pair on={fragMode} /><span>end</span></p>
             <button id="before-sib" onClick={() => { sibMode.value = !sibMode.value }}>
               {sibMode.value ? 'Remove' : <b>x</b>}<span>!</span>
             </button>
@@ -274,6 +283,16 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       expect(nullBtn2.querySelector('i')?.textContent).toBe('dot')
       nullBtn2.click()
       expect(nullBtn2.textContent).toBe('')
+
+      // A fragment branch hydrated from SSR leaves when toggled, for && and for a ternary
+      const fragAnd = hostTrue.querySelector('#frag-and')!
+      const fragTern = hostTrue.querySelector('#frag-tern')!
+      const fragIns = hostTrue.querySelector('#frag-ins')!
+      expect([fragAnd.textContent, fragTern.textContent, fragIns.textContent]).toEqual(['BUend', 'BUend', 'BUend'])
+      ;(hostTrue.querySelector('#frag-toggle') as HTMLButtonElement).click()
+      expect([fragAnd.textContent, fragTern.textContent, fragIns.textContent]).toEqual(['end', 'Iend', 'Iend'])
+      ;(hostTrue.querySelector('#frag-toggle') as HTMLButtonElement).click()
+      expect([fragAnd.textContent, fragTern.textContent, fragIns.textContent]).toEqual(['BUend', 'BUend', 'BUend'])
 
       // Preceding static text merged with SSR text node stays intact when switching!
       const sibBtn = hostTrue.querySelector('#sib') as HTMLButtonElement

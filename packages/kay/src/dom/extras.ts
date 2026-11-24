@@ -140,6 +140,11 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
     marker = res.marker
     const next = res.result
 
+    if (next == null && res.nodes !== undefined) {
+      current = res.nodes
+      return
+    }
+
     if (next == null || typeof next === 'boolean') {
       clearInserted(current)
       current = null
@@ -259,8 +264,10 @@ export function show(
     const res = claimInsert(parent, marker, () => untrack(() => runWithOwner(owner, fn)))
     marker = res.marker
     const rendered = res.result
-    if (rendered == null || typeof rendered === 'boolean')
+    if (rendered == null || typeof rendered === 'boolean') {
+      nodes = res.nodes ?? []
       return
+    }
 
     if (typeof rendered === 'string' || typeof rendered === 'number') {
       const str = String(rendered)

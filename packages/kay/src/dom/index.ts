@@ -27,29 +27,38 @@ export function claimLoop(parent: Node, fn: () => void, skip = 0): boolean {
   return true
 }
 
-export function claimInsert<T>(parent: Node, marker: Node | null, fn: () => T): { result: T, marker: Node | null, claimed: Node | null } {
+// `nodes` is the SSR range the render claimed through template() (a fragment hydrates to null, so the caller learns its nodes here).
+export function claimInsert<T>(parent: Node, marker: Node | null, fn: () => T): { result: T, marker: Node | null, claimed: Node | null, nodes: Node[] | undefined } {
   if (!hydrating)
-    return { result: fn(), marker, claimed: null }
+    return { result: fn(), marker, claimed: null, nodes: undefined }
 
-  let claimed: Node | null = marker !== null ? marker : parent.lastChild
-  let nextMarker = marker
-  if (marker !== null && marker.nodeType !== 8) {
-    const anchor = document.createComment('')
-    ;(anchor as unknown as { __kayAnchor?: boolean }).__kayAnchor = true
-    parent.insertBefore(anchor, marker.nextSibling)
-    nextMarker = anchor
-  }
-  else if (marker !== null) {
-    claimed = null
-  }
+  const claimed: Node | null = marker === null ? parent.lastChild : marker.nodeType === 8 ? null : marker
   const prevNode = hydrateNode
   hydrateNode = claimed
+  let result: T
+  let end: Node | null
   try {
-    return { result: fn(), marker: nextMarker, claimed }
+    result = fn()
+    end = hydrateNode
   }
   finally {
     hydrateNode = prevNode
   }
+  if (marker === null || claimed === null)
+    return { result, marker, claimed, nodes: undefined }
+
+  // The anchor goes after the claimed range; a text value or a nested insert moves no cursor and claims the one node.
+  const consumed = end !== claimed
+  const anchor = document.createComment('')
+  ;(anchor as unknown as { __kayAnchor?: boolean }).__kayAnchor = true
+  parent.insertBefore(anchor, consumed ? end : claimed.nextSibling)
+  let nodes: Node[] | undefined
+  if (consumed) {
+    nodes = []
+    for (let n: Node | null = claimed; n !== null && n !== anchor; n = n.nextSibling)
+      nodes.push(n)
+  }
+  return { result, marker: anchor, claimed, nodes }
 }
 
 export function hydrate(container: Element, render: () => Node | DocumentFragment | null): () => void {
