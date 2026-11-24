@@ -355,4 +355,50 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     expect(chunkText('src/components/ui.tsx#default')).toContain('Ui as default')
     expect(chunkText('src/components/ui.tsx#Button')).toContain('Button as default')
   })
+
+  test('a plain component rendered inside an island hydrates with the island', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-static-in-island-'))
+    tempDirs.push(dir)
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/components/Total.tsx'), `
+      export function Total(props: { n: number, m: string }) {
+        return <p>Total {props.n} EUR <b>{props.m}</b></p>
+      }
+    `)
+    writeFileSync(join(dir, 'src/components/Cart.tsx'), `
+      import { signal } from 'kay'
+      import { Total } from './Total'
+      export default function Cart() {
+        const n = signal(1)
+        return <div><button type="button" onClick={() => n.value++}>add</button><Total n={n.value} m="net" /></div>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import Cart from '../components/Cart'
+      export default function Page() { return <main><Cart /><p>Total {1 + 1} static</p></main> }
+    `)
+
+    const manifest = await build({ root: dir, minify: false })
+    const app = await createServer({ root: dir })
+    const html = await (await app.handle(new Request('http://localhost/'))).text()
+    const ssr = html.match(/<kay-island[^>]*>([\s\S]*?)<\/kay-island>/)![1]!
+
+    GlobalRegistrator.register({ settings: { handleDisabledFileLoadingAsSuccess: true } })
+    try {
+      const { hydrate } = await import(join(dir, 'dist/client', manifest.runtimeScript!.replace('/_kay/', ''))) as { hydrate: (el: Element, fn: () => Node | null) => () => void }
+      const Cart = (await import(join(dir, 'dist/client', manifest.islands[join(dir, 'src/components/Cart.tsx#default')]!.replace('/_kay/', '')))).default as () => Node | null
+      const host = document.createElement('div')
+      host.innerHTML = ssr
+      document.body.appendChild(host)
+      const dispose = hydrate(host, () => Cart())
+      expect(host.querySelector('p')!.textContent).toBe('Total 1 EUR net')
+      host.querySelector('button')!.click()
+      expect(host.querySelector('p')!.textContent).toBe('Total 2 EUR net')
+      dispose()
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+    }
+  })
 })

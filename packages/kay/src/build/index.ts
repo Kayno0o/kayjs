@@ -456,6 +456,21 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   for (const [, target] of islandTargets)
     collectIslandCss(target.file)
 
+  // The client compiles every module an island imports to hydrate against SSR markers, so their SSR must emit them too.
+  const islandReach = new Set<string>()
+  const reachStack = [...islandTargets.values()].map(t => t.file)
+  while (reachStack.length > 0) {
+    const file = reachStack.pop()!
+    if (islandReach.has(file))
+      continue
+    islandReach.add(file)
+    for (const imp of analyses.get(file)?.imports ?? []) {
+      const target = resolveImportPath(file, imp.source)
+      if (target !== undefined && target.endsWith('.tsx'))
+        reachStack.push(target)
+    }
+  }
+
   const standaloneCssSet = new Set<string>(pluginCssFiles)
   for (const [file, analysis] of analyses) {
     for (const imp of analysis.imports) {
@@ -777,7 +792,8 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           const analysis = analyses.get(args.path)
           const rawBindings = pageIslandBindings.get(args.path)
           let islandMap: Map<string, IslandBinding> | undefined
-          let islandKey = analysis?.isInteractive ? '1' : '0'
+          const inIsland = analysis?.isInteractive === true || islandReach.has(args.path)
+          let islandKey = inIsland ? '1' : '0'
           if (rawBindings !== undefined) {
             islandMap = new Map()
             for (const [localName, target] of rawBindings) {
@@ -800,7 +816,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           const compiled = compileSsr(args.path, raw, {
             analysis,
             islands: islandMap,
-            isIsland: analysis?.isInteractive,
+            isIsland: inIsland,
           })
           const outCode = applyTransforms(compiled.code, args.path, 'server')
           if (cache !== undefined && stamp !== undefined)
