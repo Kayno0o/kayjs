@@ -64,6 +64,7 @@ export interface KayConfig {
   assetPrefix?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
+  compress?: boolean | undefined
   plugins?: KayPlugin[] | undefined
 }
 

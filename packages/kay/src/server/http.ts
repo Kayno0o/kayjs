@@ -5,7 +5,7 @@ import type { KayPlugin } from '../plugins/index'
 import type { Cookies } from './cookies'
 import type { SecurityHeadersOptions } from './security'
 import { CookieStore } from './cookies'
-import { applySecurityHeaders } from './security'
+import { buildSecurityHeaderEntries } from './security'
 
 export interface ServerOptions {
   root: string
@@ -15,6 +15,7 @@ export interface ServerOptions {
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
+  compress?: boolean | undefined
   plugins?: KayPlugin[] | undefined
 }
 
@@ -46,10 +47,12 @@ export interface EmbeddedServerConfig {
   publicAssets?: Record<string, EmbeddedBody> | undefined
   publicEtags?: Record<string, string> | undefined
   prerendered: Record<string, string>
+  prerenderedFiles?: Record<string, string> | undefined
   assetPrefix?: string | undefined
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
+  compress?: boolean | undefined
   plugins?: KayPlugin[] | undefined
 }
 
@@ -114,10 +117,40 @@ export function makeRequestContext(request: Request, params: Record<string, stri
   return { ctx, cookieStore }
 }
 
-export function finalizeResponse(res: Response, cookieStore: CookieStore, security: SecurityHeadersOptions | false | undefined): Response {
-  const headers = new Headers(res.headers)
-  cookieStore.applyTo(headers)
-  if (security !== false)
-    applySecurityHeaders(headers, security)
-  return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+export function finalizeResponse(
+  res: Response,
+  cookieStore: CookieStore,
+  securityEntries: readonly [string, string][] | SecurityHeadersOptions | false | undefined,
+): Response {
+  const entries: readonly [string, string][] = Array.isArray(securityEntries)
+    ? securityEntries
+    : buildSecurityHeaderEntries(securityEntries as SecurityHeadersOptions | false | undefined)
+
+  if (!cookieStore.hasChanges && entries.length === 0)
+    return res
+
+  // Fast path: mutate Response.headers in place (zero Response/Headers copy in Bun!)
+  try {
+    const h = res.headers
+    if (cookieStore.hasChanges)
+      cookieStore.applyTo(h)
+    for (let i = 0; i < entries.length; i++) {
+      const [k, v] = entries[i]!
+      if (!h.has(k))
+        h.set(k, v)
+    }
+    return res
+  }
+  catch {
+    // Fallback for immutable headers (e.g. proxied upstream fetch Response)
+    const headers = new Headers(res.headers)
+    if (cookieStore.hasChanges)
+      cookieStore.applyTo(headers)
+    for (let i = 0; i < entries.length; i++) {
+      const [k, v] = entries[i]!
+      if (!headers.has(k))
+        headers.set(k, v)
+    }
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+  }
 }

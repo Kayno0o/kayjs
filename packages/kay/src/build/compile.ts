@@ -67,18 +67,21 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     embeddedPublic.push(`${JSON.stringify(rel)}: ${v}`)
     embeddedPublicEtags.push(`${JSON.stringify(rel)}: ${JSON.stringify(etag)}`)
   }
-  const embeddedPrerendered: string[] = []
+  const embeddedPrerenderedFiles: string[] = []
+  let preIdx = 0
   for (const r of manifest.routes) {
     if (r.prerendered) {
       for (const [, relHtml] of Object.entries(r.prerendered)) {
-        const html = readFileSync(join(outDir, relHtml), 'utf8')
-        embeddedPrerendered.push(`${JSON.stringify(relHtml)}: ${JSON.stringify(html)}`)
+        const abs = join(outDir, relHtml)
+        const v = `_r${preIdx++}`
+        imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
+        embeddedPrerenderedFiles.push(`${JSON.stringify(relHtml)}: ${v}`)
       }
     }
   }
 
   const cfgSpread = hasConfig
-    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins`
+    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins, compress: _kayConfig?.compress`
     : ''
 
   // Default NODE_ENV to 'production' in compiled binaries (dynamic key avoids Bun.build constant-folding).
@@ -91,8 +94,9 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     `const assets = { ${embeddedAssets.join(', ')} };`,
     `const publicAssets = { ${embeddedPublic.join(', ')} };`,
     `const publicEtags = { ${embeddedPublicEtags.join(', ')} };`,
-    `const prerendered = { ${embeddedPrerendered.join(', ')} };`,
-    `const app = await createServerFromEmbedded({ manifest, modules, assets, publicAssets, publicEtags, prerendered, assetPrefix: ${JSON.stringify(assetPrefix)}${cfgSpread} });`,
+    `const prerendered = {};`,
+    `const prerenderedFiles = { ${embeddedPrerenderedFiles.join(', ')} };`,
+    `const app = await createServerFromEmbedded({ manifest, modules, assets, publicAssets, publicEtags, prerendered, prerenderedFiles, assetPrefix: ${JSON.stringify(assetPrefix)}${cfgSpread} });`,
     `const port = Number(process.env.PORT ?? 3000);`,
     `const server = app.serve(port);`,
     `console.log(\`kay server listening on http://localhost:\${server.port}\`);`,

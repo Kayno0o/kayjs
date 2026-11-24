@@ -20,6 +20,10 @@ test *args:
 bench:
 	bun run bench
 
+# Run the compiled server footprint & compression benchmark
+bench-server:
+	bun run bench:server
+
 # Start the docs site dev server
 docs-dev:
 	cd docs && bun run dev

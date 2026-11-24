@@ -58,6 +58,22 @@ export function verifyOrigin(request: Request, trustedOrigins?: ReadonlySet<stri
   return { ok: true }
 }
 
+export function buildSecurityHeaderEntries(options: SecurityHeadersOptions | false | undefined): readonly [string, string][] {
+  if (options === false)
+    return []
+  const opts = options ?? {}
+  const entries: [string, string][] = []
+  if (opts.contentTypeOptions ?? true)
+    entries.push(['x-content-type-options', 'nosniff'])
+  if (opts.frameOptions !== false)
+    entries.push(['x-frame-options', opts.frameOptions ?? 'SAMEORIGIN'])
+  if (opts.referrerPolicy !== false)
+    entries.push(['referrer-policy', opts.referrerPolicy ?? 'strict-origin-when-cross-origin'])
+  if (opts.csp !== undefined)
+    entries.push(['content-security-policy', opts.csp])
+  return entries
+}
+
 export function applySecurityHeaders(headers: Headers, options: SecurityHeadersOptions = {}): void {
   if ((options.contentTypeOptions ?? true) && !headers.has('x-content-type-options'))
     headers.set('x-content-type-options', 'nosniff')

@@ -83,6 +83,10 @@ export class CookieStore implements Cookies {
     return Object.fromEntries(this.#values)
   }
 
+  get hasChanges(): boolean {
+    return this.#headers.length > 0
+  }
+
   applyTo(headers: Headers): void {
     for (let i = 0; i < this.#headers.length; i++)
       headers.append('set-cookie', this.#headers[i]!)
