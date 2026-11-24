@@ -61,6 +61,21 @@ describe('TSX compiler', () => {
     expect(out.code).toContain('for (let ')
   })
 
+  test('rewrites destructured props read outside JSX in a statement that also holds JSX', () => {
+    const { code } = compileDom('Toggle.tsx', `
+      export function A({ on }: { on: boolean }) { return on ? <b>a</b> : <i>a</i> }
+      export function B({ on }: { on: boolean }) { if (on) return <b>b</b>; return <i>b</i> }
+      export const C = ({ on, label = 'c' }: { on: boolean, label?: string }) => on ? <b>{label}</b> : <i>c</i>
+      export function D({ on }: { on: boolean }) { const list = [1].map(on => <b>{on}</b>); return on ? list : null }
+    `)
+    expect(code).toContain('{ return __p.on ? _t')
+    expect(code).toContain('{ if (__p.on) return _t')
+    expect(code).toContain('=> __p.on ? (() =>')
+    expect(code).toContain('(__p.label === undefined ? \'c\' : __p.label)')
+    expect(code).toContain('[1].map(on =>')
+    expect(code).toContain('return __p.on ? list : null')
+  })
+
   test('compiles DOM with template cloning, destructured props, delegated events, and keyed .map()', () => {
     const counterCode = `
       import { signal } from 'kay'

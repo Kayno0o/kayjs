@@ -1001,29 +1001,24 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           }
           return undefined
         })
-        if (!stmtHasJsx) {
-          const active = new Map<string, string>()
-          for (const [k, v] of propRewrites) {
-            if (!shadowed.has(k))
-              active.set(k, v)
-          }
-          if (active.size > 0)
-            editor.replace(stmt.start, stmt.end, rewriteFreeIdentifiers(code, stmt, active))
+        const active = new Map<string, string>()
+        for (const [k, v] of propRewrites) {
+          if (!shadowed.has(k))
+            active.set(k, v)
         }
-        else {
-          walk(stmt, (child) => {
-            if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
-              editor.replace(child.start, child.end, compileRootJsx(child, propRewrites))
-              return false
-            }
-            return undefined
-          })
-        }
+        // A statement holding JSX also reads props around it (`if (on) return <b/>`): compile both in one pass.
+        if (stmtHasJsx)
+          editor.replace(stmt.start, stmt.end, compileExpression(stmt, active))
+        else if (active.size > 0)
+          editor.replace(stmt.start, stmt.end, rewriteFreeIdentifiers(code, stmt, active))
         if (stmt.type === 'VariableDeclaration') {
           for (const d of stmt.declarations as AstNode[])
             collectPatternNames(d.id, shadowed)
         }
       }
+    }
+    else if (propRewrites.size > 0) {
+      editor.replace(fn.body.start, fn.body.end, compileExpression(fn.body, propRewrites))
     }
     else {
       walk(fn.body, (child) => {
