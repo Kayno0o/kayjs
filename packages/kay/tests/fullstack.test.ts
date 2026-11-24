@@ -381,4 +381,89 @@ describe('Kay v2 Milestone 2 full-stack features', () => {
     expect(existsSync(`${homeHtmlPath}.br`)).toBe(true)
     expect(existsSync(`${homeHtmlPath}.gz`)).toBe(true)
   })
+
+  test('progressive form action redirects 303 back to referer behind HTTPS proxy or trustedOrigins, never open-redirects', async () => {
+    const app = await testApp({
+      root: fixtureDir,
+      outDir: 'dist-proxy',
+      trustedOrigins: ['https://trusted.example'],
+    })
+    const notesHtml = await (await app.get('/notes')).text()
+    const actionUrl = /action="(\/_kay\/action\/[^"]+)"/.exec(notesHtml)![1]!
+
+    // 1. Both X-Forwarded-Proto and X-Forwarded-Host sent
+    const bothFwd = await app.submit(actionUrl, { title: 'Via Proxy' }, {
+      'origin': 'https://artifact.localhost',
+      'referer': 'https://artifact.localhost/notes?page=2',
+      'x-forwarded-proto': 'https',
+      'x-forwarded-host': 'artifact.localhost',
+    })
+    expect(bothFwd.status).toBe(303)
+    expect(bothFwd.headers.get('location')).toBe('https://artifact.localhost/notes?page=2')
+
+    // 2. Only X-Forwarded-Proto sent with Host preserved
+    const protoOnly = await app.submit(actionUrl, { title: 'Proto Only' }, {
+      'host': 'artifact.localhost',
+      'origin': 'https://artifact.localhost',
+      'referer': 'https://artifact.localhost/notes',
+      'x-forwarded-proto': 'https',
+    })
+    expect(protoOnly.status).toBe(303)
+    expect(protoOnly.headers.get('location')).toBe('https://artifact.localhost/notes')
+
+    // 3. Neither forwarded header sent, referer origin in trustedOrigins
+    const trusted = await app.submit(actionUrl, { title: 'Trusted' }, {
+      'origin': 'https://trusted.example',
+      'referer': 'https://trusted.example/dashboard',
+    })
+    expect(trusted.status).toBe(303)
+    expect(trusted.headers.get('location')).toBe('https://trusted.example/dashboard')
+
+    // 4. Referer from an untrusted origin still gets JSON, never an open redirect
+    const untrustedRef = await app.submit(actionUrl, { title: 'Untrusted Ref' }, {
+      'origin': 'http://localhost',
+      'referer': 'https://evil.example/phish',
+    })
+    expect(untrustedRef.status).toBe(200)
+    expect(untrustedRef.headers.get('location')).toBeNull()
+    expect(await untrustedRef.json()).toMatchObject({ ok: true, data: { title: 'Untrusted Ref' } })
+  })
+
+  test('build() and testApp() with outDir outside root resolve routes npm imports and kay/build', async () => {
+    const appDir = mkdtempSync(join(tmpdir(), 'kay-v2-ext-app-'))
+    const externalOutDir = mkdtempSync(join(tmpdir(), 'kay-v2-ext-out-'))
+    try {
+      mkdirSync(join(appDir, 'node_modules/fake-ext-pkg'), { recursive: true })
+      writeFileSync(
+        join(appDir, 'node_modules/fake-ext-pkg/package.json'),
+        JSON.stringify({ name: 'fake-ext-pkg', version: '1.0.0', type: 'module', main: './index.js' }),
+      )
+      writeFileSync(
+        join(appDir, 'node_modules/fake-ext-pkg/index.js'),
+        'export function greet(name) { return `ext:${name}` }\n',
+      )
+
+      mkdirSync(join(appDir, 'src/routes'), { recursive: true })
+      writeFileSync(
+        join(appDir, 'src/routes/index.tsx'),
+        `import { greet } from 'fake-ext-pkg'
+import { resolveKaySpecifier } from 'kay/build'
+
+export default function Home() {
+  const hasBuild = typeof resolveKaySpecifier === 'function'
+  return <main>{greet('world')}:{String(hasBuild)}</main>
+}
+`,
+      )
+
+      const app = await testApp({ root: appDir, outDir: externalOutDir })
+      const res = await app.get('/')
+      expect(res.status).toBe(200)
+      expect(await res.text()).toContain('<main>ext:world:true</main>')
+    }
+    finally {
+      rmSync(appDir, { recursive: true, force: true })
+      rmSync(externalOutDir, { recursive: true, force: true })
+    }
+  })
 })

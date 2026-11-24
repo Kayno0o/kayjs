@@ -7,7 +7,7 @@ import type { BunPlugin } from 'bun'
 import type { IslandBinding, ModuleAnalysis } from '../compiler/index'
 import type { BuildPluginContext, KayPlugin } from '../plugins/index'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, dirname, extname, join, relative, resolve } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
 import { loadConfig } from '../plugins/index'
@@ -86,10 +86,22 @@ export function resolveKaySpecifier(specifier: string): string | undefined {
     return join(KAY_SRC_ROOT, 'ssr/index.ts')
   if (specifier === 'kay/server' || specifier === '@kayjs/kay/server')
     return join(KAY_SRC_ROOT, 'server/index.ts')
+  if (specifier === 'kay/compiler' || specifier === '@kayjs/kay/compiler')
+    return join(KAY_SRC_ROOT, 'compiler/index.ts')
+  if (specifier === 'kay/build' || specifier === '@kayjs/kay/build')
+    return join(KAY_SRC_ROOT, 'build/index.ts')
+  if (specifier === 'kay/dev' || specifier === '@kayjs/kay/dev')
+    return join(KAY_SRC_ROOT, 'dev/index.ts')
   if (specifier === 'kay/test' || specifier === '@kayjs/kay/test')
     return join(KAY_SRC_ROOT, 'test/index.ts')
-  if (specifier === 'kay/jsx-runtime' || specifier === 'kay/jsx-dev-runtime')
+  if (
+    specifier === 'kay/jsx-runtime'
+    || specifier === 'kay/jsx-dev-runtime'
+    || specifier === '@kayjs/kay/jsx-runtime'
+    || specifier === '@kayjs/kay/jsx-dev-runtime'
+  ) {
     return join(KAY_SRC_ROOT, 'jsx-runtime.ts')
+  }
   return undefined
 }
 
@@ -509,13 +521,28 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const serverEntries = [...specialFiles, ...pageFiles, ...standaloneActionFiles]
   const serverRoot = standaloneActionFiles.length > 0 ? root : routesDir
 
+  const relOut = relative(root, outDir)
+  const outDirOutsideRoot = relOut !== '' && (relOut.startsWith('..') || isAbsolute(relOut))
+  const EXTERNAL_KAY_SUBPATHS = new Set([
+    'kay/build',
+    '@kayjs/kay/build',
+    'kay/compiler',
+    '@kayjs/kay/compiler',
+    'kay/dev',
+    '@kayjs/kay/dev',
+    'kay/test',
+    '@kayjs/kay/test',
+  ])
+
   const runServerBuild = async (): Promise<void> => {
     const serverPlugin: BunPlugin = {
       name: 'kay-v2-server',
       setup(b) {
         b.onResolve({ filter: /^(?:@kayjs\/)?kay(?:\/.*)?$/ }, (args) => {
           const resolved = resolveKaySpecifier(args.path)
-          return resolved !== undefined ? { path: resolved } : undefined
+          if (resolved === undefined)
+            return undefined
+          return EXTERNAL_KAY_SUBPATHS.has(args.path) ? { path: resolved, external: true } : { path: resolved }
         })
         b.onResolve({ filter: /^@kayjs\// }, (args) => {
           try {
@@ -525,6 +552,28 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
             return undefined
           }
         })
+        if (outDirOutsideRoot) {
+          b.onResolve({ filter: /^[^./]/ }, (args) => {
+            if (args.path === 'bun' || args.path.startsWith('bun:') || args.path.startsWith('node:') || isAbsolute(args.path))
+              return undefined
+            let resolved: string | undefined
+            try {
+              resolved = Bun.resolveSync(args.path, args.resolveDir || root)
+            }
+            catch {
+              try {
+                resolved = Bun.resolveSync(args.path, root)
+              }
+              catch {
+                return undefined
+              }
+            }
+            const isInsideNodeModules = resolved.includes('/node_modules/') || resolved.includes('\\node_modules\\')
+            const relToRoot = relative(root, resolved)
+            const isLocalSource = !isInsideNodeModules && !relToRoot.startsWith('..') && !isAbsolute(relToRoot)
+            return isLocalSource ? undefined : { path: resolved, external: true }
+          })
+        }
         b.onLoad({ filter: /\.tsx$/ }, (args) => {
           const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
           const analysis = analyses.get(args.path)

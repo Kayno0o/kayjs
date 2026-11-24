@@ -2,7 +2,7 @@
 
 import type { Cookies } from './cookies'
 import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
-import { verifyOrigin } from './security'
+import { isTrustedOrigin, verifyOrigin } from './security'
 import { validateSchema } from './standard-schema'
 
 export interface ActionContext {
@@ -141,8 +141,14 @@ export async function executeAction(
   if (!wantsJson) {
     const referer = request.headers.get('referer')
     if (referer) {
-      const refUrl = new URL(referer)
-      if (refUrl.origin === ctx.url.origin)
+      let refUrl: URL | undefined
+      try {
+        refUrl = new URL(referer)
+      }
+      catch {
+        refUrl = undefined
+      }
+      if (refUrl !== undefined && isTrustedOrigin(refUrl.origin, request, trustedOrigins))
         return Response.redirect(refUrl.href, 303)
     }
   }
