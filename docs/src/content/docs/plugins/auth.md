@@ -50,7 +50,7 @@ export default defineConfig({
 | `POST /auth/signin` | Timing-safe Argon2id verify + per-IP rate limiting (`429`) |
 | `POST /auth/signout` | Revokes hashed session + clears cookie |
 | `GET /auth/session` | Returns current public user JSON |
-| `POST /auth/magic-link` & `GET /auth/magic-link/verify` | One-time email login via `@kayjs/mail`. The first sign-in by link verifies the address and drops any password and sessions set before it |
+| `POST /auth/magic-link` & `GET /auth/magic-link/verify` | One-time email login via `@kayjs/mail`. The first sign-in by link verifies the address and drops any password, sessions and provider links set before it |
 | `GET /auth/oauth/:provider` & callback | OAuth 2.0 + PKCE (`S256`) with HMAC-signed state (`github`, `discord`, `google`, or custom `oauthProvider`) |
 
 ## Protecting routes & actions
