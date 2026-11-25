@@ -10,6 +10,8 @@ import {
   createServer,
   createServerFromEmbedded,
   definePlugin,
+  getClientIp,
+  isHttpsRequest,
   KAY_ISLAND_STYLE_HASH,
   KAY_STREAM_SCRIPT_HASH,
   KAY_SUSPENSE_STYLE_HASH,
@@ -29,6 +31,29 @@ function makeTemp(prefix: string): string {
 afterAll(() => {
   for (const d of tempDirs)
     rmSync(d, { recursive: true, force: true })
+})
+
+describe('client IP and forwarded headers behind a trusted proxy', () => {
+  const req = (headers: Record<string, string>, url = 'http://app.example/') => new Request(url, { method: 'POST', headers })
+
+  it.each([
+    ['no proxy trusted', false, 'spoofed, 203.0.113.5', '10.0.0.1'],
+    ['one proxy appending to a client-sent header', true, 'spoofed, 203.0.113.5', '203.0.113.5'],
+    ['one proxy, no client header', true, '203.0.113.5', '203.0.113.5'],
+    ['two proxies', 2, 'spoofed, 203.0.113.5, 198.51.100.7', '203.0.113.5'],
+    ['two proxies trusted, one hop seen', 2, '203.0.113.5', '203.0.113.5'],
+  ] as const)('ctx.ip with %s', (_, trustProxy, xff, expected) => {
+    expect(getClientIp(req({ 'x-forwarded-for': xff }), trustProxy, '10.0.0.1')).toBe(expected)
+  })
+
+  it('reads the protocol and host the trusted proxy set, not the client', () => {
+    expect(isHttpsRequest(req({ 'x-forwarded-proto': 'https, http' }), true)).toBe(false)
+    expect(isHttpsRequest(req({ 'x-forwarded-proto': 'http, https' }), true)).toBe(true)
+    const spoofedHost = req({ 'origin': 'https://evil.example', 'x-forwarded-proto': 'https', 'x-forwarded-host': 'evil.example, app.example' })
+    expect(verifyOrigin(spoofedHost, undefined, true).ok).toBe(false)
+    const realHost = req({ 'origin': 'https://app.example', 'x-forwarded-proto': 'https', 'x-forwarded-host': 'evil.example, app.example' })
+    expect(verifyOrigin(realHost, undefined, true).ok).toBe(true)
+  })
 })
 
 describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () => {
@@ -634,9 +659,10 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
         srv.stop(true)
       }
 
-      const trustedApp = await createServer({ root: dir, trustProxy: true })
+      // Two trusted hops (CDN then nginx): the client is the entry the outer proxy wrote, second from the right
+      const trustedApp = await createServer({ root: dir, trustProxy: 2 })
       const trustedRes = await trustedApp.handle(new Request('http://localhost/api/who', {
-        headers: { 'x-forwarded-for': '203.0.113.5, 10.0.0.1' },
+        headers: { 'x-forwarded-for': 'spoofed, 203.0.113.5, 10.0.0.1' },
       }))
       expect(await trustedRes.json()).toEqual({ ip: '203.0.113.5' })
 

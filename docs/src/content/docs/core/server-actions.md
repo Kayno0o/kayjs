@@ -68,5 +68,5 @@ export function QuickSave() {
 ```
 
 <Callout title="Built-in CSRF & reverse-proxy support" tone="info">
-Every action `POST` automatically verifies the `Origin` / `Referer` header against the request host, honoring `X-Forwarded-Proto` and `X-Forwarded-Host` behind HTTPS reverse proxies (nginx, Caddy, Cloudflare).
+Every action `POST` automatically verifies the `Origin` / `Referer` header against the request host, honoring `X-Forwarded-Proto` and `X-Forwarded-Host` behind HTTPS reverse proxies (nginx, Caddy, Cloudflare) once `trustProxy` is set in `kay.config.ts`: `true` for one proxy, `2` for a CDN in front of it.
 </Callout>

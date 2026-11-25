@@ -22,7 +22,7 @@ export interface RoomsOptions {
   maxConnectionsPerClient?: number | undefined
   /** Maximum concurrent subscribers across all rooms (default: 10000). */
   maxTotalConnections?: number | undefined
-  /** Derive a client key for per-client caps (defaults to ctx.ip / x-forwarded-for / x-real-ip / 'anonymous'). */
+  /** Derive a client key for per-client caps (defaults to ctx.ip, else 'anonymous'). */
   clientKey?: ((ctx: RequestContext) => string) | undefined
   /** ReadableStream queue high-water mark before dropping stalled subscribers (default: 64). */
   highWaterMark?: number | undefined
@@ -97,20 +97,9 @@ function encodeEvent(message: unknown, event?: string, id?: string): Uint8Array 
   return encoder.encode(frame)
 }
 
+// ctx.ip already honours `trustProxy`; a forwarded header read here would let any client pick its own key.
 function defaultClientKey(ctx: RequestContext): string {
-  const ip = (ctx as { ip?: string }).ip
-  if (typeof ip === 'string' && ip !== '')
-    return ip
-  const xff = ctx.request.headers.get('x-forwarded-for')
-  if (xff) {
-    const first = xff.split(',')[0]?.trim()
-    if (first)
-      return first
-  }
-  const realIp = ctx.request.headers.get('x-real-ip')?.trim()
-  if (realIp)
-    return realIp
-  return 'anonymous'
+  return ctx.ip || 'anonymous'
 }
 
 const PING_CHUNK = encoder.encode(': ping\n\n')

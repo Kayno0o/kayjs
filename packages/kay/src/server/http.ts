@@ -3,7 +3,7 @@
 import type { BuildManifest } from '../build/index'
 import type { KayPlugin, ServerErrorInfo } from '../plugins/index'
 import type { Cookies } from './cookies'
-import type { SecurityHeadersOptions } from './security'
+import type { SecurityHeadersOptions, TrustProxy } from './security'
 import { CookieStore } from './cookies'
 import { buildSecurityHeaderEntries, getClientIp, isHttpsRequest } from './security'
 
@@ -17,7 +17,7 @@ export interface ServerOptions {
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
-  trustProxy?: boolean | undefined
+  trustProxy?: TrustProxy | undefined
   maxRequestBodySize?: number | undefined
   compress?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
@@ -58,7 +58,7 @@ export interface EmbeddedServerConfig {
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
-  trustProxy?: boolean | undefined
+  trustProxy?: TrustProxy | undefined
   maxRequestBodySize?: number | undefined
   compress?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
@@ -110,7 +110,7 @@ export function extractRenderedIslands(html: string): { hasIslands: boolean, eag
 }
 
 export interface RequestContextOptions {
-  trustProxy?: boolean | undefined
+  trustProxy?: TrustProxy | undefined
   remoteIp?: string | undefined
 }
 
@@ -120,7 +120,7 @@ export function makeRequestContext(
   opts?: RequestContextOptions,
 ): { ctx: RequestContext, cookieStore: CookieStore } {
   const url = new URL(request.url)
-  const trustProxy = opts?.trustProxy === true
+  const trustProxy = opts?.trustProxy ?? false
   const isHttps = isHttpsRequest(request, trustProxy)
   const cookieStore = new CookieStore(request.headers.get('cookie'), isHttps)
   const ip = getClientIp(request, trustProxy, opts?.remoteIp)
@@ -217,7 +217,7 @@ export function applyHstsHeader(
   res: Response,
   request: Request,
   hstsValue: string | undefined,
-  trustProxy: boolean,
+  trustProxy: TrustProxy,
 ): Response {
   if (hstsValue === undefined || process.env.NODE_ENV !== 'production' || !isHttpsRequest(request, trustProxy))
     return res

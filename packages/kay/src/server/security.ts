@@ -77,12 +77,28 @@ export interface SecurityHeadersOptions {
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
-function requestOrigins(request: Request, trustProxy = false): { expectedOrigin: string, forwardedOrigin: string | undefined } {
+/** How many reverse proxies sit in front of the app: `true` is one, a number is that many, `false` trusts no forwarded header. */
+export type TrustProxy = boolean | number
+
+function proxyHops(trustProxy: TrustProxy): number {
+  return trustProxy === true ? 1 : trustProxy === false ? 0 : Math.max(0, Math.floor(trustProxy))
+}
+
+// Proxies append to X-Forwarded-*, so only the entries the trusted hops wrote count: the one `hops` from the right.
+function forwardedValue(request: Request, header: string, trustProxy: TrustProxy): string | undefined {
+  const hops = proxyHops(trustProxy)
+  if (hops === 0)
+    return undefined
+  const entries = (request.headers.get(header) ?? '').split(',').map(e => e.trim()).filter(e => e !== '')
+  return entries[Math.max(0, entries.length - hops)]
+}
+
+function requestOrigins(request: Request, trustProxy: TrustProxy = false): { expectedOrigin: string, forwardedOrigin: string | undefined } {
   const expectedOrigin = new URL(request.url).origin
   let forwardedOrigin: string | undefined
-  if (trustProxy) {
-    const fwdProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim()
-    const fwdHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() || request.headers.get('host')?.trim()
+  if (proxyHops(trustProxy) > 0) {
+    const fwdProto = forwardedValue(request, 'x-forwarded-proto', trustProxy)
+    const fwdHost = forwardedValue(request, 'x-forwarded-host', trustProxy) || request.headers.get('host')?.trim()
     if (fwdProto && fwdHost) {
       try {
         forwardedOrigin = new URL(`${fwdProto}://${fwdHost}`).origin
@@ -96,29 +112,21 @@ function requestOrigins(request: Request, trustProxy = false): { expectedOrigin:
 }
 
 /** Returns true when the request arrived over HTTPS (directly, or via X-Forwarded-Proto when `trustProxy` is true). */
-export function isHttpsRequest(request: Request, trustProxy = false): boolean {
+export function isHttpsRequest(request: Request, trustProxy: TrustProxy = false): boolean {
   try {
     if (new URL(request.url).protocol === 'https:')
       return true
   }
   catch {}
-  if (trustProxy) {
-    const fwdProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase()
-    if (fwdProto === 'https')
-      return true
-  }
-  return false
+  return forwardedValue(request, 'x-forwarded-proto', trustProxy)?.toLowerCase() === 'https'
 }
 
-/** Extracts the client IP from proxy headers (only when `trustProxy` is true) or falls back to the direct socket IP. */
-export function getClientIp(request: Request, trustProxy = false, remoteIp?: string): string | undefined {
-  if (trustProxy) {
-    const xff = request.headers.get('x-forwarded-for')
-    if (xff) {
-      const first = xff.split(',')[0]?.trim()
-      if (first)
-        return first
-    }
+/** Extracts the client IP from the trusted proxies' headers, or falls back to the direct socket IP. */
+export function getClientIp(request: Request, trustProxy: TrustProxy = false, remoteIp?: string): string | undefined {
+  if (proxyHops(trustProxy) > 0) {
+    const forwarded = forwardedValue(request, 'x-forwarded-for', trustProxy)
+    if (forwarded)
+      return forwarded
     const realIp = request.headers.get('x-real-ip')?.trim()
     if (realIp)
       return realIp
@@ -131,7 +139,7 @@ export function isTrustedOrigin(
   origin: string,
   request: Request,
   trustedOrigins?: ReadonlySet<string>,
-  trustProxy = false,
+  trustProxy: TrustProxy = false,
 ): boolean {
   const { expectedOrigin, forwardedOrigin } = requestOrigins(request, trustProxy)
   return origin === expectedOrigin
@@ -143,7 +151,7 @@ export function isTrustedOrigin(
 export function verifyOrigin(
   request: Request,
   trustedOrigins?: ReadonlySet<string>,
-  trustProxy = false,
+  trustProxy: TrustProxy = false,
 ): { ok: true } | { ok: false, reason: string } {
   if (!UNSAFE_METHODS.has(request.method.toUpperCase()))
     return { ok: true }

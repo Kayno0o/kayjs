@@ -20,6 +20,7 @@ import { ACTION_ERROR_COOKIE, executeAction, isServerAction } from './action'
 import { CompressionCache, compressedHtmlResponse, isCompressibleType, maybeCompressResponse, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, extractRenderedIslands, finalizeResponse, makeRequestContext, MIME } from './http'
 import { Router } from './router'
+import type { TrustProxy } from './security'
 import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, resolveCspPolicy, resolveHstsValue, verifyOrigin, withCspHashes } from './security'
 
 export { defineConfig, definePlugin, loadConfig } from '../plugins/index'
@@ -33,7 +34,7 @@ export { defineEnv } from './env'
 export { DEFAULT_MAX_REQUEST_BODY_SIZE } from './http'
 export type { EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
 export { DEFAULT_CSP, DEFAULT_HSTS, getClientIp, isHttpsRequest, isTrustedOrigin, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, verifyOrigin, withCspHashes } from './security'
-export type { SecurityHeadersOptions } from './security'
+export type { SecurityHeadersOptions, TrustProxy } from './security'
 export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
 
 interface LoadedPageModule {
@@ -68,7 +69,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered, prerenderedFiles = {}, lang = 'en', security, plugins = [] } = config
   const assetPrefix = (config.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const trustedOrigins = config.trustedOrigins ? new Set(config.trustedOrigins) : undefined
-  const trustProxy = config.trustProxy === true
+  const trustProxy = config.trustProxy ?? false
   const maxRequestBodySize = config.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
   const alwaysLoadRuntime = plugins.some(p => Boolean(p.clientEntry))
   const htmlTransformers = plugins
@@ -975,7 +976,7 @@ function createStaticDirServer(
   securityEntries: readonly [string, string][],
   compressEnabled: boolean,
   hstsValue: string | undefined,
-  trustProxy: boolean,
+  trustProxy: TrustProxy,
 ): KayApp {
   const cleanPrefix = `${assetPrefix.replace(/\/$/, '')}/`
   const absRoot = resolve(outDir)
@@ -1091,7 +1092,7 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
   const clientDir = join(outDir, 'client')
   const manifestPath = join(outDir, 'manifest.json')
   const securityOpt = options.security ?? fileConfig.security
-  const trustProxy = (options.trustProxy ?? fileConfig.trustProxy) === true
+  const trustProxy = options.trustProxy ?? fileConfig.trustProxy ?? false
   const maxRequestBodySize = options.maxRequestBodySize ?? fileConfig.maxRequestBodySize
 
   if (!existsSync(manifestPath)) {

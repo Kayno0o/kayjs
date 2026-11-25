@@ -5,7 +5,7 @@
 import type { BunPlugin } from 'bun'
 import type { RouteManifestEntry } from '../build/index'
 import type { Middleware, RequestContext } from '../server/index'
-import type { SecurityHeadersOptions } from '../server/security'
+import type { SecurityHeadersOptions, TrustProxy } from '../server/security'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
@@ -93,7 +93,7 @@ export interface KayConfig {
   assetPrefix?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
-  trustProxy?: boolean | undefined
+  trustProxy?: TrustProxy | undefined
   maxRequestBodySize?: number | undefined
   compress?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined

@@ -2,6 +2,7 @@
 
 import type { BuildManifest, BuildOptions } from '../build/index'
 import type { KayApp, ServerOptions } from '../server/index'
+import type { TrustProxy } from '../server/security'
 import { build } from '../build/index'
 import { createServer } from '../server/index'
 
@@ -10,7 +11,7 @@ export interface TestAppOptions extends Omit<BuildOptions, 'compile' | 'static'>
   lang?: string | undefined
   security?: ServerOptions['security']
   trustedOrigins?: string[] | undefined
-  trustProxy?: boolean | undefined
+  trustProxy?: TrustProxy | undefined
   maxRequestBodySize?: number | undefined
 }
 

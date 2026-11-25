@@ -3,10 +3,10 @@
 // Supports Argon2id passwords, hashed DB sessions with sliding renewal, email verification,
 // magic links, OAuth 2.0 + PKCE (S256), role/route guards, RGPD helpers, and memory or `bun:sqlite` stores.
 
-import type { KayPlugin, Middleware, RequestContext } from 'kay/server'
+import type { KayPlugin, Middleware, RequestContext, TrustProxy } from 'kay/server'
 import type { OAuthProvider } from './oauth'
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
-import { verifyOrigin } from 'kay/server'
+import { getClientIp, isHttpsRequest, verifyOrigin } from 'kay/server'
 import {
   hashPassword,
   pkceChallenge,
@@ -104,7 +104,7 @@ export interface AuthOptions {
    * Trust `X-Forwarded-For` / `X-Real-IP` headers as a fallback when `ctx.ip` is not populated by the server (default: `false`).
    * When `ctx.ip` is provided by Kay's `trustProxy`-aware server, `ctx.ip` is always used.
    */
-  trustProxy?: boolean | undefined
+  trustProxy?: TrustProxy | undefined
   /** Optional per-key rate limit on auth endpoints (`false` disables). */
   rateLimit?: RateLimitOptions | false | undefined
   /** Periodic interval in ms to purge expired sessions, tokens, and rate-limit buckets (default: 15 minutes; `false` disables). */
@@ -192,17 +192,8 @@ function isValidEmail(email: string): boolean {
   return at > 0 && at === e.lastIndexOf('@') && e.indexOf('.', at + 2) > at + 1 && !/\s/.test(e)
 }
 
-function resolveClientIp(ctx: RequestContext, trustProxy: boolean): string {
-  const ctxIp = (ctx as { ip?: string | undefined }).ip?.trim()
-  if (ctxIp)
-    return ctxIp
-  if (trustProxy) {
-    const forwarded = ctx.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || ctx.request.headers.get('x-real-ip')?.trim()
-    if (forwarded)
-      return forwarded
-  }
-  return 'unknown'
+function resolveClientIp(ctx: RequestContext, trustProxy: TrustProxy): string {
+  return ctx.ip?.trim() || getClientIp(ctx.request, trustProxy) || 'unknown'
 }
 
 function formatSessionIp(ip: string, mode: boolean | 'truncate'): string | undefined {
@@ -320,7 +311,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
   const trustedOrigins = options.trustedOrigins ? new Set(options.trustedOrigins) : undefined
   const site = options.site !== undefined ? siteOrigin(options.site) : undefined
   const requireEmailVerification = options.requireEmailVerification !== false
-  const trustProxy = options.trustProxy === true
+  const trustProxy = options.trustProxy ?? false
   const storeIp = options.storeIp ?? true
   const storeUserAgent = options.storeUserAgent !== false
   const rateLimiter = createRateLimiter(options.rateLimit)
@@ -349,7 +340,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
 
   const isSecureCookie = (ctx: RequestContext): boolean =>
     ctx.url.protocol === 'https:'
-    || (trustProxy && ctx.request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() === 'https')
+    || isHttpsRequest(ctx.request, trustProxy)
     || runtimeNodeEnv() === 'production'
 
   async function resolveRequestSession(ctx: RequestContext): Promise<{ user: PublicUser, session: AuthSession } | undefined> {

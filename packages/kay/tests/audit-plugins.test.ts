@@ -439,26 +439,34 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
       const ac2 = new AbortController()
       const ac3 = new AbortController()
 
-      const r1 = rooms.stream(makeCtx('http://localhost/live', {}, { headers: { 'x-forwarded-for': '1.1.1.1' }, signal: ac1.signal }), { room: 'a', member: 'u1', pingMs: 0 })
+      const fromIp = (ip: string | undefined, init?: RequestInit) => Object.assign(makeCtx('http://localhost/live', {}, init), { ip })
+      const r1 = rooms.stream(fromIp('1.1.1.1', { signal: ac1.signal }), { room: 'a', member: 'u1', pingMs: 0 })
       expect(r1.status).toBe(200)
 
       // Same client exceeds maxConnectionsPerClient -> 429
-      const rSameClient = rooms.stream(makeCtx('http://localhost/live', {}, { headers: { 'x-forwarded-for': '1.1.1.1' } }), { room: 'a', member: 'u1b', pingMs: 0 })
+      const rSameClient = rooms.stream(fromIp('1.1.1.1', { headers: { 'x-forwarded-for': '7.7.7.7' } }), { room: 'a', member: 'u1b', pingMs: 0 })
       expect(rSameClient.status).toBe(429)
 
       // Second client joins room 'a' -> succeeds (2/2)
-      const r2 = rooms.stream(makeCtx('http://localhost/live', {}, { headers: { 'x-forwarded-for': '2.2.2.2' }, signal: ac2.signal }), { room: 'a', member: 'u2', pingMs: 0 })
+      const r2 = rooms.stream(fromIp('2.2.2.2', { signal: ac2.signal }), { room: 'a', member: 'u2', pingMs: 0 })
       expect(r2.status).toBe(200)
 
       // Third client exceeds maxConnectionsPerRoom -> 503
-      const r3 = rooms.stream(makeCtx('http://localhost/live', {}, { headers: { 'x-forwarded-for': '3.3.3.3' }, signal: ac3.signal }), { room: 'a', member: 'u3', pingMs: 0 })
+      const r3 = rooms.stream(fromIp('3.3.3.3', { signal: ac3.signal }), { room: 'a', member: 'u3', pingMs: 0 })
       expect(r3.status).toBe(503)
 
       // Disconnecting frees capacity
       ac1.abort()
-      const r4 = rooms.stream(makeCtx('http://localhost/live', {}, { headers: { 'x-forwarded-for': '1.1.1.1' } }), { room: 'a', member: 'u1-rejoin', pingMs: 0 })
+      const r4 = rooms.stream(fromIp('1.1.1.1'), { room: 'a', member: 'u1-rejoin', pingMs: 0 })
       expect(r4.status).toBe(200)
       ac2.abort()
+
+      // Without ctx.ip, a client-sent X-Forwarded-For does not buy a fresh per-client quota
+      const lone = createRooms<{ n: number }, string>(undefined, { maxConnectionsPerClient: 1 })
+      const acA = new AbortController()
+      expect(lone.stream(fromIp(undefined, { headers: { 'x-forwarded-for': '4.4.4.4' }, signal: acA.signal }), { room: 'b', member: 'x', pingMs: 0 }).status).toBe(200)
+      expect(lone.stream(fromIp(undefined, { headers: { 'x-forwarded-for': '5.5.5.5' } }), { room: 'b', member: 'y', pingMs: 0 }).status).toBe(429)
+      acA.abort()
     })
 
     it('drops stalled subscribers when controller.desiredSize <= 0', () => {

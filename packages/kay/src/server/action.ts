@@ -2,6 +2,7 @@
 
 import type { Cookies } from './cookies'
 import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
+import type { TrustProxy } from './security'
 import { isTrustedOrigin } from './security'
 import { validateSchema } from './standard-schema'
 
@@ -183,7 +184,7 @@ export async function executeAction(
   request: Request,
   ctx: ActionContext,
   trustedOrigins?: ReadonlySet<string>,
-  trustProxy = false,
+  trustProxy: TrustProxy = false,
 ): Promise<Response> {
   const wantsJson = (request.headers.get('accept') ?? '').includes('application/json')
     || (request.headers.get('content-type') ?? '').includes('application/json')
