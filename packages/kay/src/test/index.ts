@@ -8,6 +8,7 @@ import { createServer } from '../server/index'
 
 export interface TestAppOptions extends Omit<BuildOptions, 'compile' | 'static'> {
   prebuilt?: boolean | undefined
+  site?: string | undefined
   lang?: string | undefined
   security?: ServerOptions['security']
   trustedOrigins?: string[] | undefined
@@ -33,6 +34,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     outDir: options.outDir,
     minify: options.minify ?? false,
     assetPrefix: options.assetPrefix,
+    site: options.site,
     plugins: options.plugins,
   })
 
@@ -40,6 +42,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     root: options.root,
     outDir: options.outDir,
     assetPrefix: options.assetPrefix,
+    site: options.site,
     lang: options.lang,
     security: options.security,
     trustedOrigins: options.trustedOrigins,

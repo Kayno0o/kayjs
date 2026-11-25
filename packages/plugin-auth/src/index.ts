@@ -93,9 +93,9 @@ export interface AuthOptions<TUser extends AuthUser = AuthUser> {
   defaultRole?: string | undefined
   /** Default redirect after successful form login/signup/OAuth (default: '/'). */
   defaultRedirect?: string | undefined
-  /** Trusted cross-origin origins allowed to POST to auth routes. */
+  /** Additional trusted cross-origin origins merged with `KayConfig.trustedOrigins` for auth POST routes. */
   trustedOrigins?: string[] | undefined
-  /** Public origin of the site (`https://example.com`), used to build mailed sign-in/verification links and OAuth callbacks. Without it, links are only built for a loopback host. */
+  /** Public origin of the site (`https://example.com`), defaults to `KayConfig.site`. Without it, mailed links are only built for a loopback host. */
   site?: string | undefined
   /** OAuth 2.0 providers (e.g. `[github(...), discord(...), google(...)]`). */
   providers?: OAuthProvider[] | undefined
@@ -185,7 +185,7 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     ...(options.trustedOrigins !== undefined ? { trustedOrigins: options.trustedOrigins } : {}),
     ...(options.trustProxy !== undefined ? { trustProxy: options.trustProxy } : {}),
   }
-  const site = options.site !== undefined ? siteOrigin(options.site) : undefined
+  let site = options.site !== undefined ? siteOrigin(options.site) : undefined
   const requireEmailVerification = options.requireEmailVerification !== false
   let trustProxy = options.trustProxy ?? false
   const storeIp = options.storeIp ?? 'truncate'
@@ -620,6 +620,8 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     server(api) {
       if (options.trustProxy === undefined)
         trustProxy = api.trustProxy
+      if (options.site === undefined && api.site !== undefined)
+        site = siteOrigin(api.site)
       api.onShutdown(dispose)
 
       // Resolve session lazily on first read of ctx.locals.user/session; skip asset & internal non-action routes.

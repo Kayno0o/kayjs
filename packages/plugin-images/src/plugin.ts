@@ -439,6 +439,9 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
     build(ctx) {
       const publicDir = join(ctx.outDir, 'public')
       const cacheDir = resolve(ctx.root, cacheDirRel)
+      const cardWithSite: ShareCardDefaults | undefined = options.card !== undefined || ctx.site !== undefined
+        ? { ...(ctx.site !== undefined ? { site: ctx.site } : {}), ...options.card }
+        : undefined
       const persisted: PersistedImagesConfig = {
         cacheDirRel,
         widths,
@@ -446,11 +449,11 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
         quality,
         avifQuality,
         markdownSizes: options.markdownSizes,
-        card: options.card,
+        card: cardWithSite,
       }
       ctx.setData(persisted as unknown as Record<string, unknown>)
       ctx.provide(SHARE_CARD_CONFIG_SERVICE, {
-        ...options.card,
+        ...cardWithSite,
         publicDir,
         cacheDir,
       } satisfies ShareCardDefaults)
@@ -490,6 +493,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       const cacheDir = resolve(api.root, effCacheRel)
 
       api.provide(SHARE_CARD_CONFIG_SERVICE, {
+        ...(api.site !== undefined ? { site: api.site } : {}),
         ...effCard,
         publicDir,
         cacheDir,

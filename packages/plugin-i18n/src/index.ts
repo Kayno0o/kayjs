@@ -2,8 +2,8 @@
 // hreflang alternates, Intl formatters, and CLI missing-key check.
 // Implemented 100% through KayPlugin public hooks — zero i18n logic in @kay/core.
 
-import type { KayPlugin } from '@kayjs/kay/server'
-import { definePlugin } from '@kayjs/kay/server'
+import type { ActiveI18nConfig, KayPlugin } from '@kayjs/kay/server'
+import { definePlugin, I18N_CONFIG_SERVICE } from '@kayjs/kay/server'
 
 declare module '@kayjs/kay/server' {
   interface KayLocals {
@@ -87,8 +87,10 @@ export function formatNumber(
 }
 
 export function i18n(options: I18nOptions): KayPlugin {
-  const { locales, defaultLocale, messages = {}, prefixDefault = false, site } = options
+  const { locales, defaultLocale, messages = {}, prefixDefault = false } = options
+  let activeSite = options.site?.replace(/\/$/, '')
   const localeSet = new Set(locales)
+  const sharedConfig: ActiveI18nConfig = { locales, defaultLocale, prefixDefault }
 
   function translate(locale: string, key: string): string {
     return messages[locale]?.[key] ?? messages[defaultLocale]?.[key] ?? key
@@ -112,7 +114,17 @@ export function i18n(options: I18nOptions): KayPlugin {
     enforce: 'pre',
     providesLocals: ['locale', 't', 'localize', 'alternates'],
 
+    build(ctx) {
+      if (options.site === undefined && ctx.site !== undefined)
+        activeSite = ctx.site.replace(/\/$/, '')
+      ctx.provide(I18N_CONFIG_SERVICE, sharedConfig)
+    },
+
     server(api) {
+      if (options.site === undefined && api.site !== undefined)
+        activeSite = api.site.replace(/\/$/, '')
+      api.provide(I18N_CONFIG_SERVICE, sharedConfig)
+
       // Rewrite /fr/about -> /about and attach locale + helpers onto ctx.locals
       api.rewrite((pathname, ctx) => {
         const { locale: matched, path } = stripLocalePrefix(pathname, locales)
@@ -120,7 +132,7 @@ export function i18n(options: I18nOptions): KayPlugin {
         ctx.locals.locale = active
         ctx.locals.t = (key: string) => translate(active, key)
         ctx.locals.localize = (p: string, target = active) => localizePath(p, target, defaultLocale, locales, prefixDefault)
-        ctx.locals.alternates = () => alternateLinks(path, { site, locales, defaultLocale, prefixDefault })
+        ctx.locals.alternates = () => alternateLinks(path, { site: activeSite, locales, defaultLocale, prefixDefault })
         return matched !== undefined ? path : undefined
       })
 
@@ -145,9 +157,9 @@ export function i18n(options: I18nOptions): KayPlugin {
       const locale = ctx.locals.locale ?? defaultLocale
       let out = html.replace(/<html\s+lang="[^"]*"/i, () => `<html lang="${locale}"`)
 
-      if (site) {
+      if (activeSite) {
         const { path } = stripLocalePrefix(ctx.url.pathname, locales)
-        const links = alternateLinks(path, { site, locales, defaultLocale, prefixDefault })
+        const links = alternateLinks(path, { site: activeSite, locales, defaultLocale, prefixDefault })
         const tags = links.map(l => `<link rel="alternate" hreflang="${l.locale}" href="${l.href}">`).join('')
         if (tags && out.includes('</head>'))
           out = out.replace('</head>', () => `${tags}</head>`)

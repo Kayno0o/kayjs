@@ -195,7 +195,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
       w.close()
     pluginWatchers.length = 0
     const seen = new Set<string>(watchedDirs)
-    const watchCtx = createAppContext({ root, outDir: devRoot, publicDir, assetPrefix: activeAssetPrefix, dev: true })
+    const watchCtx = createAppContext({ root, outDir: devRoot, publicDir, assetPrefix: activeAssetPrefix, site: cfg.site, dev: true })
     for (const plugin of resolvePlugins(cfg.plugins)) {
       const paths = runWithAppContext(watchCtx, () =>
         typeof plugin.watchPaths === 'function' ? plugin.watchPaths(root) : (plugin.watchPaths ?? []))

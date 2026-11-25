@@ -177,7 +177,8 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
   const ogDir = join(publicDir, 'og')
   mkdirSync(ogDir, { recursive: true })
 
-  const site = cfg.site ? cfg.site.replace(/\/$/, '') : ''
+  const rawSite = cfg.site ?? appCtx?.site
+  const site = rawSite ? rawSite.replace(/\/$/, '') : ''
 
   if (hasRsvgConvert() || hasMagick()) {
     const fileName = `${slug}-${hash}.png`

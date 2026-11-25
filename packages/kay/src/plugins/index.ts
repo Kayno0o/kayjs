@@ -12,8 +12,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { createAppContext, getAppContext, runWithAppContext } from './context'
 
-export { createAppContext, getAppContext, runWithAppContext } from './context'
-export type { AppRuntimeContext, CreateAppContextOptions } from './context'
+export { createAppContext, getAppContext, I18N_CONFIG_SERVICE, runWithAppContext } from './context'
+export type { ActiveI18nConfig, AppRuntimeContext, CreateAppContextOptions } from './context'
 
 export type BuildPluginTarget = 'client' | 'server' | 'compile'
 
@@ -21,6 +21,7 @@ export interface BuildPluginContext {
   readonly root: string
   readonly outDir: string
   readonly assetPrefix: string
+  readonly site?: string | undefined
   readonly minify: boolean
   readonly isStatic: boolean
   readonly dev: boolean
@@ -49,6 +50,7 @@ export interface FinalizeBuildContext {
   readonly root: string
   readonly outDir: string
   readonly assetPrefix: string
+  readonly site?: string | undefined
   readonly minify: boolean
   readonly isStatic: boolean
   readonly dev: boolean
@@ -93,6 +95,7 @@ export interface ServerPluginAPI {
   readonly root: string
   readonly outDir: string
   readonly assetPrefix: string
+  readonly site?: string | undefined
   readonly dev: boolean
   /** Readonly server security configuration so plugins inherit `trustProxy` / `trustedOrigins` without overriding them. */
   readonly trustProxy: TrustProxy
@@ -164,6 +167,8 @@ export interface KayPlugin {
 }
 
 export interface KayConfig {
+  /** Public origin of the site (e.g. 'https://example.com'), inherited by @kayjs/seo, @kayjs/i18n, @kayjs/content, @kayjs/images, and @kayjs/auth. */
+  site?: string | undefined
   lang?: string | undefined
   port?: number | undefined
   routesDir?: string | undefined

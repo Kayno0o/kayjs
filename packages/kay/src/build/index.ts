@@ -40,6 +40,7 @@ export interface BuildOptions {
   publicDir?: string | undefined
   minify?: boolean | undefined
   assetPrefix?: string | undefined
+  site?: string | undefined
   plugins?: KayPlugin[] | undefined
   /** Reusable incremental cache for `kay dev` (skips re-parsing/re-compiling unchanged files). */
   cache?: BuildCache | undefined
@@ -70,6 +71,7 @@ interface BuildRun {
   staticStageDir: string | undefined
   stageSuffix: string
   assetPrefix: string
+  site: string | undefined
   minify: boolean
   isDev: boolean
   appCtx: AppRuntimeContext
@@ -96,12 +98,14 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const outDir = options.static ? join(cacheBaseDir, `.static-stage-${stageSuffix}`) : finalOutDir
   const staticStageDir = options.static ? join(dirname(finalOutDir), `.${basename(finalOutDir)}.stage-${stageSuffix}`) : undefined
   const assetPrefix = (options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay').replace(/\/$/, '')
+  const site = (options.site ?? fileConfig.site)?.replace(/\/$/, '') || undefined
   const publicFiles = createPublicFiles()
   const appCtx = createAppContext({
     root,
     outDir,
     publicDir: join(outDir, 'public'),
     assetPrefix,
+    site,
     dev: isDev,
     onRegisterPublicFile: publicFiles.register,
   })
@@ -122,6 +126,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       staticStageDir,
       stageSuffix,
       assetPrefix,
+      site,
       minify: options.minify ?? true,
       isDev,
       appCtx,
@@ -261,6 +266,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     clientDir,
     outPublicDir,
     assetPrefix,
+    site: run.site,
     minify: run.minify,
     isStatic,
     isDev,
@@ -294,7 +300,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const prerenderRoutes = options.prerender !== false || isStatic ? routes.filter(r => r.prerender) : []
   const prerenderDir = isStatic ? run.staticStageDir! : join(outDir, 'prerendered')
   const app = prerenderRoutes.length > 0 || isStatic
-    ? await prerender({ root, outDir, assetPrefix, plugins, isDev, isStatic, prerenderDir, routes: prerenderRoutes })
+    ? await prerender({ root, outDir, assetPrefix, site: run.site, plugins, isDev, isStatic, prerenderDir, routes: prerenderRoutes })
     : undefined
 
   try {

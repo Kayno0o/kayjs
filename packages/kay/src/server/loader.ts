@@ -106,6 +106,7 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     outDir,
     publicDir: join(outDir, 'public'),
     assetPrefix: options.assetPrefix ?? fileConfig.assetPrefix,
+    site: options.site ?? fileConfig.site,
     lang: options.lang ?? fileConfig.lang,
     security: securityOpt,
     trustedOrigins: options.trustedOrigins ?? fileConfig.trustedOrigins,

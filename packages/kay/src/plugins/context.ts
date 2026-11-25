@@ -2,11 +2,20 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks'
 
+export interface ActiveI18nConfig {
+  readonly locales: readonly string[]
+  readonly defaultLocale: string
+  readonly prefixDefault: boolean
+}
+
+export const I18N_CONFIG_SERVICE = 'kay.i18n.config'
+
 export interface AppRuntimeContext {
   readonly root: string
   readonly outDir: string
   readonly publicDir: string
   readonly assetPrefix: string
+  readonly site?: string | undefined
   readonly dev: boolean
   provide<T>(key: string, value: T): void
   inject<T>(key: string): T | undefined
@@ -18,6 +27,7 @@ export interface CreateAppContextOptions {
   outDir: string
   publicDir: string
   assetPrefix: string
+  site?: string | undefined
   dev: boolean
   onRegisterPublicFile?: ((relPath: string) => void) | undefined
 }
@@ -30,11 +40,13 @@ const appStorage: AsyncLocalStorage<AppRuntimeContext> = (
 
 export function createAppContext(options: CreateAppContextOptions): AppRuntimeContext {
   const services = new Map<string, unknown>()
+  const site = options.site?.replace(/\/$/, '')
   return {
     root: options.root,
     outDir: options.outDir,
     publicDir: options.publicDir,
     assetPrefix: options.assetPrefix,
+    ...(site !== undefined && site !== '' ? { site } : {}),
     dev: options.dev,
     provide<T>(key: string, value: T): void {
       services.set(key, value)

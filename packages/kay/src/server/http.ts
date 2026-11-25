@@ -92,6 +92,7 @@ export interface ServerOptions {
   root: string
   outDir?: string | undefined
   assetPrefix?: string | undefined
+  site?: string | undefined
   port?: number | undefined
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
@@ -147,6 +148,7 @@ export interface EmbeddedServerConfig {
   outDir?: string | undefined
   publicDir?: string | undefined
   assetPrefix?: string | undefined
+  site?: string | undefined
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined

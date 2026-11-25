@@ -2,10 +2,10 @@
 // Built strictly on the public KayPlugin API (server, build, transformHtml).
 
 import type { Html } from '@kayjs/kay'
-import type { KayPlugin } from '@kayjs/kay/server'
+import type { ActiveI18nConfig, KayPlugin } from '@kayjs/kay/server'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, extname, resolve } from 'node:path'
-import { definePlugin } from '@kayjs/kay/server'
+import { definePlugin, I18N_CONFIG_SERVICE } from '@kayjs/kay/server'
 import { escAttr, raw } from '@kayjs/kay/ssr'
 
 export interface FontEntry {
@@ -81,8 +81,30 @@ function descriptionTags(description: string): string {
   return `<meta name="description" content="${content}"><meta property="og:description" content="${content}">`
 }
 
+function stripLocaleFromPath(pathname: string, i18n: ActiveI18nConfig): { locale: string, basePath: string } {
+  const normalized = pathname.startsWith('/') ? pathname : `/${pathname}`
+  const parts = normalized.split('/')
+  const first = parts[1]
+  if (first !== undefined && i18n.locales.includes(first)) {
+    const rest = `/${parts.slice(2).join('/')}`.replace(/\/+$/, '') || '/'
+    return { locale: first, basePath: rest }
+  }
+  return { locale: i18n.defaultLocale, basePath: normalized === '/' ? '/' : normalized.replace(/\/+$/, '') || '/' }
+}
+
+function localizeSitemapPath(basePath: string, locale: string, i18n: ActiveI18nConfig): string {
+  const clean = basePath === '/' ? '/' : basePath.replace(/\/+$/, '') || '/'
+  if (locale === i18n.defaultLocale && !i18n.prefixDefault)
+    return clean
+  return clean === '/' ? `/${locale}` : `/${locale}${clean}`
+}
+
 export function seo(options: SeoPluginOptions = {}): KayPlugin {
-  const site = options.site?.replace(/\/$/, '')
+  let activeSite = options.site?.replace(/\/$/, '')
+  let activeI18n: ActiveI18nConfig | undefined
+
+  const resolveSite = (ctxSite?: string): string | undefined =>
+    options.site?.replace(/\/$/, '') ?? ctxSite?.replace(/\/$/, '') ?? activeSite
 
   return definePlugin({
     name: '@kayjs/seo',
@@ -90,6 +112,8 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
     readsLocals: ['locale'],
 
     server(api) {
+      activeSite = resolveSite(api.site)
+      activeI18n = api.inject<ActiveI18nConfig>(I18N_CONFIG_SERVICE)
       if (options.redirects !== undefined) {
         for (const [from, target] of Object.entries(options.redirects)) {
           const to = typeof target === 'string' ? target : target.to
@@ -100,6 +124,9 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
     },
 
     build(ctx) {
+      activeSite = resolveSite(ctx.site)
+      activeI18n = ctx.inject<ActiveI18nConfig>(I18N_CONFIG_SERVICE)
+      const site = activeSite
       // 1. Default meta, OG, Twitter, and JSON-LD tags
       if (typeof options.description === 'string') {
         ctx.addHead(descriptionTags(options.description))
@@ -187,6 +214,8 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
 
     afterPrerender(ctx) {
       // 5. Sitemap XML (runs after Step 3 prerendering so dynamic `paths()` and @kayjs/i18n URLs are included)
+      const site = resolveSite(ctx.site)
+      const i18nCfg = ctx.inject<ActiveI18nConfig>(I18N_CONFIG_SERVICE) ?? activeI18n
       if (site && options.sitemap !== false) {
         const excluded = new Set(options.sitemapExclude ?? [])
         const urls = new Set<string>()
@@ -197,8 +226,17 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
                 urls.add(u)
             }
           }
-          else if (!r.path.includes(':') && !r.path.includes('*') && !r.path.startsWith('/api/') && !excluded.has(r.path)) {
-            urls.add(r.path)
+          else if (!r.path.includes(':') && !r.path.includes('*') && !r.path.startsWith('/api/')) {
+            if (i18nCfg !== undefined && i18nCfg.locales.length > 0) {
+              for (const loc of i18nCfg.locales) {
+                const localized = localizeSitemapPath(r.path, loc, i18nCfg)
+                if (!excluded.has(localized) && !excluded.has(r.path))
+                  urls.add(localized)
+              }
+            }
+            else if (!excluded.has(r.path)) {
+              urls.add(r.path)
+            }
           }
         }
         if (options.extraUrls !== undefined) {
@@ -207,9 +245,39 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
               urls.add(u)
           }
         }
-        const entries = [...urls].sort().map(u => `  <url><loc>${escAttr(`${site}${u === '/' ? '/' : u}`)}</loc></url>`).join('\n')
-        const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries}\n</urlset>\n`
-        ctx.emitPublic('sitemap.xml', xml)
+        const sortedUrls = [...urls].sort()
+        if (i18nCfg !== undefined && i18nCfg.locales.length > 0) {
+          const localeOrder = new Map(i18nCfg.locales.map((l, idx) => [l, idx]))
+          const byBase = new Map<string, Array<{ locale: string, path: string }>>()
+          for (const u of sortedUrls) {
+            const { locale, basePath } = stripLocaleFromPath(u, i18nCfg)
+            let group = byBase.get(basePath)
+            if (group === undefined) {
+              group = []
+              byBase.set(basePath, group)
+            }
+            if (!group.some(item => item.locale === locale))
+              group.push({ locale, path: u })
+          }
+          for (const group of byBase.values())
+            group.sort((a, b) => (localeOrder.get(a.locale) ?? 999) - (localeOrder.get(b.locale) ?? 999))
+
+          const entries = sortedUrls.map((u) => {
+            const { basePath } = stripLocaleFromPath(u, i18nCfg)
+            const group = byBase.get(basePath) ?? []
+            const alts = group
+              .map(a => `<xhtml:link rel="alternate" hreflang="${escAttr(a.locale)}" href="${escAttr(`${site}${a.path === '/' ? '/' : a.path}`)}"/>`)
+              .join('')
+            return `  <url><loc>${escAttr(`${site}${u === '/' ? '/' : u}`)}</loc>${alts}</url>`
+          }).join('\n')
+          const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${entries}\n</urlset>\n`
+          ctx.emitPublic('sitemap.xml', xml)
+        }
+        else {
+          const entries = sortedUrls.map(u => `  <url><loc>${escAttr(`${site}${u === '/' ? '/' : u}`)}</loc></url>`).join('\n')
+          const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries}\n</urlset>\n`
+          ctx.emitPublic('sitemap.xml', xml)
+        }
       }
     },
 
@@ -240,14 +308,15 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
       // Localized fallback description when <head> didn't emit its own <meta name="description">
       if (options.description && typeof options.description === 'object' && !head.includes('name="description"')) {
         const loc = 'locale' in ctx.locals && typeof ctx.locals.locale === 'string' ? ctx.locals.locale : undefined
-        const desc = (loc && options.description[loc]) ?? Object.values(options.description)[0]
+        const fallbackLoc = activeI18n?.defaultLocale
+        const desc = (loc && options.description[loc]) ?? (fallbackLoc && options.description[fallbackLoc]) ?? Object.values(options.description)[0]
         if (desc)
           head += descriptionTags(desc)
       }
 
       // Canonical URL
-      if (site && !head.includes('rel="canonical"')) {
-        const canonical = escAttr(`${site}${ctx.url.pathname}`)
+      if (activeSite && !head.includes('rel="canonical"')) {
+        const canonical = escAttr(`${activeSite}${ctx.url.pathname}`)
         head += `<link rel="canonical" href="${canonical}">`
       }
 

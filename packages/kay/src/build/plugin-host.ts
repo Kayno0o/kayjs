@@ -45,6 +45,7 @@ export interface PluginHostOptions {
   clientDir: string
   outPublicDir: string
   assetPrefix: string
+  site?: string | undefined
   minify: boolean
   isStatic: boolean
   isDev: boolean
@@ -100,6 +101,7 @@ export function createPluginHost(options: PluginHostOptions) {
     root: options.root,
     outDir,
     assetPrefix,
+    ...(options.site !== undefined ? { site: options.site } : {}),
     minify: options.minify,
     isStatic: options.isStatic,
     dev: options.isDev,

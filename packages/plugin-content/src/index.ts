@@ -1,10 +1,10 @@
 // @kayjs/content — Zero-dependency Bun-native Markdown collections, nested YAML frontmatter (Bun.YAML),
 // Shiki/custom highlight hook, MDX-lite embedded TSX components, localized collections, TOC, and RSS (`0 KB` client JS).
 
-import type { KayPlugin, StandardSchemaV1 } from '@kayjs/kay/server'
+import type { ActiveI18nConfig, KayPlugin, StandardSchemaV1 } from '@kayjs/kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
-import { definePlugin, formatIssuePath, getAppContext, validateSchemaSync } from '@kayjs/kay/server'
+import { definePlugin, formatIssuePath, getAppContext, I18N_CONFIG_SERVICE, validateSchemaSync } from '@kayjs/kay/server'
 
 import { escAttr } from '@kayjs/kay/ssr'
 import { renderMarkdown } from './markdown'
@@ -293,7 +293,8 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
   const getDir = () => resolveCollectionDir(options.dir)
   const includeDrafts = options.includeDrafts ?? false
   const localized = options.localized ?? false
-  const defaultLocale = options.defaultLocale ?? 'en'
+  const getDefaultLocale = (): string =>
+    options.defaultLocale ?? getAppContext()?.inject<ActiveI18nConfig>(I18N_CONFIG_SERVICE)?.defaultLocale ?? 'en'
   const baseRenderOpts: RenderMarkdownOptions = {
     highlight: options.highlight,
     components: options.components,
@@ -440,7 +441,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
 
   function all(locale?: string): ContentEntry<TData>[] {
     const absDir = getDir()
-    const targetLocale = localized ? (locale ?? defaultLocale) : undefined
+    const targetLocale = localized ? (locale ?? getDefaultLocale()) : undefined
     const scanDir = localeDir(absDir, targetLocale)
     if (scanDir === undefined)
       return []
@@ -480,7 +481,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     get(slug, locale) {
       const absDir = getDir()
       const clean = slug.replace(/^\/+|\/+$/g, '')
-      const targetLocale = localized ? (locale ?? defaultLocale) : undefined
+      const targetLocale = localized ? (locale ?? getDefaultLocale()) : undefined
       const scanDir = localeDir(absDir, targetLocale)
       if (scanDir === undefined || !isInsideOrSame(scanDir, resolve(scanDir, clean)))
         return undefined
@@ -542,7 +543,8 @@ export interface RssFeedConfig<TData = Record<string, unknown>> {
   path?: string | undefined
   title: string
   description: string
-  site: string
+  /** Public site origin; defaults to `KayConfig.site` when registered via `content()`. */
+  site?: string | undefined
   collection: Collection<TData>
   locale?: string | undefined
   /** URL prefix prepended to each entry's slug (e.g. '/blog'). */
@@ -557,7 +559,7 @@ export interface RssFeedConfig<TData = Record<string, unknown>> {
 
 
 export function renderRss<TData>(feed: RssFeedConfig<TData>): string {
-  const site = feed.site.replace(/\/$/, '')
+  const site = (feed.site ?? getAppContext()?.site ?? '').replace(/\/$/, '')
   const prefix = (feed.linkPrefix ?? '').replace(/\/$/, '')
   const items = feed.collection.all(feed.locale).map((entry) => {
     const rawData = entry.data as Record<string, unknown>
@@ -598,7 +600,7 @@ export interface ContentFeed {
   readonly path?: string | undefined
   readonly title: string
   readonly description: string
-  readonly site: string
+  readonly site?: string | undefined
   readonly collection: Collection<unknown>
   readonly locale?: string | undefined
   readonly linkPrefix?: string | undefined
@@ -641,6 +643,7 @@ export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefi
 
   return definePlugin({
     name: '@kayjs/content',
+    after: ['@kayjs/i18n'],
     watchPaths: (root) => {
       const dirs = new Set<string>()
       for (const c of activeCollections(root))
@@ -665,7 +668,7 @@ export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefi
     build(ctx) {
       for (const feed of feeds) {
         const rel = (feed.path ?? '/rss.xml').replace(/^\/+/, '')
-        ctx.emitPublic(rel, renderRss(feed as RssFeedConfig<unknown>))
+        ctx.emitPublic(rel, renderRss({ ...feed, site: feed.site ?? ctx.site } as RssFeedConfig<unknown>))
       }
     },
     server(api) {
@@ -676,7 +679,7 @@ export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefi
           const versionFn = (feed.collection as unknown as Record<symbol, (() => number) | undefined>)[COLLECTION_VERSION_KEY]
           const version = versionFn ? versionFn() : -1
           if (api.dev || memo === undefined || memo.version !== version) {
-            const xml = renderRss(feed as RssFeedConfig<unknown>)
+            const xml = renderRss({ ...feed, site: feed.site ?? api.site } as RssFeedConfig<unknown>)
             const etag = `"${Bun.hash(xml).toString(36)}"`
             memo = { xml, etag, version }
           }

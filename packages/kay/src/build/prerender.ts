@@ -30,6 +30,7 @@ export interface PrerenderOptions {
   root: string
   outDir: string
   assetPrefix: string
+  site?: string | undefined
   plugins: KayPlugin[]
   isDev: boolean
   isStatic: boolean
@@ -42,7 +43,7 @@ export interface PrerenderOptions {
 export async function prerender(options: PrerenderOptions) {
   const { root, outDir, prerenderDir, isStatic } = options
   const { createServer } = await import('../server/index')
-  const app = await createServer({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, plugins: options.plugins, dev: options.isDev })
+  const app = await createServer({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, site: options.site, plugins: options.plugins, dev: options.isDev })
   mkdirSync(prerenderDir, { recursive: true })
 
   const stamp = `${Date.now()}-${++prerenderImportSeq}`
