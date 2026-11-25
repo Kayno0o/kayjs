@@ -25,7 +25,7 @@ import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit
 import { Router } from './router'
 import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, resolveCspPolicy, resolveHstsValue, verifyOrigin, withCspHashes } from './security'
 
-export { createAppContext, defineConfig, definePlugin, getAppContext, loadConfig, runWithAppContext } from '../plugins/index'
+export { createAppContext, defineConfig, definePlugin, getAppContext, loadConfig, pickRuntimeConfig, runWithAppContext } from '../plugins/index'
 export type { AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, CreateAppContextOptions, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
 export { action, getActionError } from './action'
 export type { ActionContext, ActionErrorFlash, ActionOptions, ActionResult, ServerAction } from './action'
@@ -387,6 +387,18 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     }
   }
 
+  const {
+    manifest: _m,
+    modules: _mods,
+    assets: _a,
+    publicAssets: _pa,
+    publicEtags: _pe,
+    prerendered: _pr,
+    prerenderedFiles: _pf,
+    ...forwardedConfig
+  } = config as EmbeddedServerConfig & Record<string, unknown>
+  const readonlyRuntimeConfig: Readonly<Record<string, unknown>> = Object.freeze({ ...forwardedConfig })
+
   for (const plugin of plugins) {
     if (plugin.dispose !== undefined)
       shutdownHooks.push(() => plugin.dispose!())
@@ -398,6 +410,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         dev: isDev,
         trustProxy,
         trustedOrigins: trustedOriginsList,
+        config: readonlyRuntimeConfig,
         use(mw: Middleware, options?: MiddlewareOptions) {
           scopedMiddlewares.push({ mw, scope: options?.scope ?? 'all' })
         },

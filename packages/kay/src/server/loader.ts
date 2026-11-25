@@ -4,7 +4,7 @@ import type { BuildManifest } from '../build/index'
 import type { EmbeddedBody, KayApp, ServerOptions } from './http'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { loadConfig } from '../plugins/index'
+import { loadConfig, pickRuntimeConfig } from '../plugins/index'
 import { createServerFromEmbedded } from './index'
 import { createStaticDirServer } from './static-dir'
 
@@ -92,7 +92,9 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     for (const m of a.middlewares) await loadMod(m)
   }
 
+  const runtimeConfig = pickRuntimeConfig(fileConfig)
   return createServerFromEmbedded({
+    ...runtimeConfig,
     manifest,
     modules,
     assets,

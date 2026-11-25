@@ -96,13 +96,11 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     }
   }
 
-  const cfgSpread = hasConfig
-    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins, trustProxy: _kayConfig?.trustProxy, maxRequestBodySize: _kayConfig?.maxRequestBodySize, streamTimeout: _kayConfig?.streamTimeout, compress: _kayConfig?.compress, onError: _kayConfig?.onError`
-    : ''
+  const cfgSpread = hasConfig ? `...pickRuntimeConfig(_kayConfig), ` : ''
 
   const code = [
     ...imports,
-    `import { createServerFromEmbedded } from ${JSON.stringify(join(kaySrcRoot, 'server/index.ts'))};`,
+    `import { createServerFromEmbedded, pickRuntimeConfig } from ${JSON.stringify(join(kaySrcRoot, 'server/index.ts'))};`,
     `const manifest = ${JSON.stringify(manifest)};`,
     `const modules = { ${modEntries.join(', ')} };`,
     `const assets = { ${embeddedAssets.join(', ')} };`,
@@ -113,7 +111,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     `const port = Number(process.env.PORT || ${hasConfig ? '_kayConfig?.port || ' : ''}3000);`,
     `const hostname = process.env.HOST || undefined;`,
     `if (Bun.argv.includes('--health')) { const probeHost = !hostname || hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname; const r = await fetch(\`http://\${probeHost}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
-    `const app = await createServerFromEmbedded({ manifest, modules, assets, publicAssets, publicEtags, prerendered, prerenderedFiles, assetPrefix: ${JSON.stringify(assetPrefix)}${cfgSpread} });`,
+    `const app = await createServerFromEmbedded({ ${cfgSpread}manifest, modules, assets, publicAssets, publicEtags, prerendered, prerenderedFiles, assetPrefix: ${JSON.stringify(assetPrefix)} });`,
     `const server = app.serve(port, hostname);`,
     `console.log(\`kay server listening on http://\${hostname ?? 'localhost'}:\${server.port}\`);`,
   ].join('\n')

@@ -97,6 +97,8 @@ export interface ServerPluginAPI {
   /** Readonly server security configuration so plugins inherit `trustProxy` / `trustedOrigins` without overriding them. */
   readonly trustProxy: TrustProxy
   readonly trustedOrigins: readonly string[]
+  /** Readonly runtime config forwarded from `kay.config.ts` (minus build-only keys). */
+  readonly config?: Readonly<Record<string, unknown>> | undefined
   /** Register global (or scoped) middleware that runs before route handlers. */
   use(middleware: Middleware, options?: MiddlewareOptions): void
   /** Register a custom HTTP route (e.g. GET /sitemap.xml, POST /auth/callback). */
@@ -173,6 +175,14 @@ export interface KayConfig {
 
 export function defineConfig(config: KayConfig): KayConfig {
   return config
+}
+
+/** Forwards every runtime key from `kay.config.ts`, stripping build/CLI-only keys (`routesDir`, `outDir`, `publicDir`, `port`). */
+export function pickRuntimeConfig(config: KayConfig | undefined): Omit<KayConfig, 'routesDir' | 'outDir' | 'publicDir' | 'port'> {
+  if (config === undefined)
+    return {}
+  const { routesDir: _r, outDir: _o, publicDir: _p, port: _pt, ...runtime } = config
+  return runtime
 }
 
 export function definePlugin(plugin: KayPlugin): KayPlugin {
