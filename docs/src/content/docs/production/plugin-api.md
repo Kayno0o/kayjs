@@ -1,33 +1,45 @@
 ---
 title: Plugin API
-description: Extend Kay v2 cleanly with KayPlugin hooks — server routes & middleware, build asset emission, Bun.build plugins, HTML transforms, and custom CLI commands.
+description: Extend Kay v2 cleanly with KayPlugin hooks — server routes & middleware, build and post-prerender hooks, kay check rules, Bun.build plugins, HTML transforms, and custom CLI commands.
 section: production
 order: 3
 ---
 
-Every first-party package in Kay v2 is built exclusively on the public `KayPlugin` interface — with zero special cases in core.
+Every first-party package in Kay v2 is built exclusively on the public `KayPlugin` interface, with zero special cases in core.
 
 ## `KayPlugin` contract
 
 ```ts
-import type { KayPlugin } from 'kay/server'
+import { definePlugin } from 'kay/server'
 
-export function myPlugin(): KayPlugin {
-  return {
+export function myPlugin() {
+  return definePlugin({
     name: 'my-plugin',
 
-    // Register global middleware, custom routes, or URL rewrites
+    // Register global middleware, custom routes, URL rewrites, or shared server services
     server(api) {
       api.use(async (ctx, next) => {
         ctx.locals.startedAt = performance.now()
         return next()
       })
       api.route('GET', '/health', ctx => ctx.json({ ok: true }))
+      api.route('POST', '/webhook', ctx => ctx.json({ received: true }), { csrf: false })
     },
 
-    // Emit hashed client assets, public files, <link> styles, or <head> tags
+    // Observe unhandled errors from routes, actions, or plugins
+    onError({ error, request, source }) {
+      console.error(`[${source}] ${request.url}`, error)
+    },
+
+    // Emit hashed client assets, public files, <link> styles, <head> tags, or build data
     build(ctx) {
       ctx.emitPublic('robots.txt', 'User-agent: *\nAllow: /\n')
+      ctx.setData({ builtAt: Date.now() })
+    },
+
+    // Run after Step 3 prerendering (route.prerendered & publicFiles are populated)
+    afterPrerender(ctx) {
+      // Ideal for sitemaps, feeds, or inspecting generated static files
     },
 
     // Expand prerendered URLs (used by @kayjs/i18n)
@@ -35,17 +47,25 @@ export function myPlugin(): KayPlugin {
       return paths
     },
 
-    // Post-process rendered HTML (on a streamed page: the document and its initial body, not the boundaries that stream in later)
+    // Post-process rendered HTML (pages, <Suspense> shells, _error.tsx, _404.tsx)
     transformHtml(html, ctx) {
       return html
     },
 
-    // Native Bun.build plugins (e.g. Tailwind, icons, images)
-    bunPlugins: ({ root, assetPrefix, minify }) => [],
+    // Native Bun.build plugins per target ('client' | 'server' | 'compile')
+    bunPlugins: ({ root, assetPrefix, minify, target }) => [],
 
     // Global CSS files or optional client bootstrap script
     css: ['src/plugin.css'],
     clientEntry: undefined,
+
+    // Validate plugin invariants during `kay check`
+    check(ctx) {
+      // ctx.error('missing required file')
+    },
+
+    // Extra paths for `kay dev` to watch
+    watchPaths: ['src/content'],
 
     // Custom CLI subcommands (`kay my-cmd`)
     commands: {
@@ -53,6 +73,13 @@ export function myPlugin(): KayPlugin {
         console.log('Running in', root, args)
       },
     },
-  }
+  })
 }
 ```
+
+## Build-to-server handoff & service sharing
+
+- **`ctx.setData(data)` / `api.getBuildData()`**: Persists JSON-serializable plugin data into `manifest.pluginData[plugin.name]` so it survives cold starts and `kay build --compile`.
+- **`provide(key, value)` / `inject(key)`**: Available on both `BuildPluginContext` and `ServerPluginAPI` to share services between plugins without module-level singletons.
+- **Per-route assets**: Use `ctx.addRouteStyle(routePath, href)` and `ctx.addRouteHead(routePath, html)` when an asset belongs on one route rather than every page.
+- **Route CSRF**: `api.route()` enforces `Origin` / `Sec-Fetch-Site` on unsafe methods by default. Pass `{ csrf: false }` for webhooks or bearer-token endpoints (such as `@kayjs/mcp`).

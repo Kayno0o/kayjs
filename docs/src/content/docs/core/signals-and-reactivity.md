@@ -1,11 +1,11 @@
 ---
 title: Signals & Reactivity
-description: Fine-grained push-pull signals with .value, glitch-free computed values, effects, O(1) selector, and deep reactive stores.
+description: Fine-grained push-pull signals with .value, glitch-free computed values, effects, O(1) selector, deep reactive stores, and JSX rules.
 section: core
 order: 1
 ---
 
-Kay's reactivity kernel (`kay`) uses a push-pull doubly-linked-list dependency graph with `"sideEffects": false` so unused primitives tree-shake to **0 bytes**.
+Kay's reactivity kernel (`kay`) uses a push-pull doubly-linked-list dependency graph. With `"sideEffects": false`, unused helpers tree-shake to **0 bytes**.
 
 ## Core primitives
 
@@ -34,18 +34,18 @@ export function Counter({ step = 1 }: { step?: number }) {
 
 | Primitive | Purpose |
 | :--- | :--- |
-| `signal(initial)` | Reactive cell; read & write via `.value`, non-tracking read via `.peek()` |
-| `computed(fn)` | Lazy, memoized, glitch-free derived signal |
-| `effect(fn)` | Runs whenever tracked dependencies change; return a cleanup function |
-| `batch(fn)` | Coalesces multiple signal writes into a single flush |
-| `untrack(fn)` | Reads signals without subscribing the enclosing computation |
-| `onMount(fn)` | Runs in the browser once the component's elements are in the document; return a cleanup function |
-| `onCleanup(fn)` | Runs when the component is disposed |
-| `root(dispose => ...)` | Creates an isolated disposal scope |
+| `signal(initial)` | Reactive cell. Read and write via `.value`; read without subscribing via `.peek()`. |
+| `computed(fn)` | Lazy, memoized, glitch-free derived signal. |
+| `effect(fn)` | Runs whenever tracked dependencies change. Return a cleanup function if needed. |
+| `batch(fn)` | Coalesces multiple signal writes into a single flush. |
+| `untrack(fn)` | Reads signals without subscribing the enclosing computation. |
+| `onMount(fn)` | Runs in the browser after the component's elements attach to the document. Return a cleanup function if needed. |
+| `onCleanup(fn)` | Runs when the enclosing component or effect is disposed. |
+| `root(dispose => ...)` | Creates an isolated disposal scope. |
 
 ## Compiler-safe prop destructuring
 
-Unlike SolidJS, destructuring props in Kay v2 **stays reactive**. The compiler rewrites reads of destructured props in client components to live getter reads:
+Destructuring props in Kay v2 stays reactive. The compiler rewrites reads of destructured props inside client components to live getter reads:
 
 ```tsx
 export function Badge({ count = 0, label }: { count?: number, label: string }) {
@@ -53,9 +53,20 @@ export function Badge({ count = 0, label }: { count?: number, label: string }) {
 }
 ```
 
-To let a child component mutate parent state, pass the signal itself as a prop (`<Modal open={isOpen} />`) — no special `bind:` syntax needed.
+To let a child mutate parent state, pass the signal itself as a prop (`<Modal open={isOpen} />`). No `bind:` syntax is needed.
 
 ## Tree-shakable helpers (`selector` & `store`)
 
-- **`selector(() => selectedId.value)`**: turns O(N) row-highlight checks in large tables into **O(1)** updates (only the previously selected and newly selected rows update).
-- **`store(initial)` + `snapshot(s)`**: deep proxy store for nested objects and forms; 0 bytes in your bundle if unimported.
+- **`selector(() => selectedId.value)`**: Turns O(N) row-highlight checks in large tables into **O(1)** updates. Only the previously selected and newly selected rows re-run.
+- **`store(initial)` + `snapshot(s)`**: Deep proxy store for nested objects and arrays. Costs 0 bytes if unimported.
+
+## JSX rules
+
+Kay's compiler and runtime reject common React, Solid, and Astro habits that would otherwise fail silently:
+
+- **Raw HTML**: Use `innerHTML={html}` with a string (or `raw(html)` from `kay/ssr`). Never pass `{ __html }`, never use `dangerouslySetInnerHTML`, never combine `innerHTML` with children, and never put it on a void element.
+- **Events**: Use camelCase DOM names (`onClick`, `onDblClick`, `onKeyDown`). Lowercase (`onclick`), namespaced (`on:click`), `onDoubleClick`, `*Capture`, string handlers, and render-time assignments (`onClick={count.value++}`) fail compilation. For capture listeners or custom events, call `addEventListener` inside a `ref`.
+- **Refs**: Always pass a callback: `ref={el => ...}`. Ref objects (`{ current }`) are refused.
+- **Attributes & SVG**: Use `class` or `className` (never both), standard `value`/`checked` (never `defaultValue`/`defaultChecked`), kebab-case SVG attributes (`stroke-width`, `fill-opacity`), and boolean `{false}` (never `"false"`). `style` accepts either a CSS string or an object (`style={{ color: 'red' }}`).
+- **Renderable values**: Promises, functions, raw signal objects, and plain objects throw in JSX text and attributes. Read `count.value` instead of passing `count`.
+- **Spread safety**: `{...spread}` automatically strips `on*` handlers, `innerHTML`, `srcdoc`, and `javascript:`/`vbscript:` URLs during SSR.

@@ -82,7 +82,7 @@ export default function GrammarsPage() {
             <CardBody>
               <Stack gap="1rem">
                 <Cluster>
-                  <Badge tone="accent">v2.0-alpha</Badge>
+                  <Badge tone="accent">v2.0-beta</Badge>
                   <Badge tone="success">38/38 pass</Badge>
                   <Badge tone="warning">experimental</Badge>
                   <Badge tone="danger">breaking</Badge>

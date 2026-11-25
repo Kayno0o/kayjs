@@ -20,7 +20,7 @@ export default function Layout({ children, url }: { children: KayChild, url: URL
           <a class="docs-brand" href="/">
             <img src="/favicon.svg" width="24" height="24" alt="" />
             kay
-            <span class="docs-ver">v2.0-alpha</span>
+            <span class="docs-ver">v2.0-beta</span>
           </a>
           <nav class="docs-nav-links" aria-label="Main navigation">
             <a href="/docs/getting-started/introduction" aria-current={isDocs ? 'page' : undefined}>Docs</a>

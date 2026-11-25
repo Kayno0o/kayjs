@@ -1,6 +1,6 @@
 ---
 title: CLI & Testing
-description: Kay CLI commands and in-process integration testing with testApp() from kay/test.
+description: Kay CLI commands, plugin subcommands, bundle analysis, and in-process integration testing with testApp() from kay/test.
 section: production
 order: 4
 ---
@@ -9,22 +9,27 @@ order: 4
 
 | Command | Description |
 | :--- | :--- |
-| `kay new <dir> [--template minimal\|fullstack\|blog\|app]` | Scaffold a new project |
-| `kay check` | Run TypeScript typechecking + Kay compiler validation |
-| `kay dev` | Dev server with live reload; saving a source file re-runs only the server modules it changed |
-| `kay build` | Single-pass production build into `dist/` |
+| `kay new <dir> [--template minimal\|fullstack\|blog\|app] [--force]` | Scaffold a new project |
+| `kay check [dir] [--no-typecheck]` | Run Kay compiler checks, route checks, plugin `check()` hooks, and `tsgo`/`tsc` |
+| `kay dev [dir] [--port 3000] [--host [addr]]` | Dev server with live reload (binds `127.0.0.1` by default; pass `--host` for `0.0.0.0`) |
+| `kay build [dir] [--analyze]` | Single-pass production build into `dist/`; `--analyze` prints per-route JS/CSS weights |
 | `kay build --static` | Static HTML + asset export into `dist/` |
 | `kay build --compile [out]` | Compile into a single standalone Bun executable |
-| `kay start` | Serve a built `dist/` app on `Bun.serve()` |
+| `kay start [dir] [--port 3000] [--host [addr]]` | Serve a built `dist/` app on `Bun.serve()` (binds `127.0.0.1` by default) |
 | `kay ui-eject <grammar> [dest]` | Eject a `@kayjs/ui` CSS Grammar into your repo |
+| `kay mcp-footprint` | Print `@kayjs/mcp` tool sizes in bytes and estimated tokens |
+| `kay i18n-check` | List missing translation keys across `@kayjs/i18n` locales |
+
+Plugins can register additional commands via `KayPlugin.commands`.
 
 ## In-process testing (`kay/test`)
 
-Test routes, middleware, cookies, auth flows, and server actions directly in-process with `testApp()` — no port binding required:
+Test routes, middleware, cookies, auth flows, and server actions in-process with `testApp()` — no port binding needed:
 
 ```ts
 import { describe, expect, it } from 'bun:test'
 import { testApp } from 'kay/test'
+import { savePreferences } from '../src/actions/preferences'
 
 describe('app routes', () => {
   it('renders home and submits a server action', async () => {
@@ -34,9 +39,18 @@ describe('app routes', () => {
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('Latest posts')
 
-    // Persistent cookie jar across requests
-    const submitRes = await app.submit('/settings', { project: 'orbit' })
+    // Sends FormData with a same-origin Origin header and persists cookies
+    const submitRes = await app.submit(savePreferences.url, { project: 'orbit', target: 'binary' })
     expect(submitRes.status).toBe(200)
   })
 })
 ```
+
+`TestApp` helpers:
+
+- `app.get(path, headers?)`: Sends a `GET` request with the current cookie jar.
+- `app.post(path, body?, headers?)`: Sends JSON (or `FormData`) with `Origin: http://localhost`.
+- `app.submit(actionUrl, fields, headers?)`: Sends `FormData` with `Origin: http://localhost`.
+- `app.fetch(pathOrRequest, init?)`: Low-level request helper with cookie jar persistence.
+- `app.cookies` / `app.clearCookies()`: Inspect or reset cookies between test cases.
+- Pass `prebuilt: true` to `testApp({ root, prebuilt: true })` to reuse an existing `dist/` build across tests.

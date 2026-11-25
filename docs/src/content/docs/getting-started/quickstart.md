@@ -11,13 +11,13 @@ order: 2
 
 ## 1. Create a project
 
-Choose one of the four built-in starter templates:
+Pick one of the four built-in starter templates:
 
 ```bash
-bunx @kayjs/kay@alpha new my-app --template minimal    # Static route + 1 auto-island
-bunx @kayjs/kay@alpha new my-app --template fullstack  # Layouts, API route, Standard-Schema action
-bunx @kayjs/kay@alpha new my-app --template blog       # @kayjs/content + @kayjs/ui + RSS (0 KB JS)
-bunx @kayjs/kay@alpha new my-app --template app        # @kayjs/auth + @kayjs/ui + guarded /dashboard
+bunx @kayjs/kay@beta new my-app --template minimal    # Static route + 1 auto-island
+bunx @kayjs/kay@beta new my-app --template fullstack  # Layouts, API route, Standard-Schema action
+bunx @kayjs/kay@beta new my-app --template blog       # @kayjs/content + @kayjs/ui + RSS (0 KB JS)
+bunx @kayjs/kay@beta new my-app --template app        # @kayjs/auth + @kayjs/ui + guarded /dashboard
 ```
 
 Install dependencies and start the dev server:
@@ -28,12 +28,12 @@ bun install
 bun run dev
 ```
 
-Your app is now live at `http://localhost:3000` with fast incremental rebuilds and automatic live reload over SSE.
+Your app runs at `http://127.0.0.1:3000` with incremental rebuilds and live reload over SSE.
 
 ## 2. Build for production
 
 <Tabs label="Deployment targets">
-<Tab group="deploy" label="Node / Bun Server" checked>
+<Tab group="deploy" label="Bun Server" checked>
 
 ```bash
 bun run build
@@ -59,10 +59,12 @@ kay build --static
 </Tab>
 </Tabs>
 
+Pass `--analyze` to `kay build` to print per-route eager JS and CSS weights plus the largest bundled modules.
+
 ## 3. Validate before shipping
 
 ```bash
 kay check
 ```
 
-`kay check` runs TypeScript typechecking plus Kay compiler rules (verifying `async` routes never use client signals/handlers directly and checking route exports).
+`kay check` runs TypeScript checking, Kay compiler guardrails, route conflict checks, and every active plugin's `check` hook. Pass `--no-typecheck` to skip `tsc`/`tsgo` when iterating quickly.

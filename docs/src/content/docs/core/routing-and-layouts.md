@@ -5,7 +5,7 @@ section: core
 order: 3
 ---
 
-Every file in `src/routes/` maps directly to a URL path on Bun's native server.
+Every file in `src/routes/` maps directly to a URL path on `Bun.serve()`.
 
 ## Route conventions
 
@@ -17,13 +17,15 @@ Every file in `src/routes/` maps directly to a URL path on Bun's native server.
 | `src/routes/docs/[...slug].tsx` | `/docs/*slug` | Catch-all (`params.slug`) |
 | `src/routes/api/users.ts` | `/api/users` | API route (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`) |
 | `src/routes/_layout.tsx` | All sibling & nested routes | Nested layout (outer → inner) |
-| `src/routes/_middleware.ts` | All sibling & nested routes | Request middleware |
+| `src/routes/_middleware.ts` | All sibling & nested routes | Request middleware (outer → inner) |
 | `src/routes/_404.tsx` | Unmatched routes | 404 page (also `404.html` in `--static`) |
-| `src/routes/_error.tsx` | Uncaught route errors | Error page |
+| `src/routes/_error.tsx` | Uncaught route errors | Error page (receives `{ error }`) |
+
+`_404.tsx` and `_error.tsx` automatically render inside your root `_layout.tsx` with global styles.
 
 ## Data loading (`load` vs `async` page)
 
-Use either an `async` route component (strictly server-only) or a sync route with `export async function load(ctx)` (which can return data or a `Response` like `404` / redirect):
+Use either an `async` route component (strictly server-only) or a sync route with `export async function load(ctx)`. `load()` can return data props or a `Response` (such as a `404` or redirect):
 
 ```tsx
 import type { RequestContext } from 'kay/server'
@@ -39,6 +41,30 @@ export default function PostPage({ data }: { data: { post: Post } }) {
   return <article><h1>{data.post.title}</h1></article>
 }
 ```
+
+## API routes & `RequestContext`
+
+Export HTTP verb handlers from any `.ts` file under `src/routes/`:
+
+```ts
+// src/routes/api/items.ts
+import type { RequestContext } from 'kay/server'
+
+export function GET(ctx: RequestContext) {
+  return ctx.json({ items: [], ip: ctx.ip })
+}
+
+export async function POST(ctx: RequestContext) {
+  const body = await ctx.request.json()
+  if (!body?.name)
+    return ctx.deny(400, 'name is required', { name: 'Required' })
+  return ctx.json({ created: body.name }, { status: 201 })
+}
+```
+
+Every `RequestContext` provides: `request`, `url`, `params`, `cookies`, `locals`, `ip`, `json(data, init?)`, `text(body, init?)`, `redirect(location, status?)`, and `deny(status, message, fieldErrors?)`.
+
+Unsafe HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`) verify `Origin` / `Sec-Fetch-Site` by default. Export `export const csrf = false` in an API route to opt out for external webhooks or bearer-token endpoints.
 
 ## Layouts & Middleware
 
@@ -57,15 +83,16 @@ export default function Layout({ children, locals }: { children: KayChild, local
 }
 ```
 
-Middleware in `_middleware.ts` runs outer-to-inner before matching routes:
+Middleware in `_middleware.ts` runs outer-to-inner before matching routes and actions in that directory:
 
 ```ts
 import type { Middleware } from 'kay/server'
 
-export const middleware: Middleware = async (ctx, next) => {
+const middleware: Middleware = async (ctx, next) => {
   ctx.locals.requestId = crypto.randomUUID()
   return next()
 }
+
 export default middleware
 ```
 
@@ -75,9 +102,12 @@ Mark any static or dynamic route with `export const prerender = true`:
 
 ```tsx
 export const prerender = true
+
 export function paths() {
   return ['/posts/hello', '/posts/kay-v2']
 }
 ```
 
-In `kay dev`, prerendering is skipped so routes render on-demand in milliseconds. In `kay build` / `kay build --static`, all paths are prerendered concurrently.
+Dynamic routes with `prerender = true` must export `paths()` — `kay check` enforces this. Any request for a param not returned by `paths()` receives a `404` instead of falling back to SSR.
+
+In `kay dev`, prerendering is skipped so routes render on demand. In `kay build` and `kay build --static`, all paths prerender concurrently.

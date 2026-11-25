@@ -87,18 +87,19 @@ Core stays tiny (`~6.9k LOC`). Every optional capability plugs in cleanly throug
 
 | Package | Purpose | Notes |
 | :--- | :--- | :--- |
-| **`@kayjs/kay`** | Compiler, linked-list signals, DOM runtime, router, SSR/Suspense, actions, build/compile, `kay/test` (installed as `"kay": "npm:@kayjs/kay@alpha"`) | 1 runtime dep (`oxc-parser`) |
+| **`@kayjs/kay`** | Compiler, linked-list signals, DOM runtime, router, SSR/Suspense, actions, build/compile, `kay/test` (installed as `"kay": "npm:@kayjs/kay@beta"`) | 1 runtime dep (`oxc-parser`) |
 | **`@kayjs/ui`** | Platform-first headless primitives + 5 structurally distinct pure CSS `@layer kui` Grammars (`editorial`, `workshop`, `console`, `soft`, `orbit`) + `kay ui-eject` | Zero JS recipe engine, zero Tailwind lock-in |
-| **`@kayjs/auth`** | Argon2id passwords, hashed DB sessions, magic links, OAuth 2.0 + PKCE (GitHub/Discord/Google), `auth.guard()`, `bun:sqlite` store | Zero external deps |
+| **`@kayjs/auth`** | Argon2id passwords, hashed DB sessions, email verification, magic links, OAuth 2.0 + PKCE (GitHub/Discord/Google), `auth.guard()`, RGPD helpers, `bun:sqlite` store | Zero external deps |
 | **`@kayjs/live`** | Typed real-time SSE rooms, microtask-coalesced presence, `useLive()` browser signal hook | Zero external deps |
-| **`@kayjs/content`** | `Bun.markdown` GFM collections, YAML frontmatter + Standard Schema, heading TOC, `paths()` prerender, RSS XML | Zero external deps |
+| **`@kayjs/content`** | `Bun.markdown` GFM collections, YAML frontmatter + Standard Schema, lazy `render()`, heading TOC, `paths()` prerender, RSS XML | Zero external deps |
+| **`@kayjs/mcp`** | Streamable HTTP (`2025-03-26`) MCP server exposing typed `action()` tools with schema compaction, shared schemas, `resources`, output shaping, and `kay mcp-footprint` | Zero external deps |
 | **`@kayjs/mail`** | Resend HTTP transport, custom transports, and dev-only `/_kay/mail` outbox preview | Zero external deps |
-| **`@kayjs/images`** | Build-time responsive AVIF/WebP pipeline + content-hash cache + `<Picture>` | Sharp-backed |
+| **`@kayjs/images`** | Build-time responsive AVIF/WebP pipeline + content-hash cache + `<Picture>` + OG `shareCard()` | Sharp-backed |
 | **`@kayjs/icons`** | Virtual `~icons/<set>/<name>` imports + browser-pure `<Icon>` | Iconify JSON sets |
 | **`@kayjs/seo`** | `titleTemplate`, OpenGraph/Twitter meta, JSON-LD, sitemap, redirects, self-hosted fonts | Zero external deps |
-| **`@kayjs/tailwind`** | Tailwind v4 CSS integration via `bun-plugin-tailwind` | Opt-in |
-| **`@kayjs/spa`** | Opt-in SPA navigation with persistent islands | Opt-in |
-| **`@kayjs/i18n`** | Locale URL rewriting, dictionary lookup & localized HTML | Zero external deps |
+| **`@kayjs/tailwind`** | Tailwind v4 CSS integration (auto-loads `bun-plugin-tailwind`) | Opt-in |
+| **`@kayjs/spa`** | Opt-in SPA navigation with persistent `[data-persist]` islands and `[data-kay-prefetch]` | Opt-in |
+| **`@kayjs/i18n`** | Locale URL rewriting, dictionary lookup, localized HTML & `kay i18n-check` | Zero external deps |
 
 ---
 
@@ -115,12 +116,13 @@ cd examples/noticeboard && bun run dev
 ## CLI Commands
 
 ```sh
-bunx @kayjs/kay@alpha new my-app [--template minimal|fullstack|blog|app]  # Scaffold a new project
-kay check                              # Validate routes, compiler rules & types
-kay dev                                # Fast rebuild + live reload
-kay build                              # Production client + server build
+bunx @kayjs/kay@beta new my-app [--template minimal|fullstack|blog|app]  # Scaffold a new project
+kay check [--no-typecheck]             # Validate routes, compiler rules, plugin checks & types
+kay dev [--port 3000] [--host [addr]]  # Fast rebuild + live reload (127.0.0.1 by default)
+kay build [--analyze]                  # Production client + server build (optional bundle report)
 kay build --static                     # Pure static HTML export
-kay build --compile ./server           # Single standalone executable
-kay start                              # Serve built production app
-kay ui-eject editorial                 # Eject a standalone @kayjs/ui CSS Grammar
+kay build --compile [out]              # Single standalone executable
+kay start [--port 3000] [--host [addr]] # Serve built production app
+kay ui-eject <grammar> [dest]          # Eject a standalone @kayjs/ui CSS Grammar
+kay mcp-footprint                      # Inspect @kayjs/mcp tool byte & token budgets
 ```

@@ -34,7 +34,7 @@ docs-build:
 
 # Build docs and audit layout, contrast, overflow, and tap targets with `page check` (light + dark)
 docs-qa: docs-build
-	@bun -e 'import { resolve } from "node:path"; const dist = resolve("docs/dist"); const srv = Bun.serve({ port: 0, async fetch(req) { const u = new URL(req.url); const p = u.pathname === "/" ? "/index.html" : u.pathname; let f = Bun.file(resolve(dist, "." + p)); if (!(await f.exists())) f = Bun.file(resolve(dist, "." + p + "/index.html")); if (!(await f.exists())) return new Response(Bun.file(resolve(dist, "404.html")), { status: 404 }); if (u.searchParams.get("scheme") === "dark" && f.name?.endsWith(".html")) { const html = (await f.text()).replace("</head>", "<style>:root{color-scheme:dark;--buncss-light: ;--buncss-dark:initial}</style></head>"); return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } }); } return new Response(f); } }); const base = `http://127.0.0.1:${srv.port}`; const paths = ["/", "/docs/getting-started/quickstart", "/docs/core/signals-and-reactivity", "/docs/core/server-actions", "/docs/plugins/ui", "/docs/plugins/mcp", "/docs/production/deploy-and-compile", "/grammars", "/404.html"]; const urls = [...paths.map(p => `${base}${p}`), ...paths.map(p => `${base}${p}?scheme=dark`)]; const proc = Bun.spawn(["page", "check", "-w", "1440,1024,400", ...urls], { stdout: "inherit", stderr: "inherit" }); const code = await proc.exited; srv.stop(true); process.exit(code);'
+	@bun -e 'import { resolve } from "node:path"; const dist = resolve("docs/dist"); const srv = Bun.serve({ port: 0, async fetch(req) { const u = new URL(req.url); const p = u.pathname === "/" ? "/index.html" : u.pathname; let f = Bun.file(resolve(dist, "." + p)); if (!(await f.exists())) f = Bun.file(resolve(dist, "." + p + "/index.html")); if (!(await f.exists())) return new Response(Bun.file(resolve(dist, "404.html")), { status: 404 }); if (u.searchParams.get("scheme") === "dark" && f.name?.endsWith(".html")) { const html = (await f.text()).replace("</head>", "<style>:root{color-scheme:dark;--buncss-light: ;--buncss-dark:initial}</style></head>"); return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } }); } return new Response(f); } }); const base = `http://127.0.0.1:${srv.port}`; const paths = ["/", "/docs/getting-started/quickstart", "/docs/core/signals-and-reactivity", "/docs/core/server-actions", "/docs/core/configuration-and-security", "/docs/plugins/ui", "/docs/plugins/mcp", "/docs/production/deploy-and-compile", "/docs/production/migrating-from-v1", "/grammars", "/404.html"]; const urls = [...paths.map(p => `${base}${p}`), ...paths.map(p => `${base}${p}?scheme=dark`)]; const proc = Bun.spawn(["page", "check", "-w", "1440,1024,400", ...urls], { stdout: "inherit", stderr: "inherit" }); const code = await proc.exited; srv.stop(true); process.exit(code);'
 
 # Build and start the docs Caddy container on 127.0.0.1:3650
 docs-up:
@@ -52,7 +52,7 @@ showcase:
 noticeboard:
 	cd examples/noticeboard && bun run dev
 
-# Dry-run pack all 12 workspace packages
+# Dry-run pack all 13 workspace packages
 pack:
 	@for dir in packages/*/; do echo "=== $dir ==="; (cd "$dir" && bun pm pack --dry-run) || exit 1; done
 
@@ -82,7 +82,7 @@ minor: (release "minor")
 # Cut next major release (vX.0.0)
 major: (release "major")
 
-# Bump all 12 packages in lockstep, verify, tag, push atomically, and watch Forgejo CI
+# Bump all 13 packages in lockstep, verify, tag, push atomically, and watch Forgejo CI
 release level:
 	#!/usr/bin/env bash
 	set -euo pipefail

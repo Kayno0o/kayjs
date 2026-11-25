@@ -9,7 +9,7 @@ Every remaining capability is an opt-in package built strictly on `KayPlugin`.
 
 ## `@kayjs/i18n`
 
-Prefix-free default locale + prefixed secondary locales (`/fr/...`), automatic `<html lang>` + internal link rewriting, `prerenderPaths` expansion across locales, `hreflang` alternate links, and `Intl` helpers (`localizePath`, `alternateLinks`, `formatDate`, `formatNumber`):
+Prefix-free default locale with prefixed secondary locales (`/fr/...`), automatic `<html lang>` and internal `<a href="/...">` rewriting, `prerenderPaths` expansion, `hreflang` alternate links, and `Intl` helpers (`localizePath`, `alternateLinks`, `formatDate`, `formatNumber`):
 
 ```ts
 import { i18n } from '@kayjs/i18n'
@@ -22,18 +22,26 @@ i18n({
 })
 ```
 
+- Every request receives `ctx.locals.locale`, `ctx.locals.t(key)`, `ctx.locals.localize(path, target?)`, and `ctx.locals.alternates()`.
+- Add `data-no-localize` to any `<a>` tag to skip automatic locale prefixing.
+- Missing translation keys are reported by both `kay check` and `kay i18n-check`.
+
 ## `@kayjs/mail`
 
-Send transactional email via Resend or any custom transport, with a zero-config dev outbox UI at `/_kay/mail`:
+Send transactional email through Resend or any custom `MailTransport`, with a dev-only outbox preview at `/_kay/mail` (and `/_kay/mail.json`):
 
 ```ts
-import { createMail, mailPlugin, resendTransport } from '@kayjs/mail'
+// src/mail.ts
+import { mailer, mailPlugin, resend } from '@kayjs/mail'
 
-export const mail = createMail({
+export const mail = mailer({
   from: 'hello@example.com',
-  transport: process.env.RESEND_API_KEY ? resendTransport(process.env.RESEND_API_KEY) : undefined,
+  // Omit transport to auto-use RESEND_API_KEY when set
+  transport: process.env.RESEND_API_KEY ? resend() : undefined,
 })
 ```
+
+Register `mailPlugin(mail)` in `kay.config.ts`. In development and tests, sent messages are recorded in `mail.outbox` and rendered at `/_kay/mail`. In `NODE_ENV=production`, the preview routes are never mounted and no outbox copy is kept in memory.
 
 ## `@kayjs/icons`
 
@@ -48,15 +56,27 @@ import arrowRight from '~icons/tabler/arrow-right'
 
 ## `@kayjs/tailwind`
 
-Opt-in Tailwind CSS v4 via `bun-plugin-tailwind`:
+Opt-in Tailwind CSS v4 integration. `tailwind()` auto-loads `bun-plugin-tailwind` from your project and defaults to `src/app.css`:
 
 ```ts
 import { tailwind } from '@kayjs/tailwind'
-import tailwindPlugin from 'bun-plugin-tailwind'
 
-tailwind({ css: 'src/app.css', bunPlugin: tailwindPlugin })
+tailwind({ css: 'src/app.css' })
 ```
 
 ## `@kayjs/spa`
 
-MPA navigation (`0 KB` JS) is the default. Add `spa()` to opt into client-side HTML swaps with persistent islands across navigations.
+Multi-page navigation (`0 KB` JS) is the default. Add `spa()` to `plugins` to opt into in-place HTML swaps:
+
+```ts
+import { spa } from '@kayjs/spa'
+
+export default defineConfig({
+  plugins: [spa()],
+})
+```
+
+- **Persistent islands**: Add `data-persist="id"` to an element or island to keep its live DOM and state across navigations.
+- **Prefetch on hover/focus**: Add `data-kay-prefetch` to internal links (respects `Save-Data`).
+- **Opt-out**: Add `data-no-spa` to any link that should trigger a full page load.
+- **Accessibility**: Updates `<title>`, `<html lang>`, head metadata, scroll position, focus, and a polite `aria-live` route announcer.
