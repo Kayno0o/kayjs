@@ -161,18 +161,13 @@ export function ssrSpread(props: Record<string, unknown> | null | undefined): st
   return out
 }
 
-export function ssrLoop<T>(items: Iterable<T> | null | undefined | false, render: (item: T, index: number) => string): string {
+export function ssrLoop<T>(items: Iterable<T> | null | undefined | false, render: (item: T, index: number, array: readonly T[]) => string): string {
   if (!items)
     return ''
+  const list: readonly T[] = Array.isArray(items) ? items : [...items]
   let out = ''
-  if (Array.isArray(items)) {
-    for (let i = 0; i < items.length; i++)
-      out += render(items[i] as T, i)
-    return out
-  }
-  let i = 0
-  for (const item of items)
-    out += render(item, i++)
+  for (let i = 0; i < list.length; i++)
+    out += render(list[i] as T, i, list)
   return out
 }
 

@@ -8,6 +8,7 @@ import { compileDom, compileSsr } from '../src/compiler/index'
 import * as domExtras from '../src/dom/extras'
 import * as domCore from '../src/dom/index'
 import { defineIslandElement } from '../src/dom/island'
+import { loop } from '../src/dom/loop'
 import { onCleanup, signal } from '../src/reactivity/index'
 import { createRenderContext, runWithRenderContext } from '../src/ssr/context'
 import * as ssrRt from '../src/ssr/index'
@@ -732,5 +733,65 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
       delete (globalThis as Record<string, unknown>).__box37
       rmSync(tmp, { recursive: true, force: true })
     }
+  })
+})
+
+describe('destructured loop rows and component props in an island', () => {
+  // Mounts compiled island code against the real dom runtime: each `__name` it imports is bound to that runtime export.
+  function mountIsland(src: string, entry: string, props: object): { host: HTMLElement, dispose: () => void } {
+    const code = compileDom('Island.tsx', src).code
+    const runtime = Object.entries({ ...domCore, ...domExtras, loop }).map(([name, value]) => [`__${name}`, value] as const)
+    const body = code.replace(/^import .*?;\n/gm, '').replace(/export function /g, 'function ')
+    const render = new Function(...runtime.map(([n]) => n), 'props', `${body}\nreturn ${entry}(props)`)
+    const host = document.createElement('div')
+    const dispose = domCore.mount(host, () => render(...runtime.map(([, v]) => v), props) as Node)
+    return { host, dispose }
+  }
+
+  test.each([
+    ['an array pattern with a key', '([k, v]) => <li key={k}>{k}={v}</li>', [['a', 1], ['b', 2]], [['b', 3]], 'a=1b=2', 'b=3'],
+    ['a nested object', '({ a: { b } }) => <li>{b}</li>', [{ a: { b: 'x' } }], [{ a: { b: 'y' } }], 'x', 'y'],
+    ['a rest element', '({ id, ...rest }) => <li>{id}:{rest.label}</li>', [{ id: 1, label: 'one' }], [{ id: 2, label: 'two' }], '1:one', '2:two'],
+    ['a renamed key with a default', '({ a: b = \'none\' }) => <li>{b}</li>', [{ a: 'z' }, {}], [{}], 'znone', 'none'],
+    ['a string key', '({ \'x-y\': z }) => <li>{z}</li>', [{ 'x-y': 'dash' }], [{ 'x-y': 'line' }], 'dash', 'line'],
+  ])('a loop row destructured as %s renders and updates', async (_, row, first, next, firstText, nextText) => {
+    await withDom(() => {
+      const rows = signal<unknown[]>(first)
+      const { host, dispose } = mountIsland(`export function List({ rows }) { return <ul>{rows.value.map(${row})}</ul> }`, 'List', { rows })
+      expect(host.querySelector('ul')!.textContent).toBe(firstText)
+      rows.value = next
+      expect(host.querySelector('ul')!.textContent).toBe(nextText)
+      dispose()
+    })
+  })
+
+  test.each([
+    ['a nested object', '{ user: { name } }', 'name', { user: { name: 'Ada' } }, { user: { name: 'Bob' } }, 'Ada', 'Bob'],
+    ['a nested object with a default', '{ user: { name } = { name: \'anon\' } }', 'name', {}, { user: { name: 'Bob' } }, 'anon', 'Bob'],
+    ['a string key', '{ \'data-x\': x }', 'x', { 'data-x': 'one' }, { 'data-x': 'two' }, 'one', 'two'],
+    ['a renamed key with a default', '{ label: text = \'none\' }', 'text', {}, { label: 'set' }, 'none', 'set'],
+    ['a rest beside a string key', '{ \'data-x\': x, ...rest }', 'Object.keys(rest).join()', { 'data-x': 'a', other: 1 }, { 'data-x': 'b', more: 2 }, 'other', 'more'],
+  ])('component props destructured as %s render and update', async (_, pattern, read, first, next, firstText, nextText) => {
+    await withDom(() => {
+      const current = signal<Record<string, unknown>>(first)
+      const props = new Proxy({}, {
+        get: (_t, key) => current.value[key as string],
+        has: (_t, key) => key in current.value,
+        ownKeys: () => Reflect.ownKeys(current.value),
+        getOwnPropertyDescriptor: (_t, key) => ({ enumerable: true, configurable: true, value: current.value[key as string] }),
+      })
+      const { host, dispose } = mountIsland(`export function Card(${pattern}) { return <p>{${read}}</p> }`, 'Card', props)
+      expect(host.querySelector('p')!.textContent).toBe(firstText)
+      current.value = next
+      expect(host.querySelector('p')!.textContent).toBe(nextText)
+      dispose()
+    })
+  })
+
+  test('an inline SSR loop reading the array parameter renders it', () => {
+    const out = compileSsr('List.tsx', `export function List({ rows }) { return <ul>{rows.map((r, i, all) => <li>{r}/{all.length}</li>)}</ul> }`)
+    const body = out.code.replace(/^import .*?;\n/gm, '').replace(/export function /g, 'function ')
+    const run = new Function(...Object.keys(ssrRt).map(n => `__${n}`), `${body}\nreturn List({ rows: ['a', 'b'] }).__html`)
+    expect(run(...Object.values(ssrRt))).toBe('<ul><li>a/2</li><li>b/2</li></ul>')
   })
 })

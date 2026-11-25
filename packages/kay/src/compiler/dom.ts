@@ -346,6 +346,30 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   }
   const freshVar = (prefix = '_e'): string => `${prefix}${varCounter++}`
 
+  // How each name a destructuring pattern binds is read from `source` on every access, so reads stay reactive. Plain `{ a }` and `{ a = d }` keys read the property; any other shape re-runs the pattern: `(({ a: { b } }) => b)(source)`.
+  function patternReads(pattern: AstNode, source: string): Map<string, string> {
+    const reads = new Map<string, string>()
+    if (pattern.type === 'ObjectPattern') {
+      for (const prop of pattern.properties as AstNode[]) {
+        if (prop.type !== 'Property' || prop.computed || prop.key?.type !== 'Identifier')
+          continue
+        const read = `${source}.${prop.key.name as string}`
+        if (prop.value.type === 'Identifier')
+          reads.set(prop.value.name as string, read)
+        else if (prop.value.type === 'AssignmentPattern' && prop.value.left?.type === 'Identifier')
+          reads.set(prop.value.left.name as string, `(${read} === undefined ? ${code.slice(prop.value.right.start, prop.value.right.end)} : ${read})`)
+      }
+    }
+    const names = new Set<string>()
+    collectPatternNames(pattern, names)
+    const patCode = code.slice(pattern.start, pattern.end)
+    for (const name of names) {
+      if (!reads.has(name))
+        reads.set(name, `((${patCode}) => ${name})(${source})`)
+    }
+    return reads
+  }
+
   // Client builds keep the `load` binding, so every export form stays valid, and drop its server-only code.
   for (const node of loadDeclarations(program))
     editor.replace(node.start, node.end, node.type === 'FunctionDeclaration' ? `const ${node.id.name as string} = undefined` : 'undefined')
@@ -843,23 +867,13 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
                   keyRewrites.delete(n)
               }
 
-              if (firstParam?.type === 'ObjectPattern') {
+              if (firstParam !== undefined && firstParam.type !== 'Identifier') {
                 const patCode = code.slice(firstParam.start, firstParam.end)
                 keyFn = keyAst !== undefined
                   ? `(${patCode}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
                   : `(_item) => _item`
-                for (const prop of firstParam.properties as AstNode[]) {
-                  if (prop.type === 'Property' && prop.key?.type === 'Identifier') {
-                    const propKey = prop.key.name as string
-                    if (prop.value.type === 'Identifier') {
-                      rowRewrites.set(prop.value.name as string, `${rowSig}.value.${propKey}`)
-                    }
-                    else if (prop.value.type === 'AssignmentPattern' && prop.value.left?.type === 'Identifier') {
-                      const defCode = code.slice(prop.value.right.start, prop.value.right.end)
-                      rowRewrites.set(prop.value.left.name as string, `(${rowSig}.value.${propKey} === undefined ? ${defCode} : ${rowSig}.value.${propKey})`)
-                    }
-                  }
-                }
+                for (const [name, read] of patternReads(firstParam, `${rowSig}.value`))
+                  rowRewrites.set(name, read)
               }
               else {
                 const itemParam = firstParam?.type === 'Identifier' ? firstParam.name as string : '_item'
@@ -1088,27 +1102,24 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       const typeAnn = firstParam.typeAnnotation ? code.slice(firstParam.typeAnnotation.start, firstParam.typeAnnotation.end) : ''
       editor.replace(firstParam.start, firstParam.end, `${pVar}${typeAnn}`)
 
+      for (const [name, read] of patternReads(firstParam, pVar))
+        propRewrites.set(name, read)
+
+      // A rest beside static keys stays a live view of the props; beside a computed key it keeps the pattern's own copy.
       const extractedKeys: string[] = []
       let restName: string | undefined
-
+      let staticKeys = true
       for (const prop of firstParam.properties as AstNode[]) {
-        if (prop.type === 'Property' && prop.key?.type === 'Identifier') {
-          const propKey = prop.key.name as string
-          extractedKeys.push(propKey)
-          if (prop.value.type === 'Identifier') {
-            propRewrites.set(prop.value.name as string, `${pVar}.${propKey}`)
-          }
-          else if (prop.value.type === 'AssignmentPattern' && prop.value.left?.type === 'Identifier') {
-            const defCode = code.slice(prop.value.right.start, prop.value.right.end)
-            propRewrites.set(prop.value.left.name as string, `(${pVar}.${propKey} === undefined ? ${defCode} : ${pVar}.${propKey})`)
-          }
-        }
-        else if (prop.type === 'RestElement' && prop.argument?.type === 'Identifier') {
-          restName = prop.argument.name as string
-        }
+        if (prop.type === 'RestElement')
+          restName = prop.argument?.type === 'Identifier' ? prop.argument.name as string : undefined
+        else if (!prop.computed && prop.key?.type === 'Identifier')
+          extractedKeys.push(prop.key.name as string)
+        else if (!prop.computed && typeof prop.key?.value === 'string')
+          extractedKeys.push(prop.key.value)
+        else
+          staticKeys = false
       }
-
-      if (restName !== undefined)
+      if (restName !== undefined && staticKeys)
         propRewrites.set(restName, `${use('omit')}(${pVar}, ${JSON.stringify(extractedKeys)})`)
     }
 

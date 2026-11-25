@@ -386,7 +386,8 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
               const itemParam = params[0]?.type === 'Identifier' ? params[0].name as string : undefined
               const idxParam = params[1]?.type === 'Identifier' ? params[1].name as string : undefined
 
-              if (itemParam !== undefined) {
+              // Only `(item)` and `(item, index)` inline; any other shape goes through ssrLoop with its params as written.
+              if (itemParam !== undefined && params.length <= 2 && (params.length < 2 || idxParam !== undefined)) {
                 flushParts()
                 const n = loopCounter++
                 const arrVar = `_a${n}`
