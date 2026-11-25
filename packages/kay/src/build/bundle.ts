@@ -5,11 +5,12 @@ import type { IslandBinding } from '../compiler/index'
 import type { BuildPluginTarget, KayPlugin } from '../plugins/index'
 import type { BuildCache, ModuleGraph } from './graph'
 import type { ActionsByFile, IslandPlan } from './islands'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { isAbsolute, join, resolve } from 'node:path'
+import { copyFileSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { compileDom, compileSsr } from '../compiler/index'
 import { readsPrivateEnv, SERVER_ONLY_FILTER } from '../compiler/server-only'
 import { formatBunBuildLogs, isOutsideRoot, isTsFile, relPosix } from './files'
+import { stampFiles, stampsMatch } from './graph'
 import { islandKey } from './islands'
 import { resolveKaySpecifier } from './resolve'
 
@@ -21,11 +22,46 @@ export interface BundleEnv {
   assetPrefix: string
   minify: boolean
   isDev: boolean
+  analyze?: boolean | undefined
   graph: ModuleGraph
   cache: BuildCache | undefined
   plugins: KayPlugin[]
   actionsByFile: ActionsByFile
   islands: IslandPlan
+}
+
+function linkOrCopyFile(src: string, dst: string): void {
+  mkdirSync(dirname(dst), { recursive: true })
+  try {
+    linkSync(src, dst)
+  }
+  catch {
+    copyFileSync(src, dst)
+  }
+}
+
+function reuseDirFiles(srcDir: string, dstDir: string, relFiles?: readonly string[]): boolean {
+  if (!existsSync(srcDir))
+    return false
+  if (relFiles !== undefined) {
+    for (const rel of relFiles) {
+      const from = join(srcDir, rel)
+      if (!existsSync(from))
+        return false
+      linkOrCopyFile(from, join(dstDir, rel))
+    }
+    return true
+  }
+  let count = 0
+  for (const ent of readdirSync(srcDir, { recursive: true, withFileTypes: true })) {
+    if (!ent.isFile())
+      continue
+    const from = join(ent.parentPath, ent.name)
+    const rel = relative(srcDir, from)
+    linkOrCopyFile(from, join(dstDir, rel))
+    count++
+  }
+  return count > 0
 }
 
 const KAY_SPECIFIER_FILTER = /^(?:@kayjs\/)?kay(?:\/.*)?$/
@@ -111,10 +147,68 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     metafile: undefined,
   }
   const pluginClientEntries = env.plugins.map(p => p.clientEntry).filter((e): e is string => Boolean(e))
-  if (islands.targets.size === 0 && pluginClientEntries.length === 0 && standaloneCss.length === 0)
+  if (islands.targets.size === 0 && pluginClientEntries.length === 0 && standaloneCss.length === 0) {
+    if (cache !== undefined)
+      cache.lastClient = undefined
     return result
+  }
 
   const transforms = pluginTransforms(env.plugins)
+  // A mode computed at runtime may be any of them, so it keeps both loaders.
+  let hasDeferredHydrate = false
+  let hasClientOnlyHydrate = false
+  for (const analysis of graph.analyses.values()) {
+    for (const mode of [analysis.defaultHydrate, ...analysis.hydrateModes]) {
+      if (mode === 'client' || mode === '*')
+        hasClientOnlyHydrate = true
+      if (mode !== undefined && mode !== 'load' && mode !== 'client')
+        hasDeferredHydrate = true
+    }
+  }
+
+  const envDefines = publicEnvDefines()
+  const clientSignature = cache !== undefined
+    ? JSON.stringify({
+        minify: env.minify,
+        assetPrefix,
+        isDev: env.isDev,
+        transforms: transforms.key,
+        hasDeferredHydrate,
+        hasClientOnlyHydrate,
+        pluginClientEntries,
+        standaloneCss: [...standaloneCss].sort(),
+        islands: [...islands.targets.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([k, t]) => [k, t.id, t.file, t.exportName, t.defaultHydrate ?? '']),
+        actions: [...actionsByFile.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([f, list]) => [f, list.map(a => `${a.exportName}=${a.url}`)]),
+        envDefines: Object.entries(envDefines).sort(([a], [b]) => a.localeCompare(b)),
+        bunPlugins: env.plugins.filter(p => p.bunPlugins !== undefined).map(p => p.name),
+      })
+    : ''
+
+  if (
+    cache !== undefined
+    && !env.analyze
+    && cache.lastClient !== undefined
+    && cache.lastClient.signature === clientSignature
+    && stampsMatch(cache.lastClient.inputStamps)
+    && reuseDirFiles(cache.lastClient.clientDir, clientDir, cache.lastClient.assetFiles)
+  ) {
+    cache.stats.clientSkips++
+    cache.lastClient.clientDir = clientDir
+    return {
+      islandChunks: new Map(cache.lastClient.islandChunks),
+      srcCssToUrl: new Map(cache.lastClient.srcCssToUrl),
+      islandCssUrl: new Map(cache.lastClient.islandCssUrl),
+      assetFiles: [...cache.lastClient.assetFiles],
+      styleUrls: [...cache.lastClient.styleUrls],
+      runtimeScript: cache.lastClient.runtimeScript,
+      metafile: undefined,
+    }
+  }
+
   // Bun hashes an entry's path into its chunk name, so the entries sit at one path per app: a dev rebuild or a static stage then keeps every unchanged chunk name.
   const entriesDir = join(root, 'node_modules/.cache/kay/entries')
   mkdirSync(entriesDir, { recursive: true })
@@ -128,18 +222,6 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   }
   const entryPoints: string[] = []
   const islandEntryToKey = new Map<string, string>()
-
-  // A mode computed at runtime may be any of them, so it keeps both loaders.
-  let hasDeferredHydrate = false
-  let hasClientOnlyHydrate = false
-  for (const analysis of graph.analyses.values()) {
-    for (const mode of [analysis.defaultHydrate, ...analysis.hydrateModes]) {
-      if (mode === 'client' || mode === '*')
-        hasClientOnlyHydrate = true
-      if (mode !== undefined && mode !== 'load' && mode !== 'client')
-        hasDeferredHydrate = true
-    }
-  }
 
   if (islands.targets.size > 0 || pluginClientEntries.length > 0) {
     const runtimeLines: string[] = []
@@ -168,7 +250,6 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   }
 
   const clientLeaks = new Set<string>()
-  const envDefines = publicEnvDefines()
   const inlinedEnvKey = (key: string): boolean => key === 'NODE_ENV' || `process.env.${key}` in envDefines
   const clientPlugin: BunPlugin = {
     name: 'kay-v2-client',
@@ -316,6 +397,31 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     else if (output.kind === 'entry-point' && relFile.startsWith('runtime-'))
       result.runtimeScript = url
   }
+
+  if (cache !== undefined) {
+    cache.stats.clientBuilds++
+    const inputFiles = new Set<string>([...standaloneCss, ...pluginClientEntries])
+    for (const inKey of Object.keys(metafile?.inputs ?? {})) {
+      const abs = resolveMetaPath(inKey)
+      // Skip generated entry shims and stubbed action files (whose signature tracks exported action names/URLs, not server body).
+      if (abs.startsWith(entriesDir))
+        continue
+      if (actionsByFile.has(abs) && !graph.analyses.get(abs)?.isInteractive)
+        continue
+      inputFiles.add(abs)
+    }
+    cache.lastClient = {
+      signature: clientSignature,
+      clientDir,
+      inputStamps: stampFiles(inputFiles),
+      islandChunks: new Map(result.islandChunks),
+      srcCssToUrl: new Map(result.srcCssToUrl),
+      islandCssUrl: new Map(result.islandCssUrl),
+      assetFiles: [...result.assetFiles],
+      styleUrls: [...result.styleUrls],
+      runtimeScript: result.runtimeScript,
+    }
+  }
   return result
 }
 
@@ -323,6 +429,34 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
   const { root, outDir, serverDir, graph, cache, islands } = env
   const transforms = pluginTransforms(env.plugins)
   const externalOutDir = isOutsideRoot(root, outDir)
+
+  const serverSignature = cache !== undefined
+    ? JSON.stringify({
+        serverRoot,
+        assetPrefix: env.assetPrefix,
+        isDev: env.isDev,
+        transforms: transforms.key,
+        entries: [...entries].sort(),
+        islandChunks: [...islandChunks.entries()].sort(([a], [b]) => a.localeCompare(b)),
+        reach: [...islands.reach].sort(),
+        bindings: [...islands.pageBindings.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([f, map]) => [f, [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([l, t]) => [l, t.id, t.defaultHydrate ?? ''])]),
+        bunPlugins: env.plugins.filter(p => p.bunPlugins !== undefined).map(p => p.name),
+      })
+    : ''
+
+  if (
+    cache !== undefined
+    && cache.lastServer !== undefined
+    && cache.lastServer.signature === serverSignature
+    && stampsMatch(cache.lastServer.inputStamps)
+    && reuseDirFiles(cache.lastServer.serverDir, serverDir)
+  ) {
+    cache.stats.serverSkips++
+    cache.lastServer.serverDir = serverDir
+    return
+  }
 
   // Whether a file renders components, directly or through what it imports: such packages are bundled so Kay's SSR compiler transforms them.
   const tsxReach = new Map<string, boolean>()
@@ -376,6 +510,14 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
         }
         if (resolved.endsWith('.tsx') || reachesTsx(resolved))
           return { path: resolved }
+        if (env.isDev && isTsFile(resolved)) {
+          try {
+            const real = realpathSync(resolved)
+            if (!real.includes('/node_modules/') && !real.includes('\\node_modules\\'))
+              return { path: resolved }
+          }
+          catch {}
+        }
         if (externalOutDir)
           return { path: resolved, external: true }
         return undefined
@@ -433,6 +575,7 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
       splitting: true,
       packages: 'external',
       minify: false,
+      metafile: cache !== undefined,
       define: {
         'process.env.NODE_ENV': 'process.env.NODE_ENV',
       },
@@ -448,5 +591,25 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
   if (!serverResult.success) {
     const msgs = formatBunBuildLogs(serverResult.logs, env.root)
     throw new Error(`kay build (server) failed:\n${msgs}`)
+  }
+
+  if (cache !== undefined) {
+    cache.stats.serverBuilds++
+    const inputFiles = new Set<string>(entries)
+    for (const inKey of Object.keys(serverResult.metafile?.inputs ?? {})) {
+      const fromCwd = resolve(process.cwd(), inKey)
+      const abs = existsSync(fromCwd) ? fromCwd : resolve(serverDir, inKey)
+      if (!existsSync(abs))
+        continue
+      // Plain `.css` stylesheets are bundled exclusively by `buildClient`; CSS edits must not trigger a server rebuild.
+      if (abs.endsWith('.css') && !abs.endsWith('.module.css'))
+        continue
+      inputFiles.add(abs)
+    }
+    cache.lastServer = {
+      signature: serverSignature,
+      serverDir,
+      inputStamps: stampFiles(inputFiles),
+    }
   }
 }

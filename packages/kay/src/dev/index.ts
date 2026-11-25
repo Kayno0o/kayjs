@@ -2,8 +2,9 @@
 // SSE error push, and live config reload.
 
 import type { FSWatcher } from 'node:fs'
+import type { BuildCacheStats } from '../build/graph'
 import type { KayApp } from '../server/index'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { clearBuildCache } from '../build/graph'
 import { build, createBuildCache } from '../build/index'
@@ -167,12 +168,19 @@ function createModuleStore(storeRoot: string) {
   }
 }
 
-export async function devServer(options: DevServerOptions): Promise<{ url: string, stop: () => void, rebuild: () => Promise<void> }> {
+export async function devServer(options: DevServerOptions): Promise<{
+  url: string
+  stop: () => void
+  rebuild: () => Promise<void>
+  stats: () => BuildCacheStats
+}> {
   const prevKayDev = process.env.KAY_DEV
   process.env.KAY_DEV = '1'
   const root = resolve(options.root)
   const devRoot = join(root, '.kay-dev')
+  let initialConfigFailed = false
   const initialCfg = await loadConfig(root).catch((err) => {
+    initialConfigFailed = true
     console.warn(`[kay dev] failed to load kay.config.ts: ${err instanceof Error ? err.message : String(err)}`)
     return {} as Awaited<ReturnType<typeof loadConfig>>
   })
@@ -188,7 +196,63 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   const watchers: FSWatcher[] = []
   const watchedDirs = new Set<string>()
   const pluginWatchers: FSWatcher[] = []
+  const graphWatchers = new Map<string, FSWatcher>()
   let activeAssetPrefix = assetPrefix
+  let pluginWatchersAttached = false
+
+  const isInsideDir = (parent: string, target: string): boolean =>
+    target === parent || target.startsWith(`${parent}/`) || target.startsWith(`${parent}\\`)
+
+  function isCoveredByStaticWatchers(dir: string): boolean {
+    if (dir === root)
+      return false
+    for (const base of watchedDirs) {
+      if (isInsideDir(base, dir))
+        return true
+    }
+    return false
+  }
+
+  function syncBuildWatchers(watchedFiles: ReadonlySet<string>): void {
+    const nextDirs = new Set<string>()
+    let realRoot = root
+    try {
+      realRoot = realpathSync(root)
+    }
+    catch {}
+    for (const file of watchedFiles) {
+      if (file.includes('/node_modules/') || file.includes('\\node_modules\\'))
+        continue
+      if (isInsideDir(devRoot, file) || isInsideDir(join(root, '.kay-cache'), file))
+        continue
+      const dir = dirname(file)
+      // Root is already watched non-recursively for `kay.config.ts`; skip if it's only kay.config.ts itself.
+      if (dir === root || dir === realRoot) {
+        if (file === join(root, 'kay.config.ts') || file === join(realRoot, 'kay.config.ts'))
+          continue
+      }
+      if (isCoveredByStaticWatchers(dir))
+        continue
+      nextDirs.add(dir)
+    }
+    for (const [dir, watcher] of graphWatchers) {
+      if (!nextDirs.has(dir)) {
+        watcher.close()
+        graphWatchers.delete(dir)
+      }
+    }
+    for (const dir of nextDirs) {
+      if (graphWatchers.has(dir) || !existsSync(dir))
+        continue
+      try {
+        graphWatchers.set(dir, watch(dir, (_ev, filename) => {
+          const name = typeof filename === 'string' ? filename : ''
+          scheduleRebuild(srcChangeKind(name))
+        }))
+      }
+      catch {}
+    }
+  }
 
   function refreshPluginWatchers(cfg: Awaited<ReturnType<typeof loadConfig>>): void {
     for (const w of pluginWatchers)
@@ -296,8 +360,21 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
       }
       const prevApp = currentApp
       currentApp = nextApp
-      void prevApp?.dispose?.()
+      await prevApp?.dispose?.()
       lastError = undefined
+      syncBuildWatchers(buildCache.watchedFiles)
+      if (!pluginWatchersAttached && !initialConfigFailed) {
+        pluginWatchersAttached = true
+      }
+      else if (initialConfigFailed) {
+        initialConfigFailed = false
+        try {
+          const recoveredCfg = await loadConfig(root)
+          refreshPluginWatchers(recoveredCfg)
+          pluginWatchersAttached = true
+        }
+        catch {}
+      }
       if (n > 2)
         rmSync(join(devRoot, `b${n - 2}`), { recursive: true, force: true })
       console.log(`[kay dev] rebuilt in ${(performance.now() - t0).toFixed(1)} ms`)
@@ -451,7 +528,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
       const ct = res.headers.get('content-type') ?? ''
       if (ct.includes('text/event-stream'))
         srv.timeout(request, 0)
-      if (ct.includes('text/html') && request.method !== 'HEAD' && res.body !== null) {
+      if (ct.includes('text/html') && request.method !== 'HEAD' && res.body !== null && !res.headers.has('content-encoding')) {
         const headers = new Headers(res.headers)
         headers.delete('content-length')
         const existingCsp = headers.get('content-security-policy')
@@ -473,6 +550,9 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
       pendingCssOnly = false
       return drainRebuilds()
     },
+    stats() {
+      return { ...buildCache.stats }
+    },
     stop() {
       stopped = true
       clearTimeout(timer)
@@ -481,6 +561,9 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
         w.close()
       for (const w of pluginWatchers)
         w.close()
+      for (const w of graphWatchers.values())
+        w.close()
+      graphWatchers.clear()
       server.stop(true)
       void currentApp?.dispose?.()
       rmSync(devRoot, { recursive: true, force: true })

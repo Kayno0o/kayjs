@@ -1,20 +1,49 @@
 // The module graph of one build: every .ts/.tsx file reachable from the routes, analyzed once (and reused across `kay dev` rebuilds while mtime and size match).
 
 import type { ModuleAnalysis } from '../compiler/index'
-import { readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { analyzeModule } from '../compiler/index'
 import { isTsFile } from './files'
 import { resolveImportPath } from './resolve'
 
-interface FileStamp {
+export interface FileStamp {
   mtimeMs: number
   size: number
+}
+
+export interface CachedClientBuild {
+  signature: string
+  clientDir: string
+  inputStamps: Map<string, FileStamp>
+  islandChunks: Map<string, string>
+  srcCssToUrl: Map<string, string>
+  islandCssUrl: Map<string, string>
+  assetFiles: string[]
+  styleUrls: string[]
+  runtimeScript: string | undefined
+}
+
+export interface CachedServerBuild {
+  signature: string
+  serverDir: string
+  inputStamps: Map<string, FileStamp>
+}
+
+export interface BuildCacheStats {
+  clientBuilds: number
+  clientSkips: number
+  serverBuilds: number
+  serverSkips: number
 }
 
 export interface BuildCache {
   analyses: Map<string, FileStamp & { code: string, analysis: ModuleAnalysis }>
   domCompiled: Map<string, FileStamp & { key?: string | undefined, code: string }>
   ssrCompiled: Map<string, FileStamp & { key: string, code: string }>
+  lastClient?: CachedClientBuild | undefined
+  lastServer?: CachedServerBuild | undefined
+  watchedFiles: Set<string>
+  stats: BuildCacheStats
 }
 
 export function createBuildCache(): BuildCache {
@@ -22,6 +51,8 @@ export function createBuildCache(): BuildCache {
     analyses: new Map(),
     domCompiled: new Map(),
     ssrCompiled: new Map(),
+    watchedFiles: new Set(),
+    stats: { clientBuilds: 0, clientSkips: 0, serverBuilds: 0, serverSkips: 0 },
   }
 }
 
@@ -29,6 +60,40 @@ export function clearBuildCache(cache: BuildCache): void {
   cache.analyses.clear()
   cache.domCompiled.clear()
   cache.ssrCompiled.clear()
+  cache.lastClient = undefined
+  cache.lastServer = undefined
+  cache.watchedFiles.clear()
+}
+
+export function stampFiles(files: Iterable<string>): Map<string, FileStamp> {
+  const out = new Map<string, FileStamp>()
+  for (const file of files) {
+    if (out.has(file))
+      continue
+    try {
+      const st = statSync(file)
+      if (st.isFile())
+        out.set(file, { mtimeMs: st.mtimeMs, size: st.size })
+    }
+    catch {}
+  }
+  return out
+}
+
+export function stampsMatch(inputStamps: ReadonlyMap<string, FileStamp>): boolean {
+  for (const [file, prev] of inputStamps) {
+    if (!existsSync(file))
+      return false
+    try {
+      const st = statSync(file)
+      if (st.mtimeMs !== prev.mtimeMs || st.size !== prev.size)
+        return false
+    }
+    catch {
+      return false
+    }
+  }
+  return true
 }
 
 const MAX_REEXPORT_DEPTH = 8

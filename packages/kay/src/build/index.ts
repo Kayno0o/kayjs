@@ -9,7 +9,7 @@ import type { BuildCache } from './graph'
 import type { ActionsByFile } from './islands'
 import type { BuildManifest } from './manifest'
 import type { PublicFiles } from './plugin-host'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { actionHash } from '../server/action'
@@ -203,7 +203,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     .flatMap(p => p.css ?? [])
     .map(c => resolve(root, c))
     .filter(c => existsSync(c))
-  const env = { root, outDir, clientDir, serverDir, assetPrefix, minify: run.minify, isDev, graph, cache: options.cache, plugins, actionsByFile, islands }
+  const env = { root, outDir, clientDir, serverDir, assetPrefix, minify: run.minify, isDev, analyze: options.analyze === true, graph, cache: options.cache, plugins, actionsByFile, islands }
 
   const configSrc = join(root, 'kay.config.ts')
   const hasConfigFile = existsSync(configSrc)
@@ -222,6 +222,44 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   else {
     client = await clientPass()
     await buildServer(env, serverEntries, serverRoot, client.islandChunks)
+  }
+
+  if (options.cache !== undefined) {
+    const watched = options.cache.watchedFiles
+    watched.clear()
+    const recordWatched = (file: string) => {
+      if (!existsSync(file))
+        return
+      let real = file
+      try {
+        real = realpathSync(file)
+      }
+      catch {}
+      watched.add(real)
+    }
+    for (const f of graph.analyses.keys())
+      recordWatched(f)
+    for (const f of options.cache.lastClient?.inputStamps.keys() ?? [])
+      recordWatched(f)
+    for (const f of options.cache.lastServer?.inputStamps.keys() ?? [])
+      recordWatched(f)
+    for (const f of pluginCssFiles)
+      recordWatched(f)
+    if (hasConfigFile)
+      recordWatched(configSrc)
+    // Prune deleted files from caches so long-lived dev sessions stay flat in memory.
+    for (const f of [...options.cache.analyses.keys()]) {
+      if (!existsSync(f))
+        options.cache.analyses.delete(f)
+    }
+    for (const f of [...options.cache.domCompiled.keys()]) {
+      if (!existsSync(f))
+        options.cache.domCompiled.delete(f)
+    }
+    for (const f of [...options.cache.ssrCompiled.keys()]) {
+      if (!existsSync(f))
+        options.cache.ssrCompiled.delete(f)
+    }
   }
 
   const toOutRel = (srcFile: string): string =>
