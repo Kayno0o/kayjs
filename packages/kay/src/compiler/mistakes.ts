@@ -141,9 +141,9 @@ function reactHtmlSource(value: AstNode | null, code: string): string | undefine
   return html === undefined ? undefined : code.slice(html.value.start, html.value.end)
 }
 
-function hasChildren(element: AstNode): boolean {
-  return (element.children as AstNode[]).some(child =>
-    child.type === 'JSXText' ? cleanJsxText(child.value as string) !== '' : !(child.type === 'JSXExpressionContainer' && child.expression.type === 'JSXEmptyExpression'))
+function countChildren(element: AstNode): number {
+  return (element.children as AstNode[]).filter(child =>
+    child.type === 'JSXText' ? cleanJsxText(child.value as string) !== '' : !(child.type === 'JSXExpressionContainer' && child.expression.type === 'JSXEmptyExpression')).length
 }
 
 function checkInnerHtml(element: AstNode, tag: string, attr: AstNode, filename: string, code: string): void {
@@ -152,7 +152,7 @@ function checkInnerHtml(element: AstNode, tag: string, attr: AstNode, filename: 
     throw mistake('innerHTML={{ __html }}', filename, `write innerHTML={${html}}, kay takes the HTML string itself`)
   if (VOID_ELEMENTS.has(tag))
     throw mistake(`innerHTML on <${tag}>`, filename, 'a void element has no content, drop innerHTML')
-  if (hasChildren(element))
+  if (countChildren(element) > 0)
     throw mistake('innerHTML with children', filename, 'keep one, the children or innerHTML')
 }
 
@@ -191,6 +191,11 @@ export function checkMistakes(element: AstNode, filename: string, code: string):
   const tag = jsxTagName(element.openingElement.name)
   const isElement = tag !== '' && !isComponentTag(tag)
   const isCustomElement = tag.includes('-')
+  if (tag === 'Suspense') {
+    const children = countChildren(element)
+    if (children > 1)
+      throw mistake(`<Suspense> with ${children} children`, filename, 'give it one child, and one <Suspense> per async component')
+  }
   const attributes = element.openingElement.attributes as AstNode[]
   if (isElement && attributes.some(a => a.name?.name === 'class') && attributes.some(a => a.name?.name === 'className'))
     throw mistake('class and className', filename, 'keep one, they set the same attribute')

@@ -59,6 +59,11 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<div innerHTML={html}>\n</div>', 'const html = \'\'')
   })
 
+  test('<Suspense> with several children, which renders none of them', () => {
+    refuses('<Suspense fallback={<p>...</p>}><A /><B /></Suspense>', /<Suspense> with 2 children in Page\.tsx: give it one child/, 'import { Suspense } from \'kay\'\nconst A = () => <p>a</p>\nconst B = () => <p>b</p>')
+    accepts('<Suspense fallback={<p>...</p>}>\n  <A />\n</Suspense>', 'import { Suspense } from \'kay\'\nconst A = () => <p>a</p>')
+  })
+
   test('a ref that is not a function, which fails at hydration far from the cause', () => {
     refuses('<input ref={{ current: null }} />', /ref=\{\{ \.\.\. \}\} in Page\.tsx: pass a function, ref=\{el => \.\.\.\}/)
     refuses('<input ref="field" />', /ref="\.\.\." in Page\.tsx: pass a function/)
