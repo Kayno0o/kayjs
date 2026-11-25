@@ -49,6 +49,16 @@ export default function Dashboard() {
 }
 ```
 
+If the component throws, the boundary renders its `error` prop in place of the fallback and the rest of the page still streams. `error` takes markup, or a function that receives the thrown value. Without it, the boundary renders nothing. The error also reaches `onError` in `kay.config.ts`.
+
+```tsx
+<Suspense fallback={<p>Loading stats…</p>} error={<p>Stats unavailable.</p>}>
+  <LiveStats />
+</Suspense>
+```
+
+A boundary that hasn't resolved after 30 seconds is treated as failed, so the response always ends. Set `streamTimeout` (in milliseconds) in `kay.config.ts` to change it.
+
 ## Typed environment variables (`defineEnv`)
 
 Validate environment variables once at startup with any Standard Schema validator:

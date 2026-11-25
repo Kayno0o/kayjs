@@ -35,7 +35,7 @@ export function myPlugin(): KayPlugin {
       return paths
     },
 
-    // Post-process rendered HTML
+    // Post-process rendered HTML (on a streamed page: the document and its initial body, not the boundaries that stream in later)
     transformHtml(html, ctx) {
       return html
     },

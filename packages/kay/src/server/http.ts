@@ -19,6 +19,8 @@ export interface ServerOptions {
   trustedOrigins?: string[] | undefined
   trustProxy?: TrustProxy | undefined
   maxRequestBodySize?: number | undefined
+  /** Milliseconds a streamed `<Suspense>` boundary may take before it renders its error and the response ends (default 30000). */
+  streamTimeout?: number | undefined
   compress?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
@@ -60,6 +62,8 @@ export interface EmbeddedServerConfig {
   trustedOrigins?: string[] | undefined
   trustProxy?: TrustProxy | undefined
   maxRequestBodySize?: number | undefined
+  /** Milliseconds a streamed `<Suspense>` boundary may take before it renders its error and the response ends (default 30000). */
+  streamTimeout?: number | undefined
   compress?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined

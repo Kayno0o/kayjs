@@ -14,6 +14,7 @@ import type { EmbeddedBody, EmbeddedServerConfig, KayApp, Middleware, RequestCon
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { loadConfig } from '../plugins/index'
+import type { PendingChunk, SettledChunk } from '../ssr/context'
 import { createRenderContext, renderCollectedHead, runWithRenderContext, streamChunkScript } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
 import { ACTION_ERROR_COOKIE, executeAction, isServerAction } from './action'
@@ -62,6 +63,10 @@ interface LoadedErrorModule {
 }
 
 const textEncoder = new TextEncoder()
+// Where a streamed page's document splits: everything before it flushes first, resolved boundaries go in between.
+const STREAM_TAIL_MARK = '<!--kay:stream-tail-->'
+// Matches Bun.serve's 30 s idle timeout, which a streamed page turns off.
+const DEFAULT_STREAM_TIMEOUT = 30_000
 
 type PrerenderEntry = { kind: 'file', path: string, hasIslands: boolean } | { kind: 'html', html: string, hasIslands: boolean }
 
@@ -71,6 +76,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const trustedOrigins = config.trustedOrigins ? new Set(config.trustedOrigins) : undefined
   const trustProxy = config.trustProxy ?? false
   const maxRequestBodySize = config.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
+  const streamTimeout = config.streamTimeout ?? DEFAULT_STREAM_TIMEOUT
   const alwaysLoadRuntime = plugins.some(p => Boolean(p.clientEntry))
   const htmlTransformers = plugins
     .map(p => p.transformHtml)
@@ -586,8 +592,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     // Streaming SSR path when <Suspense> boundaries are pending (never buffered for compression)!
     if (rctx.pending.length > 0) {
       disableTimeout?.()
-      const shell = renderDocument({
-        body: '\0',
+      let shell = renderDocument({
+        body: body + STREAM_TAIL_MARK,
         head: collectedHead,
         headTags: routeHeadTags,
         lang,
@@ -598,19 +604,46 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         hasIslands,
         hasSuspense: true,
       })
-      const splitAt = shell.indexOf('\0')
-      const headHtml = shell.slice(0, splitAt)
-      const tailHtml = shell.slice(splitAt + 1)
+      // Transforms see the document with its initial body; boundaries resolved later stream as they render.
+      for (let i = 0; i < htmlTransformers.length; i++)
+        shell = await htmlTransformers[i]!(shell, ctx)
+      const splitAt = shell.lastIndexOf(STREAM_TAIL_MARK)
+      const openingHtml = splitAt === -1 ? shell : shell.slice(0, splitAt)
+      const tailHtml = splitAt === -1 ? '' : shell.slice(splitAt + STREAM_TAIL_MARK.length)
+
+      const settleWithin = async (chunk: PendingChunk): Promise<SettledChunk> => {
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const timedOut = new Promise<SettledChunk>((resolve) => {
+          timer = setTimeout(() => {
+            const error = new Error(`<Suspense> boundary ${chunk.id} did not resolve within ${streamTimeout} ms`)
+            resolve({ html: chunk.renderError(error), error })
+          }, streamTimeout)
+        })
+        try {
+          return await Promise.race([chunk.settled, timedOut])
+        }
+        finally {
+          clearTimeout(timer)
+        }
+      }
 
       const stream = new ReadableStream<Uint8Array>({
         async start(controller) {
-          controller.enqueue(textEncoder.encode(headHtml + body))
-          await Promise.all(
-            rctx.pending.map(async (chunk) => {
-              const resolved = await chunk.promise
-              controller.enqueue(textEncoder.encode(streamChunkScript(chunk.id, resolved)))
-            }),
-          )
+          controller.enqueue(textEncoder.encode(openingHtml))
+          // A resolved boundary can render boundaries of its own, so each flush also drains the ones it added.
+          let flushed = 0
+          const flushPending = async (): Promise<void> => {
+            const chunks = rctx.pending.slice(flushed)
+            flushed = rctx.pending.length
+            await Promise.all(chunks.map(async (chunk) => {
+              const settled = await settleWithin(chunk)
+              if ('error' in settled)
+                notifyError(settled.error, ctx.request, 'route')
+              controller.enqueue(textEncoder.encode(streamChunkScript(chunk.id, settled.html)))
+              await flushPending()
+            }))
+          }
+          await flushPending()
           controller.enqueue(textEncoder.encode(tailHtml))
           controller.close()
         },
@@ -1179,6 +1212,7 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     trustedOrigins: options.trustedOrigins ?? fileConfig.trustedOrigins,
     trustProxy,
     maxRequestBodySize,
+    streamTimeout: options.streamTimeout ?? fileConfig.streamTimeout,
     compress: options.compress ?? fileConfig.compress,
     onError: options.onError ?? fileConfig.onError,
     plugins,

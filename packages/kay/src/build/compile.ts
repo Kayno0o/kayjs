@@ -94,7 +94,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   }
 
   const cfgSpread = hasConfig
-    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins, trustProxy: _kayConfig?.trustProxy, maxRequestBodySize: _kayConfig?.maxRequestBodySize, compress: _kayConfig?.compress, onError: _kayConfig?.onError`
+    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins, trustProxy: _kayConfig?.trustProxy, maxRequestBodySize: _kayConfig?.maxRequestBodySize, streamTimeout: _kayConfig?.streamTimeout, compress: _kayConfig?.compress, onError: _kayConfig?.onError`
     : ''
 
   // Default NODE_ENV to 'production' in compiled binaries (dynamic key avoids Bun.build constant-folding).

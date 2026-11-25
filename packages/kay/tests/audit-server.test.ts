@@ -785,3 +785,75 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
     })
   })
 })
+
+describe('streamed Suspense boundaries', () => {
+  async function streamApp(page: string, options: { streamTimeout?: number, plugins?: ReturnType<typeof definePlugin>[] } = {}) {
+    const dir = makeTemp('kay-stream-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), page)
+    await build({ root: dir })
+    const errors: unknown[] = []
+    const app = await createServer({ root: dir, onError: info => errors.push(info.error), ...options })
+    return { errors, page: async () => (await app.handle(new Request('http://localhost/'))).text() }
+  }
+
+  it('renders a rejected boundary as its error template, completes the page and reports the error', async () => {
+    const { errors, page } = await streamApp(`
+      import { Suspense } from 'kay'
+      async function Boom() { await Bun.sleep(1); throw new Error('stats down') }
+      async function Bang() { await Bun.sleep(1); throw new Error('feed down') }
+      export default function Home() {
+        return <main>
+          <Suspense fallback={<p>a</p>} error={<p class="err">failed</p>}><Boom /></Suspense>
+          <Suspense fallback={<p>b</p>} error={(e) => <p class="err">{e.message}</p>}><Bang /></Suspense>
+          <Suspense fallback={<p>c</p>}><Boom /></Suspense>
+        </main>
+      }
+    `)
+    const html = await page()
+    expect(html).toContain('<template data-ks="0"><p class="err">failed</p></template>')
+    expect(html).toContain('<template data-ks="1"><p class="err">feed down</p></template>')
+    expect(html).toContain('<template data-ks="2"></template>')
+    expect(html.endsWith('</html>')).toBe(true)
+    expect(errors.map(e => (e as Error).message).sort()).toEqual(['feed down', 'stats down', 'stats down'])
+  })
+
+  it('flushes a boundary rendered by a boundary that resolved', async () => {
+    const { page } = await streamApp(`
+      import { Suspense } from 'kay'
+      async function Inner() { await Bun.sleep(1); return <b>inner</b> }
+      async function Outer() { await Bun.sleep(1); return <div><Suspense fallback={<i>wait</i>}><Inner /></Suspense></div> }
+      export default function Home() { return <main><Suspense fallback={<p>...</p>}><Outer /></Suspense></main> }
+    `)
+    const html = await page()
+    expect(html).toContain('<template data-ks="0"><div><kay-s id="k-s-1"><i>wait</i></kay-s></div></template>')
+    expect(html).toContain('<template data-ks="1"><b>inner</b></template>')
+    expect(html.endsWith('</html>')).toBe(true)
+  })
+
+  it('ends the response with the error template once a boundary exceeds streamTimeout', async () => {
+    const { errors, page } = await streamApp(`
+      import { Suspense } from 'kay'
+      async function Hang() { await new Promise(() => {}); return <p>never</p> }
+      export default function Home() { return <main><Suspense fallback={<p>...</p>} error={<p>slow</p>}><Hang /></Suspense></main> }
+    `, { streamTimeout: 30 })
+    const html = await page()
+    expect(html).toContain('<template data-ks="0"><p>slow</p></template>')
+    expect(html.endsWith('</html>')).toBe(true)
+    expect((errors[0] as Error).message).toBe('<Suspense> boundary 0 did not resolve within 30 ms')
+  })
+
+  it('runs plugin HTML transforms on the shell and initial body of a streamed page', async () => {
+    const tag = definePlugin({ name: 'tag', transformHtml: html => html.replace('<main>', '<main data-tagged>').replace('</head>', '<meta name="t"></head>') })
+    const { page } = await streamApp(`
+      import { Suspense } from 'kay'
+      async function Slow() { await Bun.sleep(1); return <p>done</p> }
+      export default function Home() { return <main><Suspense fallback={<p>...</p>}><Slow /></Suspense></main> }
+    `, { plugins: [tag] })
+    const html = await page()
+    expect(html).toContain('<meta name="t"></head>')
+    expect(html).toContain('<main data-tagged>')
+    expect(html).toContain('<template data-ks="0"><p>done</p></template>')
+    expect(html.endsWith('</html>')).toBe(true)
+  })
+})

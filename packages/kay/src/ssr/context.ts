@@ -5,9 +5,16 @@ import type { Html, KayChild } from '../jsx-runtime'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { raw, ssrChild } from './index'
 
+export interface SettledChunk {
+  html: string
+  error?: unknown
+}
+
 export interface PendingChunk {
   id: number
-  promise: Promise<string>
+  // Settles to the boundary's HTML, or to its error template and the error: it never rejects.
+  settled: Promise<SettledChunk>
+  renderError: (error: unknown) => string
 }
 
 export interface RenderContext {
@@ -65,7 +72,7 @@ export function renderCollectedHead(ctx: RenderContext): string {
  * Streaming SSR boundary: flushes `fallback` immediately and streams resolved async children
  * with a zero-dependency inline swap script. Islands inside streamed chunks hydrate automatically!
  */
-export function Suspense(props: { fallback?: KayChild, children?: KayChild | Promise<KayChild> }): Html {
+export function Suspense(props: { fallback?: KayChild, error?: KayChild | ((error: unknown) => KayChild), children?: KayChild | Promise<KayChild> }): Html {
   const ctx = renderStorage.getStore()
   const child = props.children
 
@@ -76,13 +83,27 @@ export function Suspense(props: { fallback?: KayChild, children?: KayChild | Pro
     return raw(ssrChild(props.fallback))
 
   const id = ctx.nextId++
-  ctx.pending.push({
-    id,
-    promise: child.then(resolved => ssrChild(resolved)),
-  })
+  const renderError = (error: unknown): string => {
+    try {
+      return ssrChild(typeof props.error === 'function' ? props.error(error) : props.error)
+    }
+    catch {
+      return ''
+    }
+  }
+  ctx.pending.push({ id, settled: settle(child, renderError), renderError })
 
   const fallbackHtml = ssrChild(props.fallback)
   return raw(`<kay-s id="k-s-${id}">${fallbackHtml}</kay-s>`)
+}
+
+async function settle(child: Promise<KayChild>, renderError: (error: unknown) => string): Promise<SettledChunk> {
+  try {
+    return { html: ssrChild(await child) }
+  }
+  catch (error) {
+    return { html: renderError(error), error }
+  }
 }
 
 /** Fixed streaming swap bootstrap (constant content -> deterministic SHA-256 CSP hash, zero per-chunk inline scripts). */
