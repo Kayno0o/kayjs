@@ -4,10 +4,7 @@
 import type { AstNode, ModuleAnalysis } from './analyze'
 import { analyzeModule, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
-
-export function escapeStaticText(str: string): string {
-  return str.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-}
+import { cleanJsxText, escapeStaticAttr, escapeStaticText, isComponentTag, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
 
 const RAW_TEXT_ELEMENTS = new Set(['style', 'script'])
 const CLOSE_STYLE_RE = /<\/(style)/gi
@@ -21,27 +18,7 @@ function escapeRawText(str: string, tag: 'style' | 'script'): string {
   return str.replace(CLOSE_STYLE_RE, '<\\/$1')
 }
 
-const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr',
-])
-
 const EVENT_ATTR = /^on[A-Z]/
-const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href'])
-const UNSAFE_URL_RE = /^(?:javascript|vbscript):/i
-const STRING_BOOL_ATTRS = new Set(['draggable', 'spellcheck', 'contenteditable'])
-
-function isStringBoolAttr(name: string): boolean {
-  const lower = name.toLowerCase()
-  return lower.startsWith('aria-') || STRING_BOOL_ATTRS.has(lower)
-}
-
-function isUnsafeUrlAttr(name: string, value: unknown): boolean {
-  if (!URL_ATTRS.has(name.toLowerCase()))
-    return false
-  return UNSAFE_URL_RE.test(String(value).replace(/[\u0000-\u0020]+/g, ''))
-}
-
 function containsDirectAwait(root: AstNode): boolean {
   let found = false
   walk(root, (child) => {
@@ -113,67 +90,6 @@ class StringParts {
       .map(p => (p.static ? JSON.stringify(p.value) : `(${p.value})`))
       .join(' + ')
   }
-}
-
-export function cleanJsxText(raw: string): string {
-  if (!raw.includes('\n'))
-    return raw
-  const lines = raw.split(/\r\n|\n|\r/)
-  let out = ''
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i]!.replace(/\t/g, ' ')
-    if (i > 0)
-      line = line.replace(/^ +/, '')
-    if (i < lines.length - 1)
-      line = line.replace(/ +$/, '')
-    if (line !== '') {
-      if (out !== '')
-        out += ' '
-      out += line
-    }
-  }
-  return out
-}
-
-function escapeStaticAttr(str: string): string {
-  return str
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-}
-
-function jsxTagName(node: AstNode): string {
-  if (node.type === 'JSXIdentifier')
-    return node.name as string
-  if (node.type === 'JSXMemberExpression')
-    return `${jsxTagName(node.object)}.${node.property.name}`
-  if (node.type === 'JSXNamespacedName')
-    return `${node.namespace.name}:${node.name.name}`
-  return ''
-}
-
-function isComponentTag(tag: string): boolean {
-  const first = tag.charCodeAt(0)
-  return (first >= 65 && first <= 90) || tag.includes('.')
-}
-
-function unwrapParens(node: AstNode): AstNode {
-  let cur = node
-  while (cur.type === 'ParenthesizedExpression')
-    cur = cur.expression as AstNode
-  return cur
-}
-
-function isSimpleLiteral(node: AstNode): { ok: true, value: string | number | boolean | null } | { ok: false } {
-  if (node.type === 'Literal') {
-    const v = node.value
-    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null)
-      return { ok: true, value: v }
-  }
-  if (node.type === 'UnaryExpression' && node.operator === '-' && node.argument?.type === 'Literal' && typeof node.argument.value === 'number')
-    return { ok: true, value: -node.argument.value }
-  return { ok: false }
 }
 
 function isStaticNullish(node: AstNode): boolean {
@@ -523,7 +439,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       }
       else if (attr.value.type === 'JSXExpressionContainer') {
         const expr = attr.value.expression as AstNode
-        const lit = isSimpleLiteral(expr)
+        const lit = staticLiteral(expr)
         if (lit.ok)
           staticPropsObj[name] = lit.value
         else

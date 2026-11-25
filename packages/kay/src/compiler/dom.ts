@@ -4,12 +4,7 @@
 import type { AstNode, ModuleAnalysis } from './analyze'
 import { analyzeModule, loadDeclarations, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
-import { cleanJsxText, escapeStaticText } from './ssr'
-
-const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr',
-])
+import { cleanJsxText, escapeStaticAttr, escapeStaticText, isComponentTag, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
 
 const SVG_CHILD_TAGS = new Set([
   'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse',
@@ -26,21 +21,6 @@ const DELEGATED_EVENTS = new Set([
 
 const DOM_PROPS = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
 const EVENT_ATTR = /^on([A-Z]\w*)$/
-const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href'])
-const UNSAFE_URL_RE = /^(?:javascript|vbscript):/i
-const STRING_BOOL_ATTRS = new Set(['draggable', 'spellcheck', 'contenteditable'])
-
-function isStringBoolAttr(name: string): boolean {
-  const lower = name.toLowerCase()
-  return lower.startsWith('aria-') || STRING_BOOL_ATTRS.has(lower)
-}
-
-function isUnsafeUrlAttr(name: string, value: unknown): boolean {
-  if (!URL_ATTRS.has(name.toLowerCase()))
-    return false
-  return UNSAFE_URL_RE.test(String(value).replace(/[\u0000-\u0020]+/g, ''))
-}
-
 const HTML_ENTITIES: Record<string, string> = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: '\u00A0',
   ndash: '\u2013', mdash: '\u2014', lsquo: '\u2018', rsquo: '\u2019',
@@ -134,48 +114,6 @@ export interface CompileDomOptions {
 export interface CompileDomResult {
   code: string
   analysis: ModuleAnalysis
-}
-
-function jsxTagName(node: AstNode): string {
-  if (node.type === 'JSXIdentifier')
-    return node.name as string
-  if (node.type === 'JSXMemberExpression')
-    return `${jsxTagName(node.object)}.${node.property.name}`
-  if (node.type === 'JSXNamespacedName')
-    return `${node.namespace.name}:${node.name.name}`
-  return ''
-}
-
-function isComponentTag(tag: string): boolean {
-  const first = tag.charCodeAt(0)
-  return (first >= 65 && first <= 90) || tag.includes('.')
-}
-
-function unwrapParens(node: AstNode): AstNode {
-  let cur = node
-  while (cur.type === 'ParenthesizedExpression')
-    cur = cur.expression as AstNode
-  return cur
-}
-
-function escapeStaticAttr(str: string): string {
-  return str
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-}
-
-function staticLiteral(node: AstNode): { ok: true, value: string | number | boolean | null } | { ok: false } {
-  const n = unwrapParens(node)
-  if (n.type === 'Literal') {
-    const v = n.value
-    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null)
-      return { ok: true, value: v }
-  }
-  if (n.type === 'UnaryExpression' && n.operator === '-' && n.argument?.type === 'Literal' && typeof n.argument.value === 'number')
-    return { ok: true, value: -n.argument.value }
-  return { ok: false }
 }
 
 function collectPatternNames(pattern: AstNode, out: Set<string>): void {

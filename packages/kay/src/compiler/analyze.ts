@@ -2,6 +2,8 @@
 
 import { parseSync } from 'oxc-parser'
 
+import { isComponentTag, jsxTagName } from './shared'
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AstNode = Record<string, any>
 
@@ -141,14 +143,6 @@ function hydrateMode(value: AstNode | null | undefined): string {
   if (node?.type === 'TemplateLiteral' && node.expressions.length === 0)
     return node.quasis[0].value.cooked as string
   return '*'
-}
-
-function jsxName(node: AstNode): string {
-  if (node.type === 'JSXIdentifier')
-    return node.name as string
-  if (node.type === 'JSXMemberExpression')
-    return `${jsxName(node.object)}.${node.property.name as string}`
-  return ''
 }
 
 export function analyzeModule(filename: string, code: string, program: AstNode = parseTsx(filename, code)): ModuleAnalysis {
@@ -313,8 +307,8 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     if (node.type === 'JSXElement' || node.type === 'JSXFragment')
       hasJsx = true
     if (node.type === 'JSXOpeningElement') {
-      const tag = jsxName(node.name)
-      const isComponent = node.name.type === 'JSXMemberExpression' || (tag.charCodeAt(0) >= 65 && tag.charCodeAt(0) <= 90)
+      const tag = jsxTagName(node.name)
+      const isComponent = isComponentTag(tag)
       if (isComponent)
         jsxTags.add(tag)
       for (const attr of node.attributes as AstNode[]) {
