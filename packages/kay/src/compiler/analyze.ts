@@ -2,7 +2,7 @@
 
 import { parseSync } from 'oxc-parser'
 
-import { checkHydrateMode, checkMistakes, mistake } from './mistakes'
+import { checkBareSignals, checkHydrateMode, checkMistakes, mistake } from './mistakes'
 import { isComponentTag, isJsxNode, jsxTagName } from './shared'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,6 +172,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   const hydrateModes = new Set<string>()
   const kayNamespaces = new Set<string>()
   const stateCallees = new Set<string>()
+  const signalCallees = new Set<string>()
   const asyncLocals = new Set<string>()
   const localInits = new Map<string, AstNode>()
   const localExports = new Map<string, string>()
@@ -222,6 +223,8 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
             markInteractive(`imports ${imported} from '${source}'`)
           if (KAY_SOURCES.has(source) && STATE_PRIMITIVES.has(imported))
             stateCallees.add(local)
+          if (KAY_SOURCES.has(source) && (imported === 'signal' || imported === 'computed'))
+            signalCallees.add(local)
           if ((source === 'kay' || source === '@kayjs/kay' || source === 'kay/ssr') && (imported === 'Head' || imported === 'Suspense'))
             usesRenderContext = true
           if ((source === 'kay/server' || source === '@kayjs/kay/server') && imported === 'action') {
@@ -362,8 +365,12 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
         markInteractive(`calls ${node.object.name as string}.${member}`)
       if (STATE_PRIMITIVES.has(member))
         stateCallees.add(`${node.object.name as string}.${member}`)
+      if (member === 'signal' || member === 'computed')
+        signalCallees.add(`${node.object.name as string}.${member}`)
     }
   })
+
+  checkBareSignals(program, signalCallees, filename)
 
   for (const [name, init] of localInits) {
     if (isAsyncFunction(init))

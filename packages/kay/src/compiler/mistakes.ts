@@ -1,6 +1,7 @@
 // Refuses JSX that compiles but does the wrong thing, mostly habits from React, Solid and Astro, with an error naming the fix.
 
 import type { AstNode } from './analyze'
+import { walk } from './analyze'
 import { cleanJsxText, isComponentTag, jsxTagName, unwrapParens, VOID_ELEMENTS } from './shared'
 
 // The kay prop for each DOM event, keyed by the event name kay binds (`onKeyDown` binds `keydown`).
@@ -218,4 +219,92 @@ export function checkMistakes(element: AstNode, filename: string, code: string):
     else if (isElement)
       checkElementAttribute(attr, isCustomElement, filename, code)
   }
+}
+
+function calleeName(callee: AstNode): string {
+  if (callee.type === 'Identifier')
+    return callee.name as string
+  if (callee.type === 'MemberExpression' && callee.object?.type === 'Identifier')
+    return `${callee.object.name as string}.${callee.property?.name as string}`
+  return ''
+}
+
+// Names bound once in the file to a signal() or computed() call; a name bound twice may be shadowed, so it is left out.
+function signalNames(program: AstNode, signalCallees: ReadonlySet<string>): Set<string> {
+  const bindings = new Map<string, number>()
+  const signals = new Set<string>()
+  const bind = (id: AstNode | null | undefined): void => {
+    if (id?.type === 'Identifier')
+      bindings.set(id.name as string, (bindings.get(id.name as string) ?? 0) + 1)
+  }
+  walk(program, (node) => {
+    if (node.type === 'VariableDeclarator') {
+      bind(node.id)
+      if (node.id?.type === 'Identifier' && node.init?.type === 'CallExpression' && signalCallees.has(calleeName(node.init.callee as AstNode)))
+        signals.add(node.id.name as string)
+    }
+    else if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+      bind(node.id)
+      for (const param of node.params as AstNode[])
+        walk(param, (p) => { if (p.type === 'Identifier') bind(p) })
+    }
+  })
+  for (const name of signals) {
+    if (bindings.get(name) !== 1)
+      signals.delete(name)
+  }
+  return signals
+}
+
+// The signal an expression reads without `.value` where JSX would print or test it.
+function bareSignal(expr: AstNode, signals: ReadonlySet<string>): string | undefined {
+  const node = unwrapParens(expr)
+  if (node.type === 'Identifier')
+    return signals.has(node.name as string) ? node.name as string : undefined
+  if (node.type === 'LogicalExpression' || node.type === 'BinaryExpression')
+    return bareSignal(node.left as AstNode, signals) ?? bareSignal(node.right as AstNode, signals)
+  if (node.type === 'ConditionalExpression')
+    return bareSignal(node.test as AstNode, signals)
+  if (node.type === 'UnaryExpression')
+    return bareSignal(node.argument as AstNode, signals)
+  if (node.type === 'TemplateLiteral') {
+    for (const part of node.expressions as AstNode[]) {
+      const found = bareSignal(part, signals)
+      if (found !== undefined)
+        return found
+    }
+  }
+  return undefined
+}
+
+/** Throws when JSX prints or tests a local signal or computed without `.value`, on an element's children or attributes. */
+export function checkBareSignals(program: AstNode, signalCallees: ReadonlySet<string>, filename: string): void {
+  if (signalCallees.size === 0)
+    return
+  const signals = signalNames(program, signalCallees)
+  if (signals.size === 0)
+    return
+  const refuse = (expr: AstNode): void => {
+    const name = bareSignal(expr, signals)
+    if (name !== undefined)
+      throw mistake(`${name} without .value`, filename, `write ${name}.value`)
+  }
+  walk(program, (node) => {
+    if (node.type !== 'JSXElement' && node.type !== 'JSXFragment')
+      return
+    const tag = node.type === 'JSXElement' ? jsxTagName(node.openingElement.name) : ''
+    if (isComponentTag(tag))
+      return
+    for (const child of node.children as AstNode[]) {
+      if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression')
+        refuse(child.expression as AstNode)
+    }
+    if (node.type !== 'JSXElement')
+      return
+    for (const attr of node.openingElement.attributes as AstNode[]) {
+      const name = attr.type === 'JSXAttribute' && attr.name.type === 'JSXIdentifier' ? attr.name.name as string : ''
+      if (name !== '' && name !== 'ref' && name !== 'key' && !EVENT_ATTR.test(name) && attr.value?.type === 'JSXExpressionContainer')
+        refuse(attr.value.expression as AstNode)
+    }
+  })
 }

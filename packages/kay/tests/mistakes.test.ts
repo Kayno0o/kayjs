@@ -67,6 +67,22 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<Suspense fallback={<p>...</p>}>\n  <A />\n</Suspense>', 'import { Suspense } from \'kay\'\nconst A = () => <p>a</p>')
   })
 
+  test('a signal used without .value, which renders [object Object] or is always truthy', () => {
+    const page = (jsx: string): string => `import { signal, computed } from 'kay'\nexport default function Page() { const count = signal(0); const label = computed(() => 'x'); return ${jsx} }`
+    const refusesPage = (jsx: string, message: RegExp): void => {
+      expect(() => compileSsr('Page.tsx', page(jsx))).toThrow(message)
+      expect(() => compileDom('Page.tsx', page(jsx))).toThrow(message)
+    }
+    refusesPage('<p>{count}</p>', /count without \.value in Page\.tsx: write count\.value/)
+    refusesPage('<p title={label}>x</p>', /label without \.value in Page\.tsx: write label\.value/)
+    refusesPage('<div>{count > 0 && <b>x</b>}</div>', /count without \.value/)
+    refusesPage('<div>{label ? <b>x</b> : null}</div>', /label without \.value/)
+    refusesPage('<p>{`n=${count}`}</p>', /count without \.value/)
+    expect(() => compileSsr('Page.tsx', page('<p>{count.value} {label.value}</p>'))).not.toThrow()
+    expect(() => compileSsr('Page.tsx', page('<Child n={count} />').replace('export default', 'const Child = (p: any) => <p>{p.n.value}</p>\nexport default'))).not.toThrow()
+    expect(() => compileSsr('Page.tsx', `import { signal } from 'kay'\nconst A = () => { const n = signal(0); return <p>{n.value}</p> }\nexport default function B({ n }: { n: number }) { return <p>{n}</p> }`)).not.toThrow()
+  })
+
   test('a ref that is not a function, which fails at hydration far from the cause', () => {
     refuses('<input ref={{ current: null }} />', /ref=\{\{ \.\.\. \}\} in Page\.tsx: pass a function, ref=\{el => \.\.\.\}/)
     refuses('<input ref="field" />', /ref="\.\.\." in Page\.tsx: pass a function/)
