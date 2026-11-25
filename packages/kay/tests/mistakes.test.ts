@@ -3,7 +3,7 @@ import { compileDom, compileSsr } from '../src/compiler/index'
 import { insert, spread } from '../src/dom/extras'
 import { setAttr, setClass, setText } from '../src/dom/index'
 import { signal } from '../src/reactivity/index'
-import { esc, raw, ssrAttr, ssrChild, ssrSpread } from '../src/ssr/index'
+import { esc, raw, ssrAttr, ssrChild, ssrIsland, ssrSpread } from '../src/ssr/index'
 
 // Each mistake must fail both compile targets with the same message naming the fix.
 function refuses(jsx: string, message: RegExp, setup = ''): void {
@@ -130,5 +130,14 @@ describe('kay refuses values it cannot render, instead of printing them', () => 
     expect(ssrChild(['a', 1, null])).toBe('a1')
     expect(ssrAttr('action', Object.assign(() => {}, { toString: () => '/_kay/action/x' }))).toBe(' action="/_kay/action/x"')
     expect(esc({ toString: () => 'custom' })).toBe('custom')
+  })
+})
+
+describe('kay refuses island props the browser cannot receive', () => {
+  test('a function or a signal, which JSON drops on the way to the browser', () => {
+    expect(() => ssrIsland('c', () => '', { onSave: () => {} })).toThrow(/island prop "onSave" is a function, which cannot reach the browser; define it inside the island, or import it there/)
+    expect(() => ssrIsland('c', () => '', { opts: { format: () => '' } })).toThrow(/island prop "format" is a function/)
+    expect(() => ssrIsland('c', () => '', { count: signal(1) })).toThrow(/island prop "count" is a signal; pass count\.value, or import the signal in the island from a shared module/)
+    expect(ssrIsland('c', () => '', { n: 1, when: new Date(0), tags: new Set(['a']) })).toContain(' p="')
   })
 })

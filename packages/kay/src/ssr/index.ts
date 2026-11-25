@@ -208,6 +208,10 @@ function serializeIslandProps(props: Record<string, unknown>): string {
       return { __k: 'R', v: [orig.source, orig.flags] }
     if (typeof orig === 'bigint')
       return { __k: 'B', v: orig.toString() }
+    if (typeof orig === 'function')
+      throw new TypeError(`kay: island prop "${key}" is a function, which cannot reach the browser; define it inside the island, or import it there.`)
+    if (typeof orig === 'object' && orig !== null && 'peek' in orig && 'value' in orig)
+      throw new TypeError(`kay: island prop "${key}" is a signal; pass ${key}.value, or import the signal in the island from a shared module.`)
     return value
   })
 }
