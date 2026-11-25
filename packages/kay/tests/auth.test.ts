@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createAuth, oauthProvider, safeRedirect } from '../../plugin-auth/src/index'
+import { createAuth, memoryAuthStore, oauthProvider, safeRedirect } from '../../plugin-auth/src/index'
 import { sqliteAuthStore } from '../../plugin-auth/src/sqlite'
 import { mailer } from '../../plugin-mail/src/index'
 import { testApp } from '../src/test/index'
@@ -428,5 +428,96 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       'x-forwarded-host': '3000.kevyn.fr',
     })
     expect(proxied.status).toBe(202)
+  })
+
+  test('#3558: resolves session lazily on first read, skips asset/internal routes, and writes sliding expiry at most once per interval', async () => {
+    const appDir = join(TMP, 'lazy-auth-app')
+    const routesDir = join(appDir, 'src', 'routes')
+    mkdirSync(join(appDir, 'public'), { recursive: true })
+    mkdirSync(routesDir, { recursive: true })
+    writeFileSync(join(appDir, 'public', 'logo.txt'), 'brand')
+    writeFileSync(join(routesDir, 'index.tsx'), `
+      export default function PublicHome() { return <main>public-only</main> }
+    `)
+    writeFileSync(join(routesDir, 'me.tsx'), `
+      import type { PageProps } from 'kay'
+      export default function Me({ locals }: PageProps) {
+        const a = locals.user?.email ?? 'anon'
+        const b = locals.user?.email ?? 'anon'
+        const s = locals.session?.id ? 'yes' : 'no'
+        return <p>{a}:{b}:{s}</p>
+      }
+    `)
+
+    const baseStore = memoryAuthStore()
+    let getSessionCalls = 0
+    let getUserCalls = 0
+    let renewCalls = 0
+    let forceHalfLife = false
+    const instrumentedStore: typeof baseStore = {
+      ...baseStore,
+      getSession(tokenHash) {
+        getSessionCalls++
+        const s = baseStore.getSession(tokenHash)
+        if (forceHalfLife && s && !(s instanceof Promise))
+          s.expiresAt = Date.now() + 10_000
+        return s
+      },
+      getUserById(id) {
+        getUserCalls++
+        return baseStore.getUserById(id)
+      },
+      updateSessionExpiry(tokenHash, expiresAt) {
+        renewCalls++
+        return baseStore.updateSessionExpiry(tokenHash, expiresAt)
+      },
+    }
+
+    const auth = createAuth({
+      store: instrumentedStore,
+      secret: 'lazy-session-test-secret-32-bytes-ok',
+      requireEmailVerification: false,
+      sessionTtlSeconds: 120,
+      renewalIntervalSeconds: 60,
+    })
+
+    const internalPlugin = {
+      name: 'internal-probe',
+      server(api: import('../src/server/index').ServerPluginAPI) {
+        api.route('GET', '/_kay/probe', ctx => ctx.json({ user: ctx.locals.user ?? null }))
+      },
+    }
+
+    const app = await testApp({ root: appDir, plugins: [auth.plugin, internalPlugin] })
+    const signup = await app.post('/auth/signup', { email: 'lazy@example.com', password: 'password123456' })
+    expect(signup.status).toBe(201)
+
+    // Reset counters after signup
+    getSessionCalls = 0
+    getUserCalls = 0
+    renewCalls = 0
+
+    // 1. Public asset + internal /_kay/* route + page that never reads locals.user do ZERO session lookups
+    expect((await app.get('/logo.txt')).status).toBe(200)
+    const probe = await app.get('/_kay/probe')
+    expect(probe.status).toBe(200)
+    expect(await probe.json()).toEqual({ user: null })
+    expect((await app.get('/')).status).toBe(200)
+    expect(getSessionCalls).toBe(0)
+    expect(getUserCalls).toBe(0)
+
+    // 2. Page reading locals.user twice + locals.session resolves ONCE and caches for the request
+    const me = await app.get('/me')
+    expect(me.status).toBe(200)
+    expect(await me.text()).toContain('lazy@example.com:lazy@example.com:yes')
+    expect(getSessionCalls).toBe(1)
+    expect(getUserCalls).toBe(1)
+
+    // 3. Sliding-expiry write runs at most once per renewalIntervalSeconds across repeated & concurrent reads
+    forceHalfLife = true
+    await Promise.all([app.get('/me'), app.get('/me'), app.get('/me')])
+    expect(renewCalls).toBe(1)
+
+    auth.dispose()
   })
 })

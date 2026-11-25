@@ -83,6 +83,8 @@ export interface AuthOptions<TUser extends AuthUser = AuthUser> {
   cookieName?: string | undefined
   /** Session lifetime in seconds (default: 30 days). */
   sessionTtlSeconds?: number | undefined
+  /** Minimum interval in seconds between sliding-expiry DB writes for the same session (default: up to 1 hour). */
+  renewalIntervalSeconds?: number | undefined
   /** Magic-link / verification token lifetime in seconds (default: 15 minutes). */
   tokenTtlSeconds?: number | undefined
   /** Minimum password length (default: 12, aligned with CNIL guidance). */
@@ -139,6 +141,7 @@ export interface Auth<TUser extends AuthUser = AuthUser> {
   readonly basePath: string
   getUser(ctx: { locals: KayLocals }): PublicUser<TUser> | undefined
   getSession(ctx: { locals: KayLocals }): AuthSession | undefined
+  resolve(ctx: RequestContext): Promise<{ user: PublicUser<TUser>, session: AuthSession } | undefined>
   guard(options?: GuardOptions<TUser>): Middleware
   createUser(input: CreateUserInput<TUser>): Promise<PublicUser<TUser>>
   createSessionForUser(userId: string, ctx: RequestContext): Promise<AuthSession>
@@ -171,7 +174,9 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
   const basePath = (options.basePath ?? '/auth').replace(/\/$/, '')
   const cookieName = options.cookieName ?? 'kay_session'
   const oauthCookieName = `${cookieName}_oauth`
-  const sessionTtlMs = (options.sessionTtlSeconds ?? 60 * 60 * 24 * 30) * 1000
+  const sessionTtlSeconds = options.sessionTtlSeconds ?? 60 * 60 * 24 * 30
+  const sessionTtlMs = sessionTtlSeconds * 1000
+  const renewalIntervalMs = Math.max(0, (options.renewalIntervalSeconds ?? Math.min(60 * 60, Math.max(1, Math.floor(sessionTtlSeconds / 4)))) * 1000)
   const tokenTtlMs = (options.tokenTtlSeconds ?? 60 * 15) * 1000
   const minPasswordLength = options.minPasswordLength ?? 12
   const defaultRole = options.defaultRole ?? 'user'
@@ -228,50 +233,198 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
 
   const resolvedContexts = new WeakSet<object>()
   const resolvedUsers = new WeakMap<object, PublicUser<TUser>>()
+  const pendingContexts = new WeakMap<object, Promise<{ user: PublicUser<TUser>, session: AuthSession } | undefined>>()
+  const renewedAt = new Map<string, number>()
+
+  function defineLocal(locals: KayLocals, key: 'user' | 'session', value: unknown): void {
+    if (value === undefined) {
+      delete locals[key]
+      return
+    }
+    Object.defineProperty(locals, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    })
+  }
 
   function setResolvedUser(ctx: RequestContext, pub: PublicUser<TUser>): void {
     resolvedUsers.set(ctx.locals, pub)
-    ctx.locals.user = pub
+    defineLocal(ctx.locals, 'user', pub)
   }
 
-  async function resolveRequestSession(ctx: RequestContext): Promise<{ user: PublicUser<TUser>, session: AuthSession } | undefined> {
+  function setResolvedSession(ctx: RequestContext, session: AuthSession): void {
+    defineLocal(ctx.locals, 'session', session)
+  }
+
+  function clearLazyLocals(locals: KayLocals): void {
+    resolvedUsers.delete(locals)
+    delete locals.user
+    delete locals.session
+  }
+
+  function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+    return typeof value === 'object' && value !== null && typeof (value as PromiseLike<T>).then === 'function'
+  }
+
+  function maybeRenewSession(ctx: RequestContext, rawToken: string, tokenHash: string, session: AuthSession): void | Promise<void> {
+    const now = Date.now()
+    if (session.expiresAt - now >= sessionTtlMs / 2)
+      return
+    const prev = renewedAt.get(tokenHash)
+    if (prev !== undefined && now - prev < renewalIntervalMs)
+      return
+    renewedAt.set(tokenHash, now)
+    const nextExpiry = now + sessionTtlMs
+    session.expiresAt = nextExpiry
+    setSessionCookie(ctx, rawToken)
+    return store.updateSessionExpiry(tokenHash, nextExpiry)
+  }
+
+  function sweepRenewedAt(): void {
+    if (renewedAt.size === 0)
+      return
+    const cutoff = Date.now() - Math.max(renewalIntervalMs, 1000)
+    for (const [k, ts] of renewedAt) {
+      if (ts <= cutoff)
+        renewedAt.delete(k)
+    }
+  }
+
+  function finalizeResolved(ctx: RequestContext, rawToken: string, tokenHash: string, session: AuthSession, userRecord: TUser): { user: PublicUser<TUser>, session: AuthSession } {
+    const pub = toPublicUser(userRecord)
+    resolvedContexts.add(ctx.locals)
+    setResolvedUser(ctx, pub)
+    setResolvedSession(ctx, session)
+    const renew = maybeRenewSession(ctx, rawToken, tokenHash, session)
+    if (isPromiseLike(renew))
+      void renew.catch(() => {})
+    return { user: pub, session }
+  }
+
+  function resolveRequestSessionSync(ctx: RequestContext): { user: PublicUser<TUser>, session: AuthSession } | undefined {
     if (resolvedContexts.has(ctx.locals)) {
       const user = resolvedUsers.get(ctx.locals) ?? (ctx.locals.user as PublicUser<TUser> | undefined)
       const session = ctx.locals.session
       return user && session ? { user, session } : undefined
     }
-    resolvedContexts.add(ctx.locals)
-
     const rawToken = ctx.cookies.get(cookieName)
-    if (!rawToken)
+    if (!rawToken) {
+      resolvedContexts.add(ctx.locals)
+      clearLazyLocals(ctx.locals)
       return undefined
-
+    }
     const tokenHash = sha256Hex(rawToken)
-    const session = await store.getSession(tokenHash)
-    if (!session || session.expiresAt <= Date.now()) {
+    const maybeSession = store.getSession(tokenHash)
+    if (isPromiseLike(maybeSession)) {
+      // Async store: kick off async resolution and cache its promise for `resolve()` / `guard()`.
+      void resolveRequestSession(ctx, maybeSession)
+      return undefined
+    }
+    if (!maybeSession || maybeSession.expiresAt <= Date.now()) {
+      resolvedContexts.add(ctx.locals)
+      clearLazyLocals(ctx.locals)
       ctx.cookies.delete(cookieName, { path: '/' })
       return undefined
     }
-
-    const userRecord = await store.getUserById(session.userId)
-    if (!userRecord) {
-      await store.deleteSession(tokenHash)
+    const maybeUser = store.getUserById(maybeSession.userId)
+    if (isPromiseLike(maybeUser)) {
+      void resolveRequestSession(ctx, Promise.resolve(maybeSession), maybeUser)
+      return undefined
+    }
+    if (!maybeUser) {
+      resolvedContexts.add(ctx.locals)
+      clearLazyLocals(ctx.locals)
+      void Promise.resolve(store.deleteSession(tokenHash)).catch(() => {})
       ctx.cookies.delete(cookieName, { path: '/' })
       return undefined
     }
+    return finalizeResolved(ctx, rawToken, tokenHash, maybeSession, maybeUser)
+  }
 
-    // Sliding window renewal once past half-life
-    if (session.expiresAt - Date.now() < sessionTtlMs / 2) {
-      const nextExpiry = Date.now() + sessionTtlMs
-      await store.updateSessionExpiry(tokenHash, nextExpiry)
-      session.expiresAt = nextExpiry
-      setSessionCookie(ctx, rawToken)
+  async function resolveRequestSession(
+    ctx: RequestContext,
+    preloadedSession?: Promise<AuthSession | undefined>,
+    preloadedUser?: Promise<TUser | undefined>,
+  ): Promise<{ user: PublicUser<TUser>, session: AuthSession } | undefined> {
+    if (resolvedContexts.has(ctx.locals)) {
+      const user = resolvedUsers.get(ctx.locals) ?? (ctx.locals.user as PublicUser<TUser> | undefined)
+      const session = ctx.locals.session
+      return user && session ? { user, session } : undefined
     }
+    const inFlight = pendingContexts.get(ctx.locals)
+    if (inFlight !== undefined)
+      return inFlight
 
-    const pub = toPublicUser(userRecord)
-    setResolvedUser(ctx, pub)
-    ctx.locals.session = session
-    return { user: pub, session }
+    const run = (async (): Promise<{ user: PublicUser<TUser>, session: AuthSession } | undefined> => {
+      const rawToken = ctx.cookies.get(cookieName)
+      if (!rawToken) {
+        resolvedContexts.add(ctx.locals)
+        clearLazyLocals(ctx.locals)
+        return undefined
+      }
+
+      const tokenHash = sha256Hex(rawToken)
+      const session = preloadedSession !== undefined ? await preloadedSession : await store.getSession(tokenHash)
+      if (!session || session.expiresAt <= Date.now()) {
+        resolvedContexts.add(ctx.locals)
+        clearLazyLocals(ctx.locals)
+        ctx.cookies.delete(cookieName, { path: '/' })
+        return undefined
+      }
+
+      const userRecord = preloadedUser !== undefined ? await preloadedUser : await store.getUserById(session.userId)
+      if (!userRecord) {
+        resolvedContexts.add(ctx.locals)
+        clearLazyLocals(ctx.locals)
+        await store.deleteSession(tokenHash)
+        ctx.cookies.delete(cookieName, { path: '/' })
+        return undefined
+      }
+
+      const pub = toPublicUser(userRecord)
+      resolvedContexts.add(ctx.locals)
+      setResolvedUser(ctx, pub)
+      setResolvedSession(ctx, session)
+      await maybeRenewSession(ctx, rawToken, tokenHash, session)
+      return { user: pub, session }
+    })()
+
+    pendingContexts.set(ctx.locals, run)
+    try {
+      return await run
+    }
+    finally {
+      pendingContexts.delete(ctx.locals)
+    }
+  }
+
+  function attachLazySession(ctx: RequestContext): void {
+    if (resolvedContexts.has(ctx.locals) || !ctx.cookies.get(cookieName))
+      return
+    Object.defineProperties(ctx.locals, {
+      user: {
+        configurable: true,
+        enumerable: false,
+        get() {
+          return resolveRequestSessionSync(ctx)?.user
+        },
+        set(val: PublicUser<TUser> | undefined) {
+          defineLocal(ctx.locals, 'user', val)
+        },
+      },
+      session: {
+        configurable: true,
+        enumerable: false,
+        get() {
+          return resolveRequestSessionSync(ctx)?.session
+        },
+        set(val: AuthSession | undefined) {
+          defineLocal(ctx.locals, 'session', val)
+        },
+      },
+    })
   }
 
   async function createSessionForUser(userId: string, ctx: RequestContext): Promise<AuthSession> {
@@ -289,18 +442,20 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     }
     await store.createSession(session)
     setSessionCookie(ctx, rawToken)
-    ctx.locals.session = session
+    setResolvedSession(ctx, session)
     return session
   }
 
   async function signOut(ctx: RequestContext): Promise<void> {
     const rawToken = ctx.cookies.get(cookieName)
-    if (rawToken)
-      await store.deleteSession(sha256Hex(rawToken))
+    if (rawToken) {
+      const tokenHash = sha256Hex(rawToken)
+      renewedAt.delete(tokenHash)
+      await store.deleteSession(tokenHash)
+    }
     ctx.cookies.delete(cookieName, { path: '/' })
-    resolvedUsers.delete(ctx.locals)
-    delete ctx.locals.user
-    delete ctx.locals.session
+    resolvedContexts.add(ctx.locals)
+    clearLazyLocals(ctx.locals)
   }
 
   async function createUser(input: CreateUserInput<TUser>): Promise<PublicUser<TUser>> {
@@ -465,9 +620,13 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         trustProxy = api.trustProxy
       api.onShutdown(dispose)
 
-      // Populate ctx.locals.user & ctx.locals.session on every route and server action
-      api.use(async (ctx, next) => {
-        await resolveRequestSession(ctx)
+      // Resolve session lazily on first read of ctx.locals.user/session; skip asset & internal non-action routes.
+      const internalPrefix = `${api.assetPrefix.replace(/\/$/, '')}/`
+      const actionPrefix = `${internalPrefix}action/`
+      api.use((ctx, next) => {
+        const p = ctx.url.pathname
+        if (!p.startsWith(internalPrefix) || p.startsWith(actionPrefix))
+          attachLazySession(ctx)
         return next()
       })
 
@@ -659,11 +818,15 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     store,
     basePath,
     getUser(ctx) {
-      return resolvedUsers.get(ctx.locals) ?? (ctx.locals.user as PublicUser<TUser> | undefined)
+      const cached = resolvedUsers.get(ctx.locals)
+      if (cached !== undefined)
+        return cached
+      return ctx.locals.user as PublicUser<TUser> | undefined
     },
     getSession(ctx) {
       return ctx.locals.session
     },
+    resolve: resolveRequestSession,
     guard,
     createUser,
     createSessionForUser,
@@ -685,6 +848,7 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     async pruneExpired() {
       await store.pruneExpired?.()
       rateLimiter.sweep()
+      sweepRenewedAt()
     },
     dispose,
   }
