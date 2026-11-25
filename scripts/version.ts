@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Bumps every package under packages/*/package.json (plus peerDependencies.kay,
-// packages/kay/src/cli/new.ts default version, and bun.lock) in lockstep,
+// packages/kay/src/cli/new.ts default version, bun.lock and docs/bun.lock) in lockstep,
 // then commits and creates annotated tag v<next>.
 // Usage: bun scripts/version.ts <alpha|beta|rc|patch|minor|major|X.Y.Z[-pre]> [--dry-run]
 
@@ -91,7 +91,8 @@ const run = (cmd: string[]) => {
 }
 
 run(['bun', 'install', '--silent'])
-run(['git', 'add', ...manifests, newCliPath, 'bun.lock'])
+run(['bun', 'install', '--silent', '--cwd', 'docs'])
+run(['git', 'add', ...manifests, newCliPath, 'bun.lock', 'docs/bun.lock'])
 run(['git', 'commit', '-m', `chore(release): ${tag}`])
 run(['git', 'tag', '-a', tag, '-m', `Kay ${tag}`])
 
