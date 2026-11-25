@@ -157,3 +157,13 @@ describe('kay refuses island props the browser cannot receive', () => {
     expect(ssrIsland('c', () => '', { n: 1, when: new Date(0), tags: new Set(['a']) })).toContain(' p="')
   })
 })
+
+describe('kay refuses actions it cannot give a URL', () => {
+  const server = 'import { action } from \'kay/server\'\n'
+  test('an action() that is not an exported const, which posts to the page and gets 405', () => {
+    expect(() => compileSsr('actions.ts', `${server}const save = action(async () => {})\nexport { save }`)).toThrow(/action\(\) not declared as export const in actions\.ts: write export const save = action\(\.\.\.\) at the top level/)
+    expect(() => compileSsr('actions.ts', `${server}export default action(async () => {})`)).toThrow(/write export const name = action/)
+    expect(() => compileSsr('actions.ts', `${server}export function make() { return action(async () => {}) }`)).toThrow(/action\(\) not declared as export const/)
+    expect(compileSsr('actions.ts', `${server}export const save = action(async () => {})`).code).toContain('save')
+  })
+})

@@ -134,6 +134,17 @@ function isAsyncFunction(node: AstNode | null | undefined): boolean {
   return (node?.type === 'FunctionDeclaration' || node?.type === 'FunctionExpression' || node?.type === 'ArrowFunctionExpression') && node.async === true
 }
 
+// The variable an action() call is assigned to (`const save = action(...)`), to name it in an error.
+function actionVariable(program: AstNode, call: AstNode): string | undefined {
+  let name: string | undefined
+  walk(program, (node) => {
+    if (node.type === 'VariableDeclarator' && node.init === call && node.id?.type === 'Identifier')
+      name = node.id.name as string
+    return name === undefined ? undefined : false
+  })
+  return name
+}
+
 // The mode a `$hydrate` attribute names: its string, or `*` when an expression picks it at runtime.
 function hydrateMode(value: AstNode | null | undefined): string {
   let node = value?.type === 'JSXExpressionContainer' ? value.expression as AstNode : value
@@ -170,6 +181,9 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   const reexports: ReexportInfo[] = []
   const exportedNames: string[] = []
   let actionLocalName = 'action'
+  let importsAction = false
+  // The action() calls kay gives a URL to: the initialisers of top-level `export const`s.
+  const registeredActions = new Set<AstNode>()
 
   const markInteractive = (reason: string) => {
     if (!isInteractive) {
@@ -210,8 +224,10 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
             stateCallees.add(local)
           if ((source === 'kay' || source === '@kayjs/kay' || source === 'kay/ssr') && (imported === 'Head' || imported === 'Suspense'))
             usesRenderContext = true
-          if ((source === 'kay/server' || source === '@kayjs/kay/server') && imported === 'action')
+          if ((source === 'kay/server' || source === '@kayjs/kay/server') && imported === 'action') {
             actionLocalName = local
+            importsAction = true
+          }
         }
         else if (spec.type === 'ImportDefaultSpecifier') {
           specifiers.push({ local: spec.local.name as string, imported: 'default' })
@@ -302,8 +318,10 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
             }
             if (d.init?.type === 'CallExpression' && d.init.callee?.name === 'island' && d.init.arguments?.length > 1)
               throw mistake(`island() options on export ${name}`, filename, 'only the default export\'s island() options apply; export the island as default, or set $hydrate where it renders')
-            if (d.init?.type === 'CallExpression' && d.init.callee?.type === 'Identifier' && d.init.callee.name === actionLocalName)
+            if (d.init?.type === 'CallExpression' && d.init.callee?.type === 'Identifier' && d.init.callee.name === actionLocalName) {
               exportedActions.push(name)
+              registeredActions.add(d.init)
+            }
           }
         }
       }
@@ -315,6 +333,8 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
       hasJsx = true
     if (node.type === 'JSXElement')
       checkMistakes(node, filename, code)
+    if (importsAction && node.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === actionLocalName && !registeredActions.has(node))
+      throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${actionLocalName}(...) at the top level, only those get a URL`)
     if (node.type === 'JSXOpeningElement') {
       const tag = jsxTagName(node.name)
       const isComponent = isComponentTag(tag)
