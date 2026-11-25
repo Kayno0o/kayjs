@@ -2,7 +2,7 @@
 
 import { parseSync } from 'oxc-parser'
 
-import { isComponentTag, jsxTagName } from './shared'
+import { isComponentTag, isJsxNode, jsxTagName } from './shared'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AstNode = Record<string, any>
@@ -304,7 +304,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   }
 
   walk(program, (node) => {
-    if (node.type === 'JSXElement' || node.type === 'JSXFragment')
+    if (isJsxNode(node))
       hasJsx = true
     if (node.type === 'JSXOpeningElement') {
       const tag = jsxTagName(node.name)

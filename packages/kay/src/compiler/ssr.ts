@@ -4,7 +4,7 @@
 import type { AstNode, ModuleAnalysis } from './analyze'
 import { analyzeModule, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
-import { cleanJsxText, escapeStaticAttr, escapeStaticText, isComponentTag, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
+import { cleanJsxText, containsJsx, escapeStaticAttr, escapeStaticText, isComponentTag, isJsxNode, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
 
 const RAW_TEXT_ELEMENTS = new Set(['style', 'script'])
 const CLOSE_STYLE_RE = /<\/(style)/gi
@@ -135,21 +135,13 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   const emitMarkers = options.emitMarkers ?? options.isIsland ?? analysis.isInteractive
 
   function compileSubExpression(node: AstNode): string {
-    let hasNestedJsx = false
-    walk(node, (child) => {
-      if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
-        hasNestedJsx = true
-        return false
-      }
-      return undefined
-    })
-    if (!hasNestedJsx)
+    if (!containsJsx(node))
       return code.slice(node.start, node.end)
 
     const sub = new SourceEditor(code.slice(node.start, node.end))
     const offset = node.start as number
     walk(node, (child) => {
-      if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
+      if (isJsxNode(child)) {
         sub.replace(child.start - offset, child.end - offset, compileRootJsx(child))
         return false
       }
@@ -254,7 +246,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         const text = cleanJsxText(child.value as string)
         parts.pushStatic(rawTextTag !== undefined ? escapeRawText(text, rawTextTag) : text)
       }
-      else if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
+      else if (isJsxNode(child)) {
         emitIntoBuffer(child, bufVar, parts, flushParts, pushStmt)
       }
       else if (child.type === 'JSXExpressionContainer') {
@@ -296,7 +288,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
           const cb = expr.arguments[0] as AstNode
           if ((cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression') && !cb.async && cb.body !== null) {
             const body = (cb.body.type === 'ParenthesizedExpression' ? cb.body.expression : cb.body) as AstNode
-            if (body.type === 'JSXElement' || body.type === 'JSXFragment') {
+            if (isJsxNode(body)) {
               const target = compileSubExpression(expr.callee.object)
               const params = cb.params as AstNode[]
               const itemParam = params[0]?.type === 'Identifier' ? params[0].name as string : undefined
@@ -336,7 +328,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   }
 
   function compileExpressionAsString(expr: AstNode, hasSiblings: boolean, isLast = true): string {
-    if (expr.type === 'JSXElement' || expr.type === 'JSXFragment')
+    if (isJsxNode(expr))
       return compileJsxToStringExpr(expr)
 
     if (
@@ -349,7 +341,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       const cb = expr.arguments[0] as AstNode
       if ((cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression') && !cb.async && cb.body !== null) {
         const body = (cb.body.type === 'ParenthesizedExpression' ? cb.body.expression : cb.body) as AstNode
-        if (body.type === 'JSXElement' || body.type === 'JSXFragment') {
+        if (isJsxNode(body)) {
           const target = compileSubExpression(expr.callee.object)
           const params = (cb.params as AstNode[]).map(p => code.slice(p.start, p.end)).join(', ')
           const rendered = `${use('ssrLoop')}(${target}, (${params}) => ${compileJsxToStringExpr(body)})`
@@ -358,7 +350,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         if (body.type === 'BlockStatement') {
           let blockHasJsx = false
           walk(body, (c) => {
-            if (c.type === 'JSXElement' || c.type === 'JSXFragment') {
+            if (isJsxNode(c)) {
               blockHasJsx = true
               return false
             }
@@ -374,7 +366,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
     if (expr.type === 'LogicalExpression' && expr.operator === '&&') {
       const right = unwrapParens(expr.right)
-      if (right.type === 'JSXElement' || right.type === 'JSXFragment') {
+      if (isJsxNode(right)) {
         const left = compileSubExpression(expr.left)
         const emptyVal = emitMarkers && !isLast ? '"<!---->"' : '""'
         return `((${left}) ? (${compileJsxToStringExpr(right)}) : ${emptyVal})`
@@ -384,7 +376,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     if (expr.type === 'ConditionalExpression') {
       const consNode = unwrapParens(expr.consequent)
       const altNode = unwrapParens(expr.alternate)
-      if (consNode.type === 'JSXElement' || consNode.type === 'JSXFragment' || altNode.type === 'JSXElement' || altNode.type === 'JSXFragment') {
+      if (isJsxNode(consNode) || isJsxNode(altNode)) {
         const test = compileSubExpression(expr.test)
         const cons = compileExpressionAsString(consNode, false, true)
         const alt = compileExpressionAsString(altNode, false, true)
@@ -587,7 +579,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   }
 
   walk(program, (node) => {
-    if (node.type === 'JSXElement' || node.type === 'JSXFragment') {
+    if (isJsxNode(node)) {
       editor.replace(node.start, node.end, compileRootJsx(node))
       return false
     }

@@ -4,7 +4,7 @@
 import type { AstNode, ModuleAnalysis } from './analyze'
 import { analyzeModule, loadDeclarations, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
-import { cleanJsxText, escapeStaticAttr, escapeStaticText, isComponentTag, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
+import { cleanJsxText, containsJsx, escapeStaticAttr, escapeStaticText, isComponentTag, isJsxNode, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
 
 const SVG_CHILD_TAGS = new Set([
   'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse',
@@ -144,6 +144,16 @@ function collectPatternNames(pattern: AstNode, out: Set<string>): void {
   }
 }
 
+function withoutBindings(rewrites: ReadonlyMap<string, string>, patterns: AstNode[]): Map<string, string> {
+  const names = new Set<string>()
+  for (const pattern of patterns)
+    collectPatternNames(pattern, names)
+  const kept = new Map(rewrites)
+  for (const name of names)
+    kept.delete(name)
+  return kept
+}
+
 // Names whose every binding in the file is a `const` holding an array literal: only those can be looped once without tracking, since a store, an import or a reassigned binding may change.
 function literalArrayConsts(program: AstNode): Set<string> {
   const literal = new Set<string>()
@@ -180,13 +190,14 @@ function literalArrayConsts(program: AstNode): Set<string> {
   return literal
 }
 
-/** Rewrites free identifier reads inside an AST node while respecting shadowing and property keys. */
+/** Rewrites free identifier reads inside an AST node while respecting shadowing and property keys; `onJsx` compiles each nested JSX root under the rewrites still unshadowed there. */
 function rewriteFreeIdentifiers(
   source: string,
   rootNode: AstNode,
   replacements: ReadonlyMap<string, string>,
+  onJsx?: (node: AstNode, rewrites: ReadonlyMap<string, string>) => string,
 ): string {
-  if (replacements.size === 0)
+  if (replacements.size === 0 && onJsx === undefined)
     return source.slice(rootNode.start, rootNode.end)
 
   const offset = rootNode.start as number
@@ -195,6 +206,12 @@ function rewriteFreeIdentifiers(
   function visit(node: AstNode | null | undefined, shadowed: Set<string>): void {
     if (!node || typeof node !== 'object')
       return
+
+    if (onJsx !== undefined && (isJsxNode(node))) {
+      const active = shadowed.size === 0 ? replacements : new Map([...replacements].filter(([k]) => !shadowed.has(k)))
+      editor.replace(node.start - offset, node.end - offset, onJsx(node, active))
+      return
+    }
 
     switch (node.type) {
       case 'Identifier': {
@@ -258,15 +275,6 @@ function rewriteFreeIdentifiers(
       }
       case 'VariableDeclarator': {
         visit(node.init, shadowed)
-        return
-      }
-      case 'JSXAttribute': {
-        visit(node.value, shadowed)
-        return
-      }
-      case 'JSXOpeningElement': {
-        for (const attr of node.attributes as AstNode[])
-          visit(attr, shadowed)
         return
       }
       case 'TSAsExpression':
@@ -350,19 +358,6 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   for (const node of loadDeclarations(program))
     editor.replace(node.start, node.end, node.type === 'FunctionDeclaration' ? `const ${node.id.name as string} = undefined` : 'undefined')
 
-  function hasJsxDescendant(node: AstNode | null | undefined): boolean {
-    if (!node)
-      return false
-    let found = false
-    walk(node, (child) => {
-      if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
-        found = true
-        return false
-      }
-      return undefined
-    })
-    return found
-  }
 
   function extractBlockKeyExpr(block: AstNode): AstNode | undefined {
     let found: AstNode | undefined
@@ -385,118 +380,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   }
 
   function compileExpression(node: AstNode, scopeRewrites: ReadonlyMap<string, string>): string {
-    if (!hasJsxDescendant(node))
-      return rewriteFreeIdentifiers(code, node, scopeRewrites)
-
-    // Replace nested JSX roots AND rewrite free identifiers in all surrounding non-JSX spans (respecting shadowing)
-    const offset = node.start as number
-    const sub = new SourceEditor(code.slice(node.start, node.end))
-
-    function visitExpr(cur: AstNode | null | undefined, shadowed: Set<string>): void {
-      if (!cur || typeof cur !== 'object')
-        return
-
-      if (cur.type === 'JSXElement' || cur.type === 'JSXFragment') {
-        const activeRewrites = shadowed.size === 0
-          ? scopeRewrites
-          : new Map([...scopeRewrites].filter(([k]) => !shadowed.has(k)))
-        sub.replace(cur.start - offset, cur.end - offset, compileRootJsx(cur, activeRewrites))
-        return
-      }
-
-      switch (cur.type) {
-        case 'Identifier': {
-          const name = cur.name as string
-          if (!shadowed.has(name)) {
-            const rep = scopeRewrites.get(name)
-            if (rep !== undefined)
-              sub.replace(cur.start - offset, cur.end - offset, rep)
-          }
-          return
-        }
-        case 'MemberExpression': {
-          visitExpr(cur.object, shadowed)
-          if (cur.computed)
-            visitExpr(cur.property, shadowed)
-          return
-        }
-        case 'Property': {
-          if (cur.computed)
-            visitExpr(cur.key, shadowed)
-          if (cur.shorthand && cur.value?.type === 'Identifier') {
-            const name = cur.value.name as string
-            if (!shadowed.has(name) && scopeRewrites.has(name)) {
-              sub.replace(cur.start - offset, cur.end - offset, `${name}: ${scopeRewrites.get(name)}`)
-              return
-            }
-          }
-          visitExpr(cur.value, shadowed)
-          return
-        }
-        case 'ArrowFunctionExpression':
-        case 'FunctionExpression':
-        case 'FunctionDeclaration': {
-          const nextShadow = new Set(shadowed)
-          if (cur.id?.name)
-            nextShadow.add(cur.id.name as string)
-          for (const p of cur.params as AstNode[])
-            collectPatternNames(p, nextShadow)
-          visitExpr(cur.body, nextShadow)
-          return
-        }
-        case 'BlockStatement': {
-          const nextShadow = new Set(shadowed)
-          for (const stmt of cur.body as AstNode[]) {
-            if (stmt.type === 'VariableDeclaration') {
-              for (const d of stmt.declarations as AstNode[]) {
-                visitExpr(d.init, nextShadow)
-                collectPatternNames(d.id, nextShadow)
-              }
-            }
-            else if (stmt.type === 'FunctionDeclaration') {
-              if (stmt.id?.name)
-                nextShadow.add(stmt.id.name as string)
-              visitExpr(stmt, nextShadow)
-            }
-            else {
-              visitExpr(stmt, nextShadow)
-            }
-          }
-          return
-        }
-        case 'VariableDeclarator': {
-          visitExpr(cur.init, shadowed)
-          return
-        }
-        case 'TSAsExpression':
-        case 'TSNonNullExpression':
-        case 'TSSatisfiesExpression':
-        case 'TSTypeAssertion':
-        case 'TSInstantiationExpression': {
-          visitExpr(cur.expression, shadowed)
-          return
-        }
-        default: {
-          if (typeof cur.type === 'string' && cur.type.startsWith('TS'))
-            return
-          for (const key of Object.keys(cur)) {
-            if (key === 'start' || key === 'end' || key === 'type')
-              continue
-            const val = cur[key]
-            if (Array.isArray(val)) {
-              for (let i = 0; i < val.length; i++)
-                visitExpr(val[i] as AstNode, shadowed)
-            }
-            else if (val !== null && typeof val === 'object') {
-              visitExpr(val as AstNode, shadowed)
-            }
-          }
-        }
-      }
-    }
-
-    visitExpr(node, new Set())
-    return sub.toString()
+    return rewriteFreeIdentifiers(code, node, scopeRewrites, compileRootJsx)
   }
 
   function compileComponentCall(node: AstNode, scopeRewrites: ReadonlyMap<string, string>): string {
@@ -538,7 +422,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       const child = meaningful[0]!
       if (child.type === 'JSXText')
         propEntries.push(`children: ${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value as string)))}`)
-      else if (child.type === 'JSXElement' || child.type === 'JSXFragment')
+      else if (isJsxNode(child))
         propEntries.push(`get children() { return ${compileRootJsx(child, scopeRewrites)} }`)
       else if (child.type === 'JSXExpressionContainer')
         propEntries.push(`get children() { return ${compileExpression(child.expression, scopeRewrites)} }`)
@@ -547,7 +431,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       const items = meaningful.map((c) => {
         if (c.type === 'JSXText')
           return JSON.stringify(decodeHtmlEntities(cleanJsxText(c.value as string)))
-        if (c.type === 'JSXElement' || c.type === 'JSXFragment')
+        if (isJsxNode(c))
           return compileRootJsx(c, scopeRewrites)
         return compileExpression(c.expression, scopeRewrites)
       })
@@ -793,8 +677,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           ) {
             const cb = expr.arguments[0] as AstNode
             const cbBody = cb.body?.type === 'ParenthesizedExpression' ? cb.body.expression : cb.body
-            const isJsxBody = cbBody?.type === 'JSXElement' || cbBody?.type === 'JSXFragment'
-            const isBlockJsxBody = cbBody?.type === 'BlockStatement' && hasJsxDescendant(cbBody)
+            const isJsxBody = isJsxNode(cbBody)
+            const isBlockJsxBody = cbBody?.type === 'BlockStatement' && containsJsx(cbBody)
             if (
               (cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression')
               && (isJsxBody || isBlockJsxBody)
@@ -816,13 +700,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               const isStaticArr = expr.callee.object.type === 'Identifier' && staticArrays.has(expr.callee.object.name as string) && !scopeRewrites.has(expr.callee.object.name as string)
               if (isStaticArr) {
                 const rawParams = params.map(p => code.slice(p.start, p.end)).join(', ')
-                const shadowed = new Map(scopeRewrites)
-                for (const p of params) {
-                  const names = new Set<string>()
-                  collectPatternNames(p, names)
-                  for (const n of names)
-                    shadowed.delete(n)
-                }
+                const shadowed = withoutBindings(scopeRewrites, params)
                 const rowBody = isJsxBody ? compileRootJsx(cbBody, shadowed) : compileExpression(cbBody, shadowed)
                 ops.push(`${use('eachStatic')}(${elVar}, ${anchorVar}, ${eachCode}, (${rawParams}) => ${rowBody}${skipArg});`)
                 continue
@@ -835,13 +713,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               const rowRewrites = new Map(scopeRewrites)
               let keyFn: string
 
-              const keyRewrites = new Map(scopeRewrites)
-              for (const p of params) {
-                const names = new Set<string>()
-                collectPatternNames(p, names)
-                for (const n of names)
-                  keyRewrites.delete(n)
-              }
+              const keyRewrites = withoutBindings(scopeRewrites, params)
 
               if (firstParam !== undefined && firstParam.type !== 'Identifier') {
                 const patCode = code.slice(firstParam.start, firstParam.end)
@@ -871,7 +743,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           // Case 2: `cond && <jsx>` → `__show(...)`
           if (expr.type === 'LogicalExpression' && expr.operator === '&&') {
             const right = unwrapParens(expr.right)
-            if (right.type === 'JSXElement' || right.type === 'JSXFragment') {
+            if (isJsxNode(right)) {
               const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
               if (!isLast) {
                 html += '<!---->'
@@ -888,17 +760,17 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           if (expr.type === 'ConditionalExpression') {
             const consNode = unwrapParens(expr.consequent)
             const altNode = unwrapParens(expr.alternate)
-            if (consNode.type === 'JSXElement' || consNode.type === 'JSXFragment' || altNode.type === 'JSXElement' || altNode.type === 'JSXFragment') {
+            if (isJsxNode(consNode) || isJsxNode(altNode)) {
               const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
               if (!isLast) {
                 html += '<!---->'
                 domIndex++
               }
               const whenCode = compileExpression(expr.test, scopeRewrites)
-              const trueCode = consNode.type === 'JSXElement' || consNode.type === 'JSXFragment'
+              const trueCode = isJsxNode(consNode)
                 ? compileRootJsx(consNode, scopeRewrites)
                 : compileExpression(consNode, scopeRewrites)
-              const falseCode = altNode.type === 'JSXElement' || altNode.type === 'JSXFragment'
+              const falseCode = isJsxNode(altNode)
                 ? compileRootJsx(altNode, scopeRewrites)
                 : compileExpression(altNode, scopeRewrites)
               ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode}, () => ${falseCode});`)
@@ -910,7 +782,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           const isChildrenExpr = (expr.type === 'Identifier' && expr.name === 'children')
             || (expr.type === 'MemberExpression' && !expr.computed && expr.property?.name === 'children')
           const exprCode = compileExpression(expr, scopeRewrites)
-          if (isChildrenExpr || hasJsxDescendant(expr) || mayReturnNode(expr)) {
+          if (isChildrenExpr || containsJsx(expr) || mayReturnNode(expr)) {
             if (meaningful.length === 1) {
               ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, null);`)
             }
@@ -1042,7 +914,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         return compileRootJsx(meaningful[0]!, scopeRewrites)
 
       const items = meaningful.map((child) => {
-        if (child.type === 'JSXElement' || child.type === 'JSXFragment')
+        if (isJsxNode(child))
           return compileRootJsx(child, scopeRewrites)
         if (child.type === 'JSXText')
           return `document.createTextNode(${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value as string)))})`
@@ -1060,15 +932,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   // Handle component functions with destructured props + JSX compilation
   function processFunction(fn: AstNode): void {
-    let fnHasJsx = false
-    walk(fn.body, (child) => {
-      if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
-        fnHasJsx = true
-        return false
-      }
-      return undefined
-    })
-    if (!fnHasJsx)
+    if (!containsJsx(fn.body))
       return
 
     const propRewrites = new Map<string, string>()
@@ -1103,41 +967,22 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     if (propRewrites.size > 0 && fn.body?.type === 'BlockStatement') {
       const shadowed = new Set<string>()
       for (const stmt of fn.body.body as AstNode[]) {
-        let stmtHasJsx = false
-        walk(stmt, (child) => {
-          if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
-            stmtHasJsx = true
-            return false
-          }
-          return undefined
-        })
         const active = new Map<string, string>()
         for (const [k, v] of propRewrites) {
           if (!shadowed.has(k))
             active.set(k, v)
         }
         // A statement holding JSX also reads props around it (`if (on) return <b/>`): compile both in one pass.
-        if (stmtHasJsx)
+        if (active.size > 0 || containsJsx(stmt))
           editor.replace(stmt.start, stmt.end, compileExpression(stmt, active))
-        else if (active.size > 0)
-          editor.replace(stmt.start, stmt.end, rewriteFreeIdentifiers(code, stmt, active))
         if (stmt.type === 'VariableDeclaration') {
           for (const d of stmt.declarations as AstNode[])
             collectPatternNames(d.id, shadowed)
         }
       }
     }
-    else if (propRewrites.size > 0) {
-      editor.replace(fn.body.start, fn.body.end, compileExpression(fn.body, propRewrites))
-    }
     else {
-      walk(fn.body, (child) => {
-        if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
-          editor.replace(child.start, child.end, compileRootJsx(child, propRewrites))
-          return false
-        }
-        return undefined
-      })
+      editor.replace(fn.body.start, fn.body.end, compileExpression(fn.body, propRewrites))
     }
   }
 
@@ -1146,7 +991,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       processFunction(node)
       return false
     }
-    if (node.type === 'JSXElement' || node.type === 'JSXFragment') {
+    if (isJsxNode(node)) {
       editor.replace(node.start, node.end, compileRootJsx(node, new Map()))
       return false
     }

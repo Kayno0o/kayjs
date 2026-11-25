@@ -1,6 +1,7 @@
 // Helpers the dom and ssr compilers share: JSX tag and attribute classification, static escaping, URL and ARIA rules.
 
 import type { AstNode } from './analyze'
+import { walk } from './analyze'
 
 export const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
@@ -85,4 +86,21 @@ export function staticLiteral(node: AstNode): { ok: true, value: string | number
   if (n.type === 'UnaryExpression' && n.operator === '-' && n.argument?.type === 'Literal' && typeof n.argument.value === 'number')
     return { ok: true, value: -n.argument.value }
   return { ok: false }
+}
+
+export function isJsxNode(node: AstNode | null | undefined): boolean {
+  return node?.type === 'JSXElement' || node?.type === 'JSXFragment'
+}
+
+/** Whether JSX appears anywhere inside `node`, itself included. */
+export function containsJsx(node: AstNode | null | undefined): boolean {
+  let found = false
+  walk(node, (child) => {
+    if (found)
+      return false
+    if (isJsxNode(child))
+      found = true
+    return undefined
+  })
+  return found
 }
