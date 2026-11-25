@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -381,6 +381,52 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     finally {
       proc.kill()
       await proc.exited
+    }
+  })
+})
+
+describe('compression work per request', () => {
+  it('compresses a file once whatever its size, gives up once on one that does not shrink, and never keeps private pages', async () => {
+    const dir = makeTemp('kay-compress-once-')
+    mkdirSync(join(dir, 'src/routes/api'), { recursive: true })
+    mkdirSync(join(dir, 'public'), { recursive: true })
+    // Base64 of random bytes shrinks by a quarter only, so 1 MB of it stays over 512 KB compressed.
+    const random = (n: number) => Uint8Array.from({ length: n }, () => Math.floor(Math.random() * 256))
+    writeFileSync(join(dir, 'public/big.txt'), Buffer.from(random(800_000)).toString('base64'))
+    writeFileSync(join(dir, 'public/noise.txt'), random(4096))
+    writeFileSync(join(dir, 'src/routes/me.tsx'), `
+      export function load() { return { name: 'Ada '.repeat(200) } }
+      export default function Me({ data }: { data: { name: string } }) { return <p>{data.name}</p> }
+    `)
+    writeFileSync(join(dir, 'src/routes/about.tsx'), `
+      export default function About() { return <p>{'About us. '.repeat(100)}</p> }
+    `)
+    writeFileSync(join(dir, 'src/routes/api/me.ts'), `
+      export function GET(ctx) { return ctx.json({ name: 'Ada '.repeat(200) }) }
+    `)
+    await build({ root: dir })
+    const app = await createServer({ root: dir, compress: true })
+    const get = async (path: string) => {
+      const res = await app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': 'zstd' } }))
+      await res.arrayBuffer()
+      return res
+    }
+    const spy = spyOn(Bun, 'zstdCompressSync')
+    try {
+      const counted = async (path: string) => {
+        spy.mockClear()
+        const first = await get(path)
+        await get(path)
+        return [first.headers.get('content-encoding'), spy.mock.calls.length]
+      }
+      expect(await counted('/big.txt')).toEqual(['zstd', 1])
+      expect(await counted('/noise.txt')).toEqual([null, 1])
+      expect(await counted('/about')).toEqual(['zstd', 1])
+      expect(await counted('/me')).toEqual(['zstd', 2])
+      expect(await counted('/api/me')).toEqual(['zstd', 2])
+    }
+    finally {
+      spy.mockRestore()
     }
   })
 })

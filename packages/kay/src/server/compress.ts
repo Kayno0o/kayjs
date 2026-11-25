@@ -134,14 +134,17 @@ function hasNoTransform(cacheControl: string | null | undefined): boolean {
   return Boolean(cacheControl && /\bno-transform\b/i.test(cacheControl))
 }
 
+// Bun exposes no way to tell a streamed body from a buffered one without reading it, so its inspect output decides. Checked once at load: if the output no longer tells them apart, every body without a length counts as streamed and goes out uncompressed.
+const STREAM_MARK = 'ReadableStream {'
+const inspectSeesStreams = typeof Bun !== 'undefined'
+  && Bun.inspect(new Response(new ReadableStream())).includes(STREAM_MARK)
+  && !Bun.inspect(new Response('')).includes(STREAM_MARK)
+
 function isStreamingBody(res: Response): boolean {
-  // Check transfer-encoding or Bun's unmaterialized ReadableStream representation BEFORE touching `res.body`.
   const te = res.headers.get('transfer-encoding')
   if (te && te.toLowerCase().includes('chunked'))
     return true
-  if (typeof Bun !== 'undefined')
-    return Bun.inspect(res).includes('ReadableStream {')
-  return true
+  return !inspectSeesStreams || Bun.inspect(res).includes(STREAM_MARK)
 }
 
 function hasToken(haystack: string, token: string): boolean {
@@ -163,6 +166,9 @@ export function compressBuffer(bytes: Uint8Array<ArrayBuffer>, encoding: Compres
 }
 
 export class CompressionCache {
+  // Path-keyed build files (assets, public, prerendered pages): bounded by the build, so each variant is kept for the process. `null` marks a file that does not shrink.
+  readonly #files = new Map<string, Uint8Array<ArrayBuffer> | null>()
+  // Content-hashed HTML of routes rendered per request: a byte-budget LRU.
   readonly #map = new Map<string, Uint8Array<ArrayBuffer>>()
   readonly #maxBytes: number
   readonly #maxEntryBytes: number
@@ -204,20 +210,34 @@ export class CompressionCache {
     }
   }
 
+  /** Compresses `bytes`, kept in the LRU under `staticKey` when given; without one nothing is stored. */
   compress(bytes: Uint8Array<ArrayBuffer>, encoding: CompressionEncoding, staticKey?: string): Uint8Array<ArrayBuffer> | undefined {
     if (bytes.byteLength < MIN_COMPRESS_BYTES)
       return undefined
-    const cacheKey = staticKey !== undefined
-      ? `${encoding}:${staticKey}`
-      : `${encoding}:h:${Bun.hash.wyhash(bytes).toString(36)}:${bytes.byteLength}`
-    const cached = this.get(cacheKey)
+    const cacheKey = staticKey !== undefined ? `${encoding}:${staticKey}` : undefined
+    const cached = cacheKey !== undefined ? this.get(cacheKey) : undefined
     if (cached !== undefined)
       return cached
     const compressed = compressBuffer(bytes, encoding)
     if (compressed.byteLength >= bytes.byteLength)
       return undefined
-    this.set(cacheKey, compressed)
+    if (cacheKey !== undefined)
+      this.set(cacheKey, compressed)
     return compressed
+  }
+
+  /** The compressed variant of a build file, read and compressed on its first request only; `undefined` when it does not shrink. */
+  async file(key: string, encoding: CompressionEncoding, read: () => Uint8Array<ArrayBuffer> | Promise<Uint8Array<ArrayBuffer>>): Promise<Uint8Array<ArrayBuffer> | undefined> {
+    const variantKey = `${encoding}:${key}`
+    let variant = this.#files.get(variantKey)
+    if (variant === undefined) {
+      const bytes = await read()
+      variant = bytes.byteLength < MIN_COMPRESS_BYTES ? null : compressBuffer(bytes, encoding)
+      if (variant !== null && variant.byteLength >= bytes.byteLength)
+        variant = null
+      this.#files.set(variantKey, variant)
+    }
+    return variant ?? undefined
   }
 }
 
@@ -231,23 +251,23 @@ export function appendVaryAcceptEncoding(headers: Headers): void {
   }
 }
 
+/** `reuse` keeps the compressed page by content hash, for routes whose HTML holds nothing per visitor. */
 export function compressedHtmlResponse(
   html: string,
   status: number,
   baseHeaders: Record<string, string>,
   request: Request,
   cache: CompressionCache | undefined,
+  reuse = false,
 ): Response {
   const noTransform = hasNoTransform(baseHeaders['cache-control'] ?? baseHeaders['Cache-Control'])
   if (cache !== undefined && !noTransform && request.method !== 'HEAD') {
     const enc = pickEncoding(request.headers.get('accept-encoding'))
     if (enc !== undefined && html.length >= MIN_COMPRESS_BYTES) {
-      const staticKey = `s:${Bun.hash.wyhash(html).toString(36)}:${html.length}`
-      let compressed = cache.get(`${enc}:${staticKey}`)
-      if (compressed === undefined) {
-        const bytes = encoder.encode(html)
-        compressed = cache.compress(bytes, enc, staticKey)
-      }
+      const staticKey = reuse ? `s:${Bun.hash.wyhash(html).toString(36)}:${html.length}` : undefined
+      let compressed = staticKey !== undefined ? cache.get(`${enc}:${staticKey}`) : undefined
+      if (compressed === undefined)
+        compressed = cache.compress(encoder.encode(html), enc, staticKey)
       if (compressed !== undefined) {
         const headers: Record<string, string> = { ...baseHeaders, 'content-encoding': enc, 'vary': 'Accept-Encoding' }
         const etag = headers.etag ?? headers.ETag

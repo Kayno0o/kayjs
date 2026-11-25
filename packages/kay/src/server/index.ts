@@ -211,6 +211,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   }
 
   const toResponseBody = (body: EmbeddedBody) => typeof body === 'string' ? Bun.file(body) : body
+  const readBody = async (body: EmbeddedBody): Promise<Uint8Array<ArrayBuffer>> => typeof body === 'string' ? new Uint8Array(await Bun.file(body).arrayBuffer()) : body
   const errorHooks: ((info: ServerErrorInfo) => void)[] = []
   if (config.onError !== undefined)
     errorHooks.push(config.onError)
@@ -249,20 +250,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     if (compressCache !== undefined && asset.compressible) {
       const enc = pickEncoding(request.headers.get('accept-encoding'))
       if (enc !== undefined) {
-        const key = `${enc}:a:${pathname}`
-        let compressed = compressCache.get(key)
-        if (compressed === undefined) {
-          const rawBytes = typeof asset.body === 'string'
-            ? new Uint8Array(await Bun.file(asset.body).arrayBuffer())
-            : asset.body
-          compressed = compressCache.compress(rawBytes, enc, `a:${pathname}`)
-          if (compressed === undefined)
-            return withHsts(new Response(rawBytes, { status: 200, headers: asset.varyHeaders }), request)
+        const compressed = await compressCache.file(`a:${pathname}`, enc, () => readBody(asset.body))
+        if (compressed !== undefined) {
+          return withHsts(new Response(compressed, {
+            status: 200,
+            headers: { ...asset.headers, 'content-encoding': enc, vary: 'Accept-Encoding' },
+          }), request)
         }
-        return withHsts(new Response(compressed, {
-          status: 200,
-          headers: { ...asset.headers, 'content-encoding': enc, vary: 'Accept-Encoding' },
-        }), request)
       }
     }
 
@@ -290,20 +284,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     if (hasVary) {
       const enc = pickEncoding(request.headers.get('accept-encoding'))
       if (enc !== undefined) {
-        const staticKey = `p:${pathname}:${pub.etag}`
-        let compressed = compressCache.get(`${enc}:${staticKey}`)
-        if (compressed === undefined) {
-          const rawBytes = typeof pub.body === 'string'
-            ? new Uint8Array(await Bun.file(pub.body).arrayBuffer())
-            : pub.body
-          compressed = compressCache.compress(rawBytes, enc, staticKey)
-          if (compressed === undefined)
-            return withHsts(new Response(rawBytes, { status: 200, headers: baseHeaders }), request)
+        const compressed = await compressCache.file(`p:${pathname}:${pub.etag}`, enc, () => readBody(pub.body))
+        if (compressed !== undefined) {
+          return withHsts(new Response(compressed, {
+            status: 200,
+            headers: { ...baseHeaders, 'etag': toWeakEtag(pub.etag), 'content-encoding': enc },
+          }), request)
         }
-        return withHsts(new Response(compressed, {
-          status: 200,
-          headers: { ...baseHeaders, 'etag': toWeakEtag(pub.etag), 'content-encoding': enc },
-        }), request)
       }
     }
 
@@ -322,20 +309,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     if (compressCache !== undefined) {
       const enc = pickEncoding(request.headers.get('accept-encoding'))
       if (enc !== undefined) {
-        const staticKey = `pre:${pathname}`
-        let compressed = compressCache.get(`${enc}:${staticKey}`)
-        if (compressed === undefined) {
-          const rawBytes = pre.kind === 'file'
-            ? new Uint8Array(await Bun.file(pre.path).arrayBuffer())
-            : textEncoder.encode(pre.html)
-          compressed = compressCache.compress(rawBytes, enc, staticKey)
-          if (compressed === undefined)
-            return withHsts(new Response(rawBytes, { status: 200, headers }), request)
+        const compressed = await compressCache.file(`pre:${pathname}`, enc, () => pre.kind === 'file' ? readBody(pre.path) : textEncoder.encode(pre.html))
+        if (compressed !== undefined) {
+          return withHsts(new Response(compressed, {
+            status: 200,
+            headers: { ...headers, 'content-encoding': enc },
+          }), request)
         }
-        return withHsts(new Response(compressed, {
-          status: 200,
-          headers: { ...headers, 'content-encoding': enc },
-        }), request)
       }
     }
 
@@ -443,7 +423,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         try {
           const reqUrl = new URL(request.url)
           const respondHtml = (body: string): Response =>
-            withHsts(compressedHtmlResponse(docPrefix + body + docSuffix, 200, fastHeaders, request, compressCache), request)
+            withHsts(compressedHtmlResponse(docPrefix + body + docSuffix, 200, fastHeaders, request, compressCache, !entry.hasLoad), request)
 
           const wrapLayouts = (inner: string): Response | Promise<Response> => {
             if (layouts.length === 0)
