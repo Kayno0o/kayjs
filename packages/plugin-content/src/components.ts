@@ -443,7 +443,7 @@ export function expandComponents(
     if (options.locale !== undefined && props.locale === undefined)
       props.locale = options.locale
 
-    const renderedHtml = ssrRaw(components[tagName]!(props))
+    const renderedHtml = ssrRaw(components[tagName]!(props as never))
     const slotIdx = slots.length
     slots.push(renderedHtml)
     out += `\n\n<div data-kay-md-slot="${slotPrefix}${slotIdx}"></div>\n\n`

@@ -14,9 +14,9 @@ interface OAuthStateCookie {
   exp: number
 }
 
-export interface OAuthRouteDeps {
+export interface OAuthRouteDeps<TUser extends AuthUser = AuthUser> {
   route: (method: string, path: string, handler: (ctx: RequestContext) => Response | Promise<Response>) => void
-  store: AuthStore
+  store: AuthStore<TUser>
   providers: ReadonlyMap<string, OAuthProvider>
   secret: string
   site: string | undefined
@@ -25,12 +25,12 @@ export interface OAuthRouteDeps {
   defaultRedirect: string
   limitIp: (ctx: RequestContext, scope: string) => Response | undefined
   isSecureCookie: (ctx: RequestContext) => boolean
-  claimUnverified: (user: AuthUser) => Promise<AuthUser>
-  insertUser: (fields: Pick<AuthUser, 'email' | 'emailVerified'> & Partial<AuthUser>) => Promise<AuthUser>
+  claimUnverified: (user: TUser) => Promise<TUser>
+  insertUser: (fields: Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>) => Promise<TUser>
   createSessionForUser: (userId: string, ctx: RequestContext) => Promise<unknown>
 }
 
-export function registerOAuthRoutes(deps: OAuthRouteDeps): void {
+export function registerOAuthRoutes<TUser extends AuthUser = AuthUser>(deps: OAuthRouteDeps<TUser>): void {
   const { route, store, providers, secret, site, basePath, stateCookieName, defaultRedirect, limitIp } = deps
   const callbackUrlFor = (ctx: RequestContext, provider: OAuthProvider): string =>
     `${site ?? ctx.url.origin}${basePath}/oauth/${encodeURIComponent(provider.id)}/callback`
@@ -127,7 +127,7 @@ export function registerOAuthRoutes(deps: OAuthRouteDeps): void {
 
     const profile = await provider.fetchProfile(tokenData.access_token)
     const existingLink = await store.getOAuthAccount(provider.id, profile.id)
-    let userRecord: AuthUser | undefined
+    let userRecord: TUser | undefined
 
     if (existingLink) {
       userRecord = await store.getUserById(existingLink.userId)
@@ -143,7 +143,7 @@ export function registerOAuthRoutes(deps: OAuthRouteDeps): void {
           ...(profile.name !== undefined ? { name: profile.name } : {}),
           ...(profile.avatarUrl !== undefined ? { avatarUrl: profile.avatarUrl } : {}),
           emailVerified: profile.emailVerified,
-        })
+        } as Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>)
       }
       else {
         return fail(ctx, 409, 'An account with this email already exists; verify email to link')

@@ -39,7 +39,7 @@ export interface ContentEntry<TData = Record<string, unknown>> {
   render(): Promise<RenderedMarkdown>
 }
 
-export type MarkdownComponent = (props: any) => unknown
+export type MarkdownComponent = (props: never) => unknown
 export type CodeHighlighter = (code: string, language: string | undefined) => string
 
 export interface MarkdownImageResult {
@@ -181,6 +181,17 @@ function defaultSort<T>(a: ContentEntry<T>, b: ContentEntry<T>): number {
   return a.slug.localeCompare(b.slug)
 }
 
+export interface CollectionOptionsWithSchema<TData> extends Omit<CollectionOptions<TData>, 'schema'> {
+  /** Standard Schema (Zod, Valibot, ArkType, custom) validating frontmatter into `TData`. */
+  schema: StandardSchemaV1<unknown, TData>
+}
+
+export interface CollectionOptionsWithoutSchema extends Omit<CollectionOptions<Record<string, unknown>>, 'schema'> {
+  schema?: undefined
+}
+
+export function defineCollection<TData>(options: CollectionOptionsWithSchema<TData>): Collection<TData>
+export function defineCollection(options: CollectionOptionsWithoutSchema): Collection<Record<string, unknown>>
 export function defineCollection<TData = Record<string, unknown>>(options: CollectionOptions<TData>): Collection<TData> {
   const getDir = () => resolveCollectionDir(options.dir)
   const includeDrafts = options.includeDrafts ?? false
@@ -479,7 +490,27 @@ function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
   return trimmed.split(',').some(part => part.trim().replace(/^W\//, '') === target)
 }
 
-export function contentPlugin(options: { feeds?: RssFeedConfig<any>[] | undefined, collections?: Collection<any>[] | undefined } = {}): KayPlugin {
+export interface ContentFeed {
+  readonly path?: string | undefined
+  readonly title: string
+  readonly description: string
+  readonly site: string
+  readonly collection: Collection<unknown>
+  readonly locale?: string | undefined
+  readonly linkPrefix?: string | undefined
+  readonly mapItem?: ((entry: ContentEntry<never>) => {
+    title: string
+    description?: string | undefined
+    date?: string | Date | undefined
+    link?: string | undefined
+  }) | undefined
+}
+
+export function contentPlugin<const TDataList extends readonly unknown[] = readonly unknown[]>(options?: {
+  feeds?: { [K in keyof TDataList]: RssFeedConfig<TDataList[K]> } | undefined
+  collections?: readonly Collection<unknown>[] | undefined
+}): KayPlugin
+export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefined, collections?: readonly Collection<unknown>[] | undefined } = {}): KayPlugin {
   const feeds = options.feeds ?? []
   const extraCollections = options.collections ?? []
   return {
@@ -495,7 +526,7 @@ export function contentPlugin(options: { feeds?: RssFeedConfig<any>[] | undefine
     build(ctx) {
       for (const feed of feeds) {
         const rel = (feed.path ?? '/rss.xml').replace(/^\/+/, '')
-        ctx.emitPublic(rel, renderRss(feed))
+        ctx.emitPublic(rel, renderRss(feed as RssFeedConfig<unknown>))
       }
     },
     server(api) {
@@ -506,7 +537,7 @@ export function contentPlugin(options: { feeds?: RssFeedConfig<any>[] | undefine
           const versionFn = (feed.collection as unknown as Record<symbol, (() => number) | undefined>)[COLLECTION_VERSION_KEY]
           const version = versionFn ? versionFn() : -1
           if (api.dev || memo === undefined || memo.version !== version) {
-            const xml = renderRss(feed)
+            const xml = renderRss(feed as RssFeedConfig<unknown>)
             const etag = `"${Bun.hash(xml).toString(36)}"`
             memo = { xml, etag, version }
           }

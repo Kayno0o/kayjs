@@ -12,7 +12,7 @@ export interface AuthUser {
   updatedAt: number
 }
 
-export type PublicUser = Omit<AuthUser, 'passwordHash'>
+export type PublicUser<TUser extends AuthUser = AuthUser> = Omit<TUser, 'passwordHash'>
 
 export interface AuthSession {
   /** SHA-256 hex digest of the raw session cookie token (never store raw tokens!). */
@@ -41,20 +41,20 @@ export interface VerificationToken {
   expiresAt: number
 }
 
-export interface UserExport {
-  user: PublicUser
+export interface UserExport<TUser extends AuthUser = AuthUser> {
+  user: PublicUser<TUser>
   sessions: AuthSession[]
   oauthAccounts: Array<{ provider: string, providerAccountId: string, createdAt: number }>
   exportedAt: number
 }
 
-export interface AuthStore {
-  getUserById(id: string): AuthUser | undefined | Promise<AuthUser | undefined>
-  getUserByEmail(email: string): AuthUser | undefined | Promise<AuthUser | undefined>
-  createUser(user: AuthUser): AuthUser | Promise<AuthUser>
-  updateUser(id: string, patch: Partial<Omit<AuthUser, 'id' | 'createdAt'>>): AuthUser | undefined | Promise<AuthUser | undefined>
+export interface AuthStore<TUser extends AuthUser = AuthUser> {
+  getUserById(id: string): TUser | undefined | Promise<TUser | undefined>
+  getUserByEmail(email: string): TUser | undefined | Promise<TUser | undefined>
+  createUser(user: TUser): TUser | Promise<TUser>
+  updateUser(id: string, patch: Partial<Omit<TUser, 'id' | 'createdAt'>>): TUser | undefined | Promise<TUser | undefined>
   deleteUser(userId: string): void | Promise<void>
-  exportUser(userId: string): UserExport | null | Promise<UserExport | null>
+  exportUser(userId: string): UserExport<TUser> | null | Promise<UserExport<TUser> | null>
 
   getSession(tokenHash: string): AuthSession | undefined | Promise<AuthSession | undefined>
   listSessions(userId: string): AuthSession[] | Promise<AuthSession[]>
@@ -77,22 +77,22 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
-export function toPublicUser(user: AuthUser): PublicUser {
+export function toPublicUser<TUser extends AuthUser = AuthUser>(user: TUser): PublicUser<TUser> {
   const { passwordHash: _hash, ...pub } = user
   return pub
 }
 
-interface MemoryState {
-  users: Map<string, AuthUser>
+interface MemoryState<TUser extends AuthUser = AuthUser> {
+  users: Map<string, TUser>
   usersByEmail: Map<string, string>
   sessions: Map<string, AuthSession>
   oauth: Map<string, OAuthAccount>
   tokens: Map<string, VerificationToken>
 }
 
-export function memoryAuthStore(id?: string): AuthStore {
-  const state: MemoryState = id !== undefined
-    ? (((globalThis as Record<symbol, MemoryState | undefined>)[Symbol.for(`kay.auth.memory.${id}`)] ??= {
+export function memoryAuthStore<TUser extends AuthUser = AuthUser>(id?: string): AuthStore<TUser> {
+  const state: MemoryState<TUser> = id !== undefined
+    ? (((globalThis as Record<symbol, MemoryState<TUser> | undefined>)[Symbol.for(`kay.auth.memory.${id}`)] ??= {
         users: new Map(),
         usersByEmail: new Map(),
         sessions: new Map(),
@@ -116,7 +116,7 @@ export function memoryAuthStore(id?: string): AuthStore {
       return uid !== undefined ? state.users.get(uid) : undefined
     },
     createUser(user) {
-      const norm: AuthUser = { ...user, email: normalizeEmail(user.email) }
+      const norm: TUser = { ...user, email: normalizeEmail(user.email) }
       state.users.set(norm.id, norm)
       state.usersByEmail.set(norm.email, norm.id)
       return norm
@@ -130,7 +130,7 @@ export function memoryAuthStore(id?: string): AuthStore {
         state.usersByEmail.delete(cur.email)
         state.usersByEmail.set(nextEmail, userId)
       }
-      const next: AuthUser = { ...cur, ...patch, email: nextEmail, updatedAt: patch.updatedAt ?? Date.now() }
+      const next: TUser = { ...cur, ...patch, email: nextEmail, updatedAt: patch.updatedAt ?? Date.now() }
       state.users.set(userId, next)
       return next
     },

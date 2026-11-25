@@ -61,6 +61,7 @@ export interface McpBudgetOptions {
 export interface McpActionTool<Input = unknown, Output = unknown> {
   /** Existing Kay v2 `action()` handler to expose as an MCP tool. */
   action: ServerAction<Input, Output>
+  handler?: never
   /** Human/agent-facing tool description shown in `tools/list`. */
   description: string
   /** Optional explicit JSON Schema override (otherwise derived from Standard JSON Schema v1). */
@@ -77,28 +78,89 @@ export interface McpActionTool<Input = unknown, Output = unknown> {
   pruneEmpty?: McpPruneMode | undefined
 }
 
-export interface McpHandlerTool<S extends StandardSchemaV1 = StandardSchemaV1> {
+export interface McpHandlerTool<S extends StandardSchemaV1 | undefined = undefined, R = unknown> {
+  action?: never
   description: string
-  schema?: S | undefined
+  schema?: S
   inputSchema?: JsonSchemaObject | undefined
   /** Reference a shared schema in `options.schemas` to emit a tiny stub in `tools/list` while keeping full server-side validation. */
   schemaRef?: string | undefined
   /** Optional MCP 2025-03-26 tool annotations (only emitted when provided). */
   annotations?: McpToolAnnotations | undefined
-  handler: (input: InferOutput<S>, ctx: ActionContext) => unknown | Promise<unknown>
+  handler: (input: [S] extends [StandardSchemaV1] ? InferOutput<S> : Record<string, unknown>, ctx: ActionContext) => R | Promise<R>
   /** Optional token-lean formatter transforming the handler's output before sending to the agent. */
-  format?: ((output: unknown, input: InferOutput<S>) => unknown) | undefined
+  format?: ((output: Awaited<R>, input: [S] extends [StandardSchemaV1] ? InferOutput<S> : Record<string, unknown>) => unknown) | undefined
   /** Per-tool character cap on text output before truncation with a recovery hint. */
   maxOutputChars?: number | undefined
   /** Per-tool override for stripping null/undefined/empty values from JSON outputs. */
   pruneEmpty?: McpPruneMode | undefined
 }
 
-export type McpTool = McpActionTool<any, any> | McpHandlerTool<any>
+/** Variance-safe erased action tool shape (carries no `any`). */
+export interface ErasedMcpActionTool {
+  action: ServerAction<never, unknown>
+  handler?: never
+  description: string
+  inputSchema?: JsonSchemaObject | undefined
+  schemaRef?: string | undefined
+  annotations?: McpToolAnnotations | undefined
+  format?: ((output: never, input: never) => unknown) | undefined
+  maxOutputChars?: number | undefined
+  pruneEmpty?: McpPruneMode | undefined
+}
+
+/** Variance-safe erased handler tool shape (carries no `any`). */
+export interface ErasedMcpHandlerTool {
+  action?: never
+  description: string
+  schema?: StandardSchemaV1 | undefined
+  inputSchema?: JsonSchemaObject | undefined
+  schemaRef?: string | undefined
+  annotations?: McpToolAnnotations | undefined
+  handler: (input: never, ctx: ActionContext) => unknown | Promise<unknown>
+  format?: ((output: never, input: never) => unknown) | undefined
+  maxOutputChars?: number | undefined
+  pruneEmpty?: McpPruneMode | undefined
+}
+
+export type McpTool = ErasedMcpActionTool | ErasedMcpHandlerTool
+
+type ActionInput<A> = A extends ServerAction<infer I, unknown> ? I : never
+type ActionOutput<A> = A extends ServerAction<never, infer O> ? O : unknown
+
+type McpToolEntry<Spec> =
+  | {
+      action: Spec & ServerAction<never, unknown>
+      handler?: never
+      description: string
+      inputSchema?: JsonSchemaObject | undefined
+      schemaRef?: string | undefined
+      annotations?: McpToolAnnotations | undefined
+      format?: ((output: ActionOutput<Spec>, input: ActionInput<Spec>) => unknown) | undefined
+      maxOutputChars?: number | undefined
+      pruneEmpty?: McpPruneMode | undefined
+    }
+  | {
+      action?: never
+      description: string
+      schema?: Spec & (StandardSchemaV1 | undefined)
+      inputSchema?: JsonSchemaObject | undefined
+      schemaRef?: string | undefined
+      annotations?: McpToolAnnotations | undefined
+      handler: (input: [Spec] extends [StandardSchemaV1] ? InferOutput<Spec> : Record<string, unknown>, ctx: ActionContext) => unknown | Promise<unknown>
+      format?: ((output: never, input: [Spec] extends [StandardSchemaV1] ? InferOutput<Spec> : Record<string, unknown>) => unknown) | undefined
+      maxOutputChars?: number | undefined
+      pruneEmpty?: McpPruneMode | undefined
+    }
+
+export type McpToolsRecord<T extends Record<string, unknown>> = {
+  [K in keyof T]: McpToolEntry<T[K]>
+}
 
 /** Preserves strict `Input`/`Output` inference for `format` and `handler` callbacks inside `mcp({ tools })`. */
 export function mcpTool<Input, Output>(tool: McpActionTool<Input, Output>): McpActionTool<Input, Output>
-export function mcpTool<S extends StandardSchemaV1 = StandardSchemaV1>(tool: McpHandlerTool<S>): McpHandlerTool<S>
+export function mcpTool<S extends StandardSchemaV1, R = unknown>(tool: McpHandlerTool<S, R> & { schema: S }): McpHandlerTool<S, R>
+export function mcpTool<R = unknown>(tool: McpHandlerTool<undefined, R> & { schema?: undefined }): McpHandlerTool<undefined, R>
 export function mcpTool(tool: McpTool): McpTool {
   return tool
 }
@@ -370,7 +432,7 @@ function cleanAnnotations(annotations: McpToolAnnotations | undefined): McpToolA
   return hasAny ? out : undefined
 }
 
-function isActionTool(tool: McpTool): tool is McpActionTool {
+function isActionTool(tool: McpTool): tool is ErasedMcpActionTool {
   return 'action' in tool
 }
 
@@ -431,7 +493,7 @@ function buildCatalog(
     const schema = rawSchema ?? (def.schemaRef !== undefined ? sharedValidators.get(def.schemaRef) : undefined)
     const handler = isActionTool(def)
       ? ((input: unknown, ctx: ActionContext) => def.action.handler(input as never, ctx))
-      : def.handler
+      : ((input: unknown, ctx: ActionContext) => def.handler(input as never, ctx))
 
     let inputSchema: JsonSchemaObject
     if (def.inputSchema !== undefined) {
@@ -735,6 +797,10 @@ function applyOutputBudget(result: McpToolResult, maxChars: number | undefined):
 
 const MAX_BATCH_SIZE = 50
 
+export function mcp<T extends Record<string, unknown>>(
+  options: Omit<McpOptions, 'tools'> & { tools: McpToolsRecord<T> },
+): KayPlugin
+export function mcp(options: McpOptions): KayPlugin
 export function mcp(options: McpOptions): KayPlugin {
   const rawPath = options.path ?? '/mcp/tools'
   const endpoint = rawPath === '/' ? '/' : `/${rawPath.replace(/^\/+|\/+$/g, '')}`

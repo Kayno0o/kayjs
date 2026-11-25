@@ -383,7 +383,7 @@ date: 2026-11-24
 
     // 1. Unit check: lazy render() is NOT called on metadata operations, throws clearly if html read early, runs once on entry.render()
     let renderLoaderCalls = 0
-    const col = defineCollection<{ title: string }>({
+    const col = defineCollection({
       dir: join(dir, 'src/content/posts'),
       render: async () => {
         renderLoaderCalls++

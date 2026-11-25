@@ -268,7 +268,7 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
       writeFileSync(join(postsDir, 'hello.md'), '---\ntitle: Hello RSS\ndate: 2026-01-01\n---\nBody\n')
 
       let mapItemCalls = 0
-      const col = defineCollection<{ title: string }>({ dir: postsDir })
+      const col = defineCollection({ dir: postsDir })
       const plugin = contentPlugin({
         feeds: [{
           path: '/rss.xml',
@@ -278,7 +278,7 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
           collection: col,
           mapItem: (e) => {
             mapItemCalls++
-            return { title: e.data.title }
+            return { title: String(e.data.title ?? '') }
           },
         }],
       })

@@ -57,9 +57,20 @@ export interface AuthMailPayload {
   kind: 'magic-link' | 'verify-email' | 'reset-password'
 }
 
-export interface AuthOptions {
+export type CreateUserInput<TUser extends AuthUser = AuthUser> = {
+  email: string
+  password?: string | undefined
+  name?: string | undefined
+  avatarUrl?: string | undefined
+  role?: string | undefined
+  emailVerified?: boolean | undefined
+} & Omit<TUser, keyof AuthUser>
+
+export interface AuthOptions<TUser extends AuthUser = AuthUser> {
   /** Storage adapter (defaults to `memoryAuthStore()`). Use `sqliteAuthStore()` for production SQLite. */
-  store?: AuthStore | undefined
+  store?: AuthStore<TUser> | undefined
+  /** Default custom fields merged into users created by signup, magic-link, or OAuth flows. */
+  defaultUserFields?: Omit<TUser, keyof AuthUser> | (() => Omit<TUser, keyof AuthUser>) | undefined
   /**
    * Secret used to sign short-lived OAuth state/PKCE cookies.
    * Defaults to `AUTH_SECRET` env, or a random per-process key in development.
@@ -113,36 +124,36 @@ export interface AuthOptions {
   storeUserAgent?: boolean | undefined
 }
 
-export interface GuardOptions {
+export interface GuardOptions<TUser extends AuthUser = AuthUser> {
   /** Redirect unauthenticated HTML requests here (JSON/API requests always receive 401). */
   redirectTo?: string | undefined
   /** Required user role(s); authenticated users without a matching role receive 403. */
   role?: string | string[] | undefined
   /** Custom authorization predicate. */
-  allow?: ((user: PublicUser, ctx: RequestContext) => boolean | Promise<boolean>) | undefined
+  allow?: ((user: PublicUser<TUser>, ctx: RequestContext) => boolean | Promise<boolean>) | undefined
 }
 
-export interface Auth {
+export interface Auth<TUser extends AuthUser = AuthUser> {
   readonly plugin: KayPlugin
-  readonly store: AuthStore
+  readonly store: AuthStore<TUser>
   readonly basePath: string
-  getUser(ctx: { locals: KayLocals }): PublicUser | undefined
+  getUser(ctx: { locals: KayLocals }): PublicUser<TUser> | undefined
   getSession(ctx: { locals: KayLocals }): AuthSession | undefined
-  guard(options?: GuardOptions): Middleware
-  createUser(input: { email: string, password?: string | undefined, name?: string | undefined, role?: string | undefined, emailVerified?: boolean | undefined }): Promise<PublicUser>
+  guard(options?: GuardOptions<TUser>): Middleware
+  createUser(input: CreateUserInput<TUser>): Promise<PublicUser<TUser>>
   createSessionForUser(userId: string, ctx: RequestContext): Promise<AuthSession>
   signOut(ctx: RequestContext): Promise<void>
   revokeAllSessions(userId: string): Promise<void>
   sendMagicLink(email: string, origin: string, redirectTo?: string): Promise<string>
   sendVerificationEmail(email: string, origin: string, redirectTo?: string): Promise<string>
   listSessions(userId: string): Promise<AuthSession[]>
-  exportUser(userId: string): Promise<UserExport | null>
+  exportUser(userId: string): Promise<UserExport<TUser> | null>
   deleteUser(userId: string): Promise<void>
   pruneExpired(): Promise<void>
   dispose(): void
 }
 
-export function createAuth(options: AuthOptions = {}): Auth {
+export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptions<TUser> = {}): Auth<TUser> {
   if (options.secret !== undefined && options.secret.trim().length === 0)
     throw new Error('[kay/auth] `secret` must not be empty')
 
@@ -156,7 +167,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
   }
   const secret = configuredSecret ?? randomToken(32)
 
-  const store = options.store ?? memoryAuthStore()
+  const store = options.store ?? memoryAuthStore<TUser>()
   const basePath = (options.basePath ?? '/auth').replace(/\/$/, '')
   const cookieName = options.cookieName ?? 'kay_session'
   const oauthCookieName = `${cookieName}_oauth`
@@ -216,10 +227,16 @@ export function createAuth(options: AuthOptions = {}): Auth {
   }
 
   const resolvedContexts = new WeakSet<object>()
+  const resolvedUsers = new WeakMap<object, PublicUser<TUser>>()
 
-  async function resolveRequestSession(ctx: RequestContext): Promise<{ user: PublicUser, session: AuthSession } | undefined> {
+  function setResolvedUser(ctx: RequestContext, pub: PublicUser<TUser>): void {
+    resolvedUsers.set(ctx.locals, pub)
+    ctx.locals.user = pub
+  }
+
+  async function resolveRequestSession(ctx: RequestContext): Promise<{ user: PublicUser<TUser>, session: AuthSession } | undefined> {
     if (resolvedContexts.has(ctx.locals)) {
-      const user = ctx.locals.user
+      const user = resolvedUsers.get(ctx.locals) ?? (ctx.locals.user as PublicUser<TUser> | undefined)
       const session = ctx.locals.session
       return user && session ? { user, session } : undefined
     }
@@ -252,7 +269,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
     }
 
     const pub = toPublicUser(userRecord)
-    ctx.locals.user = pub
+    setResolvedUser(ctx, pub)
     ctx.locals.session = session
     return { user: pub, session }
   }
@@ -281,31 +298,29 @@ export function createAuth(options: AuthOptions = {}): Auth {
     if (rawToken)
       await store.deleteSession(sha256Hex(rawToken))
     ctx.cookies.delete(cookieName, { path: '/' })
+    resolvedUsers.delete(ctx.locals)
     delete ctx.locals.user
     delete ctx.locals.session
   }
 
-  async function createUser(input: {
-    email: string
-    password?: string | undefined
-    name?: string | undefined
-    role?: string | undefined
-    emailVerified?: boolean | undefined
-  }): Promise<PublicUser> {
-    const email = normalizeEmail(input.email)
+  async function createUser(input: CreateUserInput<TUser>): Promise<PublicUser<TUser>> {
+    const { email: rawEmail, password, name, avatarUrl, role, emailVerified, ...extra } = input
+    const email = normalizeEmail(rawEmail)
     if (!isValidEmail(email))
       throw new Error('Invalid email address')
     if (await store.getUserByEmail(email))
       throw new Error('Email is already registered')
 
-    const passwordHash = input.password !== undefined ? await hashPassword(input.password) : undefined
+    const passwordHash = password !== undefined ? await hashPassword(password) : undefined
     const created = await insertUser({
+      ...extra,
       email,
-      ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.role !== undefined ? { role: input.role } : {}),
-      emailVerified: input.emailVerified ?? false,
+      ...(name !== undefined ? { name } : {}),
+      ...(avatarUrl !== undefined ? { avatarUrl } : {}),
+      ...(role !== undefined ? { role } : {}),
+      emailVerified: emailVerified ?? false,
       ...(passwordHash !== undefined ? { passwordHash } : {}),
-    })
+    } as Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>)
     return toPublicUser(created)
   }
 
@@ -318,8 +333,8 @@ export function createAuth(options: AuthOptions = {}): Auth {
 
   // Whoever signed up with an address before it was proven may hold its password, sessions and provider links; proving it hands the account to the owner alone.
   // The password goes first, so a squatter cannot sign in again between the purge and the update.
-  async function claimUnverified(user: AuthUser): Promise<AuthUser> {
-    const claimed = (await store.updateUser(user.id, { emailVerified: true, passwordHash: undefined })) ?? user
+  async function claimUnverified(user: TUser): Promise<TUser> {
+    const claimed = (await store.updateUser(user.id, { emailVerified: true, passwordHash: undefined } as Partial<Omit<TUser, 'id' | 'createdAt'>>)) ?? user
     await store.deleteUserSessions(user.id)
     await store.deleteUserOAuthAccounts(user.id)
     return claimed
@@ -368,7 +383,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
   }
 
   // Consumes a one-time token and loads the user it was issued for (by id, else by email).
-  async function consumeLink(kind: 'magic-link' | 'verify-email', rawToken: string): Promise<{ email: string, user: AuthUser | undefined } | undefined> {
+  async function consumeLink(kind: 'magic-link' | 'verify-email', rawToken: string): Promise<{ email: string, user: TUser | undefined } | undefined> {
     const consumed = await store.consumeToken(sha256Hex(rawToken), kind)
     if (!consumed)
       return undefined
@@ -376,9 +391,19 @@ export function createAuth(options: AuthOptions = {}): Auth {
     return { email: consumed.email, user }
   }
 
-  async function insertUser(fields: Pick<AuthUser, 'email' | 'emailVerified'> & Partial<AuthUser>): Promise<AuthUser> {
+  async function insertUser(fields: Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>): Promise<TUser> {
     const now = Date.now()
-    return store.createUser({ id: crypto.randomUUID(), role: defaultRole, createdAt: now, updatedAt: now, ...fields })
+    const defaults = typeof options.defaultUserFields === 'function'
+      ? (options.defaultUserFields as () => Partial<TUser>)()
+      : (options.defaultUserFields as Partial<TUser> | undefined)
+    return store.createUser({
+      id: crypto.randomUUID(),
+      role: defaultRole,
+      createdAt: now,
+      updatedAt: now,
+      ...defaults,
+      ...fields,
+    } as TUser)
   }
 
   function respondAuthError(ctx: RequestContext, status: number, error: string, redirectTo?: string): Response {
@@ -388,7 +413,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
     return ctx.redirect(`${redirectTo}${sep}error=${encodeURIComponent(error)}`, 303)
   }
 
-  function guard(guardOpts: GuardOptions = {}): Middleware {
+  function guard(guardOpts: GuardOptions<TUser> = {}): Middleware {
     const roles = guardOpts.role === undefined ? undefined : (Array.isArray(guardOpts.role) ? guardOpts.role : [guardOpts.role])
     return async (ctx, next) => {
       const resolved = await resolveRequestSession(ctx)
@@ -416,10 +441,10 @@ export function createAuth(options: AuthOptions = {}): Auth {
     if (!userRecord)
       return fail(ctx, 400, 'Invalid or expired verification link')
 
-    const verified = (await store.updateUser(userRecord.id, { emailVerified: true })) ?? { ...userRecord, emailVerified: true }
+    const verified = (await store.updateUser(userRecord.id, { emailVerified: true } as Partial<Omit<TUser, 'id' | 'createdAt'>>)) ?? { ...userRecord, emailVerified: true }
     await createSessionForUser(verified.id, ctx)
     const pub = toPublicUser(verified)
-    ctx.locals.user = pub
+    setResolvedUser(ctx, pub)
 
     if (wantsJson(ctx.request))
       return ctx.json({ ok: true, user: pub }, { status: 200 })
@@ -484,7 +509,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
             console.error(`[kay/auth] refusing to mail a verification link for host ${ctx.url.host}: set the auth \`site\` option to the public origin`)
             return fail(ctx, 500, 'Verification links are not configured')
           }
-          const user = await createUser({ email, password, name, emailVerified: false })
+          const user = await createUser({ email, password, name, emailVerified: false } as CreateUserInput<TUser>)
           await issueLink('verify-email', user.id, user.email, linkOrigin, redirectTarget)
 
           if (wantsJson(ctx.request))
@@ -492,9 +517,9 @@ export function createAuth(options: AuthOptions = {}): Auth {
           return ctx.redirect(redirectTarget, 303)
         }
 
-        const user = await createUser({ email, password, name })
+        const user = await createUser({ email, password, name } as CreateUserInput<TUser>)
         await createSessionForUser(user.id, ctx)
-        ctx.locals.user = user
+        setResolvedUser(ctx, user)
 
         if (wantsJson(ctx.request))
           return ctx.json({ ok: true, user }, { status: 201 })
@@ -551,7 +576,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
 
         await createSessionForUser(userRecord.id, ctx)
         const pub = toPublicUser(userRecord)
-        ctx.locals.user = pub
+        setResolvedUser(ctx, pub)
 
         if (wantsJson(ctx.request))
           return ctx.json({ ok: true, user: pub }, { status: 200 })
@@ -604,7 +629,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
           return fail(ctx, 400, 'Invalid or expired sign-in link')
 
         const userRecord = !consumed.user
-          ? await insertUser({ email: consumed.email, emailVerified: true })
+          ? await insertUser({ email: consumed.email, emailVerified: true } as Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>)
           : consumed.user.emailVerified ? consumed.user : await claimUnverified(consumed.user)
 
         await createSessionForUser(userRecord.id, ctx)
@@ -634,7 +659,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
     store,
     basePath,
     getUser(ctx) {
-      return ctx.locals.user
+      return resolvedUsers.get(ctx.locals) ?? (ctx.locals.user as PublicUser<TUser> | undefined)
     },
     getSession(ctx) {
       return ctx.locals.session
