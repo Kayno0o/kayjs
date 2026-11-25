@@ -383,3 +383,17 @@ export function finalizeResponse(
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
   }
 }
+
+/** Runs `middlewares` in order around `last`; each calls `next` at most once. */
+export async function runChain(ctx: RequestContext, middlewares: readonly Middleware[], last: () => Response | Promise<Response>): Promise<Response> {
+  if (middlewares.length === 0)
+    return last()
+  let index = -1
+  const dispatch = async (i: number): Promise<Response> => {
+    if (i <= index)
+      throw new Error('kay: middleware called next() multiple times')
+    index = i
+    return i < middlewares.length ? middlewares[i]!(ctx, () => dispatch(i + 1)) : last()
+  }
+  return dispatch(0)
+}

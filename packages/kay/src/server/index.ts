@@ -5,25 +5,29 @@
 // - <Head> collection + cancel-safe streaming <Suspense> (0-overhead fast path when unused)
 // - Hybrid prerendered HTML serving + embedded single-executable mode
 
-import type { BuildManifest, RouteManifestEntry } from '../build/index'
+import type { RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
-import type { DocumentHeadContext, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
-import type { PendingChunk, RenderContext, SettledChunk } from '../ssr/context'
 import type { DocumentOptions } from '../ssr/index'
-import type { ActionErrorFlash, ActionResult, ServerAction } from './action'
+import type { ActionErrorFlash } from './action'
 import type { CookieStore } from './cookies'
-import type { EmbeddedBody, EmbeddedServerConfig, KayApp, Middleware, RequestContext } from './http'
-import type { TrustProxy } from './security'
-import { existsSync, statSync } from 'node:fs'
-import { extname, join } from 'node:path'
+import type { EmbeddedServerConfig, KayApp, Middleware, RequestContext } from './http'
+import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } from './page'
+import { join } from 'node:path'
 import { createAppContext, getAppContext, resolvePlugins, runWithAppContext } from '../plugins/index'
-import { createRenderContext, runWithRenderContext, streamChunkScript } from '../ssr/context'
+import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
-import { ACTION_ERROR_COOKIE, executeAction, invokeActionCore, isServerAction } from './action'
-import { CompressionCache, compressedHtmlResponse, isCompressibleType, maybeCompressResponse, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
-import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, etagMatches, extractRenderedIslands, finalizeResponse, isNotFound, makeRequestContext, MIME, wantsJson } from './http'
+import { ACTION_ERROR_COOKIE, executeAction, isServerAction } from './action'
+import { createActionRegistry } from './action-registry'
+import { createAssets } from './assets'
+import { CompressionCache, compressedHtmlResponse, maybeCompressResponse } from './compress'
+import { createDocumentHooks, createHtmlHeaders, resolveRenderedIslands } from './document'
+import { createErrorNotifier, createFallbackPages } from './errors'
+import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
+import { allowedMethodsHeader, isPlainObject, mergedHeadTags, pickPageIslandProps, stripHeadBody } from './page'
+import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
 import { Router } from './router'
-import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, resolveCspPolicy, resolveHstsValue, verifyOrigin, withCspHashes } from './security'
+import { buildSecurityHeaderEntries, resolveHstsValue, verifyOrigin } from './security'
+import { STREAM_TAIL_MARK, streamDocument } from './stream'
 
 /**
  * Request-scoped locals bag shared across middlewares, plugins, actions, layouts, and pages.
@@ -47,67 +51,8 @@ export type { SecurityHeadersOptions, TrustProxy } from './security'
 export { formatIssuePath, formatSchemaIssues, validateSchema, validateSchemaSync } from './standard-schema'
 export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult, ValidationSuccess } from './standard-schema'
 
-interface LoadedPageModule {
-  default?: (props: Record<string, unknown>) => Html | string | Promise<Html | string>
-  load?: (ctx: RequestContext) => unknown | Promise<unknown>
-  clientData?: readonly string[] | ((data: unknown) => unknown) | undefined
-  csrf?: boolean | undefined
-  GET?: (ctx: RequestContext) => Response | Promise<Response>
-  POST?: (ctx: RequestContext) => Response | Promise<Response>
-  PUT?: (ctx: RequestContext) => Response | Promise<Response>
-  PATCH?: (ctx: RequestContext) => Response | Promise<Response>
-  DELETE?: (ctx: RequestContext) => Response | Promise<Response>
-  HEAD?: (ctx: RequestContext) => Response | Promise<Response>
-  OPTIONS?: (ctx: RequestContext) => Response | Promise<Response>
-  [key: string]: unknown
-}
-
-interface LoadedLayoutModule {
-  default: (props: { children: Html, url?: URL, params?: Record<string, string>, locals?: KayLocals }) => Html | string | Promise<Html | string>
-}
-
-interface LoadedMiddlewareModule {
-  default: Middleware
-}
-
-interface LoadedErrorModule {
-  default: (props: { error: unknown }) => Html | string | Promise<Html | string>
-}
-
-const HTTP_METHOD_EXPORTS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
-
-const textEncoder = new TextEncoder()
-// Where a streamed page's document splits: everything before it flushes first, resolved boundaries go in between.
-const STREAM_TAIL_MARK = '<!--kay:stream-tail-->'
 // Matches Bun.serve's 30 s idle timeout, which a streamed page turns off.
 const DEFAULT_STREAM_TIMEOUT = 30_000
-
-// A build file ready to serve: headers and compression key are fixed at startup, so a request only picks a variant.
-interface ServedFile {
-  key: string
-  headers: Record<string, string>
-  /** Headers of the on-the-fly compressed variant; undefined when the file is never compressed here. */
-  compressedHeaders: Record<string, string> | undefined
-  body: BodyInit
-  read: () => Uint8Array<ArrayBuffer> | Promise<Uint8Array<ArrayBuffer>>
-}
-
-interface Sidecar {
-  body: BodyInit
-  headers: Record<string, string>
-}
-
-interface AssetEntry {
-  file: ServedFile
-  br: Sidecar | undefined
-  gz: Sidecar | undefined
-}
-
-interface PublicEntry {
-  file: ServedFile
-  etag: string
-  notModifiedHeaders: Record<string, string>
-}
 
 type FastHandler = (req: Request, remoteIp?: string, url?: URL) => Response | Promise<Response>
 
@@ -122,155 +67,12 @@ interface CompiledRoute {
   doc: DocumentOptions
 }
 
-interface PluginRouteDef {
-  handler: (ctx: RequestContext) => Response | Promise<Response>
-  csrf: boolean
-  trustedOrigins: Set<string> | undefined
-  trustProxy: TrustProxy
-}
-
-interface ScopedMiddleware {
-  mw: Middleware
-  scope: 'all' | 'dynamic' | string
-}
-
 const isRead = (request: Request): boolean => request.method === 'GET' || request.method === 'HEAD'
 const isEventStream = (res: Response): boolean => (res.headers.get('content-type') ?? '').toLowerCase().includes('text/event-stream')
 const hasActionErrorCookie = (request: Request): boolean => (request.headers.get('cookie') ?? '').includes(`${ACTION_ERROR_COOKIE}=`)
 // A read the pre-rendered and fast static paths may answer: nothing to flash back to the page.
 const isPlainRead = (request: Request): boolean => isRead(request) && !hasActionErrorCookie(request)
 
-/** Runs `middlewares` in order around `last`; each calls `next` at most once. */
-async function runChain(ctx: RequestContext, middlewares: readonly Middleware[], last: () => Response | Promise<Response>): Promise<Response> {
-  if (middlewares.length === 0)
-    return last()
-  let index = -1
-  const dispatch = async (i: number): Promise<Response> => {
-    if (i <= index)
-      throw new Error('kay: middleware called next() multiple times')
-    index = i
-    return i < middlewares.length ? middlewares[i]!(ctx, () => dispatch(i + 1)) : last()
-  }
-  return dispatch(0)
-}
-
-async function settleWithin(chunk: PendingChunk, deadlineMs: number, signal: AbortSignal): Promise<SettledChunk | undefined> {
-  if (signal.aborted)
-    return undefined
-  const remaining = Math.max(0, deadlineMs - Date.now())
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const abortedOrTimedOut = new Promise<SettledChunk | undefined>((resolve) => {
-    const onAbort = () => resolve(undefined)
-    signal.addEventListener('abort', onAbort, { once: true })
-    timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort)
-      const error = new Error(`<Suspense> boundary ${chunk.id} did not resolve within ${remaining} ms`)
-      resolve({ html: chunk.renderError(error), error })
-    }, remaining)
-  })
-  try {
-    return await Promise.race([chunk.settled, abortedOrTimedOut])
-  }
-  finally {
-    clearTimeout(timer)
-  }
-}
-
-function mergedHeadTags(manifest: BuildManifest, entry: RouteManifestEntry): string[] | undefined {
-  return entry.headTags !== undefined && entry.headTags.length > 0
-    ? [...(manifest.headTags ?? []), ...entry.headTags]
-    : manifest.headTags
-}
-
-function allowedMethodsHeader(mod: LoadedPageModule): string {
-  const allowed = new Set<string>()
-  if (typeof mod.default === 'function') {
-    allowed.add('GET')
-    allowed.add('HEAD')
-  }
-  for (const m of HTTP_METHOD_EXPORTS) {
-    if (typeof mod[m] === 'function')
-      allowed.add(m)
-  }
-  if (allowed.has('GET'))
-    allowed.add('HEAD')
-  return [...allowed].join(', ')
-}
-
-function allowedPluginMethodsHeader(methods: ReadonlyMap<string, PluginRouteDef>): string {
-  const allowed = new Set<string>()
-  for (const m of methods.keys()) {
-    if (m === 'ALL')
-      continue
-    allowed.add(m)
-  }
-  if (allowed.has('GET'))
-    allowed.add('HEAD')
-  return [...allowed].join(', ')
-}
-
-async function cancelBodyQuietly(body: ReadableStream<Uint8Array>): Promise<void> {
-  try {
-    await body.cancel()
-  }
-  catch {}
-}
-
-function stripHeadBody(res: Response): Response {
-  if (res.body !== null)
-    void cancelBodyQuietly(res.body)
-  return new Response(null, { status: res.status, statusText: res.statusText, headers: res.headers })
-}
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
-
-function pickObjectKeys(obj: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> | undefined {
-  if (keys.length === 0)
-    return undefined
-  const picked: Record<string, unknown> = {}
-  let count = 0
-  for (const k of keys) {
-    if (Object.hasOwn(obj, k)) {
-      Object.defineProperty(picked, k, { value: obj[k], enumerable: true, writable: true, configurable: true })
-      count++
-    }
-  }
-  return count > 0 ? picked : undefined
-}
-
-function pickPageIslandProps(data: unknown, entry: RouteManifestEntry, mod: LoadedPageModule): Record<string, unknown> {
-  if (data === undefined)
-    return {}
-  if (typeof mod.clientData === 'function') {
-    const subset = mod.clientData(data)
-    return subset === undefined ? {} : { data: subset }
-  }
-  if (Array.isArray(mod.clientData)) {
-    if (!isPlainObject(data))
-      return {}
-    const subset = pickObjectKeys(data, mod.clientData)
-    return subset === undefined ? {} : { data: subset }
-  }
-  if (entry.islandDataKeys !== undefined) {
-    if (entry.islandDataKeys.length === 0)
-      return {}
-    if (isPlainObject(data)) {
-      const subset = pickObjectKeys(data, entry.islandDataKeys)
-      return subset === undefined ? {} : { data: subset }
-    }
-  }
-  return { data }
-}
-
-function middlewareAppliesToPath(scope: ScopedMiddleware['scope'], path: string, isStaticFast: boolean): boolean {
-  if (scope === 'all')
-    return true
-  if (scope === 'dynamic')
-    return !isStaticFast
-  return path === scope || path.startsWith(scope.endsWith('/') ? scope : `${scope}/`)
-}
 
 export async function createServerFromEmbedded(config: EmbeddedServerConfig): Promise<KayApp> {
   const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered = {}, prerenderedFiles = {}, lang = 'en', security } = config
@@ -289,12 +91,9 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const parentAppCtx = getAppContext()
 
   const alwaysLoadRuntime = plugins.some(p => Boolean(p.clientEntry))
-  const headHooks = plugins
-    .map(p => p.head)
-    .filter((fn): fn is NonNullable<KayPlugin['head']> => typeof fn === 'function')
-  const htmlTransformers = plugins
-    .map(p => p.transformHtml)
-    .filter((fn): fn is NonNullable<KayPlugin['transformHtml']> => typeof fn === 'function')
+  const notifyError = createErrorNotifier(config.onError, plugins)
+  const document = createDocumentHooks({ plugins, lang, trustProxy, notifyError })
+  const { hasHeadHooks, hasHtmlTransformers, htmlTransformers, resolveDocumentHead } = document
 
   const securityEntries = buildSecurityHeaderEntries(security)
   const securityRecord: Record<string, string> = Object.fromEntries(securityEntries)
@@ -307,56 +106,15 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     status: 500,
     headers: { 'content-type': 'text/plain; charset=utf-8', ...securityRecord },
   })
-
-  // HTML headers, one set per (dynamic, islands, suspense) combination: the CSP only gains the hashes a page needs.
-  const baseCsp = resolveCspPolicy(security)
-  const htmlHeaderSets: Record<string, string>[] = []
-  for (let i = 0; i < 8; i++) {
-    const isDynamic = (i & 4) !== 0
-    const hasIslands = (i & 2) !== 0
-    const hasSuspense = (i & 1) !== 0
-    const headers: Record<string, string> = { 'content-type': 'text/html; charset=utf-8', ...securityRecord }
-    if (isDynamic)
-      headers['cache-control'] = 'private'
-    if (baseCsp !== undefined && (hasIslands || hasSuspense)) {
-      headers['content-security-policy'] = withCspHashes(baseCsp, {
-        styleHashes: [...(hasIslands ? [KAY_ISLAND_STYLE_HASH] : []), ...(hasSuspense ? [KAY_SUSPENSE_STYLE_HASH] : [])],
-        scriptHashes: hasSuspense ? [KAY_STREAM_SCRIPT_HASH] : [],
-      })
-    }
-    htmlHeaderSets.push(headers)
-  }
-  const htmlHeaders = (hasIslands: boolean, hasSuspense: boolean, isDynamic: boolean): Record<string, string> =>
-    htmlHeaderSets[(isDynamic ? 4 : 0) | (hasIslands ? 2 : 0) | (hasSuspense ? 1 : 0)]!
+  const htmlHeaders = createHtmlHeaders(security, securityRecord)
 
   const compressEnabled = config.compress ?? !isDev
   const compressCache = compressEnabled ? new CompressionCache() : undefined
-  const varyEncoding: Record<string, string> = compressCache !== undefined ? { vary: 'Accept-Encoding' } : {}
 
-  const toBody = (body: EmbeddedBody): BodyInit => typeof body === 'string' ? Bun.file(body) : body
-  const readBody = async (body: EmbeddedBody): Promise<Uint8Array<ArrayBuffer>> => typeof body === 'string' ? new Uint8Array(await Bun.file(body).arrayBuffer()) : body
-  const builtFile = (key: string, source: EmbeddedBody, headers: Record<string, string>, compressedHeaders: Record<string, string> | undefined): ServedFile =>
-    ({ key, headers, compressedHeaders, body: toBody(source), read: () => readBody(source) })
-
-  const publicMap = new Map<string, PublicEntry>()
-  const publicCacheControl = isDev ? 'no-cache' : 'public, max-age=3600'
-
-  const registerPublicEntry = (rel: string, body: EmbeddedBody, explicitEtag?: string): void => {
-    const cleanRel = rel.replace(/^\/+/, '')
-    const etag = explicitEtag ?? `W/"${Bun.hash(typeof body === 'string' ? cleanRel : body).toString(36)}"`
-    const type = MIME[extname(cleanRel).toLowerCase()] ?? 'application/octet-stream'
-    const hasVary = compressCache !== undefined && isCompressibleType(type)
-    const validators = { etag, 'cache-control': publicCacheControl, ...(hasVary ? { vary: 'Accept-Encoding' } : {}), ...nosniffHeader }
-    const headers = { 'content-type': type, ...validators }
-    publicMap.set(`/${cleanRel}`, {
-      etag,
-      notModifiedHeaders: validators,
-      file: builtFile(`p:/${cleanRel}:${etag}`, body, headers, hasVary ? { ...headers, etag: toWeakEtag(etag) } : undefined),
-    })
-  }
-
+  const files = createAssets({ assets, assetPrefix, isDev, compressEnabled, compressCache, nosniffHeader, withHsts })
+  const { assetMap, publicMap, serveFile, serveAsset, servePublic } = files
   for (const [rel, body] of Object.entries(publicAssets))
-    registerPublicEntry(rel, body, publicEtags[rel])
+    files.registerPublic(rel, body, publicEtags[rel])
 
   const serverAppCtx = createAppContext({
     root: serverRoot,
@@ -367,432 +125,48 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     dev: isDev,
     onRegisterPublicFile: (rel) => {
       parentAppCtx?.registerPublicFile(rel)
-      const cleanRel = rel.replace(/^\/+/, '')
-      const abs = join(serverPublicDir, cleanRel)
-      if (existsSync(abs)) {
-        const st = statSync(abs)
-        registerPublicEntry(cleanRel, abs, `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`)
-      }
+      files.registerPublicFromDisk(serverPublicDir, rel)
     },
   })
 
-  // Plugin server hooks (plugin setup may be sync or async)
-  const scopedMiddlewares: ScopedMiddleware[] = []
-  const shutdownHooks: (() => void | Promise<void>)[] = []
-  const pluginRewrites: ((pathname: string, ctx: RequestContext) => string | undefined)[] = []
-  const pluginRouter = new Router<Map<string, PluginRouteDef>>()
-  const pluginRouteEntries = new Map<string, Map<string, PluginRouteDef>>()
-
-  const actionHandlers = new Map<string, { act: ServerAction<unknown, unknown>, middlewares: Middleware[] }>()
-  const actionByRef = new WeakMap<ServerAction<unknown, unknown>, Middleware[]>()
-
-  const registerPluginRoute = (
-    method: string,
-    path: string,
-    handler: (ctx: RequestContext) => Response | Promise<Response>,
-    options?: PluginRouteOptions,
-  ): void => {
-    const normPath = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
-    let byMethod = pluginRouteEntries.get(normPath)
-    if (byMethod === undefined) {
-      byMethod = new Map()
-      pluginRouteEntries.set(normPath, byMethod)
-      pluginRouter.add(normPath, byMethod)
-    }
-    let routeTrustedOrigins = trustedOrigins
-    if (options?.trustedOrigins !== undefined && options.trustedOrigins.length > 0) {
-      routeTrustedOrigins = new Set([...(trustedOrigins ?? []), ...options.trustedOrigins])
-    }
-    byMethod.set(method.toUpperCase(), {
-      handler,
-      csrf: options?.csrf ?? true,
-      trustedOrigins: routeTrustedOrigins,
-      trustProxy: options?.trustProxy ?? trustProxy,
-    })
-  }
-
-  async function invokeRegisteredAction<I, O>(act: ServerAction<I, O>, input: I, ctx: RequestContext): Promise<ActionResult<O>> {
-    const dirMiddlewares = actionByRef.get(act as unknown as ServerAction<unknown, unknown>) ?? []
-    if (dirMiddlewares.length === 0)
-      return invokeActionCore(act, input, ctx)
-
-    let actionResult: ActionResult<O> | undefined
-    const res = await runChain(ctx, dirMiddlewares, async () => {
-      actionResult = await invokeActionCore(act, input, ctx)
-      return new Response(null, { status: actionResult.ok ? 200 : actionResult.status })
-    })
-    if (actionResult !== undefined)
-      return actionResult
-    // A directory `_middleware.ts` short-circuited the request (e.g. 401/403 auth guard).
-    const ct = res.headers.get('content-type') ?? ''
-    if (ct.includes('application/json')) {
-      try {
-        const body = await res.clone().json() as Record<string, unknown>
-        return {
-          ok: false,
-          status: res.status,
-          error: typeof body.error === 'string' ? body.error : res.statusText || 'Forbidden',
-        }
-      }
-      catch {}
-    }
-    let text = ''
-    try {
-      text = await res.clone().text()
-    }
-    catch {}
-    return {
-      ok: false,
-      status: res.status,
-      error: text || res.statusText || 'Forbidden',
-    }
-  }
-
-  const {
-    manifest: _m,
-    modules: _mods,
-    assets: _a,
-    publicAssets: _pa,
-    publicEtags: _pe,
-    prerendered: _pr,
-    prerenderedFiles: _pf,
-    ...forwardedConfig
-  } = config as EmbeddedServerConfig & Record<string, unknown>
-  const readonlyRuntimeConfig: Readonly<Record<string, unknown>> = Object.freeze({ ...forwardedConfig })
-
-  for (const plugin of plugins) {
-    if (plugin.dispose !== undefined)
-      shutdownHooks.push(() => plugin.dispose!())
-    if (plugin.server !== undefined) {
-      const pluginApi: ServerPluginAPI = {
-        root: serverRoot,
-        outDir: serverOutDir,
-        assetPrefix,
-        site,
-        dev: isDev,
-        trustProxy,
-        trustedOrigins: trustedOriginsList,
-        config: readonlyRuntimeConfig,
-        use(mw: Middleware, options?: MiddlewareOptions) {
-          scopedMiddlewares.push({ mw, scope: options?.scope ?? 'all' })
-        },
-        route: registerPluginRoute,
-        rewrite(fn) {
-          pluginRewrites.push(fn)
-        },
-        provide: serverAppCtx.provide,
-        inject: serverAppCtx.inject,
-        getBuildData<T = Record<string, unknown>>(pluginName?: string): T | undefined {
-          return manifest.pluginData?.[pluginName ?? plugin.name] as T | undefined
-        },
-        onShutdown(fn) {
-          shutdownHooks.push(fn)
-        },
-        invokeAction: invokeRegisteredAction,
-      }
-      await runWithAppContext(serverAppCtx, () => plugin.server!(pluginApi))
-    }
-  }
-
-  const allPluginMiddlewares: readonly Middleware[] = scopedMiddlewares.map(m => m.mw)
-  const staticFastPluginMiddlewares: readonly Middleware[] = scopedMiddlewares
-    .filter(m => m.scope === 'all')
-    .map(m => m.mw)
-  const hasPathScopedMiddlewares = scopedMiddlewares.some(m => m.scope !== 'all' && m.scope !== 'dynamic')
-  const middlewaresFor = (path: string, isStaticFast = false): readonly Middleware[] => {
-    if (scopedMiddlewares.length === 0)
-      return allPluginMiddlewares
-    if (!hasPathScopedMiddlewares)
-      return isStaticFast ? staticFastPluginMiddlewares : allPluginMiddlewares
-    return scopedMiddlewares.filter(m => middlewareAppliesToPath(m.scope, path, isStaticFast)).map(m => m.mw)
-  }
-  const hasPluginRewrites = pluginRewrites.length > 0
-  const hasHeadHooks = headHooks.length > 0
-  const hasHtmlTransformers = htmlTransformers.length > 0
-
-  const errorHooks: ((info: ServerErrorInfo) => void)[] = []
-  if (config.onError !== undefined)
-    errorHooks.push(config.onError)
-  for (const p of plugins) {
-    if (p.onError !== undefined)
-      errorHooks.push(p.onError)
-  }
-  const notifyError = (error: unknown, request: Request, source: ServerErrorInfo['source']) => {
-    for (const hook of errorHooks) {
-      try {
-        hook({ error, request, source })
-      }
-      catch {}
-    }
-  }
-
-  // Hashed build assets: immutable cache, precompressed .br/.gz sidecars, optional lazy compression.
-  // Skip `.br`/`.gz` sidecars as standalone HTTP routes when their base asset exists.
-  const assetMap = new Map<string, AssetEntry>()
-  for (const [rel, body] of Object.entries(assets)) {
-    if ((rel.endsWith('.br') || rel.endsWith('.gz')) && rel.slice(0, -3) in assets)
-      continue
-    const type = MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream'
-    const compressible = compressCache !== undefined && isCompressibleType(type)
-    const headers: Record<string, string> = {
-      'content-type': type,
-      'cache-control': 'public, max-age=31536000, immutable',
-      ...nosniffHeader,
-    }
-    const sidecar = (ext: 'br' | 'gz', encoding: string): Sidecar | undefined => {
-      const source = assets[`${rel}.${ext}`] ?? (typeof body === 'string' && existsSync(`${body}.${ext}`) ? `${body}.${ext}` : undefined)
-      return source === undefined ? undefined : { body: toBody(source), headers: { ...headers, 'content-encoding': encoding, 'vary': 'Accept-Encoding' } }
-    }
-    const br = sidecar('br', 'br')
-    const gz = sidecar('gz', 'gzip')
-    const varyHeaders = compressible || br !== undefined || gz !== undefined ? { ...headers, vary: 'Accept-Encoding' } : headers
-    assetMap.set(`${assetPrefix}/${rel}`, {
-      file: builtFile(`a:${assetPrefix}/${rel}`, body, varyHeaders, compressible ? varyHeaders : undefined),
-      br,
-      gz,
-    })
-  }
-
-  async function serveFile(request: Request, file: ServedFile): Promise<Response> {
-    if (request.method === 'HEAD')
-      return withHsts(new Response(null, { status: 200, headers: file.headers }), request)
-    if (file.compressedHeaders !== undefined && compressCache !== undefined) {
-      const enc = pickEncoding(request.headers.get('accept-encoding'))
-      if (enc !== undefined) {
-        const compressed = await compressCache.file(file.key, enc, file.read)
-        if (compressed !== undefined)
-          return withHsts(new Response(compressed, { status: 200, headers: { ...file.compressedHeaders, 'content-encoding': enc } }), request)
-      }
-    }
-    return withHsts(new Response(file.body, { status: 200, headers: file.headers }), request)
-  }
-
-  async function serveAsset(request: Request, asset: AssetEntry): Promise<Response> {
-    if (compressEnabled && request.method !== 'HEAD' && (asset.br !== undefined || asset.gz !== undefined)) {
-      const preEnc = pickPrecompressedEncoding(request.headers.get('accept-encoding'), { br: asset.br !== undefined, gz: asset.gz !== undefined })
-      if (preEnc !== undefined) {
-        const sidecar = preEnc === 'br' ? asset.br! : asset.gz!
-        return withHsts(new Response(sidecar.body, { status: 200, headers: sidecar.headers }), request)
-      }
-    }
-    return serveFile(request, asset.file)
-  }
-
-  async function servePublic(request: Request, pub: PublicEntry): Promise<Response> {
-    if (etagMatches(request.headers.get('if-none-match'), pub.etag))
-      return withHsts(new Response(null, { status: 304, headers: pub.notModifiedHeaders }), request)
-    return serveFile(request, pub.file)
-  }
+  const actions = createActionRegistry()
+  const pluginHost = await createServerPluginHost({
+    plugins,
+    config,
+    manifest,
+    appCtx: serverAppCtx,
+    root: serverRoot,
+    outDir: serverOutDir,
+    assetPrefix,
+    site,
+    dev: isDev,
+    trustProxy,
+    trustedOriginsList,
+    trustedOrigins,
+    invokeAction: actions.invoke,
+  })
+  const { router: pluginRouter, middlewaresFor } = pluginHost
+  const hasPluginRewrites = pluginHost.rewrites.length > 0
 
   // Server actions and their live URLs
   for (const entry of manifest.actions) {
     const mod = modules[entry.file] as Record<string, unknown> | undefined
     const act = mod?.[entry.exportName]
-    if (isServerAction(act)) {
-      ;(act as { url: string }).url = entry.url
-      const dirMiddlewares = entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default)
-      actionByRef.set(act, dirMiddlewares)
-      actionHandlers.set(entry.url, { act, middlewares: [...middlewaresFor(entry.url), ...dirMiddlewares] })
-    }
+    if (isServerAction(act))
+      actions.register(act, entry.url, entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default), middlewaresFor(entry.url))
   }
 
-  const errorMod = manifest.errorFile ? modules[manifest.errorFile] as LoadedErrorModule : undefined
-  const notFoundMod = manifest.notFoundFile ? modules[manifest.notFoundFile] as LoadedPageModule : undefined
-
-  // Prerendered pages (zero-copy file paths preferred; raw HTML strings supported). `fastPrerenderedMap` holds those nothing may intercept.
-  const prerenderedMap = new Map<string, ServedFile>()
-  const fastPrerenderedMap = new Map<string, ServedFile>()
-  for (const route of manifest.routes) {
-    if (route.prerendered === undefined)
-      continue
-    const headers: Record<string, string> = { ...htmlHeaders(route.islandChunks.length > 0, false, false), ...varyEncoding }
-    const compressedHeaders = compressCache !== undefined ? headers : undefined
-    for (const [urlPath, relHtml] of Object.entries(route.prerendered)) {
-      const filePath = prerenderedFiles[relHtml]
-      const html = prerendered[relHtml]
-      const key = `pre:${urlPath}`
-      const entry: ServedFile | undefined = filePath !== undefined
-        ? builtFile(key, filePath, headers, compressedHeaders)
-        : html !== undefined
-          ? { key, headers, compressedHeaders, body: html, read: () => textEncoder.encode(html) }
-          : undefined
-      if (entry === undefined)
-        continue
-      prerenderedMap.set(urlPath, entry)
-      if (route.middlewares.length === 0 && middlewaresFor(urlPath, true).length === 0 && !hasPluginRewrites && pluginRouter.match(urlPath) === undefined)
-        fastPrerenderedMap.set(urlPath, entry)
-    }
-  }
+  const { all: prerenderedMap, fast: fastPrerenderedMap } = files.collectPrerendered(manifest.routes, {
+    prerendered,
+    prerenderedFiles,
+    htmlHeaders: route => htmlHeaders(route.islandChunks.length > 0, false, false),
+    isFast: (urlPath, route) => route.middlewares.length === 0 && middlewaresFor(urlPath, true).length === 0 && !hasPluginRewrites && pluginRouter.match(urlPath) === undefined,
+  })
 
   const router = new Router<CompiledRoute>()
   const fastStaticPages = new Map<string, FastHandler>()
 
-  // Error and 404 pages sit outside any route, so they render with the global styles and the explicit root layout only.
-  const rootLayoutFile = manifest.rootLayoutFile
-  const rootLayoutMod = rootLayoutFile !== undefined ? modules[rootLayoutFile] as LoadedLayoutModule | undefined : undefined
-  const fallbackDoc: DocumentOptions = {
-    body: '',
-    headTags: manifest.headTags,
-    styles: manifest.globalStyles ?? manifest.styles,
-    runtimeScript: manifest.runtimeScript,
-    alwaysLoadRuntime,
-    lang,
-  }
-
-  const TITLE_INNER_RE = /^<title\b[^>]*>([\s\S]*?)<\/title>$/i
-
-  async function resolveDocumentHead(
-    rctx: RenderContext,
-    baseHeadTags: readonly string[] | undefined,
-    url: URL,
-    req?: Request,
-    ctx?: RequestContext,
-  ): Promise<{ head: string, lang: string, htmlAttrs: Record<string, string> }> {
-    const collectedParts = rctx.headParts.join('')
-    if (!hasHeadHooks) {
-      return {
-        head: (rctx.title ?? '') + collectedParts,
-        lang,
-        htmlAttrs: rctx.htmlAttrs,
-      }
-    }
-
-    const headCtx = ctx ?? makeRequestContext(req ?? new Request(url.toString()), {}, { trustProxy, url }).ctx
-    const htmlAttrs: Record<string, string> = { ...rctx.htmlAttrs }
-    const initialTitleTag = rctx.title
-    const initialTitleInner = initialTitleTag !== undefined ? TITLE_INNER_RE.exec(initialTitleTag)?.[1] : undefined
-    let currentTitle = initialTitleInner
-    let titleDirty = false
-    let currentLang = htmlAttrs.lang ?? lang
-    let headBuf = (initialTitleTag ?? '') + collectedParts
-    if (baseHeadTags !== undefined) {
-      for (let i = 0; i < baseHeadTags.length; i++)
-        headBuf += baseHeadTags[i]
-    }
-    const added: string[] = []
-
-    const docHead: DocumentHeadContext = {
-      get lang() {
-        return currentLang
-      },
-      set lang(v: string) {
-        currentLang = v
-        htmlAttrs.lang = v
-      },
-      htmlAttrs,
-      get title() {
-        return currentTitle
-      },
-      set title(v: string | undefined) {
-        currentTitle = v
-        titleDirty = true
-      },
-      get headHtml() {
-        return headBuf
-      },
-      add(html: string) {
-        if (html !== '') {
-          added.push(html)
-          headBuf += html
-        }
-      },
-    }
-
-    for (const hook of headHooks) {
-      try {
-        await hook(docHead, headCtx)
-      }
-      catch (err) {
-        notifyError(err, req ?? headCtx.request, 'plugin')
-      }
-    }
-
-    const titleHtml = titleDirty
-      ? (currentTitle !== undefined ? `<title>${currentTitle}</title>` : '')
-      : (initialTitleTag ?? '')
-    return {
-      head: titleHtml + collectedParts + (added.length > 0 ? added.join('') : ''),
-      lang: currentLang,
-      htmlAttrs,
-    }
-  }
-
-  async function applyHtmlTransforms(html: string, url: URL, req?: Request, ctx?: RequestContext): Promise<string> {
-    if (!hasHtmlTransformers)
-      return html
-    const transformCtx = ctx ?? makeRequestContext(req ?? new Request(url.toString()), {}, { trustProxy, url }).ctx
-    let out = html
-    for (const transform of htmlTransformers) {
-      try {
-        out = await transform(out, transformCtx)
-      }
-      catch (err) {
-        notifyError(err, req ?? transformCtx.request, 'plugin')
-      }
-    }
-    return out
-  }
-
-  function resolveRenderedIslands(rctx: ReturnType<typeof createRenderContext>, body: string): { hasIslands: boolean, eagerChunks: string[] } {
-    if (rctx.hasIslands) {
-      const eagerChunks: string[] = []
-      for (const [chunk, eager] of rctx.renderedIslands) {
-        if (eager)
-          eagerChunks.push(chunk)
-      }
-      return { hasIslands: true, eagerChunks }
-    }
-    // Fallback only if raw HTML injected a <kay-island> without going through ssrIsland/ssrIslandStatic.
-    if (body.includes('<kay-island'))
-      return extractRenderedIslands(body)
-    return { hasIslands: false, eagerChunks: [] }
-  }
-
-  async function renderFallbackPage(status: number, renderInner: (() => unknown) | undefined, text: string, url?: URL, req?: Request, ctx?: RequestContext): Promise<Response> {
-    if (renderInner !== undefined) {
-      try {
-        const effUrl = url ?? new URL(`http://localhost/${status}`)
-        const rctx = createRenderContext()
-        const body = await runWithRenderContext(rctx, async () => {
-          let inner = ssrChild(await renderInner() as Html)
-          if (rootLayoutMod !== undefined)
-            inner = ssrChild(await rootLayoutMod.default({ children: raw(inner), url: effUrl, params: {}, locals: ctx?.locals ?? {} }) as Html)
-          return inner
-        })
-        const { hasIslands, eagerChunks } = resolveRenderedIslands(rctx, body)
-        const docHead = await resolveDocumentHead(rctx, manifest.headTags, effUrl, req, ctx)
-        const docHtml = renderDocument({
-          ...fallbackDoc,
-          body,
-          head: docHead.head,
-          lang: docHead.lang,
-          htmlAttrs: docHead.htmlAttrs,
-          preloadChunks: eagerChunks,
-          hasIslands,
-        })
-        const html = await applyHtmlTransforms(docHtml, effUrl, req, ctx)
-        return new Response(html, { status, headers: htmlHeaders(hasIslands, false, true) })
-      }
-      catch (err) {
-        if (req !== undefined)
-          notifyError(err, req, 'route')
-      }
-    }
-    return new Response(text, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
-  }
-
-  const buildErrorResponse = (error: unknown, url?: URL, req?: Request, ctx?: RequestContext): Promise<Response> =>
-    renderFallbackPage(500, errorMod && (() => errorMod.default({ error })), 'Internal Server Error', url, req, ctx)
-
-  const notFoundPage = notFoundMod?.default
-  const buildNotFoundResponse = (url?: URL, req?: Request, ctx?: RequestContext): Promise<Response> =>
-    renderFallbackPage(404, notFoundPage && (() => notFoundPage({})), 'Not Found', url, req, ctx)
-
-  async function renderError(error: unknown, cookieStore: CookieStore | undefined, url: URL, request: Request, ctx?: RequestContext): Promise<Response> {
-    if (wantsJson(request))
-      return finish(Response.json({ ok: false, status: 500, error: 'Internal Server Error' }, { status: 500 }), request, cookieStore)
-    return finish(await buildErrorResponse(error, url, request, ctx), request, cookieStore)
-  }
+  const { buildNotFoundResponse, renderError } = createFallbackPages({ manifest, modules, lang, alwaysLoadRuntime, document, htmlHeaders, notifyError, finish })
 
   async function renderNotFound(cookieStore: CookieStore, url: URL, request: Request, ctx: RequestContext): Promise<Response> {
     const res = await runChain(ctx, middlewaresFor(url.pathname), () => buildNotFoundResponse(url, request, ctx))
@@ -1043,68 +417,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       // Transforms see the document with its initial body; boundaries resolved later stream as they render.
       for (const transform of htmlTransformers)
         shell = await transform(shell, ctx)
-      let splitAt = shell.lastIndexOf(STREAM_TAIL_MARK)
-      let tailOffset = STREAM_TAIL_MARK.length
-      if (splitAt === -1) {
-        splitAt = shell.lastIndexOf('</body>')
-        tailOffset = 0
-      }
-      const openingHtml = splitAt === -1 ? shell : shell.slice(0, splitAt)
-      const tailHtml = splitAt === -1 ? '' : shell.slice(splitAt + tailOffset)
-
-      const abortCtrl = new AbortController()
-      let closed = false
-      const deadline = Date.now() + streamTimeout
-
-      const safeEnqueue = (controller: ReadableStreamDefaultController<Uint8Array>, data: Uint8Array): void => {
-        if (closed || abortCtrl.signal.aborted)
-          return
-        try {
-          controller.enqueue(data)
-        }
-        catch {
-          closed = true
-          abortCtrl.abort()
-        }
-      }
-
-      const stream = new ReadableStream<Uint8Array>({
-        async start(controller) {
-          safeEnqueue(controller, textEncoder.encode(openingHtml))
-          // A resolved boundary can render boundaries of its own, so each flush also drains the ones it added.
-          let flushed = 0
-          const flushPending = async (): Promise<void> => {
-            if (closed || abortCtrl.signal.aborted)
-              return
-            const chunks = rctx.pending.slice(flushed)
-            flushed = rctx.pending.length
-            await Promise.all(chunks.map(async (chunk) => {
-              const settled = await settleWithin(chunk, deadline, abortCtrl.signal)
-              if (settled === undefined || closed || abortCtrl.signal.aborted)
-                return
-              if ('error' in settled)
-                notifyError(settled.error, ctx.request, 'route')
-              safeEnqueue(controller, textEncoder.encode(streamChunkScript(chunk.id, settled.html)))
-              await flushPending()
-            }))
-          }
-          await flushPending()
-          if (!closed && !abortCtrl.signal.aborted) {
-            safeEnqueue(controller, textEncoder.encode(tailHtml))
-            closed = true
-            try {
-              controller.close()
-            }
-            catch {}
-          }
-        },
-        cancel() {
-          closed = true
-          abortCtrl.abort()
-        },
-      })
-
-      return new Response(stream, { status: 200, headers: htmlHeaders(hasIslands, true, true) })
+      return new Response(streamDocument(shell, rctx, streamTimeout, error => notifyError(error, ctx.request, 'route')), { status: 200, headers: htmlHeaders(hasIslands, true, true) })
     }
 
     let html = renderDocument({ ...doc, body, head: docHead.head, lang: docHead.lang, htmlAttrs: docHead.htmlAttrs, preloadChunks, hasIslands })
@@ -1138,7 +451,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
 
       // Actions only accept POST; other methods get 405 before any middleware runs.
-      const registeredAction = actionHandlers.get(pathname)
+      const registeredAction = actions.byUrl(pathname)
       if (registeredAction !== undefined && request.method !== 'POST')
         return finish(new Response('Method Not Allowed', { status: 405, headers: { allow: 'POST' } }), request)
 
@@ -1189,7 +502,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
       // Apply plugin URL rewrites (e.g. @kayjs/i18n stripping /fr prefix and setting ctx.locals.locale)
       let effectivePath = pathname
-      for (const rewrite of pluginRewrites) {
+      for (const rewrite of pluginHost.rewrites) {
         const nextPath = rewrite(effectivePath, ctx)
         if (nextPath !== undefined)
           effectivePath = nextPath
@@ -1209,7 +522,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         }
         ctx.params = pluginMatch.params
         try {
-          let res = await runChain(ctx, allPluginMiddlewares, () => routeDef.handler(ctx))
+          let res = await runChain(ctx, pluginHost.allMiddlewares, () => routeDef.handler(ctx))
           if (headFallbackPluginDef !== undefined)
             res = stripHeadBody(res)
           else if (isEventStream(res))
@@ -1319,18 +632,5 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     return srvRef
   }
 
-  let disposed = false
-  async function dispose(): Promise<void> {
-    if (disposed)
-      return
-    disposed = true
-    for (const hook of shutdownHooks) {
-      try {
-        await hook()
-      }
-      catch {}
-    }
-  }
-
-  return { handle, serve, dispose }
+  return { handle, serve, dispose: pluginHost.dispose }
 }
