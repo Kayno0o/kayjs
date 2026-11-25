@@ -191,6 +191,24 @@ function allowedMethodsHeader(mod: LoadedPageModule): string {
   return [...allowed].join(', ')
 }
 
+function allowedPluginMethodsHeader(methods: ReadonlyMap<string, PluginRouteDef>): string {
+  const allowed = new Set<string>()
+  for (const m of methods.keys()) {
+    if (m === 'ALL')
+      continue
+    allowed.add(m)
+  }
+  if (allowed.has('GET'))
+    allowed.add('HEAD')
+  return [...allowed].join(', ')
+}
+
+function stripHeadBody(res: Response): Response {
+  if (res.body !== null)
+    void res.body.cancel().catch(() => {})
+  return new Response(null, { status: res.status, statusText: res.statusText, headers: res.headers })
+}
+
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
@@ -822,10 +840,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         return buildNotFoundResponse(ctx.url, ctx.request, ctx)
     }
 
-    // API route (.ts exporting GET/POST/etc.)
-    const methodHandler = mod[ctx.request.method]
+    // API route (.ts exporting GET/POST/etc.) — HEAD falls back to GET without a body
+    const method = ctx.request.method.toUpperCase()
+    const methodHandler = mod[method]
     if (typeof methodHandler === 'function')
       return await (methodHandler as (c: RequestContext) => Response | Promise<Response>)(ctx)
+    if (method === 'HEAD' && typeof mod.GET === 'function')
+      return stripHeadBody(await mod.GET(ctx))
 
     // Page routes only handle GET/HEAD; unsafe methods (POST/PUT/PATCH/DELETE) without a method export get 405.
     if (typeof mod.default !== 'function' || !isRead(ctx.request)) {
@@ -886,6 +907,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
     // Streaming SSR when <Suspense> boundaries are pending (never buffered for compression)
     if (isStreamed) {
+      if (ctx.request.method === 'HEAD')
+        return new Response(null, { status: 200, headers: htmlHeaders(hasIslands, true, true) })
       disableTimeout?.()
       let shell = renderDocument({ ...doc, body: body + STREAM_TAIL_MARK, head: collectedHead, htmlAttrs: rctx.htmlAttrs, preloadChunks, hasIslands, hasSuspense: true })
       // Transforms see the document with its initial body; boundaries resolved later stream as they render.
@@ -977,15 +1000,21 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         const pub = publicMap.get(pathname)
         if (pub !== undefined) {
           const matchedPlugin = pluginRouter.match(pathname)
+          const reqMethod = request.method.toUpperCase()
           const shadowedByPlugin = matchedPlugin !== undefined
-            && (matchedPlugin.data.has(request.method) || matchedPlugin.data.has('ALL'))
+            && (matchedPlugin.data.has(reqMethod) || (reqMethod === 'HEAD' && matchedPlugin.data.has('GET')) || matchedPlugin.data.has('ALL'))
           if (!shadowedByPlugin)
             return servePublic(request, pub)
         }
       }
 
+      // Actions only accept POST; other methods get 405 before any middleware runs.
+      const registeredAction = actionHandlers.get(pathname)
+      if (registeredAction !== undefined && request.method !== 'POST')
+        return finish(new Response('Method Not Allowed', { status: 405, headers: { allow: 'POST' } }), request)
+
       // Actions are origin-checked before their body is read and before any middleware runs.
-      const actionHandler = request.method === 'POST' ? actionHandlers.get(pathname) : undefined
+      const actionHandler = request.method === 'POST' ? registeredAction : undefined
       if (actionHandler !== undefined) {
         const originCheck = verifyOrigin(request, trustedOrigins, trustProxy)
         if (!originCheck.ok)
@@ -1038,8 +1067,11 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
 
       // Custom plugin routes run behind plugin middlewares so ctx.locals (e.g. auth user/session) is available.
+      const method = req.method.toUpperCase()
       const pluginMatch = pluginRouter.match(effectivePath)
-      const routeDef = pluginMatch?.data.get(req.method.toUpperCase()) ?? pluginMatch?.data.get('ALL')
+      const directPluginDef = pluginMatch?.data.get(method) ?? pluginMatch?.data.get('ALL')
+      const headFallbackPluginDef = directPluginDef === undefined && method === 'HEAD' ? pluginMatch?.data.get('GET') : undefined
+      const routeDef = directPluginDef ?? headFallbackPluginDef
       if (pluginMatch !== undefined && routeDef !== undefined) {
         if (routeDef.csrf) {
           const originCheck = verifyOrigin(req, routeDef.trustedOrigins, routeDef.trustProxy)
@@ -1048,8 +1080,10 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         }
         ctx.params = pluginMatch.params
         try {
-          const res = await runChain(ctx, allPluginMiddlewares, () => routeDef.handler(ctx))
-          if (isEventStream(res))
+          let res = await runChain(ctx, allPluginMiddlewares, () => routeDef.handler(ctx))
+          if (headFallbackPluginDef !== undefined)
+            res = stripHeadBody(res)
+          else if (isEventStream(res))
             disableTimeout?.()
           return finish(await maybeCompressResponse(res, req, compressCache), req, cookieStore)
         }
@@ -1060,14 +1094,28 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
 
       const matched = router.match(effectivePath)
-      if (matched === undefined)
+      if (matched === undefined) {
+        if (pluginMatch !== undefined) {
+          const allow = allowedPluginMethodsHeader(pluginMatch.data)
+          return finish(new Response('Method Not Allowed', allow ? { status: 405, headers: { allow } } : { status: 405 }), req)
+        }
         return renderNotFound(cookieStore, ctx.url, req, ctx)
+      }
 
       ctx.params = matched.params
       const route = matched.data
 
+      // Reject unsupported HTTP methods with 405 + Allow BEFORE any middleware or CSRF check runs.
+      const supportsMethod = typeof route.mod[method] === 'function'
+        || (method === 'HEAD' && typeof route.mod.GET === 'function')
+        || (typeof route.mod.default === 'function' && (method === 'GET' || method === 'HEAD'))
+      if (!supportsMethod) {
+        const allow = allowedMethodsHeader(route.mod)
+        return finish(new Response('Method Not Allowed', allow ? { status: 405, headers: { allow } } : { status: 405 }), req)
+      }
+
       // CSRF verification for file-based API routes on unsafe methods (opt out via `export const csrf = false`)
-      if (typeof route.mod[req.method] === 'function' && route.mod.csrf !== false) {
+      if (typeof route.mod[method] === 'function' && route.mod.csrf !== false) {
         const originCheck = verifyOrigin(req, trustedOrigins, trustProxy)
         if (!originCheck.ok)
           return refuseCrossSite(req, originCheck.reason, cookieStore)

@@ -32,7 +32,6 @@ export function getActionError(locals?: Record<string, unknown>): ActionErrorFla
 export interface ActionContext {
   request: Request
   url: URL
-  params: Record<string, string>
   cookies: Cookies
   locals: Record<string, unknown>
   ip?: string | undefined
