@@ -63,7 +63,7 @@ function renderModalDialog(props: DrawerProps, kind: 'dialog' | 'drawer', defaul
         aria-label={!props.title ? (props.ariaLabel ?? fallbackLabel) : undefined}
         aria-describedby={props.description ? descId : undefined}
         ref={(el) => {
-          dialogEl = el as HTMLDialogElement
+          dialogEl = el
           syncDialogOpen(dialogEl, isOpen, isOpen.peek())
         }}
         onClose={() => { isOpen.value = false }}

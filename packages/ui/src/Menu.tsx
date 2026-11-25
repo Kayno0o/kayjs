@@ -47,7 +47,7 @@ export function Menu({ id, label, items, variant = 'outline', onSelect }: MenuPr
     <div
       data-ui="menu"
       data-state={popup.open.value ? 'open' : 'closed'}
-      ref={(el) => { popup.setRoot(el as HTMLElement) }}
+      ref={(el) => { popup.setRoot(el) }}
     >
       <button
         id={triggerId}

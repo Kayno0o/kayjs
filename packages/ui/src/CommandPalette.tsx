@@ -133,7 +133,7 @@ export function CommandPalette({
         data-part="content"
         aria-label={ariaLabel}
         ref={(el) => {
-          dialogEl = el as HTMLDialogElement
+          dialogEl = el
           syncDialogOpen(dialogEl, isOpen, isOpen.peek(), onOpened)
         }}
         onClose={() => { isOpen.value = false }}
@@ -145,7 +145,7 @@ export function CommandPalette({
         <div data-part="panel">
           <div data-part="input-wrap">
             <input
-              ref={(el) => { inputEl = el as HTMLInputElement }}
+              ref={(el) => { inputEl = el }}
               data-part="input"
               type="search"
               role="combobox"
@@ -157,7 +157,7 @@ export function CommandPalette({
               placeholder={placeholder}
               value={query.value}
               onInput={(e) => {
-                query.value = (e.target as HTMLInputElement).value
+                query.value = e.currentTarget.value
                 activeIdx.value = 0
               }}
               onKeyDown={(e) => {

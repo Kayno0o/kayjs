@@ -43,7 +43,7 @@ export function NewNoticeModal() {
             maxlength="120"
             required
             value={title.value}
-            onInput={(e) => { title.value = (e.target as HTMLInputElement).value }}
+            onInput={(e) => { title.value = e.currentTarget.value }}
           />
         </div>
         <div data-ui="field">
@@ -55,7 +55,7 @@ export function NewNoticeModal() {
             maxlength="4000"
             required
             value={body.value}
-            onInput={(e) => { body.value = (e.target as HTMLTextAreaElement).value }}
+            onInput={(e) => { body.value = e.currentTarget.value }}
           />
         </div>
         <div data-layout="cluster">

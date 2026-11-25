@@ -62,7 +62,7 @@ export function DataTable({
             placeholder={placeholder}
             value={table.query.value}
             onInput={(e) => {
-              table.query.value = (e.target as HTMLInputElement).value
+              table.query.value = e.currentTarget.value
               table.page.value = 1
             }}
           />

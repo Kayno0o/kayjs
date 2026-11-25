@@ -51,7 +51,7 @@ export function Select({ id, options, value, defaultValue, name, placeholder = '
     <div
       data-ui="select"
       data-state={popup.open.value ? 'open' : 'closed'}
-      ref={(el) => { popup.setRoot(el as HTMLElement) }}
+      ref={(el) => { popup.setRoot(el) }}
     >
       {name && <input type="hidden" name={name} value={selected.value} />}
       <button
