@@ -3,6 +3,7 @@
 
 import type { Owner } from '../reactivity/index'
 import { batch, createOwner, disposeOwner, effect, getOwner, runWithOwner, untrack } from '../reactivity/index'
+import { assertRenderable } from '../unrenderable'
 import { claimInsert, isBlockedAttr, setAttr, setClass, setProp, setStyle, skipRange } from './index'
 
 const RAW_HTML = Symbol.for('kay.html')
@@ -227,6 +228,12 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
         textNode.data = str
       }
       return
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      if (isRawHtml(next))
+        throw new TypeError('kay: raw() HTML cannot be a dynamic child in the browser; set it with innerHTML={html} on an element.')
+      assertRenderable(next, 'text')
     }
 
     if (textNode !== undefined) {

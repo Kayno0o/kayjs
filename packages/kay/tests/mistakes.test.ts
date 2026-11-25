@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { compileDom, compileSsr } from '../src/compiler/index'
-import { spread } from '../src/dom/extras'
+import { insert, spread } from '../src/dom/extras'
 import { setAttr, setClass, setText } from '../src/dom/index'
 import { signal } from '../src/reactivity/index'
-import { esc, ssrAttr, ssrChild, ssrSpread } from '../src/ssr/index'
+import { esc, raw, ssrAttr, ssrChild, ssrSpread } from '../src/ssr/index'
 
 // Each mistake must fail both compile targets with the same message naming the fix.
 function refuses(jsx: string, message: RegExp, setup = ''): void {
@@ -108,8 +108,13 @@ describe('kay refuses values it cannot render, instead of printing them', () => 
       expect(() => esc(value)).toThrow(message)
       expect(() => ssrChild(value as never)).toThrow(message)
       expect(() => setText({ data: '' } as Text, value)).toThrow(message)
+      expect(() => insert({} as Node, () => value)).toThrow(message)
     })
   }
+
+  test('raw() HTML as an island child, which the DOM cannot insert', () => {
+    expect(() => insert({} as Node, () => raw('<b>x</b>'))).toThrow(/kay: raw\(\) HTML cannot be a dynamic child in the browser; set it with innerHTML=\{html\} on an element/)
+  })
 
   test('an object as an attribute or class', () => {
     expect(() => ssrAttr('class', { on: true })).toThrow(/cannot render a plain object as the class attribute/)
