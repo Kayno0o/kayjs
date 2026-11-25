@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { compileDom, compileSsr } from '../src/compiler/index'
+import { assertPathUrls, routeExportProblem } from '../src/build/routes'
+import { analyzeModule, compileDom, compileSsr } from '../src/compiler/index'
 import { insert, spread } from '../src/dom/extras'
 import { setAttr, setClass, setText } from '../src/dom/index'
 import { signal } from '../src/reactivity/index'
@@ -165,5 +166,33 @@ describe('kay refuses actions it cannot give a URL', () => {
     expect(() => compileSsr('actions.ts', `${server}export default action(async () => {})`)).toThrow(/write export const name = action/)
     expect(() => compileSsr('actions.ts', `${server}export function make() { return action(async () => {}) }`)).toThrow(/action\(\) not declared as export const/)
     expect(compileSsr('actions.ts', `${server}export const save = action(async () => {})`).code).toContain('save')
+  })
+})
+
+describe('kay refuses route exports it never reads', () => {
+  const check = (code: string): void => {
+    const problem = routeExportProblem(analyzeModule('page.tsx', code), 'routes/page.tsx')
+    if (problem !== undefined)
+      throw new Error(problem)
+  }
+  test('exports from Next, Remix and Astro, which kay ignores', () => {
+    expect(() => check('export async function getStaticProps() { return {} }\nexport default function P() { return <p>x</p> }')).toThrow(/export getStaticProps in routes\/page\.tsx: kay never calls it; export async function load\(\)/)
+    expect(() => check('export async function loader() { return {} }')).toThrow(/export loader in routes\/page\.tsx: kay never calls it; export async function load\(\)/)
+    expect(() => check('export function getStaticPaths() { return [] }\nexport default function P() { return <p>x</p> }')).toThrow(/export function paths\(\) returning URL strings/)
+    expect(() => check('export const metadata = { title: \'x\' }\nexport default function P() { return <p>x</p> }')).toThrow(/render <Head> in the page/)
+    expect(() => check('export function get() { return new Response(\'x\') }')).toThrow(/export get in routes\/page\.tsx: kay never calls it; export function GET\(\)/)
+  })
+
+  test('paths and prerender kay cannot use', () => {
+    expect(() => check('export const paths = [\'/a\']\nexport default function P() { return <p>x</p> }')).toThrow(/export const paths in routes\/page\.tsx: export function paths\(\) returning the URLs/)
+    expect(() => check('export const prerender = \'true\'\nexport default function P() { return <p>x</p> }')).toThrow(/prerender = 'true' in routes\/page\.tsx: write prerender = true/)
+    expect(() => check('export const prerender = true\nexport function paths() { return [\'/a\'] }\nexport default function P() { return <p>x</p> }')).not.toThrow()
+  })
+
+  test('paths() returning something other than URL paths, which prerenders http://localhost[object Object]', () => {
+    expect(() => assertPathUrls([{ params: { slug: 'a' } }], 'routes/[slug].tsx')).toThrow(/kay build: paths\(\) in routes\/\[slug\]\.tsx returned \{"params":\{"slug":"a"\}\}: return URL paths such as "\/posts\/a"/)
+    expect(() => assertPathUrls(['posts/a'], 'routes/[slug].tsx')).toThrow(/returned "posts\/a"/)
+    expect(() => assertPathUrls('/a', 'routes/[slug].tsx')).toThrow(/returned "\/a": return an array/)
+    expect(() => assertPathUrls(['/posts/a'], 'routes/[slug].tsx')).not.toThrow()
   })
 })

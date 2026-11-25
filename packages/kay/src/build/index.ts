@@ -23,7 +23,7 @@ import { createPluginHost, createPublicFiles } from './plugin-host'
 import { prerender } from './prerender'
 import { formatBundleReport } from './report'
 import { KAY_SRC_ROOT, resolveKaySpecifier } from './resolve'
-import { assertNoRouteConflicts, hasRouteHandlerExport, SPECIAL_ROUTE_FILES } from './routes'
+import { assertNoRouteConflicts, hasRouteHandlerExport, routeExportProblem, SPECIAL_ROUTE_FILES } from './routes'
 import { exportStatic } from './static'
 
 export type { BuildCache } from './graph'
@@ -169,6 +169,11 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     graph.load(f)
 
   // Skip helper files inside routes/ that export neither a default component nor an HTTP method handler
+  for (const f of candidatePageFiles) {
+    const problem = routeExportProblem(graph.analyses.get(f)!, relPosix(root, f))
+    if (problem !== undefined)
+      throw new Error(`kay build: ${problem}`)
+  }
   const pageFiles = candidatePageFiles.filter(f => hasRouteHandlerExport(graph.analyses.get(f)!))
   assertNoRouteConflicts(root, routesDir, pageFiles)
 

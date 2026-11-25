@@ -1,5 +1,6 @@
 // Route files: their URL patterns, conflicts, and the `_layout`/`_middleware` chain that wraps them.
 
+import type { AstNode } from '../compiler/analyze'
 import type { ModuleAnalysis } from '../compiler/index'
 import { existsSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
@@ -35,6 +36,56 @@ export function hasRouteHandlerExport(analysis: ModuleAnalysis): boolean {
     }
   }
   return false
+}
+
+const LOAD_FIX = 'kay never calls it; export async function load() and read its data with the page\'s load prop'
+const PATHS_FIX = 'kay never calls it; export function paths() returning URL strings such as "/posts/a"'
+const HEAD_FIX = 'kay never reads it; render <Head> in the page'
+// Exports other frameworks read from a route file, and what kay wants instead.
+const FOREIGN_ROUTE_EXPORTS = new Map([
+  ['getStaticProps', LOAD_FIX],
+  ['getServerSideProps', LOAD_FIX],
+  ['getInitialProps', LOAD_FIX],
+  ['loader', LOAD_FIX],
+  ['clientLoader', LOAD_FIX],
+  ['getStaticPaths', PATHS_FIX],
+  ['generateStaticParams', PATHS_FIX],
+  ['metadata', HEAD_FIX],
+  ['generateMetadata', HEAD_FIX],
+  ['meta', HEAD_FIX],
+  ...['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'all'].map(m => [m, `kay never calls it; export function ${m === 'all' ? 'GET(), POST() or another method' : `${m.toUpperCase()}()`}`] as const),
+])
+
+/** The first route export kay never reads (Next, Remix and Astro names), `paths` that is not a function, or `prerender` that is not literally `true` or `false`, worded for `kay build` and `kay check` to prefix. */
+export function routeExportProblem(analysis: ModuleAnalysis, file: string): string | undefined {
+  for (const name of analysis.exportedNames) {
+    const fix = FOREIGN_ROUTE_EXPORTS.get(name)
+    if (fix !== undefined)
+      return `export ${name} in ${file}: ${fix}.`
+  }
+  for (const stmt of analysis.program.body as AstNode[]) {
+    if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration')
+      continue
+    for (const d of stmt.declaration.declarations as AstNode[]) {
+      const name = d.id?.name as string | undefined
+      const init = d.init as AstNode | null
+      if (name === 'paths' && init !== null && init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression')
+        return `export const paths in ${file}: export function paths() returning the URLs, such as () => ['/posts/a'].`
+      if (name === 'prerender' && !(init?.type === 'Literal' && typeof init.value === 'boolean'))
+        return `${init?.type === 'Literal' ? `prerender = ${init.raw as string}` : 'prerender set at runtime'} in ${file}: write prerender = true or prerender = false.`
+    }
+  }
+  return undefined
+}
+
+/** Throws unless a route's `paths()` gave an array of URL paths starting with `/`. */
+export function assertPathUrls(urls: unknown, file: string): asserts urls is string[] {
+  if (!Array.isArray(urls))
+    throw new Error(`kay build: paths() in ${file} returned ${JSON.stringify(urls)}: return an array of URL paths such as ["/posts/a"].`)
+  for (const url of urls) {
+    if (typeof url !== 'string' || !url.startsWith('/'))
+      throw new Error(`kay build: paths() in ${file} returned ${JSON.stringify(url)}: return URL paths such as "/posts/a".`)
+  }
 }
 
 export function fileToRoutePath(routesDir: string, file: string): string {

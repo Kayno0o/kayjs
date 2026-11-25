@@ -5,6 +5,7 @@ import type { RouteManifestEntry } from './manifest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { relPosix } from './files'
+import { assertPathUrls } from './routes'
 
 const CONCURRENCY = 8
 const SLASH_EDGES_RE = /^\/|\/$/g
@@ -36,7 +37,9 @@ export async function prerender(options: PrerenderOptions) {
       urls = [route.path]
     }
     else if (typeof mod.paths === 'function') {
-      urls = await mod.paths()
+      const returned: unknown = await mod.paths()
+      assertPathUrls(returned, route.file)
+      urls = returned
     }
     else if (isStatic) {
       console.warn(`kay build --static: skipping dynamic route "${route.path}" (${route.file}) because it does not export a paths() function.`)

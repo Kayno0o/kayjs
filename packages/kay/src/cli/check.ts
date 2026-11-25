@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
 import { isTsFile, relPosix, walkFiles } from '../build/files'
 import { ModuleGraph } from '../build/graph'
-import { fileToRoutePath, normalizeRoutePattern } from '../build/routes'
+import { fileToRoutePath, normalizeRoutePattern, routeExportProblem } from '../build/routes'
 import { analyzeModule, walk } from '../compiler/analyze'
 import { readsPrivateEnv, SERVER_ONLY_MODULES } from '../compiler/server-only'
 import { loadConfig } from '../plugins/index'
@@ -186,6 +186,10 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       else {
         seenRoutes.set(conflictKey, rel)
       }
+
+      const problem = routeExportProblem(analysis, rel)
+      if (problem !== undefined)
+        errors.push(`kay check: ${problem}`)
 
       // Guardrail 4: dynamic prerender = true route missing paths()
       if (analysis.hasPrerender && (conflictKey.includes(':') || conflictKey.includes('*')) && !analysis.hasPaths) {
