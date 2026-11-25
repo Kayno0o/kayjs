@@ -2,7 +2,7 @@
 // Accessible Tabs primitive with roving arrow-key + Home/End keyboard navigation.
 
 import type { KayChild } from '@kayjs/kay'
-import { createTabs } from './behaviors'
+import { createTabs, nextUiId } from './behaviors'
 
 export interface TabDef {
   id: string
@@ -11,13 +11,15 @@ export interface TabDef {
 }
 
 export interface TabsProps {
+  id?: string | undefined
   items: TabDef[]
   defaultValue?: string | undefined
   label?: string | undefined
   class?: string | undefined
 }
 
-export function Tabs({ items, defaultValue, label = 'Tabs', class: cls }: TabsProps) {
+export function Tabs({ id, items, defaultValue, label = 'Tabs', class: cls }: TabsProps) {
+  const baseId = id ?? nextUiId('kui-tabs')
   const ids = items.map(i => i.id)
   const tabs = createTabs(defaultValue ?? items[0]?.id ?? '')
 
@@ -27,13 +29,13 @@ export function Tabs({ items, defaultValue, label = 'Tabs', class: cls }: TabsPr
         {items.map(item => (
           <button
             key={item.id}
-            id={`tab-${item.id}`}
+            id={`${baseId}-tab-${item.id}`}
             data-part="trigger"
             data-state={tabs.isActive(item.id) ? 'active' : 'inactive'}
             role="tab"
             type="button"
             aria-selected={tabs.isActive(item.id) ? 'true' : 'false'}
-            aria-controls={`panel-${item.id}`}
+            aria-controls={`${baseId}-panel-${item.id}`}
             tabIndex={tabs.isActive(item.id) ? 0 : -1}
             onClick={() => tabs.select(item.id)}
             onKeyDown={e => tabs.onKeyDown(e, ids)}
@@ -45,11 +47,11 @@ export function Tabs({ items, defaultValue, label = 'Tabs', class: cls }: TabsPr
       {items.map(item => (
         <div
           key={item.id}
-          id={`panel-${item.id}`}
+          id={`${baseId}-panel-${item.id}`}
           data-part="panel"
           data-state={tabs.isActive(item.id) ? 'active' : 'inactive'}
           role="tabpanel"
-          aria-labelledby={`tab-${item.id}`}
+          aria-labelledby={`${baseId}-tab-${item.id}`}
           hidden={!tabs.isActive(item.id)}
         >
           {item.content}

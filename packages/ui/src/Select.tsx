@@ -2,8 +2,8 @@
 // Accessible custom Select (listbox) primitive with aria-activedescendant navigation + hidden input for native <form> submission.
 
 import type { Signal } from '@kayjs/kay'
-import { effect, onCleanup, signal } from '@kayjs/kay'
-import { findFirstEnabledIndex, handleListKeyDown, nextUiId } from './behaviors'
+import { signal } from '@kayjs/kay'
+import { createListPopup, nextUiId } from './behaviors'
 
 export interface SelectOption {
   value: string
@@ -29,10 +29,6 @@ export function Select({ id, options, value, defaultValue, name, placeholder = '
   const optionId = (idx: number) => `${baseId}-opt-${idx}`
 
   const selected = value ?? signal(defaultValue ?? options[0]?.value ?? '')
-  const open = signal(false)
-  const highlighted = signal(0)
-  let rootEl: HTMLElement | undefined
-
   const currentLabel = () => options.find(o => o.value === selected.value)?.label ?? placeholder
 
   const pick = (opt: SelectOption) => {
@@ -40,52 +36,22 @@ export function Select({ id, options, value, defaultValue, name, placeholder = '
       return
     selected.value = opt.value
     onChange?.(opt.value)
-    open.value = false
+    popup.open.value = false
   }
 
-  const close = (returnFocus = false) => {
-    open.value = false
-    if (returnFocus)
-      rootEl?.querySelector<HTMLElement>('[data-part="trigger"]')?.focus()
-  }
-
-  const activeOptionId = () => {
-    const idx = highlighted.value
-    if (!open.value || idx < 0 || idx >= options.length || options[idx]?.disabled)
-      return undefined
-    return optionId(idx)
-  }
-
-  effect(() => {
-    if (!open.value)
-      return
-    const onDocClick = (e: MouseEvent) => {
-      if (rootEl && !rootEl.contains(e.target as Node))
-        close()
-    }
-    const onKey = (e: KeyboardEvent) => {
-      handleListKeyDown(e, {
-        items: () => options,
-        activeIndex: highlighted,
-        isDisabled: opt => Boolean(opt.disabled),
-        onSelect: opt => pick(opt),
-        onClose: returnFocus => close(returnFocus),
-        selectOnSpace: true,
-      })
-    }
-    document.addEventListener('click', onDocClick)
-    document.addEventListener('keydown', onKey)
-    onCleanup(() => {
-      document.removeEventListener('click', onDocClick)
-      document.removeEventListener('keydown', onKey)
-    })
+  const popup = createListPopup<SelectOption>({
+    items: () => options,
+    itemId: optionId,
+    isDisabled: opt => Boolean(opt.disabled),
+    onSelect: pick,
+    initialIndex: () => options.findIndex(o => o.value === selected.value && !o.disabled),
   })
 
   return (
     <div
       data-ui="select"
-      data-state={open.value ? 'open' : 'closed'}
-      ref={(el) => { rootEl = el as HTMLElement }}
+      data-state={popup.open.value ? 'open' : 'closed'}
+      ref={(el) => { popup.setRoot(el as HTMLElement) }}
     >
       {name && <input type="hidden" name={name} value={selected.value} />}
       <button
@@ -95,22 +61,15 @@ export function Select({ id, options, value, defaultValue, name, placeholder = '
         role="combobox"
         aria-label={ariaLabel}
         aria-haspopup="listbox"
-        aria-expanded={open.value ? 'true' : 'false'}
+        aria-expanded={popup.open.value ? 'true' : 'false'}
         aria-controls={listboxId}
-        aria-activedescendant={activeOptionId()}
-        onClick={(e) => {
-          e.stopPropagation()
-          open.value = !open.value
-          if (open.value) {
-            const cur = options.findIndex(o => o.value === selected.value && !o.disabled)
-            highlighted.value = cur >= 0 ? cur : findFirstEnabledIndex(options, o => Boolean(o.disabled))
-          }
-        }}
+        aria-activedescendant={popup.activeDescendantId()}
+        onClick={e => popup.toggle(e)}
       >
         <span data-part="value">{currentLabel()}</span>
         <span aria-hidden="true">▾</span>
       </button>
-      {open.value && (
+      {popup.open.value && (
         <div
           id={listboxId}
           data-part="listbox"
@@ -124,7 +83,7 @@ export function Select({ id, options, value, defaultValue, name, placeholder = '
               id={optionId(idx)}
               data-part="option"
               data-selected={selected.value === opt.value ? 'true' : undefined}
-              data-highlighted={highlighted.value === idx ? 'true' : undefined}
+              data-highlighted={popup.highlighted.value === idx ? 'true' : undefined}
               role="option"
               type="button"
               tabindex={-1}

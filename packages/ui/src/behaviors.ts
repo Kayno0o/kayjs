@@ -3,7 +3,7 @@
 
 import type { ReadonlySignal, Signal } from '@kayjs/kay'
 import type { Tone } from './static'
-import { computed, selector, signal, useId } from '@kayjs/kay'
+import { computed, effect, onCleanup, selector, signal, useId } from '@kayjs/kay'
 
 // ---- Stable hydration-safe unique IDs for ARIA wiring ----
 
@@ -98,6 +98,87 @@ export function handleListKeyDown<T>(e: KeyboardEvent, opts: ListNavigationOptio
     }
   }
   return false
+}
+
+export interface ListPopupOptions<T> {
+  items: () => readonly T[]
+  itemId: (idx: number) => string
+  isDisabled: (item: T) => boolean
+  onSelect: (item: T, idx: number) => void
+  initialIndex?: () => number
+}
+
+export interface ListPopupState {
+  readonly open: Signal<boolean>
+  readonly highlighted: Signal<number>
+  setRoot(el: HTMLElement | undefined): void
+  close(returnFocus?: boolean): void
+  toggle(e: MouseEvent): void
+  activeDescendantId(): string | undefined
+}
+
+/** Shared popup open/close, outside-click dismiss, and keyboard list navigation for Menu and Select. */
+export function createListPopup<T>(opts: ListPopupOptions<T>): ListPopupState {
+  const open = signal(false)
+  const highlighted = signal(findFirstEnabledIndex(opts.items(), opts.isDisabled))
+  let rootEl: HTMLElement | undefined
+
+  const close = (returnFocus = false) => {
+    open.value = false
+    if (returnFocus)
+      rootEl?.querySelector<HTMLElement>('[data-part="trigger"]')?.focus()
+  }
+
+  effect(() => {
+    if (!open.value)
+      return
+    const onDocClick = (e: MouseEvent) => {
+      if (rootEl && !rootEl.contains(e.target as Node))
+        close()
+    }
+    const onKey = (e: KeyboardEvent) => {
+      handleListKeyDown(e, {
+        items: opts.items,
+        activeIndex: highlighted,
+        isDisabled: opts.isDisabled,
+        onSelect: opts.onSelect,
+        onClose: returnFocus => close(returnFocus),
+        selectOnSpace: true,
+      })
+    }
+    document.addEventListener('click', onDocClick)
+    document.addEventListener('keydown', onKey)
+    onCleanup(() => {
+      document.removeEventListener('click', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    })
+  })
+
+  return {
+    open,
+    highlighted,
+    setRoot(el) {
+      rootEl = el
+    },
+    close,
+    toggle(e) {
+      e.stopPropagation()
+      open.value = !open.value
+      if (open.value) {
+        const init = opts.initialIndex?.()
+        highlighted.value = init !== undefined && init >= 0
+          ? init
+          : findFirstEnabledIndex(opts.items(), opts.isDisabled)
+      }
+    },
+    activeDescendantId() {
+      const idx = highlighted.value
+      const list = opts.items()
+      if (!open.value || idx < 0 || idx >= list.length || opts.isDisabled(list[idx]!))
+        return undefined
+      return opts.itemId(idx)
+    },
+  }
 }
 
 // ---- Shared native <dialog> sync & backdrop click helpers ----
@@ -280,6 +361,7 @@ export function createDataTable<T>(options: DataTableOptions<T>): DataTableState
   const sortDir = signal<'asc' | 'desc'>('asc')
   const page = signal(1)
   const selected = signal<Set<string | number>>(new Set())
+  const rowSelected = new Map<string | number, Signal<boolean>>()
   const pageSize = options.pageSize ?? 25
 
   const filtered = computed<T[]>(() => {
@@ -337,18 +419,35 @@ export function createDataTable<T>(options: DataTableOptions<T>): DataTableState
       }
     },
     toggleSelect(key) {
-      const next = new Set(selected.value)
-      if (next.has(key))
-        next.delete(key)
-      else
+      const next = new Set(selected.peek())
+      const willSelect = !next.has(key)
+      if (willSelect)
         next.add(key)
+      else
+        next.delete(key)
       selected.value = next
+      const perRow = rowSelected.get(key)
+      if (perRow !== undefined)
+        perRow.value = willSelect
     },
     isSelected(key) {
-      return selected.value.has(key)
+      let perRow = rowSelected.get(key)
+      if (perRow === undefined) {
+        perRow = signal(selected.peek().has(key))
+        rowSelected.set(key, perRow)
+      }
+      return perRow.value
     },
     clearSelection() {
+      const prev = selected.peek()
+      if (prev.size === 0)
+        return
       selected.value = new Set()
+      for (const k of prev) {
+        const perRow = rowSelected.get(k)
+        if (perRow !== undefined)
+          perRow.value = false
+      }
     },
   }
 }

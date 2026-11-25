@@ -1,5 +1,5 @@
 /** @jsxImportSource @kayjs/kay */
-// Accessible native `<dialog>` primitive (top-layer, Esc-to-close, ::backdrop, focus return for free!).
+// Accessible native `<dialog>` primitive (shared by Dialog and Drawer: top-layer, Esc-to-close, ::backdrop, focus return).
 
 import type { KayChild, Signal } from '@kayjs/kay'
 import type { ButtonVariant } from './static'
@@ -18,8 +18,25 @@ export interface DialogProps {
   children?: KayChild | undefined
 }
 
-export function Dialog({ id, title, ariaLabel, description, triggerLabel, triggerVariant = 'outline', closeLabel = 'Close', open, children }: DialogProps) {
-  const baseId = id ?? nextUiId('kui-dialog')
+export interface ModalDialogSurfaceProps extends DialogProps {
+  kind: 'dialog' | 'drawer'
+  side?: 'right' | 'left' | 'bottom' | undefined
+}
+
+export function ModalDialogSurface({
+  kind,
+  side,
+  id,
+  title,
+  ariaLabel,
+  description,
+  triggerLabel,
+  triggerVariant = 'outline',
+  closeLabel = 'Close',
+  open,
+  children,
+}: ModalDialogSurfaceProps) {
+  const baseId = id ?? nextUiId(`kui-${kind}`)
   const titleId = `${baseId}-title`
   const descId = `${baseId}-desc`
 
@@ -30,8 +47,10 @@ export function Dialog({ id, title, ariaLabel, description, triggerLabel, trigge
     syncDialogOpen(dialogEl, isOpen, isOpen.value)
   })
 
+  const fallbackLabel = kind === 'drawer' ? 'Drawer' : 'Dialog'
+
   return (
-    <div data-ui="dialog-root" data-state={isOpen.value ? 'open' : 'closed'}>
+    <div data-ui={`${kind}-root`} data-state={isOpen.value ? 'open' : 'closed'}>
       {triggerLabel && (
         <button
           data-ui="button"
@@ -46,10 +65,11 @@ export function Dialog({ id, title, ariaLabel, description, triggerLabel, trigge
         </button>
       )}
       <dialog
-        data-ui="dialog"
+        data-ui={kind}
+        data-side={side}
         data-part="content"
         aria-labelledby={title ? titleId : undefined}
-        aria-label={!title ? (ariaLabel ?? 'Dialog') : undefined}
+        aria-label={!title ? (ariaLabel ?? fallbackLabel) : undefined}
         aria-describedby={description ? descId : undefined}
         ref={(el) => {
           dialogEl = el as HTMLDialogElement
@@ -82,4 +102,16 @@ export function Dialog({ id, title, ariaLabel, description, triggerLabel, trigge
       </dialog>
     </div>
   )
+}
+
+export interface DrawerProps extends DialogProps {
+  side?: 'right' | 'left' | 'bottom' | undefined
+}
+
+export function Dialog(props: DialogProps) {
+  return ModalDialogSurface({ ...props, kind: 'dialog' })
+}
+
+export function Drawer({ side = 'right', ...rest }: DrawerProps) {
+  return ModalDialogSurface({ ...rest, kind: 'drawer', side })
 }

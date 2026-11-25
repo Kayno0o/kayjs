@@ -281,12 +281,12 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
       expect(await page.locator('dialog[data-ui="dialog"]').evaluate(el => (el as HTMLDialogElement).open)).toBe(false)
 
       // 2. Tabs click + ArrowRight keyboard navigation
-      expect(await page.locator('#panel-one').isVisible()).toBe(true)
-      expect(await page.locator('#panel-two').isVisible()).toBe(false)
-      await page.focus('#tab-one')
+      expect(await page.locator('[id$="-panel-one"]').isVisible()).toBe(true)
+      expect(await page.locator('[id$="-panel-two"]').isVisible()).toBe(false)
+      await page.focus('[id$="-tab-one"]')
       await page.keyboard.press('ArrowRight')
-      expect(await page.locator('#panel-two').isVisible()).toBe(true)
-      expect(await page.locator('#tab-two').getAttribute('data-state')).toBe('active')
+      expect(await page.locator('[id$="-panel-two"]').isVisible()).toBe(true)
+      expect(await page.locator('[id$="-tab-two"]').getAttribute('data-state')).toBe('active')
 
       // 3. Menu open + floats absolutely with opaque surface background + click item closes menu
       await page.click('[data-ui="menu"] [data-part="trigger"]')

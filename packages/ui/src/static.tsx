@@ -117,47 +117,109 @@ function mergeTokenAttr(existing: string | null | undefined, addition: string): 
   return tokens.join(' ')
 }
 
-function wireFieldHtml(html: string, wiring: FieldControlWiring): string {
-  let matched = false
-  const patchTag = (full: string, tag: string, rawAttrs: string, selfClose: string): string => {
-    const lowerTag = tag.toLowerCase()
-    if (lowerTag === 'input' && /\btype\s*=\s*(?:"hidden"|'hidden'|hidden\b)/i.test(rawAttrs))
-      return full
-    if (matched)
-      return full
-    matched = true
+interface ScannedTag {
+  start: number
+  end: number
+  tag: string
+  rawAttrs: string
+  selfClose: string
+}
 
-    let attrs = rawAttrs
-    if (!/\bid\s*=/i.test(attrs))
-      attrs += ` id="${escAttr(wiring.id)}"`
-
-    if (wiring.describedBy) {
-      const descRe = /(\baria-describedby\s*=\s*")([^"]*)(")/i
-      if (descRe.test(attrs))
-        attrs = attrs.replace(descRe, (_, p1: string, cur: string, p3: string) => `${p1}${escAttr(mergeTokenAttr(cur, wiring.describedBy!))}${p3}`)
+/** Quote-aware HTML opening tag scanner so `>` inside attribute values (e.g. `placeholder="x > 0"`) never truncates a tag. */
+function scanOpeningTags(html: string): ScannedTag[] {
+  const tags: ScannedTag[] = []
+  const len = html.length
+  let i = 0
+  while (i < len) {
+    const lt = html.indexOf('<', i)
+    if (lt === -1)
+      break
+    const next = html.charCodeAt(lt + 1)
+    if (!((next >= 65 && next <= 90) || (next >= 97 && next <= 122))) {
+      i = lt + 1
+      continue
+    }
+    let nameEnd = lt + 2
+    while (nameEnd < len) {
+      const ch = html.charCodeAt(nameEnd)
+      if ((ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122) || (ch >= 48 && ch <= 57) || ch === 45 || ch === 95)
+        nameEnd++
       else
-        attrs += ` aria-describedby="${escAttr(wiring.describedBy)}"`
+        break
     }
-
-    if (wiring.invalid && !/\baria-invalid\s*=/i.test(attrs))
-      attrs += ' aria-invalid="true"'
-
-    if (wiring.required) {
-      if ((lowerTag === 'input' || lowerTag === 'textarea' || lowerTag === 'select') && !/\brequired(?:\s|=|$)/i.test(attrs))
-        attrs += ' required'
-      if (!/\baria-required\s*=/i.test(attrs))
-        attrs += ' aria-required="true"'
+    const afterName = html.charCodeAt(nameEnd)
+    if (nameEnd < len && afterName !== 62 && afterName !== 47 && afterName !== 32 && afterName !== 9 && afterName !== 10 && afterName !== 13) {
+      i = nameEnd
+      continue
     }
+    let j = nameEnd
+    let quote = 0
+    while (j < len) {
+      const ch = html.charCodeAt(j)
+      if (quote !== 0) {
+        if (ch === quote)
+          quote = 0
+      }
+      else if (ch === 34 || ch === 39) {
+        quote = ch
+      }
+      else if (ch === 62) {
+        break
+      }
+      j++
+    }
+    if (j >= len)
+      break
+    const selfClose = html.charCodeAt(j - 1) === 47 ? '/' : ''
+    const attrEnd = selfClose ? j - 1 : j
+    tags.push({
+      start: lt,
+      end: j + 1,
+      tag: html.slice(lt + 1, nameEnd),
+      rawAttrs: html.slice(nameEnd, attrEnd),
+      selfClose,
+    })
+    i = j + 1
+  }
+  return tags
+}
 
-    return `<${tag}${attrs}${selfClose}>`
+function wireFieldHtml(html: string, wiring: FieldControlWiring): string {
+  const tags = scanOpeningTags(html)
+  const nativeMatch = tags.find((t) => {
+    const lower = t.tag.toLowerCase()
+    if (lower === 'input' && /\btype\s*=\s*(?:"hidden"|'hidden'|hidden\b)/i.test(t.rawAttrs))
+      return false
+    return lower === 'input' || lower === 'textarea' || lower === 'select'
+  })
+  const target = nativeMatch ?? tags.find(t => /\brole\s*=\s*["'](?:combobox|textbox|listbox|spinbutton)["']/i.test(t.rawAttrs))
+  if (target === undefined)
+    return html
+
+  const lowerTag = target.tag.toLowerCase()
+  let attrs = target.rawAttrs
+  if (!/\bid\s*=/i.test(attrs))
+    attrs += ` id="${escAttr(wiring.id)}"`
+
+  if (wiring.describedBy) {
+    const descRe = /(\baria-describedby\s*=\s*")([^"]*)(")/i
+    if (descRe.test(attrs))
+      attrs = attrs.replace(descRe, (_, p1: string, cur: string, p3: string) => `${p1}${escAttr(mergeTokenAttr(cur, wiring.describedBy!))}${p3}`)
+    else
+      attrs += ` aria-describedby="${escAttr(wiring.describedBy)}"`
   }
 
-  const nativePatched = html.replace(/<(input|textarea|select)\b([^>]*?)(\/?)>/gi, patchTag)
-  if (matched)
-    return nativePatched
+  if (wiring.invalid && !/\baria-invalid\s*=/i.test(attrs))
+    attrs += ' aria-invalid="true"'
 
-  // Fallback for custom controls (e.g. role="combobox" / role="textbox")
-  return html.replace(/<([a-z][\w-]*)\b([^>]*\brole\s*=\s*["'](?:combobox|textbox|listbox|spinbutton)["'][^>]*?)(\/?)>/i, patchTag)
+  if (wiring.required) {
+    if ((lowerTag === 'input' || lowerTag === 'textarea' || lowerTag === 'select') && !/\brequired(?:\s|=|$)/i.test(attrs))
+      attrs += ' required'
+    if (!/\baria-required\s*=/i.test(attrs))
+      attrs += ' aria-required="true"'
+  }
+
+  return `${html.slice(0, target.start)}<${target.tag}${attrs}${target.selfClose}>${html.slice(target.end)}`
 }
 
 function wireFieldElement(el: Element, wiring: FieldControlWiring): void {
