@@ -274,6 +274,8 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
       const serverDir = join(root, outDir, 'server')
       const routeFiles = new Set(manifest.routes.map(r => r.file.replace(/^server\//, '')))
       const sharedRelFiles = new Set<string>()
+      if (manifest.configFile !== undefined)
+        sharedRelFiles.add(manifest.configFile.replace(/^server\//, ''))
       for (const a of manifest.actions) {
         const rel = a.file.replace(/^server\//, '')
         if (!routeFiles.has(rel))

@@ -9,7 +9,7 @@ import { defineConfig } from 'kay/server'
 const GRAMMARS = ['editorial', 'workshop', 'console', 'soft', 'orbit', 'bare'] as const
 
 export const auth = createAuth({
-  store: memoryAuthStore('showcase'),
+  store: memoryAuthStore(),
   secret: 'showcase-dev-secret-change-in-prod',
   defaultRedirect: '/',
 })

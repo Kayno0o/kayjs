@@ -61,7 +61,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     })
 
     const mockOrigin = `http://127.0.0.1:${mockOAuth.port}`
-    const mail = mailer({ id: `auth-test-${Date.now()}` })
+    const mail = mailer()
     const store = sqliteAuthStore(dbPath)
     const auth = createAuth({
       store,

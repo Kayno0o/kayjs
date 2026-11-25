@@ -43,6 +43,7 @@ export interface BuildManifest {
   globalStyles?: string[] | undefined
   headTags?: string[] | undefined
   routes: RouteManifestEntry[]
+  configFile?: string | undefined
   errorFile?: string | undefined
   notFoundFile?: string | undefined
   actions: ActionManifestEntry[]

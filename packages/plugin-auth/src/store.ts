@@ -90,22 +90,14 @@ interface MemoryState<TUser extends AuthUser = AuthUser> {
   tokens: Map<string, VerificationToken>
 }
 
-export function memoryAuthStore<TUser extends AuthUser = AuthUser>(id?: string): AuthStore<TUser> {
-  const state: MemoryState<TUser> = id !== undefined
-    ? (((globalThis as Record<symbol, MemoryState<TUser> | undefined>)[Symbol.for(`kay.auth.memory.${id}`)] ??= {
-        users: new Map(),
-        usersByEmail: new Map(),
-        sessions: new Map(),
-        oauth: new Map(),
-        tokens: new Map(),
-      }))
-    : {
-        users: new Map(),
-        usersByEmail: new Map(),
-        sessions: new Map(),
-        oauth: new Map(),
-        tokens: new Map(),
-      }
+export function memoryAuthStore<TUser extends AuthUser = AuthUser>(): AuthStore<TUser> {
+  const state: MemoryState<TUser> = {
+    users: new Map(),
+    usersByEmail: new Map(),
+    sessions: new Map(),
+    oauth: new Map(),
+    tokens: new Map(),
+  }
 
   return {
     getUserById(userId) {

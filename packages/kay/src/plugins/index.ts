@@ -12,8 +12,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { createAppContext, getAppContext, runWithAppContext } from './context'
 
-export { createAppContext, getAppContext, I18N_CONFIG_SERVICE, runWithAppContext } from './context'
-export type { ActiveI18nConfig, AppRuntimeContext, CreateAppContextOptions } from './context'
+export { CONTENT_IMAGE_RESOLVER_SERVICE, createAppContext, getAppContext, I18N_CONFIG_SERVICE, runWithAppContext } from './context'
+export type { ActiveI18nConfig, AppRuntimeContext, ContentImageResolver, ContentImageResult, CreateAppContextOptions } from './context'
 
 export type BuildPluginTarget = 'client' | 'server' | 'compile'
 

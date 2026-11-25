@@ -266,7 +266,7 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
       expect((await forcedApp.get('/_kay/mail.json')).status).toBe(404)
 
       // Mail a transport delivered in production is not kept in memory
-      const delivering = mailer({ id: 'prod-delivering', transport: { async send() {} } })
+      const delivering = mailer({ transport: { async send() {} } })
       await delivering.send({ subject: 'Sign-in link', text: 'https://example.test/auth/magic?token=secret' })
       expect(delivering.outbox).toEqual([])
     }

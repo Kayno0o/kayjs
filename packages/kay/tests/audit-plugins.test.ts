@@ -407,7 +407,7 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
     })
 
     it('enforces per-room and per-client connection caps with 503/429', () => {
-      const rooms = createRooms<{ n: number }, string>(undefined, {
+      const rooms = createRooms<{ n: number }, string>({
         maxConnectionsPerRoom: 2,
         maxConnectionsPerClient: 1,
       })
@@ -439,7 +439,7 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
       ac2.abort()
 
       // Without ctx.ip, a client-sent X-Forwarded-For does not buy a fresh per-client quota
-      const lone = createRooms<{ n: number }, string>(undefined, { maxConnectionsPerClient: 1 })
+      const lone = createRooms<{ n: number }, string>({ maxConnectionsPerClient: 1 })
       const acA = new AbortController()
       expect(lone.stream(fromIp(undefined, { headers: { 'x-forwarded-for': '4.4.4.4' }, signal: acA.signal }), { room: 'b', member: 'x', pingMs: 0 }).status).toBe(200)
       expect(lone.stream(fromIp(undefined, { headers: { 'x-forwarded-for': '5.5.5.5' } }), { room: 'b', member: 'y', pingMs: 0 }).status).toBe(429)

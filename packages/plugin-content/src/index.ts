@@ -1,7 +1,7 @@
 // @kayjs/content — Zero-dependency Bun-native Markdown collections, nested YAML frontmatter (Bun.YAML),
 // Shiki/custom highlight hook, MDX-lite embedded TSX components, localized collections, TOC, and RSS (`0 KB` client JS).
 
-import type { ActiveI18nConfig, KayPlugin, StandardSchemaV1 } from '@kayjs/kay/server'
+import type { ActiveI18nConfig, ContentImageResolver, ContentImageResult, KayPlugin, StandardSchemaV1 } from '@kayjs/kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { definePlugin, formatIssuePath, getAppContext, I18N_CONFIG_SERVICE, validateSchemaSync } from '@kayjs/kay/server'
@@ -52,17 +52,9 @@ export interface ContentEntry<TData = Record<string, unknown>> {
 export type MarkdownComponent = (props: never) => unknown
 export type CodeHighlighter = (code: string, language: string | undefined) => string
 
-export interface MarkdownImageResult {
-  src: string
-  srcset?: string | undefined
-  avifSrcset?: string | undefined
-  sizes?: string | undefined
-  width?: number | undefined
-  height?: number | undefined
-  loading?: 'lazy' | 'eager' | undefined
-}
+export type MarkdownImageResult = ContentImageResult
 
-export type MarkdownImageResolver = (src: string, file: string | undefined) => MarkdownImageResult | string | undefined
+export type MarkdownImageResolver = ContentImageResolver
 
 export interface CollectionRenderConfig {
   /** Custom syntax highlighter for fenced code blocks (e.g. Shiki). */

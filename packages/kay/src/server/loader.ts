@@ -1,6 +1,7 @@
 // Filesystem server loader: reads `dist/manifest.json` (or falls back to `--static` dir server) and loads built modules.
 
 import type { BuildManifest } from '../build/index'
+import type { KayConfig } from '../plugins/index'
 import type { EmbeddedBody, KayApp, ServerOptions } from './http'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -12,31 +13,64 @@ let serverLoadSeq = 0
 
 export async function createServer(options: ServerOptions): Promise<KayApp> {
   const root = resolve(options.root)
-  const fileConfig = await loadConfig(root)
+  const loadStamp = `${Date.now()}-${++serverLoadSeq}`
+  const importModule = options.importModule ?? ((path: string) => import(`${path}?v=${loadStamp}`))
+  const isDev = options.dev ?? (process.env.KAY_DEV === '1')
+
+  // When a bundled `manifest.configFile` exists and plugins were not explicitly overridden,
+  // load the bundled config module so it shares the exact same chunk instances as routes & actions.
+  const initialOutDir = resolve(root, options.outDir ?? 'dist')
+  const initialManifestPath = join(initialOutDir, 'manifest.json')
+  let fileConfig: KayConfig
+  let outDir: string
+  let manifest: BuildManifest
+
+  if (options.plugins === undefined && existsSync(initialManifestPath)) {
+    outDir = initialOutDir
+    manifest = JSON.parse(readFileSync(initialManifestPath, 'utf8')) as BuildManifest
+    if (manifest.configFile !== undefined) {
+      const cfgMod = await importModule(join(outDir, manifest.configFile))
+      const loaded = (cfgMod.default ?? cfgMod) as KayConfig | undefined
+      fileConfig = loaded !== undefined && typeof loaded === 'object' ? loaded : {}
+    }
+    else {
+      fileConfig = await loadConfig(root)
+    }
+  }
+  else {
+    fileConfig = await loadConfig(root)
+    outDir = resolve(root, options.outDir ?? fileConfig.outDir ?? 'dist')
+    const manifestPath = join(outDir, 'manifest.json')
+    if (!existsSync(manifestPath)) {
+      const securityOpt = options.security ?? fileConfig.security
+      const trustProxy = options.trustProxy ?? fileConfig.trustProxy ?? false
+      if (existsSync(outDir) && readdirSync(outDir).length > 0) {
+        return createStaticDirServer(
+          outDir,
+          options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay',
+          securityOpt,
+          (options.compress ?? fileConfig.compress) !== false,
+          trustProxy,
+          isDev,
+        )
+      }
+      throw new Error(`kay server: missing ${manifestPath}. Run build() first.`)
+    }
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as BuildManifest
+    if (options.plugins === undefined && manifest.configFile !== undefined) {
+      const cfgMod = await importModule(join(outDir, manifest.configFile))
+      const loaded = (cfgMod.default ?? cfgMod) as KayConfig | undefined
+      if (loaded !== undefined && typeof loaded === 'object')
+        fileConfig = loaded
+    }
+  }
+
   const plugins = options.plugins ?? fileConfig.plugins ?? []
-  const outDir = resolve(root, options.outDir ?? fileConfig.outDir ?? 'dist')
   const clientDir = join(outDir, 'client')
-  const manifestPath = join(outDir, 'manifest.json')
   const securityOpt = options.security ?? fileConfig.security
   const trustProxy = options.trustProxy ?? fileConfig.trustProxy ?? false
   const maxRequestBodySize = options.maxRequestBodySize ?? fileConfig.maxRequestBodySize
-  const isDev = options.dev ?? (process.env.KAY_DEV === '1')
 
-  if (!existsSync(manifestPath)) {
-    if (existsSync(outDir) && readdirSync(outDir).length > 0) {
-      return createStaticDirServer(
-        outDir,
-        options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay',
-        securityOpt,
-        (options.compress ?? fileConfig.compress) !== false,
-        trustProxy,
-        isDev,
-      )
-    }
-    throw new Error(`kay server: missing ${manifestPath}. Run build() first.`)
-  }
-
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as BuildManifest
   const modules: Record<string, unknown> = {}
   const assets: Record<string, EmbeddedBody> = {}
   const publicAssets: Record<string, EmbeddedBody> = {}
@@ -66,8 +100,6 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     }
   }
 
-  const loadStamp = `${Date.now()}-${++serverLoadSeq}`
-  const importModule = options.importModule ?? ((path: string) => import(`${path}?v=${loadStamp}`))
   const loadMod = async (rel: string) => {
     if (!(rel in modules))
       modules[rel] = await importModule(join(outDir, rel))

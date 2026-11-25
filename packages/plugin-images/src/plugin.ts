@@ -7,10 +7,10 @@ import type { ShareCardDefaults } from './card'
 import type { ImageAsset } from './helpers'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
-import { definePlugin, getAppContext } from '@kayjs/kay/server'
+import { CONTENT_IMAGE_RESOLVER_SERVICE, definePlugin, getAppContext } from '@kayjs/kay/server'
 import { hasMagick, SHARE_CARD_CONFIG_SERVICE } from './card'
 
-export const CONTENT_IMAGE_RESOLVER_SERVICE = 'kay.content.imageResolver'
+export { CONTENT_IMAGE_RESOLVER_SERVICE }
 
 const ALLOWED_IMAGE_EXTS = new Set([
   '.png',

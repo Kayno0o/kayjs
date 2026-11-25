@@ -205,10 +205,12 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     .filter(c => existsSync(c))
   const env = { root, outDir, clientDir, serverDir, assetPrefix, minify: run.minify, isDev, graph, cache: options.cache, plugins, actionsByFile, islands }
 
+  const configSrc = join(root, 'kay.config.ts')
+  const hasConfigFile = existsSync(configSrc)
   const routeEntryFiles = new Set([...specialFiles, ...pageFiles])
   const standaloneActionFiles = [...actionsByFile.keys()].filter(f => !routeEntryFiles.has(f))
-  const serverEntries = [...specialFiles, ...pageFiles, ...standaloneActionFiles]
-  const serverRoot = standaloneActionFiles.length > 0 ? root : routesDir
+  const serverEntries = [...specialFiles, ...pageFiles, ...standaloneActionFiles, ...(hasConfigFile ? [configSrc] : [])]
+  const serverRoot = standaloneActionFiles.length > 0 || hasConfigFile ? root : routesDir
 
   // The server compiles against the island chunk URLs, so islands build first; without islands both passes run in parallel.
   const clientPass = () => buildClient(env, standaloneCssFiles(graph, pluginCssFiles, islands.cssFiles))
@@ -285,6 +287,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     globalStyles,
     ...(host.headTags.length > 0 ? { headTags: host.headTags } : {}),
     routes,
+    ...(hasConfigFile ? { configFile: toOutRel(configSrc) } : {}),
     errorFile: hasErrorFile ? toOutRel(errorSrc) : undefined,
     notFoundFile: hasNotFoundFile ? toOutRel(notFoundSrc) : undefined,
     actions: buildActionEntries(actionsByFile, routesDir, toOutRel),

@@ -51,7 +51,9 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     for (const m of a.middlewares) addMod(m)
   }
 
-  const configPath = join(root, 'kay.config.ts')
+  const configPath = manifest.configFile !== undefined
+    ? join(outDir, manifest.configFile)
+    : join(root, 'kay.config.ts')
   const hasConfig = existsSync(configPath)
   if (hasConfig)
     imports.push(`import _kayConfig from ${JSON.stringify(configPath)};`)

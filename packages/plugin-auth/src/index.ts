@@ -57,6 +57,16 @@ export interface AuthMailPayload {
   kind: 'magic-link' | 'verify-email' | 'reset-password'
 }
 
+/** Structural interface matching `@kayjs/mail`'s `Mailer` so `createAuth({ mailer })` needs no glue callback. */
+export interface AuthMailer {
+  send(message: {
+    to: string
+    subject: string
+    text?: string | undefined
+    html?: string | undefined
+  }): unknown
+}
+
 export type CreateUserInput<TUser extends AuthUser = AuthUser> = {
   email: string
   password?: string | undefined
@@ -99,7 +109,9 @@ export interface AuthOptions<TUser extends AuthUser = AuthUser> {
   site?: string | undefined
   /** OAuth 2.0 providers (e.g. `[github(...), discord(...), google(...)]`). */
   providers?: OAuthProvider[] | undefined
-  /** Mail sender for magic links / verification emails (wires cleanly to `@kayjs/mail`). */
+  /** Pass a `@kayjs/mail` `Mailer` instance directly for magic links & verification emails (shorthand for `sendMail`). */
+  mailer?: AuthMailer | undefined
+  /** Custom mail sender for magic links / verification emails (overrides `mailer` when both are provided). */
   sendMail?: ((mail: AuthMailPayload) => void | Promise<void>) | undefined
   /**
    * Require email verification before opening a session on password sign-up / sign-in (default: `true`).
@@ -186,6 +198,17 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     ...(options.trustProxy !== undefined ? { trustProxy: options.trustProxy } : {}),
   }
   let site = options.site !== undefined ? siteOrigin(options.site) : undefined
+  const deliverMail: ((mail: AuthMailPayload) => void | Promise<void>) | undefined = options.sendMail
+    ?? (options.mailer !== undefined
+      ? async (mail) => {
+        await options.mailer!.send({
+          to: mail.to,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+        })
+      }
+      : undefined)
   const requireEmailVerification = options.requireEmailVerification !== false
   let trustProxy = options.trustProxy ?? false
   const storeIp = options.storeIp ?? 'truncate'
@@ -511,9 +534,9 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     const path = `${basePath}/${LINK_PATHS[kind]}?token=${encodeURIComponent(rawToken)}&redirect=${encodeURIComponent(next)}`
     const url = origin !== undefined ? `${origin.replace(/\/$/, '')}${path}` : path
 
-    if (options.sendMail && origin !== undefined) {
+    if (deliverMail && origin !== undefined) {
       const mail = LINK_MAILS[kind]
-      await options.sendMail({
+      await deliverMail({
         to: normalized,
         subject: mail.subject,
         text: `${mail.text}: ${url}`,
@@ -668,7 +691,7 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
 
         if (requireEmailVerification) {
           const linkOrigin = mailedLinkOrigin(ctx.url)
-          if (options.sendMail && linkOrigin === undefined) {
+          if (deliverMail && linkOrigin === undefined) {
             console.error(`[kay/auth] refusing to mail a verification link for host ${ctx.url.host}: set the auth \`site\` option to the public origin`)
             return fail(ctx, 500, 'Verification links are not configured')
           }

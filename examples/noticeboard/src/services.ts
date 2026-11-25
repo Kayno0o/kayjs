@@ -13,7 +13,6 @@ export type BoardMessage =
 export const BOARD_ROOM = 'board'
 
 export const mail = mailer({
-  id: 'noticeboard',
   from: 'Noticeboard <board@noticeboard.local>',
   optional: true,
 })
@@ -26,12 +25,10 @@ export const auth = createAuth({
   // Local demo opts out of email verification so interactive sign-up lands straight on the board.
   requireEmailVerification: false,
   defaultRedirect: '/',
-  sendMail: async (m) => {
-    await mail.send({ to: m.to, subject: m.subject, text: m.text, html: m.html })
-  },
+  mailer: mail,
 })
 
-export const board = createRooms<BoardMessage, string | null>('noticeboard')
+export const board = createRooms<BoardMessage, string | null>()
 
 export const sendPresence = board.coalesce((room): BoardMessage => {
   const members = board.members(room)

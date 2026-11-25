@@ -100,21 +100,12 @@ const PING_CHUNK = encoder.encode(': ping\n\n')
 const RETRY_CHUNK = encoder.encode('retry: 2000\n\n')
 
 export function createRooms<TMessage, TMember = undefined>(
-  idOrOptions?: string | RoomsOptions,
-  maybeOptions?: RoomsOptions,
+  options: RoomsOptions = {},
 ): Rooms<TMessage, TMember> {
-  const id = typeof idOrOptions === 'string' ? idOrOptions : undefined
-  const defaultOpts: RoomsOptions = typeof idOrOptions === 'object' && idOrOptions !== null
-    ? idOrOptions
-    : (maybeOptions ?? {})
+  const defaultOpts: RoomsOptions = options
 
-  // Share room map & client counts across bundled server chunks when `id` is provided
-  const map: Map<string, Set<Subscriber<TMember>>> = id !== undefined
-    ? (((globalThis as Record<symbol, Map<string, Set<Subscriber<TMember>>> | undefined>)[Symbol.for(`kay.live.rooms.${id}`)] ??= new Map()))
-    : new Map()
-  const clientCounts: Map<string, number> = id !== undefined
-    ? (((globalThis as Record<symbol, Map<string, number> | undefined>)[Symbol.for(`kay.live.clients.${id}`)] ??= new Map()))
-    : new Map()
+  const map = new Map<string, Set<Subscriber<TMember>>>()
+  const clientCounts = new Map<string, number>()
 
   function totalConnections(): number {
     let total = 0
