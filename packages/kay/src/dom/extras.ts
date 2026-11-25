@@ -3,7 +3,7 @@
 
 import type { Owner } from '../reactivity/index'
 import { batch, createOwner, disposeOwner, effect, getOwner, runWithOwner, untrack } from '../reactivity/index'
-import { claimInsert, setAttr, setClass, setProp, setStyle, skipRange } from './index'
+import { claimInsert, isBlockedAttr, setAttr, setClass, setProp, setStyle, skipRange } from './index'
 
 const RAW_HTML = Symbol.for('kay.html')
 
@@ -21,16 +21,8 @@ export function setInnerHtml(el: Element, value: unknown): void {
     el.innerHTML = html
 }
 
-const VALID_ATTR_NAME = /^[A-Za-z_:][-\w:.]*$/
 const SPREAD_DOM_PROPS = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
 const EVENT_PROP = /^on([A-Z]\w*)$/
-
-function isBlockedSpreadAttr(name: string): boolean {
-  if (!VALID_ATTR_NAME.test(name))
-    return true
-  const lower = name.toLowerCase()
-  return lower.startsWith('on') || lower === 'innerhtml' || lower === 'srcdoc'
-}
 
 export function omit(props: Record<string, unknown>, excluded: string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}
@@ -72,7 +64,7 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
       }
       else if (k !== 'key' && k !== 'ref' && k !== '$hydrate' && k !== 'children') {
         const name = k === 'htmlFor' ? 'for' : k
-        if (!isBlockedSpreadAttr(name))
+        if (!isBlockedAttr(name))
           el.removeAttribute(name)
       }
     }
@@ -96,7 +88,7 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
         continue
       }
       const name = k === 'className' ? 'class' : k === 'htmlFor' ? 'for' : k
-      if (isBlockedSpreadAttr(name))
+      if (isBlockedAttr(name))
         continue
       if (name === 'class')
         setClass(el, v)
@@ -128,6 +120,28 @@ function clearInserted(current: Node | Node[] | null): void {
   else {
     current.parentNode?.removeChild(current)
   }
+}
+
+// Inserts the nodes and texts of a rendered array before the marker; a fragment contributes its children.
+function insertAll(parent: Node, marker: Node | null, items: unknown[]): Node[] {
+  const f = document.createDocumentFragment()
+  const nodes: Node[] = []
+  for (const item of items) {
+    if (item instanceof Node) {
+      if (item.nodeType === 11)
+        nodes.push(...Array.from(item.childNodes))
+      else
+        nodes.push(item)
+      f.appendChild(item)
+    }
+    else if (item != null && typeof item !== 'boolean' && item !== '') {
+      const t = document.createTextNode(String(item))
+      nodes.push(t)
+      f.appendChild(t)
+    }
+  }
+  parent.insertBefore(f, marker)
+  return nodes
 }
 
 function claimTextNode(claimed: Node | null, str: string): Text | undefined {
@@ -193,12 +207,8 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
         const claimed = claimTextNode(res.claimed, str)
         if (claimed !== undefined) {
           textNode = claimed
-          if (ssrNodes !== undefined && ssrNodes.length > 1) {
-            for (let i = 0; i < ssrNodes.length; i++) {
-              if (ssrNodes[i] !== claimed)
-                ssrNodes[i]!.parentNode?.removeChild(ssrNodes[i]!)
-            }
-          }
+          if (ssrNodes !== undefined)
+            clearInserted(ssrNodes.filter(n => n !== claimed))
         }
         else {
           if (ssrNodes !== undefined)
@@ -222,12 +232,8 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
       if (current === next)
         return
       if (current === null && next.parentNode === parent) {
-        if (ssrNodes !== undefined && ssrNodes.length > 1) {
-          for (let i = 0; i < ssrNodes.length; i++) {
-            if (ssrNodes[i] !== next)
-              ssrNodes[i]!.parentNode?.removeChild(ssrNodes[i]!)
-          }
-        }
+        if (ssrNodes !== undefined)
+          clearInserted(ssrNodes.filter(n => n !== next))
         current = next
         return
       }
@@ -249,36 +255,9 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
     if (Array.isArray(next)) {
       clearInserted(current)
       if (ssrNodes !== undefined) {
-        const kept = new Set<Node>()
-        for (let i = 0; i < next.length; i++) {
-          const item = next[i]
-          if (item instanceof Node && item.parentNode === parent)
-            kept.add(item)
-        }
-        for (let i = 0; i < ssrNodes.length; i++) {
-          if (!kept.has(ssrNodes[i]!))
-            ssrNodes[i]!.parentNode?.removeChild(ssrNodes[i]!)
-        }
+        clearInserted(ssrNodes.filter(n => !next.includes(n)))
       }
-      const f = document.createDocumentFragment()
-      const nodes: Node[] = []
-      for (let i = 0; i < next.length; i++) {
-        const item = next[i]
-        if (item instanceof Node) {
-          if (item.nodeType === 11)
-            nodes.push(...Array.from(item.childNodes))
-          else
-            nodes.push(item)
-          f.appendChild(item)
-        }
-        else if (item != null && typeof item !== 'boolean') {
-          const t = document.createTextNode(String(item))
-          nodes.push(t)
-          f.appendChild(t)
-        }
-      }
-      parent.insertBefore(f, marker)
-      current = nodes
+      current = insertAll(parent, marker, next)
     }
   })
 }
@@ -352,28 +331,7 @@ export function show(
     }
 
     if (Array.isArray(rendered)) {
-      const f = document.createDocumentFragment()
-      const list: Node[] = []
-      for (let i = 0; i < rendered.length; i++) {
-        const item = rendered[i]
-        if (item instanceof Node) {
-          if (item.nodeType === 11)
-            list.push(...Array.from(item.childNodes))
-          else
-            list.push(item)
-          f.appendChild(item)
-        }
-        else if (item != null && typeof item !== 'boolean') {
-          const str = String(item)
-          if (str !== '') {
-            const t = document.createTextNode(str)
-            list.push(t)
-            f.appendChild(t)
-          }
-        }
-      }
-      parent.insertBefore(f, marker)
-      nodes = list
+      nodes = insertAll(parent, marker, rendered)
     }
   })
 }

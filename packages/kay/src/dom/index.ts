@@ -248,7 +248,7 @@ const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href'])
 const UNSAFE_URL_RE = /^(?:javascript|vbscript):/i
 const STRING_BOOL_ATTRS = new Set(['draggable', 'spellcheck', 'contenteditable'])
 
-function isBlockedAttr(name: string): boolean {
+export function isBlockedAttr(name: string): boolean {
   if (!VALID_ATTR_NAME.test(name))
     return true
   const lower = name.toLowerCase()
