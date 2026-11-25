@@ -184,7 +184,11 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
       import { bootId } from '../state'
       export default function Home() { return <p>{bootId}</p> }
     `)
-    writeFileSync(otherPath, `export default function Other() { return <p>other v1</p> }\n`)
+    const other = (label: string) => `
+      import { bootId } from '../state'
+      export default function Other() { return <p>${label} {bootId}</p> }
+    `
+    writeFileSync(otherPath, other('v1'))
 
     const srv = await devServer({ root: dir, port: 0 })
     const page = async (path: string) => (await (await fetch(`${srv.url}${path}`)).text()).match(/<p>([^<]+)<\/p>/)![1]
@@ -192,14 +196,73 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
       const boot = await page('/')
       expect(boot).toStartWith('boot-')
 
-      writeFileSync(otherPath, `export default function Other() { return <p>other v2</p> }\n`)
+      writeFileSync(otherPath, other('v2'))
       await srv.rebuild()
-      expect(await page('/other')).toBe('other v2')
+      expect(await page('/other')).toBe(`v2 ${boot}`)
       expect(await page('/')).toBe(boot)
 
       writeFileSync(statePath, `export const bootId = 'edited-' + Math.random().toString(36).slice(2)\n`)
       await srv.rebuild()
-      expect(await page('/')).toStartWith('edited-')
+      const edited = await page('/')
+      expect(edited).toStartWith('edited-')
+      expect(await page('/other')).toBe(`v2 ${edited}`)
+    }
+    finally {
+      srv.stop()
+    }
+  })
+
+  it('re-imports every server module when a file no bundle holds changes', async () => {
+    const dir = makeTemp('kay-dev-public-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'public'), { recursive: true })
+    const dataPath = join(dir, 'public/data.txt')
+    writeFileSync(dataPath, 'data v1')
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { readFileSync } from 'node:fs'
+      const data = readFileSync(${JSON.stringify(dataPath)}, 'utf8')
+      export default function Home() { return <p>{data}</p> }
+    `)
+
+    const srv = await devServer({ root: dir, port: 0 })
+    const ac = new AbortController()
+    try {
+      expect(await (await fetch(srv.url)).text()).toContain('<p>data v1</p>')
+      const reader = (await fetch(`${srv.url}/_kay/dev-events`, { signal: ac.signal })).body!.getReader()
+      await Bun.sleep(60)
+      writeFileSync(dataPath, 'data v2')
+      expect(await readNextSseData(reader)).toBe('reload')
+      expect(await (await fetch(srv.url)).text()).toContain('<p>data v2</p>')
+    }
+    finally {
+      ac.abort()
+      srv.stop()
+    }
+  })
+
+  it('retries a server module whose import threw on the next rebuild', async () => {
+    const dir = makeTemp('kay-dev-retry-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    const flagPath = join(dir, 'ready.flag')
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { existsSync } from 'node:fs'
+      if (!existsSync(${JSON.stringify(flagPath)}))
+        throw new Error('not ready')
+      export default function Home() { return <p>ready</p> }
+    `)
+    writeFileSync(join(dir, 'src/routes/other.tsx'), `export default function Other() { return <p>v1</p> }\n`)
+
+    const srv = await devServer({ root: dir, port: 0 })
+    try {
+      expect((await fetch(srv.url)).status).toBe(500)
+      writeFileSync(flagPath, '')
+      writeFileSync(join(dir, 'src/routes/other.tsx'), `export default function Other() { return <p>v2</p> }\n`)
+      await srv.rebuild()
+      const res = await fetch(srv.url)
+      expect(res.status).toBe(200)
+      expect(await res.text()).toContain('<p>ready</p>')
     }
     finally {
       srv.stop()

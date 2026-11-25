@@ -5,7 +5,7 @@ import type { IslandBinding } from '../compiler/index'
 import type { BuildPluginTarget, KayPlugin } from '../plugins/index'
 import type { BuildCache, ModuleGraph } from './graph'
 import type { ActionsByFile, IslandPlan } from './islands'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import { compileDom, compileSsr } from '../compiler/index'
 import { readsPrivateEnv, SERVER_ONLY_FILTER } from '../compiler/server-only'
@@ -118,9 +118,13 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   // Bun hashes an entry's path into its chunk name, so the entries sit at one path per app: a dev rebuild or a static stage then keeps every unchanged chunk name.
   const entriesDir = join(root, 'node_modules/.cache/kay/entries')
   mkdirSync(entriesDir, { recursive: true })
+  // Another build of the same app (`kay build` beside `kay dev`) may be reading the file, hence the rename.
   const writeEntry = (path: string, contents: string): void => {
-    if (!existsSync(path) || readFileSync(path, 'utf8') !== contents)
-      writeFileSync(path, contents)
+    if (existsSync(path) && readFileSync(path, 'utf8') === contents)
+      return
+    const tmpPath = `${path}.${process.pid}.tmp`
+    writeFileSync(tmpPath, contents)
+    renameSync(tmpPath, path)
   }
   const entryPoints: string[] = []
   const islandEntryToKey = new Map<string, string>()

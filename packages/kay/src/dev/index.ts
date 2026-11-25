@@ -30,14 +30,38 @@ function renderErrorOverlay(errText: string): string {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Kay Dev Error</title><style>body{margin:0;min-height:100vh;background:#0d1117;color:#e6edf3;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;display:grid;place-items:center;padding:2rem}main{max-width:56rem;width:100%;background:#161b22;border:1px solid #f85149;border-radius:10px;padding:1.5rem 2rem;box-shadow:0 16px 48px rgba(0,0,0,.45)}h1{margin:0 0 1rem;color:#ff7b72;font-size:1.15rem}pre{margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.5;font-size:.9rem;color:#ffa198}p{margin:1rem 0 0;font-size:.8rem;color:#8b949e}</style></head><body><main><h1>Kay Dev Build Error</h1><pre>${escaped}</pre><p>Save a fix to auto-reload.</p></main>${DEV_RELOAD_SCRIPT}</body></html>`
 }
 
-type ChangeKind = 'css' | 'full' | 'config'
+type ChangeKind = 'css' | 'code' | 'full' | 'config'
+
+// A source edit changes the bundled bytes; any other file (content, data, public/) may be read when a module loads.
+const CODE_FILE_RE = /\.(?:[cm]?[jt]sx?|css)$/
+
+function srcChangeKind(name: string): ChangeKind {
+  if (name.endsWith('.css') && !name.endsWith('.module.css'))
+    return 'css'
+  return CODE_FILE_RE.test(name) ? 'code' : 'full'
+}
 
 // Bun never unloads a module, so every rebuild importing a fresh copy of the server bundle grew RSS by about 1.6 MB a save.
 // Each build's server files are copied into one store instead: a chunk name is a content hash, and an entry is imported under the hash of its bytes, so only what changed is imported again.
-function createModuleStore(storeDir: string) {
+// A change no bundle shows, or an import that threw (Bun keeps the failure), moves the store to a new generation: a new folder, so every module loads again.
+function createModuleStore(storeRoot: string) {
   const hashes = new Map<string, string>()
+  let generation = 0
+  let stale = false
+  const generationDir = (g: number): string => join(storeRoot, `g${g}`)
   return {
+    reloadAll(): void {
+      stale = true
+    },
     sync(serverDir: string): void {
+      if (stale) {
+        stale = false
+        hashes.clear()
+        generation++
+        // The previous generation stays for requests the old app is still serving.
+        rmSync(generationDir(generation - 2), { recursive: true, force: true })
+      }
+      const storeDir = generationDir(generation)
       for (const entry of readdirSync(serverDir, { recursive: true, withFileTypes: true })) {
         if (!entry.isFile())
           continue
@@ -54,9 +78,16 @@ function createModuleStore(storeDir: string) {
       }
     },
     importFrom(serverDir: string) {
-      return (path: string): Promise<Record<string, unknown>> => {
+      const storeDir = generationDir(generation)
+      return async (path: string): Promise<Record<string, unknown>> => {
         const rel = relative(serverDir, path)
-        return import(`${join(storeDir, rel)}?v=${hashes.get(rel)}`)
+        try {
+          return await import(`${join(storeDir, rel)}?v=${hashes.get(rel)}`)
+        }
+        catch (err) {
+          stale = true
+          throw err
+        }
       }
     },
   }
@@ -85,6 +116,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   let pending = false
   let pendingCssOnly = true
   let pendingConfigReset = false
+  let pendingReloadAll = false
   let inFlight: Promise<void> | undefined
 
   const clients = new Set<ReadableStreamDefaultController<Uint8Array>>()
@@ -103,12 +135,13 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
 
   const broadcast = (payload: string): void => pushToClients(encoder.encode(`data: ${payload}\n\n`))
 
-  async function runSingleBuild(cssOnly: boolean, resetCache: boolean): Promise<void> {
+  async function runSingleBuild(cssOnly: boolean, resetCache: boolean, reloadAll: boolean): Promise<void> {
     if (stopped)
       return
-    if (resetCache) {
+    if (resetCache)
       clearBuildCache(buildCache)
-    }
+    if (reloadAll)
+      modules.reloadAll()
     const hadError = lastError !== undefined
     const hadApp = currentApp !== undefined
     const n = ++buildNum
@@ -156,10 +189,12 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
         do {
           const cssOnly = pendingCssOnly
           const resetCache = pendingConfigReset
+          const reloadAll = pendingReloadAll
           pending = false
           pendingCssOnly = true
           pendingConfigReset = false
-          await runSingleBuild(cssOnly, resetCache)
+          pendingReloadAll = false
+          await runSingleBuild(cssOnly, resetCache, reloadAll)
         } while (pending && !stopped)
       }
       finally {
@@ -179,13 +214,12 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   const scheduleRebuild = (kind: ChangeKind) => {
     if (stopped)
       return
-    if (kind === 'config') {
+    if (kind === 'config')
       pendingConfigReset = true
+    if (kind === 'config' || kind === 'full')
+      pendingReloadAll = true
+    if (kind !== 'css')
       pendingCssOnly = false
-    }
-    else if (kind === 'full') {
-      pendingCssOnly = false
-    }
     clearTimeout(timer)
     timer = setTimeout(() => {
       void drainRebuilds()
@@ -195,9 +229,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   const watchers: FSWatcher[] = []
   if (existsSync(srcDir)) {
     watchers.push(watch(srcDir, { recursive: true }, (_ev, filename) => {
-      const name = typeof filename === 'string' ? filename : ''
-      const isCss = name.endsWith('.css') && !name.endsWith('.module.css')
-      scheduleRebuild(isCss ? 'css' : 'full')
+      scheduleRebuild(srcChangeKind(typeof filename === 'string' ? filename : ''))
     }))
   }
   if (existsSync(publicDir))

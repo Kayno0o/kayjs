@@ -165,17 +165,21 @@ export function definePlugin(plugin: KayPlugin): KayPlugin {
 
 let configReloadSeq = 0
 
+// In dev the query follows the file content: a save elsewhere reuses the loaded config and its plugin instances instead of re-running every factory.
+function configSpecifier(configPath: string, fresh: boolean): string {
+  if (fresh)
+    return `${configPath}?v=fresh-${++configReloadSeq}`
+  if (process.env.KAY_DEV === '1')
+    return `${configPath}?v=${Bun.hash(readFileSync(configPath)).toString(36)}`
+  return configPath
+}
+
 export async function loadConfig(root: string, options?: { fresh?: boolean }): Promise<KayConfig> {
   const absRoot = resolve(root)
   const configPath = join(absRoot, 'kay.config.ts')
   if (!existsSync(configPath))
     return {}
-  // In dev the query follows the file content: a save elsewhere reuses the loaded config and its plugin instances instead of re-running every factory.
-  const spec = options?.fresh
-    ? `${configPath}?v=fresh-${++configReloadSeq}`
-    : process.env.KAY_DEV === '1'
-      ? `${configPath}?v=${Bun.hash(readFileSync(configPath)).toString(36)}`
-      : configPath
+  const spec = configSpecifier(configPath, options?.fresh === true)
   const active = getAppContext()
   const ctx = active !== undefined && active.root === absRoot
     ? active

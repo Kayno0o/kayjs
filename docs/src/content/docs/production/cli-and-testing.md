@@ -11,7 +11,7 @@ order: 4
 | :--- | :--- |
 | `kay new <dir> [--template minimal\|fullstack\|blog\|app]` | Scaffold a new project |
 | `kay check` | Run TypeScript typechecking + Kay compiler validation |
-| `kay dev` | Dev server with live reload: a save rebuilds this site in about 20 ms and reloads only the server modules it changed |
+| `kay dev` | Dev server with live reload; saving a source file re-runs only the server modules it changed |
 | `kay build` | Single-pass production build into `dist/` |
 | `kay build --static` | Static HTML + asset export into `dist/` |
 | `kay build --compile [out]` | Compile into a single standalone Bun executable |
