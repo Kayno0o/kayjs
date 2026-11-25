@@ -16,7 +16,11 @@ const REACTIVE_IMPORTS = new Set([
   'island',
 ])
 
+// Primitives whose result is reactive state another module can import and read.
+const STATE_PRIMITIVES = new Set(['signal', 'computed', 'selector', 'store'])
+
 const EVENT_ATTR = /^on[A-Z]/
+const KAY_SOURCES = new Set(['kay', '@kayjs/kay'])
 
 export interface ImportInfo {
   source: string
@@ -44,6 +48,10 @@ export interface ModuleAnalysis {
   usesRenderContext: boolean
   defaultHydrate: string | undefined
   deferredIslandTags: Set<string>
+  /** Component tags the module renders, `NS.Tag` included. */
+  jsxTags: Set<string>
+  /** Exported names bound to reactive state (`export const count = signal(0)`). */
+  stateExports: string[]
   exportedActions: string[]
   imports: ImportInfo[]
   reexports: ReexportInfo[]
@@ -113,6 +121,22 @@ export function parseTsx(filename: string, code: string): AstNode {
   return result.program as AstNode
 }
 
+export function asyncInteractiveError(filename: string, reason: string | undefined): Error {
+  return new Error(`kay compiler: async route component in ${filename} cannot use browser interactivity (${reason}). Move interactive state/handlers into a non-async component and render it from the async page.`)
+}
+
+function isAsyncFunction(node: AstNode | null | undefined): boolean {
+  return (node?.type === 'FunctionDeclaration' || node?.type === 'FunctionExpression' || node?.type === 'ArrowFunctionExpression') && node.async === true
+}
+
+function jsxName(node: AstNode): string {
+  if (node.type === 'JSXIdentifier')
+    return node.name as string
+  if (node.type === 'JSXMemberExpression')
+    return `${jsxName(node.object)}.${node.property.name as string}`
+  return ''
+}
+
 export function analyzeModule(filename: string, code: string, program: AstNode = parseTsx(filename, code)): ModuleAnalysis {
   let isInteractive = false
   let interactiveReason: string | undefined
@@ -124,6 +148,13 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   let usesRenderContext = false
   let defaultHydrate: string | undefined
   const deferredIslandTags = new Set<string>()
+  const jsxTags = new Set<string>()
+  const kayNamespaces = new Set<string>()
+  const stateCallees = new Set<string>()
+  const asyncLocals = new Set<string>()
+  const localInits = new Map<string, AstNode>()
+  const localExports = new Map<string, string>()
+  let defaultLocal: string | undefined
   const exportedActions: string[] = []
   const imports: ImportInfo[] = []
   const reexports: ReexportInfo[] = []
@@ -137,8 +168,22 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     }
   }
 
+  const collectInits = (decl: AstNode): void => {
+    for (const d of decl.declarations as AstNode[]) {
+      if (d.id?.type === 'Identifier' && d.init)
+        localInits.set(d.id.name as string, d.init as AstNode)
+    }
+  }
+
   for (const stmt of program.body as AstNode[]) {
-    if (stmt.type === 'ImportDeclaration') {
+    if (stmt.type === 'VariableDeclaration') {
+      collectInits(stmt)
+    }
+    else if (stmt.type === 'FunctionDeclaration') {
+      if (stmt.async === true && stmt.id?.name)
+        asyncLocals.add(stmt.id.name as string)
+    }
+    else if (stmt.type === 'ImportDeclaration') {
       const source = stmt.source.value as string
       const specifiers: { local: string, imported: string }[] = []
 
@@ -149,8 +194,10 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
           const imported = spec.imported.name as string
           const local = spec.local.name as string
           specifiers.push({ local, imported })
-          if ((source === 'kay' || source === '@kayjs/kay') && REACTIVE_IMPORTS.has(imported))
+          if (KAY_SOURCES.has(source) && REACTIVE_IMPORTS.has(imported))
             markInteractive(`imports ${imported} from '${source}'`)
+          if (KAY_SOURCES.has(source) && STATE_PRIMITIVES.has(imported))
+            stateCallees.add(local)
           if ((source === 'kay' || source === '@kayjs/kay' || source === 'kay/ssr') && (imported === 'Head' || imported === 'Suspense'))
             usesRenderContext = true
           if ((source === 'kay/server' || source === '@kayjs/kay/server') && imported === 'action')
@@ -161,6 +208,8 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
         }
         else if (spec.type === 'ImportNamespaceSpecifier') {
           specifiers.push({ local: spec.local.name as string, imported: '*' })
+          if (KAY_SOURCES.has(source))
+            kayNamespaces.add(spec.local.name as string)
         }
       }
 
@@ -170,8 +219,10 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     else if (stmt.type === 'ExportDefaultDeclaration') {
       exportedNames.push('default')
       const decl = stmt.declaration as AstNode
-      if ((decl.type === 'FunctionDeclaration' || decl.type === 'FunctionExpression' || decl.type === 'ArrowFunctionExpression') && decl.async === true)
+      if (isAsyncFunction(decl))
         hasAsyncDefault = true
+      else if (decl.type === 'Identifier')
+        defaultLocal = decl.name as string
 
       if (decl.type === 'CallExpression' && decl.callee?.name === 'island') {
         markInteractive('island() wrapper')
@@ -198,7 +249,22 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
           }
         }
       }
+      else if (stmt.exportKind !== 'type') {
+        for (const spec of (stmt.specifiers ?? []) as AstNode[]) {
+          const exported = (spec.exported?.name ?? spec.exported?.value) as string | undefined
+          const local = spec.local?.name as string | undefined
+          if (spec.exportKind !== 'type' && exported && local) {
+            localExports.set(exported, local)
+            if (exported === 'default')
+              defaultLocal = local
+          }
+        }
+      }
       const decl = stmt.declaration as AstNode | null
+      if (decl?.type === 'FunctionDeclaration' && decl.async === true && decl.id?.name)
+        asyncLocals.add(decl.id.name as string)
+      if (decl?.type === 'VariableDeclaration')
+        collectInits(decl)
       if (decl?.type === 'FunctionDeclaration' && decl.id?.name) {
         const name = decl.id.name as string
         exportedNames.push(name)
@@ -231,27 +297,59 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   walk(program, (node) => {
     if (node.type === 'JSXElement' || node.type === 'JSXFragment')
       hasJsx = true
-    if (node.type === 'JSXOpeningElement' && node.name?.type === 'JSXIdentifier') {
-      const tag = node.name.name as string
-      if (tag.charCodeAt(0) >= 65 && tag.charCodeAt(0) <= 90) {
-        for (const attr of node.attributes as AstNode[]) {
-          if (attr.type === 'JSXAttribute' && attr.name?.name === '$hydrate' && attr.value?.type === 'Literal' && typeof attr.value.value === 'string' && attr.value.value !== 'load')
-            deferredIslandTags.add(tag)
-        }
+    if (node.type === 'JSXOpeningElement') {
+      const tag = jsxName(node.name)
+      const isComponent = node.name.type === 'JSXMemberExpression' || (tag.charCodeAt(0) >= 65 && tag.charCodeAt(0) <= 90)
+      if (isComponent)
+        jsxTags.add(tag)
+      for (const attr of node.attributes as AstNode[]) {
+        if (attr.type !== 'JSXAttribute' || attr.name?.type !== 'JSXIdentifier')
+          continue
+        const attrName = attr.name.name as string
+        if (isComponent && attrName === '$hydrate' && attr.value?.type === 'Literal' && typeof attr.value.value === 'string' && attr.value.value !== 'load')
+          deferredIslandTags.add(tag)
+        // A handler or ref on a component tag is a prop for that component; only a DOM element binds it in the browser.
+        if (!isComponent && tag !== '' && (EVENT_ATTR.test(attrName) || attrName === 'ref'))
+          markInteractive(`uses ${attrName}`)
       }
     }
-    if (node.type === 'JSXAttribute' && node.name?.type === 'JSXIdentifier') {
-      const attrName = node.name.name as string
-      if (EVENT_ATTR.test(attrName) || attrName === 'ref')
-        markInteractive(`uses ${attrName}`)
+    if (node.type === 'MemberExpression' && !node.computed && node.object?.type === 'Identifier' && kayNamespaces.has(node.object.name as string)) {
+      const member = node.property.name as string
+      if (REACTIVE_IMPORTS.has(member))
+        markInteractive(`calls ${node.object.name as string}.${member}`)
+      if (STATE_PRIMITIVES.has(member))
+        stateCallees.add(`${node.object.name as string}.${member}`)
     }
   })
 
-  if (hasAsyncDefault && isInteractive) {
-    throw new Error(
-      `kay compiler: async route component in ${filename} cannot use browser interactivity (${interactiveReason}). Move interactive state/handlers into a non-async component and render it from the async page.`,
-    )
+  for (const [name, init] of localInits) {
+    if (isAsyncFunction(init))
+      asyncLocals.add(name)
   }
+  if (defaultLocal !== undefined && asyncLocals.has(defaultLocal))
+    hasAsyncDefault = true
+
+  const isStateCall = (init: AstNode | undefined): boolean => {
+    if (init?.type !== 'CallExpression')
+      return false
+    const callee = init.callee as AstNode
+    const name = callee.type === 'Identifier'
+      ? callee.name as string
+      : callee.type === 'MemberExpression' && callee.object?.type === 'Identifier' ? `${callee.object.name as string}.${callee.property?.name as string}` : ''
+    return stateCallees.has(name)
+  }
+  const stateExports: string[] = []
+  for (const name of exportedNames) {
+    if (isStateCall(localInits.get(name)))
+      stateExports.push(name)
+  }
+  for (const [exported, local] of localExports) {
+    if (isStateCall(localInits.get(local)))
+      stateExports.push(exported)
+  }
+
+  if (hasAsyncDefault && isInteractive)
+    throw asyncInteractiveError(filename, interactiveReason)
 
   return {
     filename,
@@ -266,6 +364,8 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     usesRenderContext,
     defaultHydrate,
     deferredIslandTags,
+    jsxTags,
+    stateExports,
     exportedActions,
     imports,
     reexports,

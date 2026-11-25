@@ -12,7 +12,8 @@ Kay analyzes every `.tsx` file at build time using `oxc-parser`. Static componen
 You never write `'use client'` or `client:load`. A component is compiled as an island automatically when it uses any of:
 
 - Reactive primitives: `signal`, `computed`, `effect`, `onMount`, `store`, `selector`
-- DOM interactivity: `on*` event handlers (`onClick`, `onInput`, etc.) or `ref`
+- DOM interactivity: `on*` event handlers (`onClick`, `onInput`, etc.) or `ref` on an HTML or SVG element. On a component tag they are plain props.
+- Reactive state imported from another module, such as `export const cart = store([])` in `src/state.ts`
 - Explicit wrapper: `island(Component, { hydrate: 'visible' })`
 
 <Callout title="Zero-JS Guarantee" tone="tip">

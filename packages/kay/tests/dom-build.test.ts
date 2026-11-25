@@ -356,6 +356,64 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     expect(chunkText('src/components/ui.tsx#Button')).toContain('Button as default')
   })
 
+  test('only names rendered as tags become islands, including a namespace member tag', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-island-tags-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/components'), { recursive: true })
+      writeFileSync(join(dir, 'src/components/Counter.tsx'), `
+        import { signal } from 'kay'
+        export const LABEL = 'count'
+        export function Counter() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{n.value}</button> }
+        export function Reset() { const n = signal(0); return <button type="button" onClick={() => n.value = 0}>reset</button> }
+      `)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { LABEL } from '../components/Counter'
+        import * as UI from '../components/Counter'
+        export default function Page() { return <main><h1>{LABEL}</h1><UI.Counter /></main> }
+      `)
+      const manifest = await build({ root: dir, minify: false })
+      expect(Object.keys(manifest.islands).map(k => k.slice(dir.length)).sort()).toEqual(['/src/components/Counter.tsx#Counter'])
+      const app = await createServer({ root: dir })
+      const html = await (await app.handle(new Request('http://localhost/'))).text()
+      expect(html).toContain(`<kay-island c="${manifest.islands[join(dir, 'src/components/Counter.tsx#Counter')]}"`)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a component reading a signal from a local module hydrates', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-imported-state-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/components'), { recursive: true })
+      writeFileSync(join(dir, 'src/state.ts'), `
+        import { signal } from 'kay'
+        export const count = signal(0)
+        export const title = 'Cart'
+      `)
+      writeFileSync(join(dir, 'src/components/Badge.tsx'), `
+        import { count } from '../state'
+        export function Badge() { return <span>{count.value}</span> }
+      `)
+      writeFileSync(join(dir, 'src/components/Title.tsx'), `
+        import { title } from '../state'
+        export function Title() { return <h1>{title}</h1> }
+      `)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { Badge } from '../components/Badge'
+        import { Title } from '../components/Title'
+        export default function Page() { return <main><Title /><Badge /></main> }
+      `)
+      const manifest = await build({ root: dir, minify: false })
+      expect(Object.keys(manifest.islands).map(k => k.slice(dir.length)).sort()).toEqual(['/src/components/Badge.tsx#Badge'])
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   test('a plain component rendered inside an island hydrates with the island', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-static-in-island-'))
     tempDirs.push(dir)

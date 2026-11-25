@@ -2,8 +2,9 @@
 
 import type { AstNode, ModuleAnalysis } from '../compiler/analyze'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { basename, dirname, join, relative, resolve } from 'node:path'
+import { basename, join, relative, resolve } from 'node:path'
 import { analyzeModule, walk } from '../compiler/analyze'
+import { resolveImportPath } from '../build/resolve'
 import { readsPrivateEnv, SERVER_ONLY_MODULES } from '../compiler/server-only'
 import { loadConfig } from '../plugins/index'
 
@@ -32,15 +33,17 @@ function walkTsFiles(dir: string, out: string[] = []): string[] {
   return out
 }
 
-function resolveLocalModule(fromFile: string, specifier: string): string | undefined {
-  if (!specifier.startsWith('.'))
-    return undefined
-  const base = resolve(dirname(fromFile), specifier)
-  for (const c of [base, `${base}.tsx`, `${base}.ts`, join(base, 'index.tsx'), join(base, 'index.ts')]) {
-    if (existsSync(c))
-      return c
+// A module outside the scanned folders (a workspace or npm package an island imports) is analysed when first reached.
+function analysisOf(file: string, analyses: Map<string, ModuleAnalysis>): ModuleAnalysis | undefined {
+  if (!analyses.has(file) && (file.endsWith('.ts') || file.endsWith('.tsx'))) {
+    try {
+      analyses.set(file, analyzeModule(file, readFileSync(file, 'utf8')))
+    }
+    catch {
+      return undefined
+    }
   }
-  return undefined
+  return analyses.get(file)
 }
 
 // Walks the local imports of an island the way the client build follows them: a module that only declares actions is stubbed there, so its imports stop the walk.
@@ -53,7 +56,10 @@ function checkIslandReach(island: string, root: string, analyses: Map<string, Mo
     if (seen.has(file))
       continue
     seen.add(file)
-    const analysis = analyses.get(file)
+    // Like the build, an npm package's own imports are its business: only project and workspace files are checked.
+    if (file.includes('/node_modules/'))
+      continue
+    const analysis = analysisOf(file, analyses)
     if (analysis === undefined || (file !== island && !analysis.isInteractive && analysis.exportedActions.length > 0))
       continue
     const rel = relative(root, file).replace(/\\/g, '/')
@@ -70,7 +76,7 @@ function checkIslandReach(island: string, root: string, analyses: Map<string, Mo
           : `kay check: ${rel}: imports server-only module "${source}" and is reachable from the island in ${islandRel}. Move server logic to a server action or async server component.`)
         continue
       }
-      const target = resolveLocalModule(file, source)
+      const target = resolveImportPath(file, source)
       if (target !== undefined)
         stack.push(target)
     }
@@ -130,7 +136,8 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   const seenRoutes = new Map<string, string>()
   const reported = new Set<string>()
 
-  for (const [file, analysis] of analyses) {
+  // A snapshot: the guardrails analyse packages they reach, and those are not checked as project files.
+  for (const [file, analysis] of [...analyses]) {
     const rel = relative(root, file).replace(/\\/g, '/')
 
     // Guardrail 1: server-only imports and private env reads in an island or any module it imports
@@ -141,10 +148,10 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     if (!analysis.isInteractive && file.endsWith('.tsx')) {
       const islandTags = new Set<string>()
       for (const imp of analysis.imports) {
-        const target = resolveLocalModule(file, imp.source)
+        const target = resolveImportPath(file, imp.source)
         if (target === undefined)
           continue
-        const targetAnalysis = analyses.get(target)
+        const targetAnalysis = analysisOf(target, analyses)
         if (targetAnalysis?.isInteractive) {
           for (const spec of imp.specifiers)
             islandTags.add(spec.local)

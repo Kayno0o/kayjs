@@ -10,11 +10,13 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameS
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
+import { asyncInteractiveError } from '../compiler/analyze'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
 import { readsPrivateEnv, SERVER_ONLY_FILTER } from '../compiler/server-only'
 import { loadConfig } from '../plugins/index'
 import { actionHash } from '../server/action'
 import { compileExecutable } from './compile'
+import { resolveImportPath } from './resolve'
 
 export interface BuildCache {
   analyses: Map<string, { mtimeMs: number, size: number, code: string, analysis: ModuleAnalysis }>
@@ -133,35 +135,6 @@ export function resolveKaySpecifier(specifier: string): string | undefined {
     return join(KAY_SRC_ROOT, 'jsx-runtime.ts')
   }
   return undefined
-}
-
-function resolveImportPath(fromFile: string, specifier: string): string | undefined {
-  if (specifier.startsWith('.')) {
-    const base = resolve(dirname(fromFile), specifier)
-    const candidates = [base, `${base}.tsx`, `${base}.ts`, join(base, 'index.tsx'), join(base, 'index.ts')]
-    for (const c of candidates) {
-      if (existsSync(c))
-        return c
-    }
-    return undefined
-  }
-  if (
-    specifier === 'kay'
-    || specifier.startsWith('kay/')
-    || specifier.startsWith('@kayjs/kay')
-    || specifier.startsWith('node:')
-    || specifier.startsWith('bun')
-    || specifier.startsWith('~')
-  ) {
-    return undefined
-  }
-  try {
-    const resolved = Bun.resolveSync(specifier, dirname(fromFile))
-    return resolved.endsWith('.tsx') || resolved.endsWith('.ts') ? resolved : undefined
-  }
-  catch {
-    return undefined
-  }
 }
 
 const SPECIAL_ROUTE_FILES = new Set(['_layout.tsx', '_middleware.ts', '_middleware.tsx', '_error.tsx', '_404.tsx'])
@@ -557,6 +530,30 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     return target
   }
 
+  // A component reading reactive state another module exports runs in the browser too. The promoted analysis lives in this build's map only, so the cached one still reflects the file alone.
+  for (const [file, analysis] of analyses) {
+    if (!file.endsWith('.tsx') || analysis.isInteractive)
+      continue
+    for (const imp of analysis.imports) {
+      const resolved = resolveImportPath(file, imp.source)
+      const state = resolved === undefined || (!resolved.endsWith('.tsx') && !resolved.endsWith('.ts'))
+        ? undefined
+        : imp.specifiers.find((spec) => {
+            if (spec.imported === '*' || analysis.jsxTags.has(spec.local))
+              return false
+            const target = resolveExportTarget(resolved, spec.imported)
+            return loadAnalysis(target.file).stateExports.includes(target.exportName)
+          })
+      if (state !== undefined) {
+        const reason = `reads ${state.local} from '${imp.source}'`
+        if (analysis.hasAsyncDefault)
+          throw asyncInteractiveError(file, reason)
+        analyses.set(file, { ...analysis, isInteractive: true, interactiveReason: reason })
+        break
+      }
+    }
+  }
+
   for (const [file, analysis] of analyses) {
     if (!file.endsWith('.tsx'))
       continue
@@ -566,20 +563,21 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       continue
     }
 
+    // Only names rendered as tags become islands: `<Counter />`, or `<UI.Counter />` through a namespace import.
     const bindings = new Map<string, IslandTarget>()
     for (const imp of analysis.imports) {
       const resolved = resolveImportPath(file, imp.source)
       if (resolved === undefined || (!resolved.endsWith('.tsx') && !resolved.endsWith('.ts')))
         continue
       for (const spec of imp.specifiers) {
-        if (spec.imported === '*')
-          continue
-        const target = resolveExportTarget(resolved, spec.imported)
-        if (!target.file.endsWith('.tsx'))
-          continue
-        const targetAnalysis = loadAnalysis(target.file)
-        if (targetAnalysis.isInteractive)
-          bindings.set(spec.local, registerIsland(target.file, target.exportName))
+        const tags = spec.imported === '*'
+          ? [...analysis.jsxTags].filter(tag => tag.startsWith(`${spec.local}.`) && !tag.slice(spec.local.length + 1).includes('.')).map(tag => [tag, tag.slice(spec.local.length + 1)] as const)
+          : analysis.jsxTags.has(spec.local) ? [[spec.local, spec.imported] as const] : []
+        for (const [tag, exportName] of tags) {
+          const target = resolveExportTarget(resolved, exportName)
+          if (target.file.endsWith('.tsx') && loadAnalysis(target.file).isInteractive)
+            bindings.set(tag, registerIsland(target.file, target.exportName))
+        }
       }
     }
     if (bindings.size > 0)

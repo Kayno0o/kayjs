@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { tailwind } from '../../plugin-tailwind/src/index'
@@ -67,6 +67,24 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     expect(res.errors.some(e => e.includes('createdAt'))).toBe(false) // Date IS serializable!
     expect(res.errors.some(e => e.includes('conflicting routes') && e.includes('/posts/:'))).toBe(true)
     expect(res.errors.some(e => e.includes('without exporting `paths()`'))).toBe(true)
+  })
+
+  it('kay check follows an island into a workspace package the way the build does', async () => {
+    const dir = makeTemp('kay-island-package-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'packages/shared-db'), { recursive: true })
+    mkdirSync(join(dir, 'node_modules'), { recursive: true })
+    writeFileSync(join(dir, 'packages/shared-db/package.json'), JSON.stringify({ name: 'shared-db', main: 'index.ts' }))
+    writeFileSync(join(dir, 'packages/shared-db/index.ts'), `import { Database } from 'bun:sqlite'\nexport const open = () => new Database(':memory:')`)
+    symlinkSync(join(dir, 'packages/shared-db'), join(dir, 'node_modules/shared-db'), 'dir')
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { signal } from 'kay'
+      import { open } from 'shared-db'
+      export default function Home() { const n = signal(0); return <button type="button" onClick={() => { open(); n.value++ }}>{n.value}</button> }
+    `)
+    const checked = await checkProject(dir, { skipTypecheck: true })
+    expect(checked.errors).toContain('kay check: packages/shared-db/index.ts: imports server-only module "bun:sqlite" and is reachable from the island in src/routes/index.tsx. Move server logic to a server action or async server component.')
+    await expect(build({ root: dir, outDir: '.pkg' })).rejects.toThrow('packages/shared-db/index.ts imports server-only module "bun:sqlite"')
   })
 
   it('fails the build and kay check when an island reaches a server-only module or a private env var through a helper', async () => {

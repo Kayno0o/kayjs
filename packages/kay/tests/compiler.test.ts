@@ -51,6 +51,42 @@ describe('TSX compiler', () => {
     expect(readsPrivateEnv(analysis.program)).toBe(false)
   })
 
+  test.each([
+    ['an event handler', '<Child onSelect={() => 1} />'],
+    ['a ref', '<Child ref={() => 1} />'],
+    ['an event handler on a namespace member tag', '<UI.Child onClick={() => 1} />'],
+    ['an event handler on a lowercase namespace member tag', '<ui.Child onClick={() => 1} />'],
+  ])('%s passed to a component leaves an async page static', (_, tag) => {
+    const page = `import { Child } from './Child'\nimport * as UI from './ui'\nimport * as ui from './ui'\nexport default async function Home() { return <main>${tag}</main> }`
+    expect(analyzeModule('index.tsx', page).isInteractive).toBe(false)
+  })
+
+  test('lists the exports bound to reactive state, in every export form', () => {
+    const state = `
+      import { signal, store } from 'kay'
+      import * as kay from 'kay'
+      export const count = signal(0)
+      const items = store([])
+      const total = kay.computed(() => count.value)
+      const title = 'Cart'
+      export { items as cart, total, title }
+    `
+    expect(analyzeModule('state.ts', state).stateExports.sort()).toEqual(['cart', 'count', 'total'])
+  })
+
+  test('a reactive primitive called through a namespace import makes the module interactive', () => {
+    expect(analyzeModule('Counter.tsx', `import * as kay from 'kay'\nexport function Counter() { const n = kay.signal(0); return <p>{n.value}</p> }`).isInteractive).toBe(true)
+    expect(analyzeModule('Counter.tsx', `import * as kay from 'kay'\nexport function Card() { return <p>{kay.raw('x')}</p> }`).isInteractive).toBe(false)
+  })
+
+  test.each([
+    ['a declaration exported by name', `async function Home() { const x = signal(0); return <p>{x.value}</p> }\nexport default Home`],
+    ['a const arrow exported by name', `const Home = async () => { const x = signal(0); return <p>{x.value}</p> }\nexport default Home`],
+    ['an export list', `async function Home() { const x = signal(0); return <p>{x.value}</p> }\nexport { Home as default }`],
+  ])('rejects interactivity in an async default page declared as %s', (_, page) => {
+    expect(() => analyzeModule('index.tsx', `import { signal } from 'kay'\n${page}`)).toThrow(/async route component/)
+  })
+
   test('rejects browser interactivity directly inside async route component', () => {
     const badPage = `
       import { signal } from 'kay'
