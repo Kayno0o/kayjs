@@ -22,4 +22,16 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<button onClick={fn}>x</button>')
     accepts('<Button onclick={fn} />', 'const Button = (p: any) => <button>{p.x}</button>')
   })
+
+  test('a string handler, which would land in the HTML as an inline script', () => {
+    refuses('<button onClick="save()">x</button>', /onClick="\.\.\." in Page\.tsx: pass a function, onClick=\{\(\) => \.\.\.\}/)
+    refuses('<button onClick={\'save()\'}>x</button>', /pass a function/)
+    refuses('<button onClick={`save()`}>x</button>', /pass a function/)
+  })
+
+  test('a handler that runs at render instead of on the event', () => {
+    refuses('<button onClick={n.value++}>x</button>', /onClick runs n\.value\+\+ at render in Page\.tsx: write onClick=\{\(\) => n\.value\+\+\}/, 'const n = { value: 0 }')
+    refuses('<button onClick={n.value = 1}>x</button>', /write onClick=\{\(\) => n\.value = 1\}/, 'const n = { value: 0 }')
+    accepts('<button onClick={make()}>x</button>', 'const make = () => () => {}')
+  })
 })

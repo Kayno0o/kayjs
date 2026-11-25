@@ -30,6 +30,7 @@ const EVENT_PROPS = new Map(Object.entries({
 }))
 
 const LOWERCASE_EVENT = /^on[a-z]/
+const EVENT_ATTR = /^on[A-Z]/
 
 function eventProp(event: string): string {
   return EVENT_PROPS.get(event) ?? `on${event.charAt(0).toUpperCase()}${event.slice(1)}`
@@ -39,7 +40,21 @@ function mistake(what: string, filename: string, fix: string): Error {
   return new Error(`kay compiler: ${what} in ${filename}: ${fix}.`)
 }
 
-function checkElementAttribute(attr: AstNode, filename: string): void {
+function checkHandler(name: string, value: AstNode | null, filename: string, code: string): void {
+  if (value?.type === 'Literal')
+    throw mistake(`${name}="..."`, filename, `pass a function, ${name}={() => ...}`)
+  if (value?.type !== 'JSXExpressionContainer')
+    return
+  const expr = value.expression as AstNode
+  if ((expr.type === 'Literal' && typeof expr.value === 'string') || expr.type === 'TemplateLiteral')
+    throw mistake(`${name}="..."`, filename, `pass a function, ${name}={() => ...}`)
+  if (expr.type === 'UpdateExpression' || expr.type === 'AssignmentExpression') {
+    const source = code.slice(expr.start, expr.end)
+    throw mistake(`${name} runs ${source} at render`, filename, `write ${name}={() => ${source}}`)
+  }
+}
+
+function checkElementAttribute(attr: AstNode, filename: string, code: string): void {
   if (attr.name.type === 'JSXNamespacedName') {
     const namespace = attr.name.namespace.name as string
     const name = attr.name.name.name as string
@@ -50,10 +65,12 @@ function checkElementAttribute(attr: AstNode, filename: string): void {
   const name = attr.name.name as string
   if (LOWERCASE_EVENT.test(name) && EVENT_PROPS.has(name.slice(2)))
     throw mistake(name, filename, `write ${eventProp(name.slice(2))}={...}, kay binds camelCase event props only`)
+  if (EVENT_ATTR.test(name))
+    checkHandler(name, attr.value, filename, code)
 }
 
 /** Throws when a JSX opening element would compile into something other than what its author meant. */
-export function checkMistakes(node: AstNode, filename: string): void {
+export function checkMistakes(node: AstNode, filename: string, code: string): void {
   if (node.type !== 'JSXOpeningElement')
     return
   const tag = jsxTagName(node.name)
@@ -61,6 +78,6 @@ export function checkMistakes(node: AstNode, filename: string): void {
     return
   for (const attr of node.attributes as AstNode[]) {
     if (attr.type === 'JSXAttribute')
-      checkElementAttribute(attr, filename)
+      checkElementAttribute(attr, filename, code)
   }
 }
