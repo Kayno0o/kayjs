@@ -33,28 +33,26 @@ interface DepNode {
   f: number // flags (0 on SignalNode, bitmask on ComputedNode)
 }
 
-interface SubNode {
+// Anything an owner holds: a child owner, an effect or a computed.
+interface Owned {
   f: number // flags
+  o: Owner | undefined // owner
+  po: Owned | undefined // prevOwned
+  no: Owned | undefined // nextOwned
+  k: (() => void) | undefined // cleanup returned by the effect
+}
+
+interface SubNode extends Owned {
   e: number // epoch
   d: Link | undefined // deps head
   dt: Link | undefined // deps tail
   c: Link | undefined // cursor
-  po: SubNode | undefined // prevOwned
-  no: SubNode | undefined // nextOwned
-  k: (() => void) | undefined // cleanup returned by the effect
-  o: Owner | undefined // owner
   r(): void // run
 }
 
-export interface Owner {
-  f: number // 0 on plain Owner, effect flags on EffectNode
-  p: Owner | undefined // parent
-  fc: Owner | undefined // firstChild
-  ps: Owner | undefined // prevSibling
-  ns: Owner | undefined // nextSibling
-  fs: SubNode | undefined // firstSub
+export interface Owner extends Owned {
+  fs: Owned | undefined // first owned
   cl: (() => void)[] | undefined // cleanups
-  x: boolean // disposed
 }
 
 export interface Signal<T> {
@@ -209,7 +207,7 @@ function unlinkAll(sub: SubNode): void {
 // A child effect can sit ahead of its parent in the queue; the parent runs first, since its run may dispose the child.
 function runParentFirst(sub: SubNode): void {
   sub.f &= ~PENDING
-  for (let o = sub.o; o !== undefined; o = o.p) {
+  for (let o = sub.o; o !== undefined; o = o.o) {
     if (o.f & (PENDING | QUEUED)) {
       runParentFirst(o as unknown as SubNode)
       break
@@ -367,8 +365,8 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   d: Link | undefined = undefined
   dt: Link | undefined = undefined
   c: Link | undefined = undefined
-  po: SubNode | undefined = undefined
-  no: SubNode | undefined = undefined
+  po: Owned | undefined = undefined
+  no: Owned | undefined = undefined
   k: (() => void) | undefined = undefined
   o: Owner | undefined = undefined
   _f: () => T
@@ -378,19 +376,8 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
 
   constructor(fn: () => T, owner: Owner | undefined) {
     this._f = fn
-    if (owner !== undefined) {
-      if (owner.x) {
-        this.f |= DISPOSED
-      }
-      else {
-        this.o = owner
-        const first = owner.fs
-        this.no = first
-        if (first !== undefined)
-          first.po = this
-        owner.fs = this
-      }
-    }
+    if (owner !== undefined)
+      adopt(this, owner)
   }
 
   r(observe?: boolean): void {
@@ -455,29 +442,18 @@ class EffectNode implements SubNode, Owner {
   d: Link | undefined = undefined
   dt: Link | undefined = undefined
   c: Link | undefined = undefined
-  po: SubNode | undefined = undefined
-  no: SubNode | undefined = undefined
+  po: Owned | undefined = undefined
+  no: Owned | undefined = undefined
   k: (() => void) | undefined = undefined
-  o: Owner | undefined
-  p: Owner | undefined
-  fc: Owner | undefined = undefined
-  ps: Owner | undefined = undefined
-  ns: Owner | undefined = undefined
-  fs: SubNode | undefined = undefined
+  o: Owner | undefined = undefined
+  fs: Owned | undefined = undefined
   cl: (() => void)[] | undefined = undefined
-  x = false
   _f: () => void | (() => void)
 
   constructor(fn: () => void | (() => void), owner: Owner | undefined) {
     this._f = fn
-    this.o = this.p = owner
-    if (owner !== undefined) {
-      const first = owner.fs
-      this.no = first
-      if (first !== undefined)
-        first.po = this
-      owner.fs = this
-    }
+    if (owner !== undefined)
+      adopt(this, owner)
   }
 
   r(): void {
@@ -517,97 +493,67 @@ class EffectNode implements SubNode, Owner {
   }
 }
 
+// A node adopted by a disposed owner is born disposed; otherwise it joins the head of the owner's list.
+function adopt(node: Owned, owner: Owner): void {
+  if (owner.f & DISPOSED) {
+    node.f |= DISPOSED
+    return
+  }
+  node.o = owner
+  const first = owner.fs
+  node.no = first
+  if (first !== undefined)
+    first.po = node
+  owner.fs = node
+}
+
 export function createOwner(parent: Owner | undefined = currentOwner): Owner {
-  const owner: Owner = {
-    f: 0,
-    p: parent,
-    fc: undefined,
-    ps: undefined,
-    ns: undefined,
-    fs: undefined,
-    cl: undefined,
-    x: false,
-  }
-  if (parent !== undefined) {
-    const first = parent.fc
-    owner.ns = first
-    if (first !== undefined)
-      first.ps = owner
-    parent.fc = owner
-  }
+  const owner: Owner = { f: 0, o: undefined, po: undefined, no: undefined, k: undefined, fs: undefined, cl: undefined }
+  if (parent !== undefined)
+    adopt(owner, parent)
   return owner
 }
 
-function unlinkOwner(owner: Owner): void {
-  const parent = owner.p
-  if (parent === undefined)
-    return
-  const prev = owner.ps
-  const next = owner.ns
-  if (prev !== undefined)
-    prev.ns = next
-  else if (parent.fc === owner)
-    parent.fc = next
-  if (next !== undefined)
-    next.ps = prev
-  owner.p = owner.ps = owner.ns = undefined
-}
-
-function unlinkOwnedSub(sub: SubNode): void {
-  const owner = sub.o
+function unadopt(node: Owned): void {
+  const owner = node.o
   if (owner === undefined)
     return
-  const prev = sub.po
-  const next = sub.no
-  if (prev !== undefined)
-    prev.no = next
-  else if (owner.fs === sub)
-    owner.fs = next
-  if (next !== undefined)
-    next.po = prev
-  sub.o = sub.po = sub.no = undefined
+  const { po, no } = node
+  if (po !== undefined)
+    po.no = no
+  else if (owner.fs === node)
+    owner.fs = no
+  if (no !== undefined)
+    no.po = po
+  node.o = node.po = node.no = undefined
 }
 
-export function disposeOwner(owner: Owner): void {
-  if (owner.x)
+// Disposes an owner, an effect or a computed: leaves its owner, drops its sources, releases what it owns, runs its cleanup.
+export function disposeOwner(node: Owner): void {
+  const f = node.f
+  if (f & DISPOSED)
     return
-  owner.x = true
-  unlinkOwner(owner)
-  releaseOwned(owner)
-}
-
-function disposeSub(sub: SubNode): void {
-  if (sub.f & DISPOSED)
-    return
-  sub.f |= DISPOSED
-  unlinkOwnedSub(sub)
-  unlinkAll(sub)
-  if (sub.f & EFFECT)
-    disposeOwner(sub as EffectNode)
-  if (sub.k !== undefined) {
-    const fn = sub.k
-    sub.k = undefined
+  node.f |= DISPOSED
+  unadopt(node)
+  if (f & (COMPUTED | EFFECT))
+    unlinkAll(node as unknown as SubNode)
+  if (!(f & COMPUTED))
+    releaseOwned(node)
+  if (node.k !== undefined) {
+    const fn = node.k
+    node.k = undefined
     fn()
   }
 }
 
 function releaseOwned(owner: Owner): void {
-  let child = owner.fc
-  owner.fc = undefined
-  while (child !== undefined) {
-    const next = child.ns
-    child.p = child.ps = child.ns = undefined
-    disposeOwner(child)
-    child = next
-  }
-
-  let sub = owner.fs
+  let node = owner.fs
   owner.fs = undefined
-  while (sub !== undefined) {
-    const next = sub.no
-    sub.o = sub.po = sub.no = undefined
-    disposeSub(sub)
-    sub = next
+  while (node !== undefined) {
+    const next = node.no
+    node.o = node.po = node.no = undefined
+    disposeOwner(node as Owner)
+    node = next
   }
 
   if (owner.cl !== undefined) {
@@ -654,10 +600,7 @@ export function effect(fn: () => void | (() => void)): () => void {
     console.warn('kay: effect() created while a computed runs has no owner and is never disposed. Create it in a component or an effect.')
   const node = new EffectNode(fn, currentOwner)
   node.r()
-  return () => {
-    if (!(node.f & DISPOSED))
-      disposeSub(node)
-  }
+  return () => disposeOwner(node)
 }
 
 // An error thrown by fn wins over one thrown by the effects it triggered, which is logged instead.
@@ -700,7 +643,7 @@ export function onCleanup(fn: () => void): void {
       console.warn('kay: onCleanup() called outside a component or effect never runs.')
     return
   }
-  if (currentOwner.x) {
+  if (currentOwner.f & DISPOSED) {
     fn()
     return
   }
@@ -713,7 +656,7 @@ export function onMount(fn: () => void | (() => void)): void {
     return
   const owner = currentOwner
   queueMicrotask(() => {
-    if (owner?.x)
+    if (owner !== undefined && owner.f & DISPOSED)
       return
     runWithOwner(owner, () => {
       const cleanup = fn()

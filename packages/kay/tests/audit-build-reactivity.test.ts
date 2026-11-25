@@ -355,7 +355,7 @@ describe('audit #3526 — Box 35: store write inside an effect does not subscrib
 })
 
 describe('audit #3526 — Box 36: disposed row owners & computeds unlink from parent and sources', () => {
-  test('disposing child owners unlinks them from parent.fc immediately', () => {
+  test('disposing child owners unlinks them from parent.fs immediately', () => {
     const parent = createOwner(undefined)
     const c1 = createOwner(parent)
     const c2 = createOwner(parent)
@@ -363,10 +363,10 @@ describe('audit #3526 — Box 36: disposed row owners & computeds unlink from pa
 
     const countChildren = (o: typeof parent) => {
       let n = 0
-      let cur = o.fc
+      let cur = o.fs
       while (cur !== undefined) {
         n++
-        cur = cur.ns
+        cur = cur.no
       }
       return n
     }
@@ -416,15 +416,17 @@ describe('audit #3526 — Box 36: disposed row owners & computeds unlink from pa
       expect(parentEl.children.length).toBe(10)
 
       let childOwners = 0
-      let cur = rootOwner!.fc
+      // The loop's own effect (flag 32) shares the list with its row owners.
+      let cur = rootOwner!.fs
       while (cur !== undefined) {
-        childOwners++
-        cur = cur.ns
+        if (!(cur.f & 32))
+          childOwners++
+        cur = cur.no
       }
       expect(childOwners).toBe(10)
 
       dispose()
-      expect(rootOwner!.fc).toBeUndefined()
+      expect(rootOwner!.fs).toBeUndefined()
     }
     finally {
       await GlobalRegistrator.unregister()
