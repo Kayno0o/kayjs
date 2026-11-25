@@ -50,9 +50,8 @@ describe('claimInsert hydration ranges', () => {
 
   test('a marker insert places an anchor after the consumed range', async () => {
     const { res, parent } = await claim('<p><b>A</b><i>B</i><u>C</u></p>', p => ({ marker: p.firstChild }), () => {
-      const t = template('<b></b>')
-      t()
-      return t()
+      template('<b></b>')()
+      return template('<i></i>')()
     })
     expect(res.claimed).toBe(parent.firstChild!)
     expect(res.nodes).toEqual([parent.childNodes[0]!, parent.childNodes[1]!])
