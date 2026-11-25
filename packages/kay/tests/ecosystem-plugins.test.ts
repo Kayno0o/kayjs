@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { icons } from '../../plugin-icons/src/index'
 import { images } from '../../plugin-images/src/index'
+import type { MailPluginOptions } from '../../plugin-mail/src/index'
 import { mailer, MailNotConfiguredError, mailPlugin } from '../../plugin-mail/src/index'
 import { seo } from '../../plugin-seo/src/index'
 import { build } from '../src/build/index'
@@ -78,7 +79,7 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
       },
     })
 
-    const mailP = mailPlugin(contactMailer, { preview: true })
+    const mailP = mailPlugin(contactMailer)
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
       import { Head } from 'kay'
@@ -218,9 +219,15 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
     expect(mailHtml).toContain('Demande de devis')
     expect(mailHtml).toContain('marie@example.test')
 
+    // A mail's HTML is shown in a sandboxed frame, never inlined into the preview page
+    await contactMailer.send({ subject: 'Rich', html: '<b>bold</b><script>alert(1)</script>' })
+    const richHtml = await (await app.get('/_kay/mail')).text()
+    expect(richHtml).not.toContain('<script>alert(1)</script>')
+    expect(richHtml).toContain('<iframe sandbox="" srcdoc="&lt;b&gt;bold&lt;/b&gt;&lt;script&gt;alert(1)&lt;/script&gt;"')
+
     const mailJson = await (await app.get('/_kay/mail.json')).json() as { count: number, messages: { subject: string }[] }
-    expect(mailJson.count).toBe(1)
-    expect(mailJson.messages[0]!.subject).toBe('Demande de devis')
+    expect(mailJson.count).toBe(2)
+    expect(mailJson.messages[1]!.subject).toBe('Demande de devis')
   })
 
   it('enforces MailNotConfiguredError in production when required and delegates to custom transport', async () => {
@@ -252,6 +259,16 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
       const prodApp = await testApp({ root: dir, plugins: [mailPlugin(strict)] })
       expect((await prodApp.get('/_kay/mail')).status).toBe(404)
       expect((await prodApp.get('/_kay/mail.json')).status).toBe(404)
+
+      // An untyped config passing preview: true still mounts nothing in production
+      const forcedApp = await testApp({ root: dir, plugins: [mailPlugin(strict, { preview: true } as unknown as MailPluginOptions)] })
+      expect((await forcedApp.get('/_kay/mail')).status).toBe(404)
+      expect((await forcedApp.get('/_kay/mail.json')).status).toBe(404)
+
+      // Mail a transport delivered in production is not kept in memory
+      const delivering = mailer({ id: 'prod-delivering', transport: { async send() {} } })
+      await delivering.send({ subject: 'Sign-in link', text: 'https://example.test/auth/magic?token=secret' })
+      expect(delivering.outbox).toEqual([])
     }
     finally {
       if (prevEnv === undefined)

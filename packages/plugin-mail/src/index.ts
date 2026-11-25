@@ -2,7 +2,7 @@
 // Built strictly on the public KayPlugin API (server(api).route).
 
 import type { KayPlugin } from 'kay/server'
-import { esc } from 'kay/ssr'
+import { esc, escAttr } from 'kay/ssr'
 
 export type MailAddress = string | { name: string, address: string }
 
@@ -139,9 +139,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
         throw new MailNotConfiguredError()
       }
 
-      outbox.unshift(record)
-      if (outbox.length > 100)
-        outbox.length = 100
+      // Production keeps no copy: the outbox holds sign-in links in plain text, and no preview reads it there.
+      if (runtimeNodeEnv() !== 'production') {
+        outbox.unshift(record)
+        if (outbox.length > 100)
+          outbox.length = 100
+      }
       return record
     },
   }
@@ -150,8 +153,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
 export interface MailPluginOptions {
   /** Dev outbox preview route (default: '/_kay/mail'). */
   previewRoute?: string | undefined
-  /** Explicitly enable/disable the outbox preview route (defaults to enabled outside production). */
-  preview?: boolean | undefined
+  /** Turns the outbox preview off; it is only ever mounted under `kay dev` or NODE_ENV development or test, never in production. */
+  preview?: false | undefined
 }
 
 export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): KayPlugin {
@@ -161,7 +164,7 @@ export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): K
     name: '@kayjs/mail',
     server(api) {
       const env = runtimeNodeEnv()
-      const enablePreview = options.preview ?? (env !== 'production' && (process.env.KAY_DEV === '1' || env === 'development' || env === 'test'))
+      const enablePreview = options.preview !== false && env !== 'production' && (process.env.KAY_DEV === '1' || env === 'development' || env === 'test')
       if (!enablePreview)
         return
 
@@ -172,7 +175,7 @@ export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): K
           `<article style="border:1px solid #e5e7eb;border-radius:8px;padding:1rem;margin-bottom:1rem;background:#fff">`
           + `<h2 style="margin:0 0 .25rem;font-size:1rem">${esc(m.subject)}</h2>`
           + `<p style="margin:0 0 .5rem;font-size:.85rem;color:#6b7280">From: ${esc(m.from)} → To: ${esc(m.to.join(', '))}${m.replyTo ? ` (Reply-To: ${esc(m.replyTo)})` : ''} · ${esc(m.sentAt)}</p>`
-          + (m.html ? `<div>${m.html}</div>` : `<pre style="margin:0;white-space:pre-wrap;font-size:.85rem">${esc(m.text ?? '')}</pre>`)
+          + (m.html ? `<iframe sandbox="" srcdoc="${escAttr(m.html)}" title="${escAttr(m.subject)}" style="width:100%;min-height:16rem;border:0"></iframe>` : `<pre style="margin:0;white-space:pre-wrap;font-size:.85rem">${esc(m.text ?? '')}</pre>`)
           + `</article>`,
         ).join('')
 

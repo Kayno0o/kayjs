@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     ui({ grammar: 'editorial' }),
     auth.plugin,
-    mailPlugin(mail, { preview: true }),
+    mailPlugin(mail),
     board.plugin({
       path: '/api/board',
       room: BOARD_ROOM,
