@@ -9,12 +9,16 @@ import { KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH,
 
 const TITLE_INNER_RE = /^<title\b[^>]*>([\s\S]*?)<\/title>$/i
 
-export type HtmlHeaders = (hasIslands: boolean, hasSuspense: boolean, isDynamic: boolean) => Record<string, string>
+/** `styleHashes` are the page's own `<style>` blocks (`inlineStyleHashes`), added to its CSP. */
+export type HtmlHeaders = (hasIslands: boolean, hasSuspense: boolean, isDynamic: boolean, styleHashes?: readonly string[]) => Record<string, string>
+
+const STYLED_HEADER_CACHE_SIZE = 256
 
 // HTML headers, one set per (dynamic, islands, suspense) combination: the CSP only gains the hashes a page needs.
 export function createHtmlHeaders(security: SecurityHeadersOptions | false | undefined, securityRecord: Record<string, string>): HtmlHeaders {
   const baseCsp = resolveCspPolicy(security)
   const htmlHeaderSets: Record<string, string>[] = []
+  const kayStyleHashes: string[][] = []
   for (let i = 0; i < 8; i++) {
     const isDynamic = (i & 4) !== 0
     const hasIslands = (i & 2) !== 0
@@ -22,15 +26,39 @@ export function createHtmlHeaders(security: SecurityHeadersOptions | false | und
     const headers: Record<string, string> = { 'content-type': 'text/html; charset=utf-8', ...securityRecord }
     if (isDynamic)
       headers['cache-control'] = 'private'
+    const styleHashes = [...(hasIslands ? [KAY_ISLAND_STYLE_HASH] : []), ...(hasSuspense ? [KAY_SUSPENSE_STYLE_HASH] : [])]
+    kayStyleHashes.push(styleHashes)
     if (baseCsp !== undefined && (hasIslands || hasSuspense)) {
       headers['content-security-policy'] = withCspHashes(baseCsp, {
-        styleHashes: [...(hasIslands ? [KAY_ISLAND_STYLE_HASH] : []), ...(hasSuspense ? [KAY_SUSPENSE_STYLE_HASH] : [])],
+        styleHashes,
         scriptHashes: hasSuspense ? [KAY_STREAM_SCRIPT_HASH] : [],
       })
     }
     htmlHeaderSets.push(headers)
   }
-  return (hasIslands, hasSuspense, isDynamic) => htmlHeaderSets[(isDynamic ? 4 : 0) | (hasIslands ? 2 : 0) | (hasSuspense ? 1 : 0)]!
+
+  // Pages sharing a layout share its blocks, so their header sets are kept by set and hashes; past the cap a new combination is built each time.
+  const styledSets = new Map<string, Record<string, string>>()
+  return (hasIslands, hasSuspense, isDynamic, styleHashes) => {
+    const index = (isDynamic ? 4 : 0) | (hasIslands ? 2 : 0) | (hasSuspense ? 1 : 0)
+    const base = htmlHeaderSets[index]!
+    if (baseCsp === undefined || styleHashes === undefined || styleHashes.length === 0)
+      return base
+    const key = `${index} ${styleHashes.join(' ')}`
+    let headers = styledSets.get(key)
+    if (headers === undefined) {
+      headers = {
+        ...base,
+        'content-security-policy': withCspHashes(baseCsp, {
+          styleHashes: [...kayStyleHashes[index]!, ...styleHashes],
+          scriptHashes: hasSuspense ? [KAY_STREAM_SCRIPT_HASH] : [],
+        }),
+      }
+      if (styledSets.size < STYLED_HEADER_CACHE_SIZE)
+        styledSets.set(key, headers)
+    }
+    return headers
+  }
 }
 
 export function resolveRenderedIslands(rctx: RenderContext, body: string): { hasIslands: boolean, eagerChunks: string[] } {

@@ -231,3 +231,77 @@ describe('Per-route CSS scoping, strict CSP hashes, and bundle weight report (#3
     }
   })
 })
+
+describe('the default CSP lets an app style its pages (#3582)', () => {
+  const LAYOUT_STYLE_HASH = `'sha256-ac1R1kU5izDDnXGpZrb2k+Dct4jThB3/YH1VfglrT3I='`
+  const HEAD_STYLE_HASH = `'sha256-QRQPRLGyxt3RJiKpYNjpkgHcmHU2PywsfL2e8oI0LQA='`
+  const styleSrc = (csp: string | null): string[] => csp?.split(';').map(d => d.trim().split(' ')).find(d => d[0] === 'style-src')?.slice(1) ?? []
+
+  async function styledApp(csp?: string) {
+    const dir = makeTemp('kay-style-csp-')
+    mkdirSync(join(dir, 'src/routes/item'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/_layout.tsx'), `
+      export default function Layout({ children }) {
+        return <div><style>{'main{color:red}'}</style><main>{children}</main></div>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      export default function Home() {
+        return <p style="color:blue">home</p>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/_404.tsx'), `
+      export default function NotFound() {
+        return <p>missing</p>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/item/[id].tsx'), `
+      export default function Item({ params }) {
+        return <p>item {params.id}</p>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/pre.tsx'), `
+      export const prerender = true
+      export default function Pre() {
+        return <p>prerendered</p>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/head.tsx'), `
+      import { Head } from 'kay'
+      export default function WithHead() {
+        return <><Head><style>{'p{margin:0}'}</style></Head><p>head</p></>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/stream.tsx'), `
+      import { Suspense } from 'kay'
+      async function Later() {
+        await Bun.sleep(1)
+        return <p>later</p>
+      }
+      export default function Stream() {
+        return <Suspense fallback={<p>wait</p>}><Later /></Suspense>
+      }
+    `)
+    await build({ root: dir })
+    return createServer({ root: dir, ...(csp !== undefined ? { security: { csp } } : {}) })
+  }
+
+  it('allows style attributes and hashes every rendered <style> block on each way a page is served', async () => {
+    const app = await styledApp()
+    for (const path of ['/', '/item/7', '/pre', '/head', '/stream', '/missing']) {
+      const res = await app.handle(new Request(`http://localhost${path}`))
+      const csp = res.headers.get('content-security-policy')
+      expect(csp, path).toContain(`style-src-attr 'unsafe-inline'`)
+      expect(styleSrc(csp), path).toContain(LAYOUT_STYLE_HASH)
+    }
+    const head = await app.handle(new Request('http://localhost/head'))
+    expect(styleSrc(head.headers.get('content-security-policy'))).toContain(HEAD_STYLE_HASH)
+  })
+
+  it('keeps an app\'s own policy, adding only the hashes of what it renders', async () => {
+    const strict = "default-src 'self'; script-src 'self'; style-src 'self'"
+    const app = await styledApp(strict)
+    const res = await app.handle(new Request('http://localhost/'))
+    expect(res.headers.get('content-security-policy')).toBe(`default-src 'self'; script-src 'self'; style-src 'self' ${LAYOUT_STYLE_HASH}`)
+  })
+})

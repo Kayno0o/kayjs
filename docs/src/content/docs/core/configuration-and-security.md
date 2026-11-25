@@ -46,8 +46,8 @@ export default defineConfig({
 
 Kay attaches safe security headers to every response out of the box:
 
-- `Content-Security-Policy`: Defaults to `DEFAULT_CSP` (`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'`).
-- **Automatic SHA-256 hashes**: Pages that render islands or `<Suspense>` automatically append only the exact SHA-256 hashes Kay needs — no `'unsafe-inline'` required.
+- `Content-Security-Policy`: Defaults to `DEFAULT_CSP` (`default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'`). A `style="..."` attribute is allowed, since it cannot run script.
+- **Automatic SHA-256 hashes**: Each page's policy gains the hashes of the inline styles and scripts it renders: islands, `<Suspense>`, and every `<style>` block of the app. A policy you set in `security.csp` gets the same hashes. No `'unsafe-inline'` is needed for them.
 - `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
 - `Strict-Transport-Security`: Sent on HTTPS requests (`max-age=31536000; includeSubDomains` by default).
 

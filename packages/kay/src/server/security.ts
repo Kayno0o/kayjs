@@ -12,6 +12,45 @@ export const KAY_ISLAND_STYLE_HASH = cspSha256(KAY_ISLAND_STYLE)
 export const KAY_SUSPENSE_STYLE_HASH = cspSha256(KAY_SUSPENSE_STYLE)
 export const KAY_STREAM_SCRIPT_HASH = cspSha256(KAY_STREAM_SCRIPT)
 
+const STYLE_HASH_CACHE_SIZE = 256
+const styleHashCache = new Map<string, string>()
+
+// Hashes stay cached by content, so a layout's fixed block costs one SHA-256 per process; past the cap a new block is hashed each time.
+function styleHash(content: string): string {
+  let hash = styleHashCache.get(content)
+  if (hash === undefined) {
+    hash = cspSha256(content)
+    if (styleHashCache.size < STYLE_HASH_CACHE_SIZE)
+      styleHashCache.set(content, hash)
+  }
+  return hash
+}
+
+// A regex finds the next tag ~10x faster than `indexOf('<style')`, which stalls on every `<span` and `<strong` of a large page.
+const STYLE_OPEN_RE = /<style[\s>/]/g
+
+/** CSP hashes of the app's own `<style>` blocks in `html`, leaving out kay's island and Suspense styles (hashed apart). */
+export function inlineStyleHashes(html: string): string[] {
+  const hashes: string[] = []
+  STYLE_OPEN_RE.lastIndex = 0
+  let open = STYLE_OPEN_RE.exec(html)
+  while (open !== null) {
+    const tagEnd = html.indexOf('>', open.index)
+    const close = tagEnd === -1 ? -1 : html.indexOf('</style', tagEnd)
+    if (close === -1)
+      break
+    const content = html.slice(tagEnd + 1, close)
+    if (content !== KAY_ISLAND_STYLE && content !== KAY_SUSPENSE_STYLE) {
+      const hash = styleHash(content)
+      if (!hashes.includes(hash))
+        hashes.push(hash)
+    }
+    STYLE_OPEN_RE.lastIndex = close
+    open = STYLE_OPEN_RE.exec(html)
+  }
+  return hashes
+}
+
 /** Augments a Content-Security-Policy header with exact SHA-256 hashes (no `'unsafe-inline'` required). */
 export function withCspHashes(
   csp: string,
@@ -68,7 +107,7 @@ export function withCspHashes(
   }).join('; ')
 }
 
-export const DEFAULT_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+export const DEFAULT_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
 export const DEFAULT_HSTS = 'max-age=31536000; includeSubDomains'
 export const DEFAULT_PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=()'
 

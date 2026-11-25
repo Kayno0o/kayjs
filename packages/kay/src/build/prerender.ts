@@ -4,6 +4,7 @@ import type { KayPlugin } from '../plugins/index'
 import type { RouteManifestEntry } from './manifest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { inlineStyleHashes } from '../server/security'
 import { relPosix } from './files'
 import { assertPathUrls } from './routes'
 
@@ -73,6 +74,7 @@ export async function prerender(options: PrerenderOptions) {
     }
 
     const map: Record<string, string> = {}
+    const styleHashes: Record<string, string[]> = {}
     for (let i = 0; i < urls.length; i += CONCURRENCY) {
       await Promise.all(urls.slice(i, i + CONCURRENCY).map(async (u) => {
         const res = await app.handle(new Request(`http://localhost${u}`))
@@ -84,11 +86,16 @@ export async function prerender(options: PrerenderOptions) {
         }
         const absHtml = resolvePrerenderHtmlPath(prerenderDir, u, isStatic)
         mkdirSync(dirname(absHtml), { recursive: true })
-        writeFileSync(absHtml, await res.text())
+        const html = await res.text()
+        writeFileSync(absHtml, html)
         map[u] = relPosix(isStatic ? prerenderDir : outDir, absHtml)
+        const hashes = inlineStyleHashes(html)
+        if (hashes.length > 0)
+          styleHashes[u] = hashes
       }))
     }
     route.prerendered = map
+    route.prerenderedStyleHashes = Object.keys(styleHashes).length > 0 ? styleHashes : undefined
   }
   return app
 }

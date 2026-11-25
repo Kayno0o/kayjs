@@ -125,6 +125,23 @@ describe('createStaticDirServer boundary tests & ServerRuntimeConfig / rootLayou
     }
   })
 
+  it('hashes each exported page\'s own <style> blocks into its CSP, following a page rewritten on disk (#3582)', async () => {
+    const outDir = makeTemp('kay-static-style-')
+    writeFileSync(join(outDir, 'index.html'), '<!DOCTYPE html><style>main{color:red}</style><main>Home</main>')
+    writeFileSync(join(outDir, '404.html'), '<!DOCTYPE html><style>p{margin:0}</style><p>Missing</p>')
+    const app = createStaticDirServer(outDir, '/_kay', undefined, false, false)
+
+    const home = await app.handle(new Request('http://localhost/'))
+    expect(home.headers.get('content-security-policy')).toContain(`style-src 'self' 'sha256-UvgDGLSJZozI65SAyh4YlF4q7thtrvbjY5VYKzwpjmQ=' 'sha256-ac1R1kU5izDDnXGpZrb2k+Dct4jThB3/YH1VfglrT3I='`)
+    const missing = await app.handle(new Request('http://localhost/nope'))
+    expect(missing.headers.get('content-security-policy')).toContain(`'sha256-QRQPRLGyxt3RJiKpYNjpkgHcmHU2PywsfL2e8oI0LQA='`)
+
+    writeFileSync(join(outDir, 'index.html'), '<!DOCTYPE html><style>p{margin:0}</style><main>Home, edited</main>')
+    const edited = await app.handle(new Request('http://localhost/'))
+    expect(edited.headers.get('content-security-policy')).toContain(`'sha256-QRQPRLGyxt3RJiKpYNjpkgHcmHU2PywsfL2e8oI0LQA='`)
+    expect(edited.headers.get('content-security-policy')).not.toContain(`'sha256-ac1R1kU5izDDnXGpZrb2k+Dct4jThB3/YH1VfglrT3I='`)
+  })
+
   it('stores rootLayoutFile explicitly: never leaks a subdirectory _layout.tsx into 404, and loads root _layout.tsx even with zero page routes', async () => {
     // Case A: only a subdirectory `admin/_layout.tsx` + root `_404.tsx` -> 404 MUST NOT render inside admin layout!
     const dirA = makeTemp('kay-sub-layout-404-')

@@ -7,7 +7,7 @@ import { existsSync, statSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { CompressionCache, isCompressibleType, maybeCompressResponse, pickPrecompressedEncoding, toWeakEtag } from './compress'
 import { applyHstsHeader, etagMatches, MIME } from './http'
-import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, resolveCspPolicy, resolveHstsValue, withCspHashes } from './security'
+import { buildSecurityHeaderEntries, inlineStyleHashes, KAY_ISLAND_STYLE_HASH, resolveCspPolicy, resolveHstsValue, withCspHashes } from './security'
 
 const isRead = (request: Request): boolean => request.method === 'GET' || request.method === 'HEAD'
 
@@ -68,6 +68,21 @@ export function createStaticDirServer(
 
   const initHeaders = (isHtml = false): Headers => new Headers((isHtml ? htmlSecurityEntries : securityEntries) as [string, string][])
 
+  // An exported page's CSP gains the hashes of its own `<style>` blocks, read once per file version.
+  const pageCsp = new Map<string, { etag: string, csp: string }>()
+  async function setPageCsp(headers: Headers, filePath: string, etag: string): Promise<void> {
+    if (htmlCsp === undefined)
+      return
+    let cached = pageCsp.get(filePath)
+    if (cached?.etag !== etag) {
+      const styleHashes = inlineStyleHashes(await Bun.file(filePath).text())
+      cached = { etag, csp: withCspHashes(htmlCsp, { styleHashes }) }
+      pageCsp.set(filePath, cached)
+    }
+    headers.set('content-security-policy', cached.csp)
+  }
+  const fileEtag = (st: Stats): string => `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`
+
   const handle = async (req: Request): Promise<Response> => {
     if (!isRead(req)) {
       const headers = initHeaders()
@@ -79,9 +94,11 @@ export function createStaticDirServer(
     const found = resolveStaticFile(url.pathname)
     if (found === undefined) {
       const notFoundPath = join(absRoot, '404.html')
-      if (statFile(notFoundPath) !== undefined) {
+      const notFoundStat = statFile(notFoundPath)
+      if (notFoundStat !== undefined) {
         const headers = initHeaders(true)
         headers.set('content-type', 'text/html; charset=utf-8')
+        await setPageCsp(headers, notFoundPath, fileEtag(notFoundStat))
         return withHsts(new Response(req.method === 'HEAD' ? null : Bun.file(notFoundPath), { status: 404, headers }), req)
       }
       return withHsts(new Response('Not Found', { status: 404, headers: initHeaders() }), req)
@@ -91,12 +108,14 @@ export function createStaticDirServer(
     const ext = extname(filePath).toLowerCase()
     const mime = MIME[ext] ?? 'application/octet-stream'
     const isHtml = ext === '.html' || ext === '.htm'
-    const etag = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`
+    const etag = fileEtag(st)
     const isImmutable = url.pathname.startsWith(cleanPrefix)
     const headers = initHeaders(isHtml)
     headers.set('content-type', mime)
     headers.set('cache-control', isImmutable ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate')
     headers.set('etag', etag)
+    if (isHtml)
+      await setPageCsp(headers, filePath, etag)
 
     const hasBr = compressEnabled && existsSync(`${filePath}.br`)
     const hasGz = compressEnabled && existsSync(`${filePath}.gz`)

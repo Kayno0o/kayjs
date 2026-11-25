@@ -51,7 +51,7 @@ export interface PrerenderedSources {
   prerendered: Record<string, string>
   prerenderedFiles: Record<string, string>
   /** HTML headers of a prerendered page, before the `Vary` header compression adds. */
-  htmlHeaders: (route: RouteManifestEntry) => Record<string, string>
+  htmlHeaders: (route: RouteManifestEntry, urlPath: string) => Record<string, string>
   /** Whether a prerendered URL may be answered before any middleware, rewrite or plugin route. */
   isFast: (urlPath: string, route: RouteManifestEntry) => boolean
 }
@@ -126,9 +126,9 @@ export function createAssets(options: AssetsOptions) {
     for (const route of routes) {
       if (route.prerendered === undefined)
         continue
-      const headers: Record<string, string> = { ...sources.htmlHeaders(route), ...varyEncoding }
-      const compressedHeaders = compressCache !== undefined ? headers : undefined
       for (const [urlPath, relHtml] of Object.entries(route.prerendered)) {
+        const headers: Record<string, string> = { ...sources.htmlHeaders(route, urlPath), ...varyEncoding }
+        const compressedHeaders = compressCache !== undefined ? headers : undefined
         const filePath = sources.prerenderedFiles[relHtml]
         const html = sources.prerendered[relHtml]
         const key = `pre:${urlPath}`

@@ -26,7 +26,7 @@ import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit
 import { allowedMethodsHeader, isPlainObject, mergedHeadTags, pickPageIslandProps, stripHeadBody } from './page'
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
 import { Router } from './router'
-import { buildSecurityHeaderEntries, resolveHstsValue, verifyOrigin } from './security'
+import { buildSecurityHeaderEntries, inlineStyleHashes, resolveHstsValue, verifyOrigin } from './security'
 import { STREAM_TAIL_MARK, streamDocument } from './stream'
 
 /**
@@ -159,7 +159,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const { all: prerenderedMap, fast: fastPrerenderedMap } = files.collectPrerendered(manifest.routes, {
     prerendered,
     prerenderedFiles,
-    htmlHeaders: route => htmlHeaders(route.islandChunks.length > 0, false, false),
+    htmlHeaders: (route, urlPath) => htmlHeaders(route.islandChunks.length > 0, false, false, route.prerenderedStyleHashes?.[urlPath]),
     isFast: (urlPath, route) => route.middlewares.length === 0 && middlewaresFor(urlPath, true).length === 0 && !hasPluginRewrites && pluginRouter.match(urlPath) === undefined,
   })
 
@@ -212,14 +212,15 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       const docPrefix = shell.slice(0, splitAt)
       const docSuffix = shell.slice(splitAt + 1)
       const singleLayout = layouts.length === 1 ? layouts[0]! : undefined
-      const fastHeaders = htmlHeaders(hasIslands, false, true)
+
 
       const fail = (error: unknown, request: Request, url: URL, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
         notifyError(error, request, 'route')
         return renderError(error, cookieStore, url, request, ctx)
       }
       const respondHtml = (body: string, request: Request, cookieStore?: CookieStore): Response => {
-        const res = compressedHtmlResponse(docPrefix + body + docSuffix, 200, fastHeaders, request, compressCache, !entry.hasLoad)
+        const html = docPrefix + body + docSuffix
+        const res = compressedHtmlResponse(html, 200, htmlHeaders(hasIslands, false, true, inlineStyleHashes(html)), request, compressCache, !entry.hasLoad)
         return cookieStore?.hasChanges ? finish(res, request, cookieStore) : withHsts(res, request)
       }
       const layoutProps = (inner: string, url: URL, locals: KayLocals) => ({ children: raw(inner), url, params: {}, locals })
@@ -417,14 +418,14 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       // Transforms see the document with its initial body; boundaries resolved later stream as they render.
       for (const transform of htmlTransformers)
         shell = await transform(shell, ctx)
-      return new Response(streamDocument(shell, rctx, streamTimeout, error => notifyError(error, ctx.request, 'route')), { status: 200, headers: htmlHeaders(hasIslands, true, true) })
+      return new Response(streamDocument(shell, rctx, streamTimeout, error => notifyError(error, ctx.request, 'route')), { status: 200, headers: htmlHeaders(hasIslands, true, true, inlineStyleHashes(shell)) })
     }
 
     let html = renderDocument({ ...doc, body, head: docHead.head, lang: docHead.lang, htmlAttrs: docHead.htmlAttrs, preloadChunks, hasIslands })
     for (const transform of htmlTransformers)
       html = await transform(html, ctx)
 
-    return compressedHtmlResponse(html, 200, htmlHeaders(hasIslands, false, true), ctx.request, compressCache)
+    return compressedHtmlResponse(html, 200, htmlHeaders(hasIslands, false, true, inlineStyleHashes(html)), ctx.request, compressCache)
   }
 
   // `bodyLimited` is set under `serve()`, where Bun.serve already enforces maxRequestBodySize on every body, chunked ones included.

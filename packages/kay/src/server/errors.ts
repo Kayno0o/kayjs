@@ -11,6 +11,7 @@ import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { raw, renderDocument, ssrChild } from '../ssr/index'
 import { resolveRenderedIslands } from './document'
 import { wantsJson } from './http'
+import { inlineStyleHashes } from './security'
 
 export type NotifyError = (error: unknown, request: Request, source: ServerErrorInfo['source']) => void
 
@@ -95,7 +96,7 @@ export function createFallbackPages(options: FallbackPagesOptions) {
           hasIslands,
         })
         const html = await document.applyHtmlTransforms(docHtml, effUrl, req, ctx)
-        return new Response(html, { status, headers: htmlHeaders(hasIslands, false, true) })
+        return new Response(html, { status, headers: htmlHeaders(hasIslands, false, true, inlineStyleHashes(html)) })
       }
       catch (err) {
         if (req !== undefined)

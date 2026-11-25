@@ -34,6 +34,8 @@ export interface RouteManifestEntry {
   usesRenderContext?: boolean | undefined
   prerender?: boolean | undefined
   prerendered?: Record<string, string> | undefined
+  /** CSP hashes of the app's `<style>` blocks per prerendered URL, for the pages that have any. */
+  prerenderedStyleHashes?: Record<string, string[]> | undefined
 }
 
 export interface BuildManifest {

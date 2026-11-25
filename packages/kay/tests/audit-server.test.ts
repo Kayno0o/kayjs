@@ -511,7 +511,8 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       expect(homeCsp).toBeTruthy()
       expect(homeCsp!).toContain("default-src 'self'")
       expect(homeCsp!).toContain(KAY_ISLAND_STYLE_HASH)
-      expect(homeCsp!).not.toContain("'unsafe-inline'")
+      // Only style attributes may be inline (#3582); scripts and <style> elements need their hash.
+      expect(homeCsp!).not.toMatch(/(?:script|style)-src [^;]*'unsafe-inline'/)
       // Dynamic HTML has Cache-Control containing private
       expect(homeRes.headers.get('cache-control')).toContain('private')
 
