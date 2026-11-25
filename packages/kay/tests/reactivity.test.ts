@@ -239,6 +239,9 @@ describe('reactivity kernel', () => {
     s.value = 2
     expect(double.value).toBe(4)
     expect(runs).toBe(2)
+    const quad = computed(() => computed(() => s.value * 2).value * 2)
+    expect(quad.value).toBe(8)
+    expect(subscribed(s)).toBe(false)
   })
 
   test('a computed whose last effect is disposed releases its sources and follows them again when observed', () => {

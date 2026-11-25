@@ -11,7 +11,6 @@ const EFFECT = 32
 const QUEUED = 64
 // A computed nothing subscribes to: it keeps its deps list but stays out of its sources' subscriber lists, checking versions on read.
 const UNOBSERVED = 128
-const DEV = process.env.NODE_ENV !== 'production'
 
 interface Link {
   d: DepNode
@@ -74,6 +73,8 @@ let batchDepth = 0
 let qHead: SubNode | undefined
 let qTail: SubNode | undefined
 let flushing = false
+// Signal writes so far: an unobserved computed that checked at the same count can skip its version walk.
+let writes = 0
 
 function linkSub(dep: DepNode, sub: SubNode): void {
   if (dep.ls === sub && dep.le === sub.e)
@@ -157,7 +158,6 @@ function removeSub(link: Link): void {
     ns.ps = ps
   else
     d.st = ps
-  link.ps = link.ns = undefined
   if (d.s === undefined && d.f !== undefined && (d.f & COMPUTED) && !(d.f & UNOBSERVED)) {
     const comp = d as unknown as SubNode
     comp.f |= UNOBSERVED
@@ -306,7 +306,7 @@ function shouldRun(sub: SubNode): boolean {
     return false
   if (f & DIRTY)
     return true
-  if (!(f & (CHECK | UNOBSERVED)))
+  if (!(f & CHECK) && (!(f & UNOBSERVED) || (sub as ComputedNode<unknown>).w === writes))
     return false
   let l = sub.d
   while (l !== undefined) {
@@ -323,6 +323,8 @@ function shouldRun(sub: SubNode): boolean {
     l = l.nd
   }
   sub.f &= ~CHECK
+  if (f & UNOBSERVED)
+    (sub as ComputedNode<unknown>).w = writes
   return false
 }
 
@@ -349,6 +351,7 @@ class SignalNode<T> implements DepNode, Signal<T> {
       return
     this._v = next
     this.v++
+    writes++
     if (this.s !== undefined) {
       propagate(this, DIRTY)
       flush()
@@ -379,6 +382,7 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   _f: () => T
   _v!: T
   _i = false
+  w = -1
 
   constructor(fn: () => T, owner: Owner | undefined) {
     this._f = fn
@@ -404,6 +408,9 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
       throw new Error('kay: cyclic computed')
     const prevSub = currentSub
     const prevOwner = currentOwner
+    // A first run for an observed reader links straight into the sources instead of attaching after the run.
+    if (this.d === undefined && prevSub !== undefined && !(prevSub.f & UNOBSERVED))
+      this.f &= ~UNOBSERVED
     this.f = (this.f | RUNNING) & ~(DIRTY | CHECK)
     this.e = ++globalEpoch
     this.c = this.d
@@ -420,6 +427,7 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
     finally {
       unlinkRemaining(this)
       this.f &= ~RUNNING
+      this.w = writes
       currentSub = prevSub
       currentOwner = prevOwner
     }
@@ -641,7 +649,7 @@ export function computed<T>(fn: () => T): ReadonlySignal<T> {
 }
 
 export function effect(fn: () => void | (() => void)): () => void {
-  if (DEV && currentOwner === undefined && currentSub !== undefined && (currentSub.f & COMPUTED))
+  if (currentOwner === undefined && currentSub !== undefined && (currentSub.f & COMPUTED) && process.env.NODE_ENV !== 'production')
     console.warn('kay: effect() created while a computed runs has no owner and is never disposed. Create it in a component or an effect.')
   const node = new EffectNode(fn, currentOwner)
   node.r()
@@ -687,7 +695,7 @@ export function untrack<T>(fn: () => T): T {
 
 export function onCleanup(fn: () => void): void {
   if (currentOwner === undefined) {
-    if (DEV)
+    if (process.env.NODE_ENV !== 'production')
       console.warn('kay: onCleanup() called outside a component or effect never runs.')
     return
   }
