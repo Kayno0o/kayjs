@@ -19,6 +19,7 @@
       "@kayjs/kay": ["./packages/kay/src/index.ts"],
       "@kayjs/kay/*": ["./packages/kay/src/*"],
       "@kayjs/icons": ["./packages/plugin-icons/src/index.ts"],
+      "@kayjs/icons/search": ["./packages/plugin-icons/src/search.ts"],
       "@kayjs/images": ["./packages/plugin-images/src/index.ts"],
       "@kayjs/seo": ["./packages/plugin-seo/src/index.ts"],
       "@kayjs/mail": ["./packages/plugin-mail/src/index.ts"],

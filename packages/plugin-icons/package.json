@@ -10,6 +10,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./search": "./src/search.ts",
     "./ambient": "./src/ambient.d.ts"
   },
   "engines": {
