@@ -93,7 +93,7 @@ export function escAttr(value: unknown): string {
 }
 
 export function raw(html: string): Html {
-  return { __html: html, [RAW_HTML]: true } as Html
+  return { __html: html, [RAW_HTML]: true } as unknown as Html
 }
 
 const VALID_ATTR_NAME = /^[A-Za-z_:][-\w:.]*$/

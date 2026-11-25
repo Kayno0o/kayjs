@@ -20,8 +20,12 @@ export type KayChild =
   | Node
   | KayChild[]
 
+declare const htmlBrand: unique symbol
+
+/** HTML kay injects unescaped; only `raw()` makes one, so a plain `{ __html }` object is not an Html. */
 export interface Html {
   readonly __html: string
+  readonly [htmlBrand]: true
 }
 
 export type Component<P = Record<string, unknown>> = (props: P) => KayChild | Promise<KayChild>
@@ -58,6 +62,13 @@ interface CommonAttributes {
   key?: string | number | undefined
   ref?: ((el: Element) => void) | undefined
   $hydrate?: HydrateStrategy | undefined
+  innerHTML?: string | Html | null | undefined
+  // Spellings from React and Solid that kay refuses at compile time, refused here first.
+  dangerouslySetInnerHTML?: never
+  classList?: never
+  defaultValue?: never
+  defaultChecked?: never
+  onDoubleClick?: never
   // Events
   onClick?: ((e: MouseEvent) => void) | undefined
   onDblClick?: ((e: MouseEvent) => void) | undefined
