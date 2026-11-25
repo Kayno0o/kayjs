@@ -167,6 +167,10 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const graph = new ModuleGraph(options.cache)
   for (const f of [...specialFiles, ...candidatePageFiles])
     graph.load(f)
+  for (const analysis of graph.analyses.values()) {
+    for (const warning of analysis.warnings)
+      console.warn(warning)
+  }
 
   // Skip helper files inside routes/ that export neither a default component nor an HTTP method handler
   for (const f of candidatePageFiles) {

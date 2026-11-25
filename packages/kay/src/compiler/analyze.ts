@@ -61,6 +61,8 @@ export interface ModuleAnalysis {
   imports: ImportInfo[]
   reexports: ReexportInfo[]
   exportedNames: string[]
+  /** Code that compiles but usually means something else, worded for build and `kay check` to print. */
+  warnings: string[]
 }
 
 export function walk(node: unknown, visit: (node: AstNode) => boolean | void): void {
@@ -172,6 +174,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   const hydrateModes = new Set<string>()
   const kayNamespaces = new Set<string>()
   const stateCallees = new Set<string>()
+  const warnings: string[] = []
   const signalCallees = new Set<string>()
   const asyncLocals = new Set<string>()
   const localInits = new Map<string, AstNode>()
@@ -335,7 +338,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     if (isJsxNode(node))
       hasJsx = true
     if (node.type === 'JSXElement')
-      checkMistakes(node, filename, code)
+      checkMistakes(node, filename, code, warnings)
     if (importsAction && node.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === actionLocalName && !registeredActions.has(node))
       throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${actionLocalName}(...) at the top level, only those get a URL`)
     if (node.type === 'JSXOpeningElement') {
@@ -404,6 +407,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   return {
     filename,
     program,
+    warnings,
     isInteractive,
     interactiveReason,
     hasAsyncDefault,

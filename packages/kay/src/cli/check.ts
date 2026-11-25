@@ -14,6 +14,7 @@ export interface CheckResult {
   ok: boolean
   checkedFiles: number
   errors: string[]
+  warnings: string[]
 }
 
 const SERIALIZABLE_NEW_CTORS = new Set(['Date', 'Map', 'Set', 'URL', 'RegExp'])
@@ -105,9 +106,12 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   const { analyses } = graph
   const unparsable = new Set<string>()
 
+  const warnings: string[] = []
   for (const file of files) {
     try {
-      analyses.set(file, analyzeModule(file, readFileSync(file, 'utf8')))
+      const analysis = analyzeModule(file, readFileSync(file, 'utf8'))
+      analyses.set(file, analysis)
+      warnings.push(...analysis.warnings)
     }
     catch (err) {
       unparsable.add(file)
@@ -244,5 +248,5 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     }
   }
 
-  return { ok: errors.length === 0, checkedFiles: files.length, errors }
+  return { ok: errors.length === 0, checkedFiles: files.length, errors, warnings }
 }

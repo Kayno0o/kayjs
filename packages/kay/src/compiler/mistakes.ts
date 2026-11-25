@@ -196,8 +196,35 @@ function checkEventName(name: string, filename: string): void {
   throw mistake(name, filename, `no DOM event is named "${event}"; for a custom event, call addEventListener in a ref`)
 }
 
-/** Throws when a JSX element would compile into something other than what its author meant. */
-export function checkMistakes(element: AstNode, filename: string, code: string): void {
+// Plain containers that never take focus unless given a tabIndex, so their onFocus/onBlur never fire.
+const UNFOCUSABLE_TAGS = new Set([
+  'article', 'aside', 'div', 'fieldset', 'footer', 'form', 'header', 'label', 'li', 'main', 'nav', 'ol', 'p', 'section',
+  'span', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul',
+])
+const FOCUS_EVENTS = new Map([['onFocus', 'onFocusIn'], ['onBlur', 'onFocusOut']])
+// Input types whose change event waits for the field to lose focus.
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number'])
+
+function staticAttr(attributes: AstNode[], name: string): AstNode | undefined {
+  return attributes.find(a => a.type === 'JSXAttribute' && a.name?.name === name)
+}
+
+function checkFocusAndChange(tag: string, attributes: AstNode[], filename: string, warnings: string[]): void {
+  const canFocus = !UNFOCUSABLE_TAGS.has(tag) || attributes.some(a => a.type === 'JSXSpreadAttribute' || ['tabIndex', 'tabindex', 'contentEditable', 'contenteditable'].includes(a.name?.name as string))
+  for (const [prop, bubbling] of FOCUS_EVENTS) {
+    if (!canFocus && staticAttr(attributes, prop) !== undefined)
+      throw mistake(`${prop} on <${tag}>`, filename, `focus does not bubble, write ${bubbling}={...}, or give the <${tag}> a tabIndex`)
+  }
+  if (staticAttr(attributes, 'onChange') === undefined)
+    return
+  const type = staticAttr(attributes, 'type')?.value
+  const isTextField = tag === 'textarea' || (tag === 'input' && (type === undefined || (type?.type === 'Literal' && TEXT_INPUT_TYPES.has(type.value as string))))
+  if (isTextField)
+    warnings.push(`kay compiler: onChange on <${tag}> in ${filename} fires when the field loses focus, not per keystroke; write onInput={...} for every keystroke.`)
+}
+
+/** Throws when a JSX element would compile into something other than what its author meant, and adds to `warnings` what may be meant but usually is not. */
+export function checkMistakes(element: AstNode, filename: string, code: string, warnings: string[]): void {
   const tag = jsxTagName(element.openingElement.name)
   const isElement = tag !== '' && !isComponentTag(tag)
   const isCustomElement = tag.includes('-')
@@ -209,6 +236,8 @@ export function checkMistakes(element: AstNode, filename: string, code: string):
   const attributes = element.openingElement.attributes as AstNode[]
   if (isElement && attributes.some(a => a.name?.name === 'class') && attributes.some(a => a.name?.name === 'className'))
     throw mistake('class and className', filename, 'keep one, they set the same attribute')
+  if (isElement)
+    checkFocusAndChange(tag, attributes, filename, warnings)
   for (const attr of attributes) {
     if (attr.type !== 'JSXAttribute')
       continue

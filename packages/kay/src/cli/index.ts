@@ -62,6 +62,8 @@ else if (cmd === 'check') {
   const t0 = performance.now()
   const res = await checkProject(root, { skipTypecheck: hasFlag('--no-typecheck') })
   const ms = (performance.now() - t0).toFixed(1)
+  for (const warning of res.warnings)
+    console.warn(warning)
   if (res.ok) {
     console.log(`kay check passed (${res.checkedFiles} files) in ${ms} ms`)
   }

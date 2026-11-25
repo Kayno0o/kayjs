@@ -49,6 +49,22 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<form onSubmit={fn} onFormData={fn} />')
   })
 
+  test('onFocus or onBlur on an element that never takes focus, since focus does not bubble', () => {
+    refuses('<div onFocus={fn}><input /></div>', /onFocus on <div> in Page\.tsx: focus does not bubble, write onFocusIn=\{\.\.\.\}, or give the <div> a tabIndex/)
+    refuses('<form onBlur={fn}><input /></form>', /write onFocusOut=\{\.\.\.\}/)
+    accepts('<div tabIndex={0} onFocus={fn} />')
+    accepts('<input onFocus={fn} onBlur={fn} />')
+    accepts('<div onFocusIn={fn} />')
+  })
+
+  test('onChange on a text field warns, since it fires on commit rather than per keystroke', () => {
+    const warningsOf = (jsx: string): string[] => analyzeModule('Page.tsx', `export default function Page() { const fn = () => {}; return ${jsx} }`).warnings
+    expect(warningsOf('<input onChange={fn} />')).toEqual(['kay compiler: onChange on <input> in Page.tsx fires when the field loses focus, not per keystroke; write onInput={...} for every keystroke.'])
+    expect(warningsOf('<textarea onChange={fn} />')).toHaveLength(1)
+    expect(warningsOf('<input type="checkbox" onChange={fn} />')).toEqual([])
+    expect(warningsOf('<select onChange={fn} />')).toEqual([])
+  })
+
   test('React\'s dangerouslySetInnerHTML, which would print [object Object] as an attribute', () => {
     refuses('<div dangerouslySetInnerHTML={{ __html: html }} />', /dangerouslySetInnerHTML in Page\.tsx: write innerHTML=\{html\}/, 'const html = \'<p>x</p>\'')
     const props = { dangerouslySetInnerHTML: { __html: '<p>x</p>' } }
