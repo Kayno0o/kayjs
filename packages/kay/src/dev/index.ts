@@ -4,6 +4,7 @@ import type { FSWatcher } from 'node:fs'
 import type { KayApp } from '../server/index'
 import { existsSync, rmSync, statSync, watch } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { clearBuildCache } from '../build/graph'
 import { build, createBuildCache } from '../build/index'
 import { createAppContext, loadConfig, runWithAppContext } from '../plugins/index'
 import { DEFAULT_MAX_REQUEST_BODY_SIZE } from '../server/http'
@@ -58,8 +59,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   const clients = new Set<ReadableStreamDefaultController<Uint8Array>>()
   const encoder = new TextEncoder()
 
-  function broadcast(payload: string): void {
-    const chunk = encoder.encode(`data: ${payload}\n\n`)
+  function pushToClients(chunk: Uint8Array): void {
     for (const c of clients) {
       try {
         c.enqueue(chunk)
@@ -70,13 +70,13 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
     }
   }
 
+  const broadcast = (payload: string): void => pushToClients(encoder.encode(`data: ${payload}\n\n`))
+
   async function runSingleBuild(cssOnly: boolean, resetCache: boolean): Promise<void> {
     if (stopped)
       return
     if (resetCache) {
-      buildCache.analyses.clear()
-      buildCache.domCompiled.clear()
-      buildCache.ssrCompiled.clear()
+      clearBuildCache(buildCache)
     }
     const hadError = lastError !== undefined
     const hadApp = currentApp !== undefined
@@ -193,16 +193,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   catch {}
 
   const pingChunk = encoder.encode(': ping\n\n')
-  const pingInterval = setInterval(() => {
-    for (const c of clients) {
-      try {
-        c.enqueue(pingChunk)
-      }
-      catch {
-        clients.delete(c)
-      }
-    }
-  }, 15_000)
+  const pingInterval = setInterval(() => pushToClients(pingChunk), 15_000)
 
   const maxRequestBodySize = options.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
 

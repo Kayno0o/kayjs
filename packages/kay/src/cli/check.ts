@@ -1,10 +1,12 @@
 // `kay check [dir]`: validates routes, Kay compiler & island rules, config, and runs TypeScript type-checking.
 
 import type { AstNode, ModuleAnalysis } from '../compiler/analyze'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
+import { isTsFile, relPosix, walkFiles } from '../build/files'
+import { ModuleGraph } from '../build/graph'
+import { fileToRoutePath, normalizeRoutePattern } from '../build/routes'
 import { analyzeModule, walk } from '../compiler/analyze'
-import { resolveImportPath } from '../build/resolve'
 import { readsPrivateEnv, SERVER_ONLY_MODULES } from '../compiler/server-only'
 import { loadConfig } from '../plugins/index'
 
@@ -16,39 +18,29 @@ export interface CheckResult {
 
 const SERIALIZABLE_NEW_CTORS = new Set(['Date', 'Map', 'Set', 'URL', 'RegExp'])
 
-function walkTsFiles(dir: string, out: string[] = []): string[] {
-  if (!existsSync(dir))
-    return out
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name)
-    if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.'))
-        continue
-      walkTsFiles(full, out)
-    }
-    else if (entry.name.endsWith('.tsx') || entry.name.endsWith('.ts')) {
-      out.push(full)
-    }
-  }
-  return out
+function walkTsFiles(dir: string): string[] {
+  return walkFiles(dir, {
+    skipDir: name => name === 'node_modules' || name === 'dist' || name.startsWith('.'),
+    keep: entry => isTsFile(entry.name),
+  })
 }
 
-// A module outside the scanned folders (a workspace or npm package an island imports) is analysed when first reached.
-function analysisOf(file: string, analyses: Map<string, ModuleAnalysis>): ModuleAnalysis | undefined {
-  if (!analyses.has(file) && (file.endsWith('.ts') || file.endsWith('.tsx'))) {
+// A module outside the scanned folders (a workspace or npm package an island imports) is analysed when first reached. One that fails to parse is not parsed again.
+function analysisOf(file: string, analyses: Map<string, ModuleAnalysis>, unparsable: Set<string>): ModuleAnalysis | undefined {
+  if (!analyses.has(file) && !unparsable.has(file) && isTsFile(file)) {
     try {
       analyses.set(file, analyzeModule(file, readFileSync(file, 'utf8')))
     }
     catch {
-      return undefined
+      unparsable.add(file)
     }
   }
   return analyses.get(file)
 }
 
 // Walks the local imports of an island the way the client build follows them: a module that only declares actions is stubbed there, so its imports stop the walk.
-function checkIslandReach(island: string, root: string, analyses: Map<string, ModuleAnalysis>, reported: Set<string>, errors: string[]): void {
-  const islandRel = relative(root, island).replace(/\\/g, '/')
+function checkIslandReach(island: string, root: string, graph: ModuleGraph, unparsable: Set<string>, reported: Set<string>, errors: string[]): void {
+  const islandRel = relPosix(root, island)
   const seen = new Set<string>()
   const stack = [island]
   while (stack.length > 0) {
@@ -59,10 +51,10 @@ function checkIslandReach(island: string, root: string, analyses: Map<string, Mo
     // Like the build, an npm package's own imports are its business: only project and workspace files are checked.
     if (file.includes('/node_modules/'))
       continue
-    const analysis = analysisOf(file, analyses)
+    const analysis = analysisOf(file, graph.analyses, unparsable)
     if (analysis === undefined || (file !== island && !analysis.isInteractive && analysis.exportedActions.length > 0))
       continue
-    const rel = relative(root, file).replace(/\\/g, '/')
+    const rel = relPosix(root, file)
     const report = (key: string, message: string): void => {
       if (reported.has(`${file}\0${key}`))
         return
@@ -76,24 +68,13 @@ function checkIslandReach(island: string, root: string, analyses: Map<string, Mo
           : `kay check: ${rel}: imports server-only module "${source}" and is reachable from the island in ${islandRel}. Move server logic to a server action or async server component.`)
         continue
       }
-      const target = resolveImportPath(file, source)
+      const target = graph.resolve(file, source)
       if (target !== undefined)
         stack.push(target)
     }
     if (readsPrivateEnv(analysis.program))
       report('process.env', `kay check: ${rel}: reads process.env and is reachable from the island in ${islandRel}. Only process.env.PUBLIC_* reaches the browser.`)
   }
-}
-
-function normalizeRouteConflictKey(routesDir: string, file: string): string {
-  const rel = relative(routesDir, file).replace(/\\/g, '/').replace(/\.(tsx|ts)$/, '')
-  if (rel === 'index')
-    return '/'
-  const clean = rel.endsWith('/index') ? rel.slice(0, -'/index'.length) : rel
-  const norm = clean
-    .replace(/\[\.\.\.[^\]]+\]/g, '*')
-    .replace(/\[[^\]]+\]/g, ':')
-  return `/${norm}`
 }
 
 export async function checkProject(rootDir: string, options: { skipTypecheck?: boolean } = {}): Promise<CheckResult> {
@@ -120,14 +101,16 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   // 3. Parse & run Kay static compiler analysis across src/
   const srcDir = resolve(root, 'src')
   const files = walkTsFiles(existsSync(srcDir) ? srcDir : routesDir)
-  const analyses = new Map<string, ModuleAnalysis>()
+  const graph = new ModuleGraph()
+  const { analyses } = graph
+  const unparsable = new Set<string>()
 
   for (const file of files) {
     try {
-      const code = readFileSync(file, 'utf8')
-      analyses.set(file, analyzeModule(file, code))
+      analyses.set(file, analyzeModule(file, readFileSync(file, 'utf8')))
     }
     catch (err) {
+      unparsable.add(file)
       errors.push(err instanceof Error ? err.message : String(err))
     }
   }
@@ -138,20 +121,20 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
 
   // A snapshot: the guardrails analyse packages they reach, and those are not checked as project files.
   for (const [file, analysis] of [...analyses]) {
-    const rel = relative(root, file).replace(/\\/g, '/')
+    const rel = relPosix(root, file)
 
     // Guardrail 1: server-only imports and private env reads in an island or any module it imports
     if (analysis.isInteractive)
-      checkIslandReach(file, root, analyses, reported, errors)
+      checkIslandReach(file, root, graph, unparsable, reported, errors)
 
     // Guardrail 2: non-serializable props (functions / unsupported class instances) passed from static server code into an island
     if (!analysis.isInteractive && file.endsWith('.tsx')) {
       const islandTags = new Set<string>()
       for (const imp of analysis.imports) {
-        const target = resolveImportPath(file, imp.source)
+        const target = graph.resolve(file, imp.source)
         if (target === undefined)
           continue
-        const targetAnalysis = analysisOf(target, analyses)
+        const targetAnalysis = analysisOf(target, analyses, unparsable)
         if (targetAnalysis?.isInteractive) {
           for (const spec of imp.specifiers)
             islandTags.add(spec.local)
@@ -195,7 +178,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     const relFromRoutes = relative(routesDir, file)
     const isRouteFile = !relFromRoutes.startsWith('..') && !basename(file).startsWith('_')
     if (isRouteFile) {
-      const conflictKey = normalizeRouteConflictKey(routesDir, file)
+      const conflictKey = normalizeRoutePattern(fileToRoutePath(routesDir, file))
       const prev = seenRoutes.get(conflictKey)
       if (prev !== undefined) {
         errors.push(`kay check: conflicting routes "${prev}" and "${rel}" both match "${conflictKey}".`)

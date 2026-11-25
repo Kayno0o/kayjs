@@ -3,8 +3,8 @@
 // - Builds client (1 pass, minimal runtime + island chunks + action stubs) and server (1 pass)
 // - Supports hybrid prerender, --static export, and --compile single-executable builds
 
-import type { KayPlugin } from '../plugins/index'
 import type { AppRuntimeContext } from '../plugins/context'
+import type { KayPlugin } from '../plugins/index'
 import type { BuildCache } from './graph'
 import type { ActionsByFile } from './islands'
 import type { BuildManifest } from './manifest'
