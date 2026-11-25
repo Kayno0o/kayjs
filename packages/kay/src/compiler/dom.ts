@@ -4,7 +4,7 @@
 import type { AstNode, ModuleAnalysis } from './analyze'
 import { analyzeModule, loadDeclarations, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
-import { cleanJsxText, containsJsx, escapeStaticAttr, escapeStaticText, isComponentTag, isJsxNode, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
+import { assertInnerHtmlNotReactObject, cleanJsxText, containsJsx, escapeStaticAttr, escapeStaticText, isComponentTag, isJsxNode, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
 
 const SVG_CHILD_TAGS = new Set([
   'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse',
@@ -520,8 +520,10 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         if (rawName === 'innerHTML') {
           if (attr.value?.type === 'Literal')
             ops.push(`${use('setInnerHtml')}(${elVar}, ${JSON.stringify(String(attr.value.value))});`)
-          else if (attr.value?.type === 'JSXExpressionContainer')
+          else if (attr.value?.type === 'JSXExpressionContainer') {
+            assertInnerHtmlNotReactObject(attr.value.expression, filename, code)
             ops.push(`${use('effect')}(() => ${use('setInnerHtml')}(${elVar}, ${compileExpression(attr.value.expression, scopeRewrites)}));`)
+          }
           continue
         }
 

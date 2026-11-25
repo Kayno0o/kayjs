@@ -48,8 +48,13 @@ export function ssrRaw(value: unknown): string {
     return ''
   if (isRawHtml(value))
     return String(value.__html)
+  if (typeof value === 'object' && '__html' in value)
+    throw new TypeError(UNBRANDED_INNER_HTML)
   return String(value)
 }
+
+/** React's `{ __html }` shape reaching innerHTML unbranded: kay would print `[object Object]`. */
+const UNBRANDED_INNER_HTML = 'kay: innerHTML takes the HTML string, got a { __html } object; pass the string, or raw(html) for a value typed Html.'
 
 const CLOSE_STYLE_RE = /<\/(style)/gi
 const SCRIPT_UNSAFE_RE = /<(\/script|script|!--)/gi

@@ -4,7 +4,7 @@
 import type { AstNode, ModuleAnalysis } from './analyze'
 import { analyzeModule, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
-import { cleanJsxText, containsJsx, escapeStaticAttr, escapeStaticText, isComponentTag, isJsxNode, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
+import { assertInnerHtmlNotReactObject, cleanJsxText, containsJsx, escapeStaticAttr, escapeStaticText, isComponentTag, isJsxNode, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
 
 const RAW_TEXT_ELEMENTS = new Set(['style', 'script'])
 const CLOSE_STYLE_RE = /<\/(style)/gi
@@ -177,8 +177,10 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       if (rawName === 'innerHTML') {
         if (attr.value?.type === 'Literal')
           innerHtmlExpr = JSON.stringify(String(attr.value.value))
-        else if (attr.value?.type === 'JSXExpressionContainer')
+        else if (attr.value?.type === 'JSXExpressionContainer') {
+          assertInnerHtmlNotReactObject(attr.value.expression, filename, code)
           innerHtmlExpr = `${use('ssrRaw')}(${compileSubExpression(attr.value.expression)})`
+        }
         continue
       }
 

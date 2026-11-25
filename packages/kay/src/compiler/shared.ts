@@ -76,6 +76,18 @@ export function unwrapParens(node: AstNode): AstNode {
   return cur
 }
 
+/** Refuses React's `innerHTML={{ __html: x }}`: kay takes the string itself and would print `[object Object]`. */
+export function assertInnerHtmlNotReactObject(expr: AstNode, filename: string, code: string): void {
+  const n = unwrapParens(expr)
+  if (n.type !== 'ObjectExpression')
+    return
+  const prop = (n.properties as AstNode[]).find(p => p.type === 'Property' && (p.key?.name ?? p.key?.value) === '__html')
+  if (prop === undefined)
+    return
+  const value = code.slice(prop.value.start, prop.value.end)
+  throw new Error(`kay compiler: innerHTML takes the HTML string in ${filename}: write innerHTML={${value}}, not React's innerHTML={{ __html: ${value} }}.`)
+}
+
 export function staticLiteral(node: AstNode): { ok: true, value: string | number | boolean | null } | { ok: false } {
   const n = unwrapParens(node)
   if (n.type === 'Literal') {

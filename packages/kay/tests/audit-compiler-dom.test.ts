@@ -42,13 +42,12 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
     // Untrusted plain { __html } object MUST NOT be treated as raw HTML
     expect(ssrRt.esc(untrusted)).not.toContain('<img')
     expect(ssrRt.ssrChild(untrusted)).not.toContain('<img')
-    expect(ssrRt.ssrRaw(untrusted)).not.toContain('<img')
+    expect(() => ssrRt.ssrRaw(untrusted)).toThrow(/innerHTML takes the HTML string/)
     expect(ssrRt.ssrRawText('script', untrusted)).not.toContain('<img')
 
     await withDom(() => {
       const el = document.createElement('div')
-      domExtras.setInnerHtml(el, untrusted)
-      expect(el.innerHTML).not.toContain('<img')
+      expect(() => domExtras.setInnerHtml(el, untrusted)).toThrow(/innerHTML takes the HTML string/)
       expect(el.querySelector('img')).toBeNull()
 
       domExtras.setInnerHtml(el, trusted)

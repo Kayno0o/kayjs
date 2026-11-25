@@ -1,9 +1,25 @@
 import { describe, expect, test } from 'bun:test'
 import { analyzeModule, compileDom, compileSsr } from '../src/compiler/index'
 import { readsPrivateEnv } from '../src/compiler/server-only'
-import { raw, ssrRawText } from '../src/ssr/index'
+import { setInnerHtml } from '../src/dom/extras'
+import { raw, ssrRaw, ssrRawText } from '../src/ssr/index'
 
 describe('TSX compiler', () => {
+  test('refuses React\'s innerHTML={{ __html }} shape, which would print [object Object]', () => {
+    const page = `export default function Page() { const html = '<p>hi</p>'; return <div innerHTML={{ __html: html }} /> }`
+    expect(() => compileSsr('Page.tsx', page)).toThrow(/Page\.tsx: write innerHTML=\{html\}/)
+    expect(() => compileDom('Page.tsx', page)).toThrow(/Page\.tsx: write innerHTML=\{html\}/)
+    expect(compileSsr('Page.tsx', page.replace('{{ __html: html }}', '{html}')).code).toContain('ssrRaw')
+  })
+
+  test('refuses an unbranded { __html } object reaching innerHTML through a variable', () => {
+    expect(() => ssrRaw({ __html: '<p>hi</p>' })).toThrow(/innerHTML takes the HTML string/)
+    const el = { innerHTML: '' } as Element
+    expect(() => setInnerHtml(el, { __html: '<p>hi</p>' })).toThrow(/innerHTML takes the HTML string/)
+    setInnerHtml(el, raw('<p>hi</p>'))
+    expect(el.innerHTML).toBe('<p>hi</p>')
+  })
+
   test('auto-detects static vs interactive components', () => {
     const staticCode = `
       export function Card({ title }: { title: string }) {

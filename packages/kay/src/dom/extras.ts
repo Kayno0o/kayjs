@@ -12,11 +12,15 @@ function isRawHtml(value: unknown): value is { __html: string } {
 }
 
 export function setInnerHtml(el: Element, value: unknown): void {
-  const html = value == null || value === false
-    ? ''
-    : isRawHtml(value)
-      ? String(value.__html)
-      : String(value)
+  let html: string
+  if (value == null || value === false)
+    html = ''
+  else if (isRawHtml(value))
+    html = String(value.__html)
+  else if (typeof value === 'object' && '__html' in value)
+    throw new TypeError('kay: innerHTML takes the HTML string, got a { __html } object; pass the string, or raw(html) for a value typed Html.')
+  else
+    html = String(value)
   if (el.innerHTML !== html)
     el.innerHTML = html
 }
