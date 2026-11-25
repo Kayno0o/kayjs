@@ -20,6 +20,7 @@ import {
   cleanJsxText,
   collectPatternNames,
   containsJsx,
+  decodeHtmlEntities,
   DOM_PROPS,
   escapeRawText,
   escapeStaticAttr,
@@ -58,49 +59,6 @@ const DELEGATED_EVENTS = new Set([
   'input', 'keydown', 'keyup', 'mousedown', 'mouseup',
   'pointerdown', 'pointerup', 'touchstart', 'touchend',
 ])
-
-const HTML_ENTITIES: Record<string, string> = {
-  amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: '\u00A0',
-  ndash: '\u2013', mdash: '\u2014', lsquo: '\u2018', rsquo: '\u2019',
-  ldquo: '\u201C', rdquo: '\u201D', hellip: '\u2026', bull: '\u2022',
-  middot: '\u00B7', laquo: '\u00AB', raquo: '\u00BB', lsaquo: '\u2039',
-  rsaquo: '\u203A', shy: '\u00AD', ensp: '\u2002', emsp: '\u2003',
-  thinsp: '\u2009', zwnj: '\u200C', zwj: '\u200D', lrm: '\u200E',
-  rlm: '\u200F', prime: '\u2032', Prime: '\u2033', sect: '\u00A7',
-  para: '\u00B6', dagger: '\u2020', Dagger: '\u2021', permil: '\u2030',
-  copy: '\u00A9', reg: '\u00AE', trade: '\u2122', euro: '\u20AC',
-  pound: '\u00A3', yen: '\u00A5', cent: '\u00A2', curren: '\u00A4',
-  deg: '\u00B0', plusmn: '\u00B1', times: '\u00D7', divide: '\u00F7',
-  frac12: '\u00BD', frac14: '\u00BC', frac34: '\u00BE', sup1: '\u00B9',
-  sup2: '\u00B2', sup3: '\u00B3', micro: '\u00B5', minus: '\u2212',
-  ne: '\u2260', le: '\u2264', ge: '\u2265', approx: '\u2248', infin: '\u221E',
-  larr: '\u2190', uarr: '\u2191', rarr: '\u2192', darr: '\u2193',
-  harr: '\u2194', crarr: '\u21B5', check: '\u2713', cross: '\u2717',
-  eacute: '\u00E9', egrave: '\u00E8', ecirc: '\u00EA', agrave: '\u00E0',
-  acirc: '\u00E2', ccedil: '\u00E7', ocirc: '\u00F4', ugrave: '\u00F9',
-  ucirc: '\u00FB', iuml: '\u00EF', icirc: '\u00EE', oelig: '\u0153',
-  Eacute: '\u00C9', Egrave: '\u00C8', Agrave: '\u00C0', Ccedil: '\u00C7',
-}
-
-const ENTITY_RE = /&(?:#(\d+)|#x([0-9a-fA-F]+)|([A-Za-z][A-Za-z0-9]*));/g
-
-function decodeHtmlEntities(str: string): string {
-  if (!str.includes('&'))
-    return str
-  return str.replace(ENTITY_RE, (match, dec: string | undefined, hex: string | undefined, named: string | undefined) => {
-    if (dec !== undefined) {
-      const cp = Number.parseInt(dec, 10)
-      return cp === 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? '\uFFFD' : String.fromCodePoint(cp)
-    }
-    if (hex !== undefined) {
-      const cp = Number.parseInt(hex, 16)
-      return cp === 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? '\uFFFD' : String.fromCodePoint(cp)
-    }
-    if (named !== undefined && Object.prototype.hasOwnProperty.call(HTML_ENTITIES, named))
-      return HTML_ENTITIES[named]!
-    return match
-  })
-}
 
 export interface CompileDomOptions {
   analysis?: ModuleAnalysis | undefined
@@ -479,6 +437,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   const templates: { name: string, html: string, isSvg?: boolean }[] = []
   const delegatedEvents = new Set<string>()
   let varCounter = 0
+  // Tracks whether the current JSX tree is enclosed by `<svg>` (reset inside `<foreignObject>`).
+  let svgDepth = 0
 
   const use = (name: string): string => {
     used.add(name)
@@ -797,21 +757,28 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       let prevWasStaticText = false
       let hadVariableRange = false
 
-      for (let i = 0; i < slots.length; i++) {
-        const slot = slots[i]!
-        const isLast = i === slots.length - 1
+      const prevSvgDepth = svgDepth
+      if (tag === 'svg')
+        svgDepth = 1
+      else if (tag === 'foreignObject')
+        svgDepth = 0
 
-        if (slot.kind === 'static-text') {
-          if (rawTextTag !== undefined)
-            html += escapeRawText(slot.text, rawTextTag)
-          else
-            html += slot.fromLiteral ? escapeStaticText(slot.text) : slot.text
-          if (!prevWasStaticText) {
-            domIndex++
-            prevWasStaticText = true
+      try {
+        for (let i = 0; i < slots.length; i++) {
+          const slot = slots[i]!
+          const isLast = i === slots.length - 1
+
+          if (slot.kind === 'static-text') {
+            if (rawTextTag !== undefined)
+              html += escapeRawText(slot.text, rawTextTag)
+            else
+              html += escapeStaticText(slot.fromLiteral ? slot.text : decodeHtmlEntities(slot.text))
+            if (!prevWasStaticText) {
+              domIndex++
+              prevWasStaticText = true
+            }
+            continue
           }
-          continue
-        }
 
         prevWasStaticText = false
 
@@ -1021,6 +988,10 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           ops.push(`const ${txtVar} = ${use('textAfter')}(${markerVar});`)
           ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
         }
+        }
+      }
+      finally {
+        svgDepth = prevSvgDepth
       }
 
       html += `</${tag}>`
@@ -1030,7 +1001,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     const html = buildHtml(rootEl, rootVar)
     const rootTag = jsxTagName(rootEl.openingElement.name)
     const tmplName = `_t${templates.length}`
-    templates.push({ name: tmplName, html, isSvg: SVG_CHILD_TAGS.has(rootTag) })
+    const isSvg = svgDepth > 0 ? rootTag !== 'svg' : SVG_CHILD_TAGS.has(rootTag)
+    templates.push({ name: tmplName, html, isSvg })
 
     // Emit parent->child sibling walks grouped by parentVar (breadth-first / parent-first order)
     const walkStmts: string[] = []

@@ -15,6 +15,7 @@ import { SourceEditor } from './patch'
 import {
   classifyJsxChild,
   containsJsx,
+  decodeHtmlEntities,
   escapeRawText,
   escapeStaticAttr,
   escapeStaticText,
@@ -338,7 +339,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         if (rawTextTag !== undefined)
           parts.pushStatic(escapeRawText(slot.text, rawTextTag))
         else
-          parts.pushStatic(slot.fromLiteral ? escapeStaticText(slot.text) : slot.text)
+          parts.pushStatic(escapeStaticText(slot.fromLiteral ? slot.text : decodeHtmlEntities(slot.text)))
         continue
       }
 
