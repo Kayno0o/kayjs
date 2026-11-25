@@ -11,6 +11,8 @@ const EFFECT = 32
 const QUEUED = 64
 // A computed nothing subscribes to: it keeps its deps list but stays out of its sources' subscriber lists, checking versions on read.
 const UNOBSERVED = 128
+// Queued for the current flush round (distinct from QUEUED, which marks the next round).
+const PENDING = 256
 
 interface Link {
   d: DepNode
@@ -27,9 +29,8 @@ interface DepNode {
   v: number // version
   s: Link | undefined // subs head
   st: Link | undefined // subs tail
-  ls: SubNode | undefined // lastSub
   le: number // lastEpoch
-  f?: number // flags (only on ComputedNode)
+  f: number // flags (0 on SignalNode, bitmask on ComputedNode)
 }
 
 interface SubNode {
@@ -40,13 +41,13 @@ interface SubNode {
   c: Link | undefined // cursor
   po: SubNode | undefined // prevOwned
   no: SubNode | undefined // nextOwned
-  nq: SubNode | undefined // nextQueued
   k: (() => void) | undefined // cleanup returned by the effect
   o: Owner | undefined // owner
   r(): void // run
 }
 
 export interface Owner {
+  f: number // 0 on plain Owner, effect flags on EffectNode
   p: Owner | undefined // parent
   fc: Owner | undefined // firstChild
   ps: Owner | undefined // prevSibling
@@ -70,17 +71,16 @@ let currentSub: SubNode | undefined
 let currentOwner: Owner | undefined
 let globalEpoch = 0
 let batchDepth = 0
-let qHead: SubNode | undefined
-let qTail: SubNode | undefined
+let q: SubNode[] = []
+let qNext: SubNode[] = []
 let flushing = false
 // Signal writes so far: an unobserved computed that checked at the same count can skip its version walk.
 let writes = 0
 
 function linkSub(dep: DepNode, sub: SubNode): void {
-  if (dep.ls === sub && dep.le === sub.e)
+  if (dep.le === sub.e)
     return
 
-  dep.ls = sub
   dep.le = sub.e
 
   const cur = sub.c
@@ -129,15 +129,16 @@ function linkSub(dep: DepNode, sub: SubNode): void {
 // Puts a link at the end of its source's subscriber list; a computed gaining its first subscriber follows its own sources again.
 function addSub(link: Link): void {
   const dep = link.d
-  const first = dep.s === undefined
-  link.ps = dep.st
+  const tail = dep.st
+  link.ps = tail
   link.ns = undefined
-  if (dep.st !== undefined)
-    dep.st.ns = link
-  else
-    dep.s = link
-  dep.st = link
-  if (first && dep.f !== undefined && (dep.f & UNOBSERVED)) {
+  if (tail !== undefined) {
+    tail.ns = link
+    dep.st = link
+    return
+  }
+  dep.s = dep.st = link
+  if (dep.f & UNOBSERVED) {
     const comp = dep as unknown as SubNode
     comp.f &= ~UNOBSERVED
     for (let l = comp.d; l !== undefined; l = l.nd)
@@ -145,11 +146,15 @@ function addSub(link: Link): void {
   }
 }
 
+function unobserve(comp: SubNode): void {
+  comp.f |= UNOBSERVED
+  for (let l = comp.d; l !== undefined; l = l.nd)
+    removeSub(l)
+}
+
 // Takes a link out of its source's subscriber list; a computed losing its last subscriber lets go of its own sources.
 function removeSub(link: Link): void {
-  const { d, s, ps, ns } = link
-  if (d.ls === s)
-    d.ls = undefined
+  const { d, ps, ns } = link
   if (ps !== undefined)
     ps.ns = ns
   else
@@ -158,12 +163,9 @@ function removeSub(link: Link): void {
     ns.ps = ps
   else
     d.st = ps
-  if (d.s === undefined && d.f !== undefined && (d.f & COMPUTED) && !(d.f & UNOBSERVED)) {
-    const comp = d as unknown as SubNode
-    comp.f |= UNOBSERVED
-    for (let l = comp.d; l !== undefined; l = l.nd)
-      removeSub(l)
-  }
+  link.ps = link.ns = undefined
+  if (d.s === undefined && (d.f & (COMPUTED | UNOBSERVED)) === COMPUTED)
+    unobserve(d as unknown as SubNode)
 }
 
 function unlink(l: Link): void {
@@ -195,19 +197,20 @@ function unlinkRemaining(sub: SubNode): void {
 function unlinkAll(sub: SubNode): void {
   let l = sub.d
   sub.d = sub.dt = sub.c = undefined
-  const observed = !(sub.f & UNOBSERVED)
+  if (sub.f & UNOBSERVED)
+    return
   while (l !== undefined) {
     const next = l.nd
-    if (observed)
-      removeSub(l)
+    removeSub(l)
     l = next
   }
 }
 
 // A child effect can sit ahead of its parent in the queue; the parent runs first, since its run may dispose the child.
 function runParentFirst(sub: SubNode): void {
+  sub.f &= ~PENDING
   for (let o = sub.o; o !== undefined; o = o.p) {
-    if ((o as Partial<SubNode>).f! & QUEUED) {
+    if (o.f & (PENDING | QUEUED)) {
       runParentFirst(o as unknown as SubNode)
       break
     }
@@ -220,14 +223,7 @@ function enqueue(sub: SubNode): void {
   if (sub.f & (QUEUED | DISPOSED))
     return
   sub.f |= QUEUED
-  sub.nq = undefined
-  if (qTail !== undefined) {
-    qTail.nq = sub
-    qTail = sub
-  }
-  else {
-    qHead = qTail = sub
-  }
+  q.push(sub)
 }
 
 function propagate(dep: DepNode, flag: number): void {
@@ -262,37 +258,34 @@ function flush(): void {
   const errors: unknown[] = []
   try {
     let rounds = 0
-    while (qHead !== undefined) {
+    while (q.length > 0) {
       if (++rounds > 1000) {
         errors.push(new Error('kay: reactive cycle'))
         break
       }
-      let node: SubNode | undefined = qHead
-      qHead = qTail = undefined
-      while (node !== undefined) {
-        const next: SubNode | undefined = node.nq
-        node.nq = undefined
-        node.f &= ~QUEUED
-        try {
-          runParentFirst(node)
+      const round = q
+      q = qNext
+      qNext = round
+      for (const node of round)
+        node.f = (node.f & ~QUEUED) | PENDING
+      for (const node of round) {
+        if (node.f & PENDING) {
+          try {
+            runParentFirst(node)
+          }
+          catch (err) {
+            errors.push(err)
+          }
         }
-        catch (err) {
-          errors.push(err)
-        }
-        node = next
       }
+      round.length = 0
     }
   }
   finally {
     flushing = false
-    let left = qHead
-    qHead = qTail = undefined
-    while (left !== undefined) {
-      const next: SubNode | undefined = left.nq
-      left.nq = undefined
-      left.f &= ~QUEUED
-      left = next
-    }
+    for (const node of q)
+      node.f &= ~QUEUED
+    q.length = 0
   }
   if (errors.length === 1)
     throw errors[0]
@@ -308,10 +301,11 @@ function shouldRun(sub: SubNode): boolean {
     return true
   if (!(f & CHECK) && (!(f & UNOBSERVED) || (sub as ComputedNode<unknown>).w === writes))
     return false
+  const w = writes
   let l = sub.d
   while (l !== undefined) {
     const dep = l.d
-    if (dep.f !== undefined && (dep.f & COMPUTED)) {
+    if (dep.f & COMPUTED) {
       const comp = dep as unknown as ComputedNode<unknown>
       if (shouldRun(comp))
         comp.r()
@@ -324,7 +318,7 @@ function shouldRun(sub: SubNode): boolean {
   }
   sub.f &= ~CHECK
   if (f & UNOBSERVED)
-    (sub as ComputedNode<unknown>).w = writes
+    (sub as ComputedNode<unknown>).w = w
   return false
 }
 
@@ -332,8 +326,8 @@ class SignalNode<T> implements DepNode, Signal<T> {
   v = 0
   s: Link | undefined = undefined
   st: Link | undefined = undefined
-  ls: SubNode | undefined = undefined
   le = -1
+  f = 0
   _v: T
 
   constructor(initial: T) {
@@ -367,7 +361,6 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   v = 0
   s: Link | undefined = undefined
   st: Link | undefined = undefined
-  ls: SubNode | undefined = undefined
   le = -1
   f = COMPUTED | DIRTY | UNOBSERVED
   e = -1
@@ -376,7 +369,6 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   c: Link | undefined = undefined
   po: SubNode | undefined = undefined
   no: SubNode | undefined = undefined
-  nq: SubNode | undefined = undefined
   k: (() => void) | undefined = undefined
   o: Owner | undefined = undefined
   _f: () => T
@@ -401,21 +393,24 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
     }
   }
 
-  r(): void {
+  r(observe?: boolean): void {
     if (this.f & DISPOSED)
       return
     if (this.f & RUNNING)
       throw new Error('kay: cyclic computed')
     const prevSub = currentSub
     const prevOwner = currentOwner
-    // A first run for an observed reader links straight into the sources instead of attaching after the run.
-    if (this.d === undefined && prevSub !== undefined && !(prevSub.f & UNOBSERVED))
+    const w = writes
+    // A first run for an observed reader links straight into its sources; roll back if the compute throws.
+    const direct = observe && this.d === undefined
+    if (direct)
       this.f &= ~UNOBSERVED
     this.f = (this.f | RUNNING) & ~(DIRTY | CHECK)
     this.e = ++globalEpoch
     this.c = this.d
     currentSub = this
     currentOwner = undefined
+    let ok = false
     try {
       const next = (this._f)()
       if (!this._i || !Object.is(this._v, next)) {
@@ -423,11 +418,14 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
         this._i = true
         this.v++
       }
+      this.w = w
+      ok = true
     }
     finally {
       unlinkRemaining(this)
       this.f &= ~RUNNING
-      this.w = writes
+      if (direct && !ok && this.s === undefined)
+        unobserve(this)
       currentSub = prevSub
       currentOwner = prevOwner
     }
@@ -436,8 +434,8 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   get value(): T {
     if (!(this.f & DISPOSED)) {
       if (shouldRun(this))
-        this.r()
-      if (currentSub !== undefined)
+        this.r(currentSub !== undefined && !(currentSub.f & UNOBSERVED))
+      if (currentSub !== undefined && !(this.f & DISPOSED))
         linkSub(this, currentSub)
     }
     return this._v
@@ -459,7 +457,6 @@ class EffectNode implements SubNode, Owner {
   c: Link | undefined = undefined
   po: SubNode | undefined = undefined
   no: SubNode | undefined = undefined
-  nq: SubNode | undefined = undefined
   k: (() => void) | undefined = undefined
   o: Owner | undefined
   p: Owner | undefined
@@ -486,15 +483,18 @@ class EffectNode implements SubNode, Owner {
   r(): void {
     if (this.f & DISPOSED)
       return
+    this.f &= ~(DIRTY | CHECK)
     releaseOwned(this)
     if (this.k !== undefined) {
       const fn = this.k
       this.k = undefined
       fn()
     }
+    if (this.f & DISPOSED)
+      return
     const prevSub = currentSub
     const prevOwner = currentOwner
-    this.f = (this.f | RUNNING) & ~(DIRTY | CHECK)
+    this.f |= RUNNING
     this.e = ++globalEpoch
     this.c = this.d
     currentSub = this
@@ -519,6 +519,7 @@ class EffectNode implements SubNode, Owner {
 
 export function createOwner(parent: Owner | undefined = currentOwner): Owner {
   const owner: Owner = {
+    f: 0,
     p: parent,
     fc: undefined,
     ps: undefined,
@@ -649,7 +650,7 @@ export function computed<T>(fn: () => T): ReadonlySignal<T> {
 }
 
 export function effect(fn: () => void | (() => void)): () => void {
-  if (currentOwner === undefined && currentSub !== undefined && (currentSub.f & COMPUTED) && process.env.NODE_ENV !== 'production')
+  if (process.env.NODE_ENV !== 'production' && currentOwner === undefined && currentSub !== undefined && (currentSub.f & COMPUTED))
     console.warn('kay: effect() created while a computed runs has no owner and is never disposed. Create it in a component or an effect.')
   const node = new EffectNode(fn, currentOwner)
   node.r()

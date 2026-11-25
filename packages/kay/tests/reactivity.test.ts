@@ -242,6 +242,46 @@ describe('reactivity kernel', () => {
     const quad = computed(() => computed(() => s.value * 2).value * 2)
     expect(quad.value).toBe(8)
     expect(subscribed(s)).toBe(false)
+    expect((s as unknown as { ls?: unknown }).ls).toBeUndefined()
+  })
+
+  test('peek() or a throwing first run inside an observed effect leaves sources unsubscribed', () => {
+    const s = signal(1)
+    const peeked = computed(() => s.value * 2)
+    const stopPeek = effect(() => {
+      expect(peeked.peek()).toBe(2)
+    })
+    expect(subscribed(s)).toBe(false)
+    stopPeek()
+    expect(subscribed(s)).toBe(false)
+
+    const inner = computed(() => s.value + 1)
+    const failing = computed(() => {
+      void inner.value
+      throw new Error('boom')
+    })
+    const stopThrow = effect(() => {
+      try {
+        void failing.value
+      }
+      catch {}
+    })
+    expect([subscribed(s), subscribed(inner)]).toEqual([false, false])
+    stopThrow()
+    expect([subscribed(s), subscribed(inner)]).toEqual([false, false])
+  })
+
+  test('an unobserved computed clears subscriber neighbor pointers when detached', () => {
+    const s = signal(1)
+    const stop1 = effect(() => { void s.value })
+    const c = computed(() => s.value * 2)
+    const stopC = effect(() => { void c.value })
+    const stop2 = effect(() => { void s.value })
+    stopC()
+    const link = (c as unknown as { d?: { ps?: unknown, ns?: unknown } }).d!
+    expect([link.ps, link.ns]).toEqual([undefined, undefined])
+    stop1()
+    stop2()
   })
 
   test('a computed whose last effect is disposed releases its sources and follows them again when observed', () => {
@@ -308,6 +348,61 @@ describe('reactivity kernel', () => {
       open.value = false
     })
     expect(seen).toEqual(['Ada'])
+    dispose()
+  })
+
+  test('a parent effect whose cleanup throws runs once when queued after its child', () => {
+    const open = signal(true)
+    const user = signal(1)
+    let parentRuns = 0
+    const dispose = root((d) => {
+      effect(() => {
+        parentRuns++
+        if (open.value) {
+          effect(() => { void user.value })
+        }
+        return () => {
+          if (parentRuns === 1)
+            throw new Error('cleanup boom')
+        }
+      })
+      return d
+    })
+    expect(() => batch(() => {
+      user.value = 2
+      open.value = false
+    })).toThrow('cleanup boom')
+    expect(parentRuns).toBe(1)
+    dispose()
+  })
+
+  test('a self-retriggering parent queued after its child runs its second pass in the next round', () => {
+    const a = signal(0)
+    const b = signal(0)
+    const log: string[] = []
+    const dispose = root((d) => {
+      effect(() => {
+        const av = a.value
+        log.push(`parent:${av}`)
+        if (av === 0) {
+          effect(() => {
+            log.push(`child:${b.value}`)
+          })
+        }
+        if (av === 1)
+          a.value = 2
+      })
+      effect(() => {
+        log.push(`sibling:${a.value}:${b.value}`)
+      })
+      return d
+    })
+    log.length = 0
+    batch(() => {
+      b.value = 1
+      a.value = 1
+    })
+    expect(log).toEqual(['parent:1', 'sibling:2:1', 'parent:2'])
     dispose()
   })
 

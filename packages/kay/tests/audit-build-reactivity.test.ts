@@ -464,6 +464,15 @@ describe('audit #3526 — Box 36: disposed row owners & computeds unlink from pa
     expect(derivedRef!.value).toBe(10)
     expect(computeRuns).toBe(1)
     expect(rawSource.s).toBeUndefined()
+
+    // Disposing an unobserved computed must also clear lastSub on its source
+    const disposeUnobserved = root((d) => {
+      const c = computed(() => source.value * 3)
+      expect(c.value).toBe(6)
+      return d
+    })
+    disposeUnobserved()
+    expect(rawSource.ls).toBeUndefined()
   })
 })
 
