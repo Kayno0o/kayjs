@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "kay": "file:../packages/kay",
+    "@kayjs/kay": "file:../packages/kay",
     "@kayjs/content": "file:../packages/plugin-content",
     "@kayjs/icons": "file:../packages/plugin-icons",
     "@kayjs/images": "file:../packages/plugin-images",

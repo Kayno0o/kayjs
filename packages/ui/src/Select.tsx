@@ -1,8 +1,8 @@
-/** @jsxImportSource kay */
+/** @jsxImportSource @kayjs/kay */
 // Accessible custom Select (listbox) primitive with aria-activedescendant navigation + hidden input for native <form> submission.
 
-import type { Signal } from 'kay'
-import { effect, onCleanup, signal } from 'kay'
+import type { Signal } from '@kayjs/kay'
+import { effect, onCleanup, signal } from '@kayjs/kay'
 import { findFirstEnabledIndex, handleListKeyDown, nextUiId } from './behaviors'
 
 export interface SelectOption {

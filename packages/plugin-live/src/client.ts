@@ -1,7 +1,7 @@
 // Browser client helper for @kayjs/live SSE rooms (~65 LOC, zero dependencies).
 
-import type { Signal } from 'kay'
-import { onMount, signal } from 'kay'
+import type { Signal } from '@kayjs/kay'
+import { onMount, signal } from '@kayjs/kay'
 
 export type LiveStatus = 'connecting' | 'open' | 'closed'
 

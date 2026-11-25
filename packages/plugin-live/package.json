@@ -21,6 +21,6 @@
     "directory": "packages/plugin-live"
   },
   "peerDependencies": {
-    "kay": "^2.0.0-beta.0"
+    "@kayjs/kay": "^2.0.0-beta.0"
   }
 }

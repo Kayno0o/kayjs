@@ -1,7 +1,7 @@
 // @kayjs/live — Zero-dependency typed real-time rooms, coalesced presence, and SSE streaming for Kay v2.
 // Built strictly on Web Streams (text/event-stream) + KayPlugin (`api.route`) — zero core WebSocket coupling.
 
-import type { KayPlugin, RequestContext } from 'kay/server'
+import type { KayPlugin, RequestContext } from '@kayjs/kay/server'
 
 export interface Subscriber<TMember> {
   readonly id: string

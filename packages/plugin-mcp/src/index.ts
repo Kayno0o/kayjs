@@ -2,11 +2,11 @@
 // Exposes typed Kay v2 server `action()` handlers (and standalone tool handlers) as MCP tools
 // over a bearer-authenticated endpoint via `KayPlugin.server`, keeping core free of MCP code.
 
-import type { ActionContext, InferOutput, KayPlugin, RequestContext, ServerAction, StandardSchemaIssue, StandardSchemaV1 } from 'kay/server'
+import type { ActionContext, InferOutput, KayPlugin, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import type { CompactSchemaOptions, JsonSchemaObject } from './schema'
-import { definePlugin, nodeEnv } from 'kay/server'
+import { definePlugin, formatSchemaIssues, nodeEnv, validateSchema } from '@kayjs/kay/server'
 import { isPlainRecord, isStandardSchema, normalizeObjectSchema, schemaToJsonSchema } from './schema'
 
 export { compactSchema, schemaToJsonSchema } from './schema'
@@ -651,17 +651,6 @@ function extractBearerToken(request: Request): string | undefined {
   return token && token.length > 0 ? token : undefined
 }
 
-function formatSchemaIssues(issues: ReadonlyArray<StandardSchemaIssue>): string {
-  return issues
-    .map((issue) => {
-      const path = issue.path && issue.path.length > 0
-        ? issue.path.map(seg => (typeof seg === 'object' && seg !== null && 'key' in seg ? String(seg.key) : String(seg))).join('.')
-        : ''
-      return path ? `${path}: ${issue.message}` : issue.message
-    })
-    .join('; ')
-}
-
 function isMcpToolResult(value: unknown): value is McpToolResult {
   if (typeof value !== 'object' || value === null || !('content' in value))
     return false
@@ -746,24 +735,6 @@ function applyOutputBudget(result: McpToolResult, maxChars: number | undefined):
 
 const MAX_BATCH_SIZE = 50
 
-function makeActionContext(ctx: RequestContext): ActionContext {
-  return {
-    request: ctx.request,
-    url: ctx.url,
-    params: ctx.params,
-    cookies: ctx.cookies,
-    locals: ctx.locals,
-    ip: ctx.ip,
-    redirect: ctx.redirect,
-    deny(status, message, fieldErrors) {
-      return Response.json(
-        { ok: false, status, error: message, ...(fieldErrors !== undefined ? { fieldErrors } : {}) },
-        { status },
-      )
-    },
-  }
-}
-
 export function mcp(options: McpOptions): KayPlugin {
   const rawPath = options.path ?? '/mcp/tools'
   const endpoint = rawPath === '/' ? '/' : `/${rawPath.replace(/^\/+|\/+$/g, '')}`
@@ -824,17 +795,16 @@ export function mcp(options: McpOptions): KayPlugin {
 
     let input: unknown = args ?? {}
     if (tool.schema !== undefined) {
-      const checked = await tool.schema['~standard'].validate(input)
-      if (checked.issues && checked.issues.length > 0) {
+      const checked = await validateSchema(tool.schema, input)
+      if (!checked.ok) {
         return {
           content: [{ type: 'text', text: `Invalid arguments: ${formatSchemaIssues(checked.issues)}` }],
           isError: true,
         }
       }
-      input = (checked as { value: unknown }).value
+      input = checked.value
     }
 
-    const actionCtx = makeActionContext(ctx)
     try {
       let rawResult: unknown
       if (tool.action !== undefined && serverApi !== undefined) {
@@ -850,7 +820,7 @@ export function mcp(options: McpOptions): KayPlugin {
         rawResult = invoked.data
       }
       else {
-        rawResult = await tool.handler(input, actionCtx)
+        rawResult = await tool.handler(input, ctx)
       }
       let mcpResult: McpToolResult
       if (rawResult instanceof Response) {

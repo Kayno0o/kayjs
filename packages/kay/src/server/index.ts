@@ -38,7 +38,8 @@ export type { EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOp
 export { createServer } from './loader'
 export { DEFAULT_CSP, DEFAULT_HSTS, DEFAULT_PERMISSIONS_POLICY, getClientIp, isHttpsRequest, isTrustedOrigin, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, verifyOrigin, withCspHashes } from './security'
 export type { SecurityHeadersOptions, TrustProxy } from './security'
-export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
+export { formatIssuePath, formatSchemaIssues, validateSchema, validateSchemaSync } from './standard-schema'
+export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult, ValidationSuccess } from './standard-schema'
 
 interface LoadedPageModule {
   default?: (props: Record<string, unknown>) => Html | string | Promise<Html | string>

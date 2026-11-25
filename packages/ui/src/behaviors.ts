@@ -1,9 +1,9 @@
 // Headless signal behavior hooks (zero CSS, zero DOM lock-in — standard TSX `{...spread}`).
 // Every interactive primitive in @kayjs/ui is built on these hooks, and apps can use them directly!
 
-import type { ReadonlySignal, Signal } from 'kay'
+import type { ReadonlySignal, Signal } from '@kayjs/kay'
 import type { Tone } from './static'
-import { computed, selector, signal, useId } from 'kay'
+import { computed, selector, signal, useId } from '@kayjs/kay'
 
 // ---- Stable hydration-safe unique IDs for ARIA wiring ----
 

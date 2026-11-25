@@ -1,9 +1,9 @@
-/** @jsxImportSource kay */
+/** @jsxImportSource @kayjs/kay */
 // Zero-JS static & native-platform primitives (`0 KB` client JS!).
 // Emit only semantic `data-ui`, `data-part`, `data-variant`, `data-tone`, `data-layout` attributes.
 
-import type { Html, KayChild } from 'kay'
-import { createContext, provideContext, useContext } from 'kay'
+import type { Html, KayChild } from '@kayjs/kay'
+import { createContext, provideContext, useContext } from '@kayjs/kay'
 
 function escAttr(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')

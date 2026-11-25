@@ -36,21 +36,52 @@ export interface ValidationSuccess<T> {
 
 export type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure
 
+export function formatIssuePath(issue: StandardSchemaIssue): string {
+  if (!issue.path || issue.path.length === 0)
+    return ''
+  return issue.path
+    .map(seg => (typeof seg === 'object' && seg !== null && 'key' in seg ? String(seg.key) : String(seg)))
+    .join('.')
+}
+
+export function formatSchemaIssues(issues: ReadonlyArray<StandardSchemaIssue>): string {
+  return issues
+    .map((issue) => {
+      const path = formatIssuePath(issue)
+      return path ? `${path}: ${issue.message}` : issue.message
+    })
+    .join('; ')
+}
+
+function buildValidationFailure(issues: ReadonlyArray<StandardSchemaIssue>): ValidationFailure {
+  const fieldErrors: Record<string, string> = {}
+  for (const issue of issues) {
+    const key = formatIssuePath(issue)
+    if (!Object.hasOwn(fieldErrors, key))
+      Object.defineProperty(fieldErrors, key, { value: issue.message, enumerable: true, writable: true, configurable: true })
+  }
+  return { ok: false, issues, fieldErrors }
+}
+
+export function validateSchemaSync<S extends StandardSchemaV1>(
+  schema: S,
+  input: unknown,
+  asyncErrorMessage = 'kay: synchronous Standard Schema validator required',
+): ValidationResult<InferOutput<S>> {
+  const res = schema['~standard'].validate(input)
+  if (res instanceof Promise)
+    throw new TypeError(asyncErrorMessage)
+  if (res.issues && res.issues.length > 0)
+    return buildValidationFailure(res.issues)
+  return { ok: true, value: (res as { value: InferOutput<S> }).value }
+}
+
 export async function validateSchema<S extends StandardSchemaV1>(
   schema: S,
   input: unknown,
 ): Promise<ValidationResult<InferOutput<S>>> {
   const res = await schema['~standard'].validate(input)
-  if (res.issues && res.issues.length > 0) {
-    const fieldErrors: Record<string, string> = {}
-    for (const issue of res.issues) {
-      const key = issue.path && issue.path.length > 0
-        ? issue.path.map(seg => (typeof seg === 'object' && seg !== null && 'key' in seg ? String(seg.key) : String(seg))).join('.')
-        : ''
-      if (!Object.hasOwn(fieldErrors, key))
-        Object.defineProperty(fieldErrors, key, { value: issue.message, enumerable: true, writable: true, configurable: true })
-    }
-    return { ok: false, issues: res.issues, fieldErrors }
-  }
+  if (res.issues && res.issues.length > 0)
+    return buildValidationFailure(res.issues)
   return { ok: true, value: (res as { value: InferOutput<S> }).value }
 }

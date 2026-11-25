@@ -1,4 +1,4 @@
-/** @jsxImportSource kay */
+/** @jsxImportSource @kayjs/kay */
 import type { IconData } from './types'
 
 export interface IconComponentProps {

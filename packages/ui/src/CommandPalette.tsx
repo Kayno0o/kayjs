@@ -1,8 +1,8 @@
-/** @jsxImportSource kay */
+/** @jsxImportSource @kayjs/kay */
 // Accessible Cmd+K / Ctrl+K CommandPalette built on native `<dialog>` + fine-grained signals.
 
-import type { Signal } from 'kay'
-import { computed, effect, onMount, signal } from 'kay'
+import type { Signal } from '@kayjs/kay'
+import { computed, effect, onMount, signal } from '@kayjs/kay'
 import { handleListKeyDown, isDialogBackdropClick, nextUiId, syncDialogOpen } from './behaviors'
 
 export interface CommandItem {

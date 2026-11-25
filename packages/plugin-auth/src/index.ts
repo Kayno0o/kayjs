@@ -3,11 +3,11 @@
 // Supports Argon2id passwords, hashed DB sessions with sliding renewal, email verification,
 // magic links, OAuth 2.0 + PKCE (S256), role/route guards, RGPD helpers, and memory or `bun:sqlite` stores.
 
-import type { KayPlugin, Middleware, RequestContext, TrustProxy } from 'kay/server'
+import type { KayPlugin, Middleware, RequestContext, TrustProxy } from '@kayjs/kay/server'
 import type { OAuthProvider } from './oauth'
 import type { RateLimitOptions } from './ratelimit'
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
-import { isHttpsRequest, nodeEnv } from 'kay/server'
+import { isHttpsRequest, nodeEnv } from '@kayjs/kay/server'
 import { hashPassword, randomToken, safeRedirect, sha256Hex, verifyPassword } from './crypto'
 import { fail, formatSessionIp, isValidEmail, parseBody, resolveClientIp, wantsJson } from './http'
 import { registerOAuthRoutes } from './oauth-routes'

@@ -16,6 +16,8 @@
     "paths": {
       "kay": ["./packages/kay/src/index.ts"],
       "kay/*": ["./packages/kay/src/*"],
+      "@kayjs/kay": ["./packages/kay/src/index.ts"],
+      "@kayjs/kay/*": ["./packages/kay/src/*"],
       "@kayjs/icons": ["./packages/plugin-icons/src/index.ts"],
       "@kayjs/images": ["./packages/plugin-images/src/index.ts"],
       "@kayjs/seo": ["./packages/plugin-seo/src/index.ts"],

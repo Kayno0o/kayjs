@@ -1,8 +1,8 @@
 // renderMarkdown: Bun's native Markdown renderer plus highlight hook, embedded components, heading ids and TOC.
 
 import type { ContentHeading, MarkdownImageResolver, MarkdownImageResult, RenderMarkdownOptions } from './index'
-import { getAppContext } from 'kay/server'
-import { escAttr } from 'kay/ssr'
+import { getAppContext } from '@kayjs/kay/server'
+import { escAttr } from '@kayjs/kay/ssr'
 import { expandComponents } from './components'
 import { sanitizeMarkdownHtml } from './sanitize'
 

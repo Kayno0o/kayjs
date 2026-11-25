@@ -1,12 +1,12 @@
 // @kayjs/content — Zero-dependency Bun-native Markdown collections, nested YAML frontmatter (Bun.YAML),
 // Shiki/custom highlight hook, MDX-lite embedded TSX components, localized collections, TOC, and RSS (`0 KB` client JS).
 
-import type { KayPlugin, StandardSchemaV1 } from 'kay/server'
+import type { KayPlugin, StandardSchemaV1 } from '@kayjs/kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
-import { getAppContext } from 'kay/server'
+import { getAppContext, validateSchemaSync } from '@kayjs/kay/server'
 
-import { escAttr } from 'kay/ssr'
+import { escAttr } from '@kayjs/kay/ssr'
 import { renderMarkdown } from './markdown'
 
 export { renderMarkdown }
@@ -267,14 +267,16 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
 
     let data: TData
     if (options.schema !== undefined) {
-      const checked = options.schema['~standard'].validate(rawData)
-      if (checked instanceof Promise)
-        throw new TypeError(`@kayjs/content: async frontmatter schema is not supported (${slug})`)
-      if (checked.issues && checked.issues.length > 0) {
+      const checked = validateSchemaSync(
+        options.schema,
+        rawData,
+        `@kayjs/content: async frontmatter schema is not supported (${slug})`,
+      )
+      if (!checked.ok) {
         const msg = checked.issues.map(i => i.message).join('; ')
         throw new Error(`@kayjs/content: invalid frontmatter in "${absFile}": ${msg}`)
       }
-      data = (checked as { value: TData }).value
+      data = checked.value
     }
     else {
       data = rawData as TData

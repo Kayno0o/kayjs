@@ -1,9 +1,9 @@
-/** @jsxImportSource kay */
+/** @jsxImportSource @kayjs/kay */
 // Accessible native `<dialog>` primitive (top-layer, Esc-to-close, ::backdrop, focus return for free!).
 
-import type { KayChild, Signal } from 'kay'
+import type { KayChild, Signal } from '@kayjs/kay'
 import type { ButtonVariant } from './static'
-import { effect, signal } from 'kay'
+import { effect, signal } from '@kayjs/kay'
 import { isDialogBackdropClick, nextUiId, syncDialogOpen } from './behaviors'
 
 export interface DialogProps {

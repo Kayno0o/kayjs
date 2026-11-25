@@ -1,9 +1,9 @@
 // @kayjs/mail — Lightweight email delivery (Resend / custom transport / dev outbox) + `/_kay/mail` preview plugin.
 // Built strictly on the public KayPlugin API (server(api).route).
 
-import type { KayPlugin } from 'kay/server'
-import { DEFAULT_CSP, nodeEnv, withCspHashes } from 'kay/server'
-import { esc, escAttr } from 'kay/ssr'
+import type { KayPlugin } from '@kayjs/kay/server'
+import { DEFAULT_CSP, nodeEnv, withCspHashes } from '@kayjs/kay/server'
+import { esc, escAttr } from '@kayjs/kay/ssr'
 
 export type MailAddress = string | { name: string, address: string }
 

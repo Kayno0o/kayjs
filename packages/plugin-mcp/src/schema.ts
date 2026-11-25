@@ -1,6 +1,6 @@
 // JSON Schema extraction and compaction for MCP tools/list: strips boilerplate, form-coercion unions and no-op bounds.
 
-import type { StandardSchemaV1 } from 'kay/server'
+import type { StandardSchemaV1 } from '@kayjs/kay/server'
 
 const DEFAULT_FOLD_HOMOGENEOUS_MIN = 4
 const SAFE_INT_MIN = Number.MIN_SAFE_INTEGER

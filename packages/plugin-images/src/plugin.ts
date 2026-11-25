@@ -2,12 +2,12 @@
 // Built strictly on the public KayPlugin API (bunPlugins + build(ctx).emitAsset).
 
 import type { BunPlugin } from 'bun'
-import type { KayPlugin } from 'kay/server'
+import type { KayPlugin } from '@kayjs/kay/server'
 import type { ShareCardDefaults } from './card'
 import type { ImageAsset } from './helpers'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
-import { getAppContext } from 'kay/server'
+import { getAppContext } from '@kayjs/kay/server'
 import { hasMagick, SHARE_CARD_CONFIG_SERVICE } from './card'
 
 export const CONTENT_IMAGE_RESOLVER_SERVICE = 'kay.content.imageResolver'
@@ -54,6 +54,22 @@ interface CachedImageMeta {
   files: { rel: string, width: number, format: string }[]
 }
 
+interface VariantEncodeJob {
+  fileName: string
+  cachedFile: string
+  width: number
+  format: 'avif' | 'webp'
+  quality: number
+}
+
+interface VariantPipelineConfig {
+  widths: number[]
+  formats: ('avif' | 'webp')[]
+  quality: number
+  avifQuality: number
+  cachePrefix: string
+}
+
 function identifyImage(filePath: string): { width: number, height: number } | undefined {
   const proc = Bun.spawnSync(['magick', 'identify', '-ping', '-format', '%w %h', `${filePath}[0]`], {
     stdout: 'pipe',
@@ -80,15 +96,18 @@ function writeFileAtomic(dstPath: string, data: string | Uint8Array): void {
   }
 }
 
-function encodeVariant(srcPath: string, dstPath: string, width: number, quality: number): boolean {
+function variantTmpPath(dstPath: string): string {
   const ext = extname(dstPath)
   const stem = ext !== '' ? dstPath.slice(0, -ext.length) : dstPath
-  const tmpPath = `${stem}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}${ext}`
-  const proc = Bun.spawnSync(
-    ['magick', `${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), tmpPath],
-    { stdout: 'pipe', stderr: 'pipe' },
-  )
-  if (proc.exitCode === 0 && existsSync(tmpPath)) {
+  return `${stem}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}${ext}`
+}
+
+function magickResizeArgs(srcPath: string, width: number, quality: number, tmpPath: string): string[] {
+  return ['magick', `${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), tmpPath]
+}
+
+function finalizeEncodedVariant(exitCode: number, tmpPath: string, dstPath: string): boolean {
+  if (exitCode === 0 && existsSync(tmpPath)) {
     try {
       renameSync(tmpPath, dstPath)
     }
@@ -101,26 +120,98 @@ function encodeVariant(srcPath: string, dstPath: string, width: number, quality:
   return false
 }
 
+function encodeVariant(srcPath: string, dstPath: string, width: number, quality: number): boolean {
+  const tmpPath = variantTmpPath(dstPath)
+  const proc = Bun.spawnSync(magickResizeArgs(srcPath, width, quality, tmpPath), { stdout: 'pipe', stderr: 'pipe' })
+  return finalizeEncodedVariant(proc.exitCode, tmpPath, dstPath)
+}
+
 async function encodeVariantAsync(srcPath: string, dstPath: string, width: number, quality: number): Promise<boolean> {
-  const ext = extname(dstPath)
-  const stem = ext !== '' ? dstPath.slice(0, -ext.length) : dstPath
-  const tmpPath = `${stem}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}${ext}`
-  const proc = Bun.spawn(
-    ['magick', `${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), tmpPath],
-    { stdout: 'pipe', stderr: 'pipe' },
-  )
-  const exitCode = await proc.exited
-  if (exitCode === 0 && existsSync(tmpPath)) {
-    try {
-      renameSync(tmpPath, dstPath)
-    }
-    catch {
-      rmSync(tmpPath, { force: true })
-    }
-    return existsSync(dstPath)
+  const tmpPath = variantTmpPath(dstPath)
+  const proc = Bun.spawn(magickResizeArgs(srcPath, width, quality, tmpPath), { stdout: 'pipe', stderr: 'pipe' })
+  return finalizeEncodedVariant(await proc.exited, tmpPath, dstPath)
+}
+
+function computeImageKey(srcPath: string, rawBytes: Uint8Array, cfg: VariantPipelineConfig): { hash: string, stem: string, rawFileName: string } {
+  const ext = extname(srcPath).toLowerCase()
+  const hash = Bun.hash(`${Bun.hash(rawBytes)}:${cfg.widths.join(',')}:${cfg.formats.join(',')}:${cfg.quality}:${cfg.avifQuality}`).toString(36)
+  const stem = basename(srcPath, extname(srcPath)).toLowerCase().replace(/[^a-z0-9-_]/g, '-')
+  return { hash, stem, rawFileName: `${stem}-${hash}${ext}` }
+}
+
+function readCachedMeta(metaPath: string, cacheRoot: string, cachePrefix: string): CachedImageMeta | undefined {
+  if (!existsSync(metaPath))
+    return undefined
+  try {
+    const parsed = JSON.parse(readFileSync(metaPath, 'utf8')) as CachedImageMeta
+    if (parsed.files.every(f => existsSync(join(cacheRoot, `${cachePrefix}${basename(f.rel)}`))))
+      return parsed
   }
-  rmSync(tmpPath, { force: true })
-  return false
+  catch {
+    return undefined
+  }
+  return undefined
+}
+
+function planVariantJobs(
+  dims: { width: number, height: number },
+  stem: string,
+  hash: string,
+  cacheRoot: string,
+  cfg: VariantPipelineConfig,
+): VariantEncodeJob[] {
+  const targetWidths = cfg.widths.filter(w => w < dims.width)
+  targetWidths.push(dims.width)
+  const jobs: VariantEncodeJob[] = []
+  for (const w of targetWidths) {
+    for (const fmt of cfg.formats) {
+      const fileName = `${stem}-${hash}-${w}w.${fmt}`
+      jobs.push({
+        fileName,
+        cachedFile: join(cacheRoot, `${cfg.cachePrefix}${fileName}`),
+        width: w,
+        format: fmt,
+        quality: fmt === 'avif' ? cfg.avifQuality : cfg.quality,
+      })
+    }
+  }
+  return jobs
+}
+
+function assembleImageAsset(
+  meta: CachedImageMeta,
+  cacheRoot: string,
+  cachePrefix: string,
+  urlPrefix: string,
+  emitVariant: (rel: string, fileName: string, cachedFile: string) => void,
+): ImageAsset {
+  const webpEntries: string[] = []
+  const avifEntries: string[] = []
+  let fallbackSrc = ''
+
+  for (const f of meta.files) {
+    const fileName = basename(f.rel)
+    const cachedFile = join(cacheRoot, `${cachePrefix}${fileName}`)
+    emitVariant(f.rel, fileName, cachedFile)
+    const url = `${urlPrefix}/${f.rel}`
+    if (f.format === 'webp') {
+      webpEntries.push(`${url} ${f.width}w`)
+      fallbackSrc = url
+    }
+    else if (f.format === 'avif') {
+      avifEntries.push(`${url} ${f.width}w`)
+      if (fallbackSrc === '')
+        fallbackSrc = url
+    }
+  }
+
+  return {
+    src: fallbackSrc,
+    width: meta.width,
+    height: meta.height,
+    ...(webpEntries.length > 0 ? { webpSrcset: webpEntries.join(', ') } : {}),
+    ...(avifEntries.length > 0 ? { avifSrcset: avifEntries.join(', ') } : {}),
+  }
 }
 
 interface PersistedImagesConfig {
@@ -152,6 +243,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       const cacheRoot = resolve(root, cacheDirRel)
       lastCacheRoot = cacheRoot
       const prefix = assetPrefix.replace(/\/$/, '')
+      const pipelineCfg: VariantPipelineConfig = { widths, formats, quality, avifQuality, cachePrefix: '' }
 
       return [{
         name: 'kayjs-images',
@@ -161,105 +253,46 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
               return undefined
 
             const rawBytes = new Uint8Array(readFileSync(args.path))
-            const hash = Bun.hash(`${Bun.hash(rawBytes)}:${widths.join(',')}:${formats.join(',')}:${quality}:${avifQuality}`).toString(36)
-            const stem = basename(args.path, extname(args.path)).toLowerCase().replace(/[^a-z0-9-_]/g, '-')
-
-            if (!magickAvailable) {
-              const rel = `img/${stem}-${hash}${extname(args.path).toLowerCase()}`
+            const { hash, stem, rawFileName } = computeImageKey(args.path, rawBytes, pipelineCfg)
+            const emitRaw = (width: number, height: number) => {
+              const rel = `img/${rawFileName}`
               emittedAssets.set(rel, rawBytes)
-              const asset: ImageAsset = { src: `${prefix}/${rel}`, width: 0, height: 0 }
-              return { contents: `export default ${JSON.stringify(asset)};\n`, loader: 'js' }
+              const asset: ImageAsset = { src: `${prefix}/${rel}`, width, height }
+              return { contents: `export default ${JSON.stringify(asset)};\n`, loader: 'js' as const }
             }
+
+            if (!magickAvailable)
+              return emitRaw(0, 0)
 
             mkdirSync(cacheRoot, { recursive: true })
             const metaName = `${stem}-${hash}.json`
             const metaPath = join(cacheRoot, metaName)
             activeCacheFiles.add(metaName)
-            let meta: CachedImageMeta | undefined
-
-            if (existsSync(metaPath)) {
-              try {
-                const parsed = JSON.parse(readFileSync(metaPath, 'utf8')) as CachedImageMeta
-                if (parsed.files.every(f => existsSync(join(cacheRoot, basename(f.rel)))))
-                  meta = parsed
-              }
-              catch {
-                meta = undefined
-              }
-            }
+            let meta = readCachedMeta(metaPath, cacheRoot, '')
 
             if (meta === undefined) {
               const dims = identifyImage(args.path)
-              if (dims === undefined) {
-                const rel = `img/${stem}-${hash}${extname(args.path).toLowerCase()}`
-                emittedAssets.set(rel, rawBytes)
-                const asset: ImageAsset = { src: `${prefix}/${rel}`, width: 0, height: 0 }
-                return { contents: `export default ${JSON.stringify(asset)};\n`, loader: 'js' }
-              }
+              if (dims === undefined)
+                return emitRaw(0, 0)
 
-              const targetWidths = widths.filter(w => w < dims.width)
-              targetWidths.push(dims.width)
-              const jobs: { fileName: string, cachedFile: string, width: number, format: 'avif' | 'webp', quality: number }[] = []
-              for (const w of targetWidths) {
-                for (const fmt of formats) {
-                  const fileName = `${stem}-${hash}-${w}w.${fmt}`
-                  jobs.push({
-                    fileName,
-                    cachedFile: join(cacheRoot, fileName),
-                    width: w,
-                    format: fmt,
-                    quality: fmt === 'avif' ? avifQuality : quality,
-                  })
-                }
-              }
-
+              const jobs = planVariantJobs(dims, stem, hash, cacheRoot, pipelineCfg)
               const encoded = await Promise.all(jobs.map(async (job) => {
                 const ok = existsSync(job.cachedFile) || await encodeVariantAsync(args.path, job.cachedFile, job.width, job.quality)
                 return ok ? { rel: `img/${job.fileName}`, width: job.width, format: job.format } : undefined
               }))
               const files: CachedImageMeta['files'] = encoded.filter((entry): entry is NonNullable<typeof entry> => entry !== undefined)
-
-              if (files.length === 0) {
-                const rel = `img/${stem}-${hash}${extname(args.path).toLowerCase()}`
-                emittedAssets.set(rel, rawBytes)
-                const asset: ImageAsset = { src: `${prefix}/${rel}`, width: dims.width, height: dims.height }
-                return { contents: `export default ${JSON.stringify(asset)};\n`, loader: 'js' }
-              }
+              if (files.length === 0)
+                return emitRaw(dims.width, dims.height)
 
               meta = { width: dims.width, height: dims.height, files }
               writeFileAtomic(metaPath, JSON.stringify(meta))
             }
 
-            const webpEntries: string[] = []
-            const avifEntries: string[] = []
-            let fallbackSrc = ''
-
-            for (const f of meta.files) {
-              const cacheFileName = basename(f.rel)
-              activeCacheFiles.add(cacheFileName)
-              const cachedFile = join(cacheRoot, cacheFileName)
-              if (!emittedAssets.has(f.rel))
-                emittedAssets.set(f.rel, new Uint8Array(readFileSync(cachedFile)))
-              const url = `${prefix}/${f.rel}`
-              if (f.format === 'webp') {
-                webpEntries.push(`${url} ${f.width}w`)
-                fallbackSrc = url
-              }
-              else if (f.format === 'avif') {
-                avifEntries.push(`${url} ${f.width}w`)
-                if (fallbackSrc === '')
-                  fallbackSrc = url
-              }
-            }
-
-            const asset: ImageAsset = {
-              src: fallbackSrc,
-              width: meta.width,
-              height: meta.height,
-              ...(webpEntries.length > 0 ? { webpSrcset: webpEntries.join(', ') } : {}),
-              ...(avifEntries.length > 0 ? { avifSrcset: avifEntries.join(', ') } : {}),
-            }
-
+            const asset = assembleImageAsset(meta, cacheRoot, '', prefix, (rel, fileName, cachedFile) => {
+              activeCacheFiles.add(fileName)
+              if (!emittedAssets.has(rel))
+                emittedAssets.set(rel, new Uint8Array(readFileSync(cachedFile)))
+            })
             return { contents: `export default ${JSON.stringify(asset)};\n`, loader: 'js' }
           })
         },
@@ -352,104 +385,56 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
   if (!ALLOWED_IMAGE_EXTS.has(ext))
     throw new Error(`@kayjs/images: unsupported image extension "${ext || '(none)'}" for "${absPath}"`)
 
-  const widths = (options.widths ?? [640, 1280]).slice().sort((a, b) => a - b)
-  const formats = options.formats ?? ['webp']
-  const quality = options.quality ?? 80
-  const avifQuality = options.avifQuality ?? 55
+  const pipelineCfg: VariantPipelineConfig = {
+    widths: (options.widths ?? [640, 1280]).slice().sort((a, b) => a - b),
+    formats: options.formats ?? ['webp'],
+    quality: options.quality ?? 80,
+    avifQuality: options.avifQuality ?? 55,
+    cachePrefix: 'md-',
+  }
   const appCtx = getAppContext()
   const outPublicDir = resolve(options.outPublicDir ?? appCtx?.publicDir ?? 'dist/public')
   const imgOutDir = join(outPublicDir, 'img')
   mkdirSync(imgOutDir, { recursive: true })
 
   const rawBytes = new Uint8Array(readFileSync(absPath))
-  const hash = Bun.hash(`${Bun.hash(rawBytes)}:${widths.join(',')}:${formats.join(',')}:${quality}:${avifQuality}`).toString(36)
-  const stem = basename(absPath, extname(absPath)).toLowerCase().replace(/[^a-z0-9-_]/g, '-')
-
-  if (!hasMagick()) {
-    const fileName = `${stem}-${hash}${extname(absPath).toLowerCase()}`
-    writeFileSync(join(imgOutDir, fileName), rawBytes)
-    appCtx?.registerPublicFile(`img/${fileName}`)
-    return { src: `/img/${fileName}`, width: 0, height: 0 }
+  const { hash, stem, rawFileName } = computeImageKey(absPath, rawBytes, pipelineCfg)
+  const emitRaw = (width: number, height: number): ImageAsset => {
+    writeFileSync(join(imgOutDir, rawFileName), rawBytes)
+    appCtx?.registerPublicFile(`img/${rawFileName}`)
+    return { src: `/img/${rawFileName}`, width, height }
   }
+
+  if (!hasMagick())
+    return emitRaw(0, 0)
 
   const cacheRoot = resolve(options.cacheDir ?? '.kay-cache/images')
   mkdirSync(cacheRoot, { recursive: true })
   const metaPath = join(cacheRoot, `md-${stem}-${hash}.json`)
-  let meta: CachedImageMeta | undefined
-
-  if (existsSync(metaPath)) {
-    try {
-      const parsed = JSON.parse(readFileSync(metaPath, 'utf8')) as CachedImageMeta
-      if (parsed.files.every(f => existsSync(join(cacheRoot, `md-${basename(f.rel)}`))))
-        meta = parsed
-    }
-    catch {
-      meta = undefined
-    }
-  }
+  let meta = readCachedMeta(metaPath, cacheRoot, 'md-')
 
   if (meta === undefined) {
     const dims = identifyImage(absPath)
-    if (dims === undefined) {
-      const fileName = `${stem}-${hash}${extname(absPath).toLowerCase()}`
-      writeFileSync(join(imgOutDir, fileName), rawBytes)
-      appCtx?.registerPublicFile(`img/${fileName}`)
-      return { src: `/img/${fileName}`, width: 0, height: 0 }
-    }
+    if (dims === undefined)
+      return emitRaw(0, 0)
 
-    const targetWidths = widths.filter(w => w < dims.width)
-    targetWidths.push(dims.width)
+    const jobs = planVariantJobs(dims, stem, hash, cacheRoot, pipelineCfg)
     const files: CachedImageMeta['files'] = []
-
-    for (const w of targetWidths) {
-      for (const fmt of formats) {
-        const fileName = `${stem}-${hash}-${w}w.${fmt}`
-        const cachedFile = join(cacheRoot, `md-${fileName}`)
-        const q = fmt === 'avif' ? avifQuality : quality
-        if (existsSync(cachedFile) || encodeVariant(absPath, cachedFile, w, q))
-          files.push({ rel: `img/${fileName}`, width: w, format: fmt })
-      }
+    for (const job of jobs) {
+      if (existsSync(job.cachedFile) || encodeVariant(absPath, job.cachedFile, job.width, job.quality))
+        files.push({ rel: `img/${job.fileName}`, width: job.width, format: job.format })
     }
-
-    if (files.length === 0) {
-      const fileName = `${stem}-${hash}${extname(absPath).toLowerCase()}`
-      writeFileSync(join(imgOutDir, fileName), rawBytes)
-      appCtx?.registerPublicFile(`img/${fileName}`)
-      return { src: `/img/${fileName}`, width: dims.width, height: dims.height }
-    }
+    if (files.length === 0)
+      return emitRaw(dims.width, dims.height)
 
     meta = { width: dims.width, height: dims.height, files }
     writeFileAtomic(metaPath, JSON.stringify(meta))
   }
 
-  const webpEntries: string[] = []
-  const avifEntries: string[] = []
-  let fallbackSrc = ''
-
-  for (const f of meta.files) {
-    const fileName = basename(f.rel)
-    const cachedFile = join(cacheRoot, `md-${fileName}`)
+  return assembleImageAsset(meta, cacheRoot, 'md-', '', (_rel, fileName, cachedFile) => {
     writeFileSync(join(imgOutDir, fileName), readFileSync(cachedFile))
     appCtx?.registerPublicFile(`img/${fileName}`)
-    const url = `/img/${fileName}`
-    if (f.format === 'webp') {
-      webpEntries.push(`${url} ${f.width}w`)
-      fallbackSrc = url
-    }
-    else if (f.format === 'avif') {
-      avifEntries.push(`${url} ${f.width}w`)
-      if (fallbackSrc === '')
-        fallbackSrc = url
-    }
-  }
-
-  return {
-    src: fallbackSrc,
-    width: meta.width,
-    height: meta.height,
-    ...(webpEntries.length > 0 ? { webpSrcset: webpEntries.join(', ') } : {}),
-    ...(avifEntries.length > 0 ? { avifSrcset: avifEntries.join(', ') } : {}),
-  }
+  })
 }
 
 export interface MarkdownImageResolverOptions extends OptimizeImageFileOptions {

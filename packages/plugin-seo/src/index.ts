@@ -1,11 +1,11 @@
 // @kayjs/seo — SEO metadata, titleTemplate, JSON-LD, sitemap.xml, redirects, manifest, favicon, and self-hosted fonts.
 // Built strictly on the public KayPlugin API (server, build, transformHtml).
 
-import type { Html } from 'kay'
-import type { KayPlugin } from 'kay/server'
+import type { Html } from '@kayjs/kay'
+import type { KayPlugin } from '@kayjs/kay/server'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, extname, resolve } from 'node:path'
-import { escAttr, raw } from 'kay/ssr'
+import { escAttr, raw } from '@kayjs/kay/ssr'
 
 export interface FontEntry {
   family: string

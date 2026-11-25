@@ -1,7 +1,7 @@
 // Request parsing and client-address helpers shared by the auth routes.
 
-import type { RequestContext, TrustProxy } from 'kay/server'
-import { getClientIp } from 'kay/server'
+import type { RequestContext, TrustProxy } from '@kayjs/kay/server'
+import { getClientIp } from '@kayjs/kay/server'
 
 export function wantsJson(req: Request): boolean {
   const accept = req.headers.get('accept') ?? ''

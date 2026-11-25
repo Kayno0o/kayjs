@@ -1,8 +1,8 @@
-/** @jsxImportSource kay */
+/** @jsxImportSource @kayjs/kay */
 // Accessible dropdown Menu primitive with aria-activedescendant navigation, Escape/Tab close & click-outside dismiss.
 
 import type { ButtonVariant } from './static'
-import { effect, onCleanup, signal } from 'kay'
+import { effect, onCleanup, signal } from '@kayjs/kay'
 import { findFirstEnabledIndex, handleListKeyDown, nextUiId } from './behaviors'
 
 export interface MenuItemDef {

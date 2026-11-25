@@ -2,7 +2,7 @@
 // hreflang alternates, Intl formatters, and CLI missing-key check.
 // Implemented 100% through KayPlugin public hooks — zero i18n logic in @kay/core.
 
-import type { KayPlugin } from 'kay/server'
+import type { KayPlugin } from '@kayjs/kay/server'
 
 export interface I18nOptions {
   locales: string[]

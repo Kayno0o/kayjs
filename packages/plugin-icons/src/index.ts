@@ -3,7 +3,7 @@
 // Built strictly on the public KayPlugin API (bunPlugins).
 
 import type { BunPlugin } from 'bun'
-import type { KayPlugin } from 'kay/server'
+import type { KayPlugin } from '@kayjs/kay/server'
 import type { IconData, IconifyIcon, IconSet } from './types'
 
 export { Icon } from './Icon'

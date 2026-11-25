@@ -1,4 +1,4 @@
-/** @jsxImportSource kay */
+/** @jsxImportSource @kayjs/kay */
 // Interactive DataTable island powered by headless `createDataTable()` signals (sort, filter, select, paginate).
 
 import { createDataTable } from './behaviors'

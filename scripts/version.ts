@@ -69,8 +69,12 @@ for (const p of manifests) {
     peerDependencies?: Record<string, string>
   }
   pkg.version = next
-  if (pkg.peerDependencies && 'kay' in pkg.peerDependencies)
-    pkg.peerDependencies.kay = `^${next}`
+  if (pkg.peerDependencies) {
+    if ('@kayjs/kay' in pkg.peerDependencies)
+      pkg.peerDependencies['@kayjs/kay'] = `^${next}`
+    if ('kay' in pkg.peerDependencies)
+      pkg.peerDependencies.kay = `^${next}`
+  }
   writeFileSync(p, `${JSON.stringify(pkg, null, 2)}\n`)
 }
 
