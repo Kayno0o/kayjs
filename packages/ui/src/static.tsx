@@ -8,6 +8,12 @@ export type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger'
 export type ButtonVariant = 'solid' | 'outline' | 'ghost'
 export type Size = 'sm' | 'md' | 'lg'
 
+interface BoxProps {
+  class?: string | undefined
+  children?: KayChild | undefined
+  [attr: string]: unknown
+}
+
 export interface ButtonProps {
   variant?: ButtonVariant | undefined
   tone?: Tone | undefined
@@ -35,32 +41,32 @@ export function Button({ variant = 'solid', tone, size = 'md', href, type = 'but
   )
 }
 
-export function Badge({ tone, class: cls, children, ...rest }: { tone?: Tone | undefined, class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
+export function Badge({ tone, class: cls, children, ...rest }: BoxProps & { tone?: Tone | undefined }) {
   return <span data-ui="badge" data-tone={tone} class={cls} {...rest}>{children}</span>
 }
 
-export function Notice({ tone, role = 'status', class: cls, children, ...rest }: { tone?: Tone | undefined, role?: 'status' | 'alert' | 'note' | undefined, class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
+export function Notice({ tone, role = 'status', class: cls, children, ...rest }: BoxProps & { tone?: Tone | undefined, role?: 'status' | 'alert' | 'note' | undefined }) {
   return <div data-ui="notice" data-tone={tone} role={role} class={cls} {...rest}>{children}</div>
 }
 
-export function Card({ class: cls, children, ...rest }: { class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
+export function Card({ class: cls, children, ...rest }: BoxProps) {
   return <section data-ui="card" class={cls} {...rest}>{children}</section>
 }
 
-export function CardHeader({ class: cls, children, ...rest }: { class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
+export function CardHeader({ class: cls, children, ...rest }: BoxProps) {
   return <header data-part="header" class={cls} {...rest}>{children}</header>
 }
 
-export function CardBody({ class: cls, children, ...rest }: { class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
+export function CardBody({ class: cls, children, ...rest }: BoxProps) {
   return <div data-part="body" class={cls} {...rest}>{children}</div>
 }
 
-export function CardFooter({ class: cls, children, ...rest }: { class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
+export function CardFooter({ class: cls, children, ...rest }: BoxProps) {
   return <footer data-part="footer" class={cls} {...rest}>{children}</footer>
 }
 
 /** Zero-JS native `<details>` accordion (`name` enables exclusive mode natively in the browser). */
-export function Accordion({ class: cls, children, ...rest }: { class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
+export function Accordion({ class: cls, children, ...rest }: BoxProps) {
   return <div data-ui="accordion" class={cls} {...rest}>{children}</div>
 }
 
@@ -341,24 +347,27 @@ export function RadioGroup({ name, legend, options, defaultValue, class: cls }: 
 
 // ---- Every Layout primitives (pure CSS, 0 KB JS) ----
 
-export function Stack({ gap, class: cls, children, ...rest }: { gap?: string | undefined, class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
-  return <div data-layout="stack" style={gap ? `--ui-gap:${gap}` : undefined} class={cls} {...rest}>{children}</div>
+function layoutStyle(vars: Record<string, string | undefined>): string | undefined {
+  const decls = Object.entries(vars).filter(([, v]) => v).map(([k, v]) => `--ui-${k}:${v}`)
+  return decls.length > 0 ? decls.join(';') : undefined
 }
 
-export function Cluster({ gap, class: cls, children, ...rest }: { gap?: string | undefined, class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
-  return <div data-layout="cluster" style={gap ? `--ui-gap:${gap}` : undefined} class={cls} {...rest}>{children}</div>
+export function Stack({ gap, class: cls, children, ...rest }: BoxProps & { gap?: string | undefined }) {
+  return <div data-layout="stack" style={layoutStyle({ gap })} class={cls} {...rest}>{children}</div>
 }
 
-export function Grid({ min, gap, class: cls, children, ...rest }: { min?: string | undefined, gap?: string | undefined, class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
-  const style = [min ? `--ui-min:${min}` : '', gap ? `--ui-gap:${gap}` : ''].filter(Boolean).join(';') || undefined
-  return <div data-layout="grid" style={style} class={cls} {...rest}>{children}</div>
+export function Cluster({ gap, class: cls, children, ...rest }: BoxProps & { gap?: string | undefined }) {
+  return <div data-layout="cluster" style={layoutStyle({ gap })} class={cls} {...rest}>{children}</div>
 }
 
-export function Sidebar({ side, gap, class: cls, children, ...rest }: { side?: string | undefined, gap?: string | undefined, class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
-  const style = [side ? `--ui-side:${side}` : '', gap ? `--ui-gap:${gap}` : ''].filter(Boolean).join(';') || undefined
-  return <div data-layout="sidebar" style={style} class={cls} {...rest}>{children}</div>
+export function Grid({ min, gap, class: cls, children, ...rest }: BoxProps & { min?: string | undefined, gap?: string | undefined }) {
+    return <div data-layout="grid" style={layoutStyle({ min, gap })} class={cls} {...rest}>{children}</div>
 }
 
-export function Split({ gap, class: cls, children, ...rest }: { gap?: string | undefined, class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
-  return <div data-layout="split" style={gap ? `--ui-gap:${gap}` : undefined} class={cls} {...rest}>{children}</div>
+export function Sidebar({ side, gap, class: cls, children, ...rest }: BoxProps & { side?: string | undefined, gap?: string | undefined }) {
+    return <div data-layout="sidebar" style={layoutStyle({ side, gap })} class={cls} {...rest}>{children}</div>
+}
+
+export function Split({ gap, class: cls, children, ...rest }: BoxProps & { gap?: string | undefined }) {
+  return <div data-layout="split" style={layoutStyle({ gap })} class={cls} {...rest}>{children}</div>
 }
