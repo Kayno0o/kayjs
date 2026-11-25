@@ -4,13 +4,23 @@
 import type { KayPlugin, StandardSchemaV1 } from '@kayjs/kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
-import { getAppContext, validateSchemaSync } from '@kayjs/kay/server'
+import { formatIssuePath, getAppContext, validateSchemaSync } from '@kayjs/kay/server'
 
 import { escAttr } from '@kayjs/kay/ssr'
 import { renderMarkdown } from './markdown'
 
 export { renderMarkdown }
 const COLLECTION_VERSION_KEY = Symbol.for('kay.content.collectionVersion')
+const COLLECTION_VALIDATE_KEY = Symbol.for('kay.content.validateAll')
+const COLLECTION_DIR_FOR_ROOT_KEY = Symbol.for('kay.content.dirForRoot')
+
+interface InternalCollection extends Collection<unknown> {
+  [COLLECTION_VERSION_KEY]?: () => number
+  [COLLECTION_VALIDATE_KEY]?: (root: string) => string[]
+  [COLLECTION_DIR_FOR_ROOT_KEY]?: (root?: string) => string
+}
+
+const registeredCollections = new Set<InternalCollection>()
 
 export interface ContentHeading {
   level: number
@@ -140,10 +150,10 @@ export function parseFrontmatter(source: string): { data: Record<string, unknown
   return { data, body }
 }
 
-function resolveCollectionDir(dir: string): string {
+function resolveCollectionDir(dir: string, explicitRoot?: string): string {
   if (isAbsolute(dir))
     return dir
-  const kayRoot = getAppContext()?.root
+  const kayRoot = explicitRoot ?? getAppContext()?.root
   if (typeof kayRoot === 'string' && kayRoot !== '') {
     const candidate = resolve(kayRoot, dir)
     if (existsSync(candidate))
@@ -188,6 +198,93 @@ export interface CollectionOptionsWithSchema<TData> extends Omit<CollectionOptio
 
 export interface CollectionOptionsWithoutSchema extends Omit<CollectionOptions<Record<string, unknown>>, 'schema'> {
   schema?: undefined
+}
+
+function findFrontmatterFieldLine(rawSource: string, fieldPath: string | undefined): number {
+  const normalized = rawSource.replace(/\r\n/g, '\n')
+  if (!normalized.startsWith('---\n'))
+    return 1
+  const end = normalized.indexOf('\n---', 4)
+  if (end === -1)
+    return 1
+  if (!fieldPath)
+    return 2
+  const topKey = fieldPath.split('.')[0] ?? fieldPath
+  const escaped = topKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const keyRe = new RegExp(`^\\s*${escaped}\\s*:`)
+  const lines = normalized.slice(4, end).split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    if (keyRe.test(lines[i]!))
+      return i + 2
+  }
+  return 2
+}
+
+function validateCollectionFiles(
+  absDir: string,
+  root: string,
+  schema: StandardSchemaV1 | undefined,
+): string[] {
+  if (!existsSync(absDir))
+    return []
+  const errors: string[] = []
+  for (const absFile of walkMarkdownFiles(absDir).sort()) {
+    const rel = relative(root, absFile).replace(/\\/g, '/')
+    const rawSource = readFileSync(absFile, 'utf8')
+    let rawData: Record<string, unknown>
+    try {
+      rawData = parseFrontmatter(rawSource).data
+    }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      errors.push(`${rel}:1:1: error: @kayjs/content: invalid YAML frontmatter: ${msg}`)
+      continue
+    }
+    if (schema === undefined)
+      continue
+    const checked = validateSchemaSync(
+      schema,
+      rawData,
+      `@kayjs/content: async frontmatter schema is not supported (${rel})`,
+    )
+    if (!checked.ok) {
+      for (const issue of checked.issues) {
+        const path = formatIssuePath(issue)
+        const line = findFrontmatterFieldLine(rawSource, path || undefined)
+        errors.push(`${rel}:${line}:1: error: @kayjs/content: ${path ? `${path}: ` : ''}${issue.message}`)
+      }
+    }
+  }
+  return errors
+}
+
+function walkCollectionDefFiles(dir: string, out: string[] = []): string[] {
+  if (!existsSync(dir))
+    return out
+  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+    if (ent.name === 'node_modules' || ent.name === 'dist' || ent.name.startsWith('.') || ent.name === 'routes')
+      continue
+    const full = join(dir, ent.name)
+    if (ent.isDirectory())
+      walkCollectionDefFiles(full, out)
+    else if (ent.isFile() && ent.name.endsWith('.ts') && !ent.name.endsWith('.d.ts') && !/\.(?:test|spec)\.ts$/.test(ent.name))
+      out.push(full)
+  }
+  return out
+}
+
+const DEFINE_COLLECTION_RE = /\bdefineCollection\s*(?:<[^>]*>)?\s*\(/
+
+async function discoverAppCollections(root: string): Promise<void> {
+  const srcDir = resolve(root, 'src')
+  for (const file of walkCollectionDefFiles(srcDir)) {
+    try {
+      const text = readFileSync(file, 'utf8')
+      if (DEFINE_COLLECTION_RE.test(text))
+        await import(file)
+    }
+    catch {}
+  }
 }
 
 export function defineCollection<TData>(options: CollectionOptionsWithSchema<TData>): Collection<TData>
@@ -371,7 +468,11 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     return entries.slice()
   }
 
-  const col: Collection<TData> & { [COLLECTION_VERSION_KEY]: () => number } = {
+  const col: Collection<TData> & {
+    [COLLECTION_VERSION_KEY]: () => number
+    [COLLECTION_VALIDATE_KEY]: (root: string) => string[]
+    [COLLECTION_DIR_FOR_ROOT_KEY]: (root?: string) => string
+  } = {
     get dir() {
       return getDir()
     },
@@ -429,7 +530,10 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       cacheVersion++
     },
     [COLLECTION_VERSION_KEY]: () => cacheVersion,
+    [COLLECTION_VALIDATE_KEY]: (root: string) => validateCollectionFiles(resolveCollectionDir(options.dir, root), root, options.schema),
+    [COLLECTION_DIR_FOR_ROOT_KEY]: (root?: string) => resolveCollectionDir(options.dir, root),
   }
+  registeredCollections.add(col as InternalCollection)
   return col
 }
 
@@ -513,15 +617,50 @@ export function contentPlugin<const TDataList extends readonly unknown[] = reado
 export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefined, collections?: readonly Collection<unknown>[] | undefined } = {}): KayPlugin {
   const feeds = options.feeds ?? []
   const extraCollections = options.collections ?? []
+
+  function dirOf(c: InternalCollection, root?: string): string {
+    return c[COLLECTION_DIR_FOR_ROOT_KEY]?.(root) ?? c.dir
+  }
+
+  function activeCollections(root?: string): InternalCollection[] {
+    const out = new Set<InternalCollection>()
+    for (const f of feeds)
+      out.add(f.collection as InternalCollection)
+    for (const c of extraCollections)
+      out.add(c as InternalCollection)
+    const absRoot = root !== undefined ? resolve(root) : getAppContext()?.root
+    for (const c of registeredCollections) {
+      const dir = dirOf(c, absRoot)
+      if (!existsSync(dir))
+        continue
+      if (absRoot === undefined || isInsideOrSame(absRoot, dir))
+        out.add(c)
+    }
+    return [...out]
+  }
+
   return {
     name: '@kayjs/content',
-    watchPaths: () => {
+    watchPaths: (root) => {
       const dirs = new Set<string>()
-      for (const f of feeds)
-        dirs.add(f.collection.dir)
-      for (const c of extraCollections)
-        dirs.add(c.dir)
+      for (const c of activeCollections(root))
+        dirs.add(dirOf(c, root))
       return [...dirs]
+    },
+    async check(ctx) {
+      await discoverAppCollections(ctx.root)
+      const seen = new Set<string>()
+      for (const c of activeCollections(ctx.root)) {
+        const validate = c[COLLECTION_VALIDATE_KEY]
+        if (validate === undefined)
+          continue
+        for (const err of validate(ctx.root)) {
+          if (seen.has(err))
+            continue
+          seen.add(err)
+          ctx.error(err)
+        }
+      }
     },
     build(ctx) {
       for (const feed of feeds) {
