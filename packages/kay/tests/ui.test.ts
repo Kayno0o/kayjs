@@ -386,6 +386,34 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
       server.stop(true)
     }
   })
+  it('ui({ emitGrammars: true }) emits all self-contained grammar CSS files into public/grammars/', () => {
+    const emitted = new Map<string, string>()
+    const plugin = ui({ grammar: false, emitGrammars: true })
+    expect(plugin.css).toBeUndefined()
+    expect(plugin.build).toBeDefined()
+    plugin.build!({
+      emitPublic(relPath: string, content: string | Uint8Array) {
+        emitted.set(relPath, typeof content === 'string' ? content : new TextDecoder().decode(content))
+        return `/${relPath}`
+      },
+    } as never)
+
+    for (const g of ['bare', 'editorial', 'workshop', 'console', 'soft', 'orbit']) {
+      const css = emitted.get(`grammars/${g}.css`)
+      expect(css).toBeDefined()
+      expect(css).not.toContain('../bare.css')
+      expect(css).toContain('[data-ui=')
+    }
+
+    const custom = new Map<string, string>()
+    ui({ emitGrammars: { dir: 'themes', grammars: ['orbit', 'bare'] } }).build!({
+      emitPublic(relPath: string, content: string | Uint8Array) {
+        custom.set(relPath, typeof content === 'string' ? content : new TextDecoder().decode(content))
+        return `/${relPath}`
+      },
+    } as never)
+    expect([...custom.keys()].sort()).toEqual(['themes/bare.css', 'themes/orbit.css'])
+  })
 })
 
 void grammarCssPath

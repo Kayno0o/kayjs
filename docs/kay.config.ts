@@ -5,13 +5,12 @@ import process from 'node:process'
 import { icons } from '@kayjs/icons'
 import { images } from '@kayjs/images'
 import { seo } from '@kayjs/seo'
-import { grammarCssPath, ui } from '@kayjs/ui/plugin'
+import { ui } from '@kayjs/ui/plugin'
 import { defineConfig } from 'kay/server'
 import { docs } from './src/content'
 import { pageWeight } from './src/page-weight'
 
 const SITE = process.env.SITE_URL ?? 'https://kayjs-v2.kaynooo.fr'
-const GRAMMARS = ['orbit', 'editorial', 'workshop', 'console', 'soft', 'bare'] as const
 
 const docsAssets = {
   name: 'kay-docs-assets',
@@ -21,23 +20,13 @@ const docsAssets = {
     const llmsPath = resolve(ctx.root, '../llms.txt')
     if (existsSync(llmsPath))
       ctx.emitPublic('llms.txt', readFileSync(llmsPath, 'utf8'))
-
-    // Emit standalone grammar CSS files for the live /grammars switcher
-    const bare = readFileSync(grammarCssPath('bare'), 'utf8')
-    ctx.emitPublic('grammars/bare.css', bare)
-    for (const g of GRAMMARS) {
-      if (g === 'bare')
-        continue
-      const css = readFileSync(grammarCssPath(g), 'utf8').replace(/@import\s+['"]\.\.\/bare\.css['"];?\s*/g, '')
-      ctx.emitPublic(`grammars/${g}.css`, `${bare}\n${css}`)
-    }
   },
 }
 
 export default defineConfig({
   lang: 'en',
   plugins: [
-    ui({ grammar: 'orbit' }),
+    ui({ grammar: 'orbit', emitGrammars: true }),
     docsAssets,
     icons(),
     images({
