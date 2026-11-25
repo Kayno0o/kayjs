@@ -18,29 +18,20 @@ export interface DialogProps {
   children?: KayChild | undefined
 }
 
-export interface ModalDialogSurfaceProps extends DialogProps {
-  kind: 'dialog' | 'drawer'
+export interface DrawerProps extends DialogProps {
   side?: 'right' | 'left' | 'bottom' | undefined
 }
 
-export function ModalDialogSurface({
-  kind,
-  side,
-  id,
-  title,
-  ariaLabel,
-  description,
-  triggerLabel,
-  triggerVariant = 'outline',
-  closeLabel = 'Close',
-  open,
-  children,
-}: ModalDialogSurfaceProps) {
-  const baseId = id ?? nextUiId(`kui-${kind}`)
+// Takes `props` without spreading so lazy `get children()` getters evaluate strictly inside `<div data-part="body">`.
+function renderModalDialog(props: DrawerProps, kind: 'dialog' | 'drawer', defaultSide?: 'right' | 'left' | 'bottom') {
+  const baseId = props.id ?? nextUiId(`kui-${kind}`)
   const titleId = `${baseId}-title`
   const descId = `${baseId}-desc`
+  const triggerVariant = props.triggerVariant ?? 'outline'
+  const closeLabel = props.closeLabel ?? 'Close'
+  const side = kind === 'drawer' ? (props.side ?? defaultSide ?? 'right') : undefined
 
-  const isOpen = open ?? signal(false)
+  const isOpen = props.open ?? signal(false)
   let dialogEl: HTMLDialogElement | undefined
 
   effect(() => {
@@ -51,7 +42,7 @@ export function ModalDialogSurface({
 
   return (
     <div data-ui={`${kind}-root`} data-state={isOpen.value ? 'open' : 'closed'}>
-      {triggerLabel && (
+      {props.triggerLabel && (
         <button
           data-ui="button"
           data-variant={triggerVariant}
@@ -61,16 +52,16 @@ export function ModalDialogSurface({
           aria-expanded={isOpen.value ? 'true' : 'false'}
           onClick={() => { isOpen.value = true }}
         >
-          {triggerLabel}
+          {props.triggerLabel}
         </button>
       )}
       <dialog
         data-ui={kind}
         data-side={side}
         data-part="content"
-        aria-labelledby={title ? titleId : undefined}
-        aria-label={!title ? (ariaLabel ?? fallbackLabel) : undefined}
-        aria-describedby={description ? descId : undefined}
+        aria-labelledby={props.title ? titleId : undefined}
+        aria-label={!props.title ? (props.ariaLabel ?? fallbackLabel) : undefined}
+        aria-describedby={props.description ? descId : undefined}
         ref={(el) => {
           dialogEl = el as HTMLDialogElement
           syncDialogOpen(dialogEl, isOpen, isOpen.peek())
@@ -83,7 +74,7 @@ export function ModalDialogSurface({
       >
         <div data-part="panel">
           <header data-part="header" data-layout="split">
-            {title && <h2 id={titleId} data-part="title">{title}</h2>}
+            {props.title && <h2 id={titleId} data-part="title">{props.title}</h2>}
             <button
               data-ui="button"
               data-variant="ghost"
@@ -96,22 +87,18 @@ export function ModalDialogSurface({
               ✕
             </button>
           </header>
-          {description && <p id={descId} data-part="description">{description}</p>}
-          <div data-part="body">{children}</div>
+          {props.description && <p id={descId} data-part="description">{props.description}</p>}
+          <div data-part="body">{props.children}</div>
         </div>
       </dialog>
     </div>
   )
 }
 
-export interface DrawerProps extends DialogProps {
-  side?: 'right' | 'left' | 'bottom' | undefined
-}
-
 export function Dialog(props: DialogProps) {
-  return ModalDialogSurface({ ...props, kind: 'dialog' })
+  return renderModalDialog(props, 'dialog')
 }
 
-export function Drawer({ side = 'right', ...rest }: DrawerProps) {
-  return ModalDialogSurface({ ...rest, kind: 'drawer', side })
+export function Drawer(props: DrawerProps) {
+  return renderModalDialog(props, 'drawer', 'right')
 }
