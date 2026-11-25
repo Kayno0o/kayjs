@@ -546,14 +546,12 @@ export function disposeOwner(node: Owner): void {
   }
 }
 
+// Pops the head each time, so a cleanup that disposes a sibling cannot cut the walk short.
 function releaseOwned(owner: Owner): void {
-  let node = owner.fs
-  owner.fs = undefined
-  while (node !== undefined) {
-    const next = node.no
-    node.o = node.po = node.no = undefined
+  let node: Owned | undefined
+  while ((node = owner.fs) !== undefined) {
+    unadopt(node)
     disposeOwner(node as Owner)
-    node = next
   }
 
   if (owner.cl !== undefined) {

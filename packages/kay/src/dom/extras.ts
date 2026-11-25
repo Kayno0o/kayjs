@@ -255,7 +255,8 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
     if (Array.isArray(next)) {
       clearInserted(current)
       if (ssrNodes !== undefined) {
-        clearInserted(ssrNodes.filter(n => !next.includes(n)))
+        const kept = new Set(next)
+        clearInserted(ssrNodes.filter(n => !kept.has(n)))
       }
       current = insertAll(parent, marker, next)
     }

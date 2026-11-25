@@ -94,7 +94,6 @@ export interface Mailer {
   send(message: MailMessage): Promise<SentMail>
 }
 
-
 export function mailer(options: MailerOptions = {}): Mailer {
   const outboxKey = Symbol.for(`kay.mail.outbox.${options.id ?? 'default'}`)
   const outbox: SentMail[] = ((globalThis as Record<symbol, SentMail[] | undefined>)[outboxKey] ??= [])

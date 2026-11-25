@@ -29,6 +29,15 @@ describe('TSX compiler', () => {
     expect(analyzeModule('Btn.tsx', handlerCode).isInteractive).toBe(true)
   })
 
+  test('an event handler on a namespaced element makes the module interactive', () => {
+    const code = `
+      export function Icon() {
+        return <svg><svg:a onClick={() => console.log('hi')}>go</svg:a></svg>
+      }
+    `
+    expect(analyzeModule('Icon.tsx', code).isInteractive).toBe(true)
+  })
+
   test.each([
     ['export async function load', `export async function load() { return process.env.SECRET_MARKER }`],
     ['export const arrow', `export const load = async () => process.env.SECRET_MARKER`],

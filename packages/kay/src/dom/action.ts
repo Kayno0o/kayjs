@@ -2,7 +2,7 @@
 
 import type { ActionResult } from '../server/action'
 
-interface ClientAction<Input, Output> {
+export interface ClientAction<Input, Output> {
   /** A FormData input is sent as multipart, so it can carry files. */
   (input: Input | FormData): Promise<ActionResult<Output>>
   readonly url: string

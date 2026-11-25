@@ -8,16 +8,7 @@ import type { OAuthProvider } from './oauth'
 import type { RateLimitOptions } from './ratelimit'
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
 import { isHttpsRequest, nodeEnv } from 'kay/server'
-import {
-  hashPassword,
-
-  randomToken,
-  safeRedirect,
-  sha256Hex,
-
-  verifyPassword,
-
-} from './crypto'
+import { hashPassword, randomToken, safeRedirect, sha256Hex, verifyPassword } from './crypto'
 import { fail, formatSessionIp, isValidEmail, parseBody, resolveClientIp, wantsJson } from './http'
 import { registerOAuthRoutes } from './oauth-routes'
 import { createRateLimiter } from './ratelimit'
@@ -31,7 +22,6 @@ export { discord, github, google, oauthProvider } from './oauth'
 export type { OAuthPresetConfig, OAuthProfile, OAuthProvider } from './oauth'
 export { memoryAuthStore, normalizeEmail, toPublicUser } from './store'
 export type { AuthSession, AuthStore, AuthUser, OAuthAccount, PublicUser, TokenKind, UserExport, VerificationToken } from './store'
-
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 const DEFAULT_PRUNE_INTERVAL_MS = 15 * 60 * 1000
@@ -144,8 +134,6 @@ export interface Auth {
   pruneExpired(): Promise<void>
   dispose(): void
 }
-
-
 
 export function createAuth(options: AuthOptions = {}): Auth {
   if (options.secret !== undefined && options.secret.trim().length === 0)

@@ -98,7 +98,6 @@ interface FieldControlWiring {
   required: boolean
 }
 
-
 function mergeTokenAttr(existing: string | null | undefined, addition: string): string {
   const tokens = (existing ?? '').split(/\s+/).filter(Boolean)
   for (const tok of addition.split(/\s+/).filter(Boolean)) {
@@ -355,11 +354,11 @@ export function Cluster({ gap, class: cls, children, ...rest }: BoxProps & { gap
 }
 
 export function Grid({ min, gap, class: cls, children, ...rest }: BoxProps & { min?: string | undefined, gap?: string | undefined }) {
-    return <div data-layout="grid" style={layoutStyle({ min, gap })} class={cls} {...rest}>{children}</div>
+  return <div data-layout="grid" style={layoutStyle({ min, gap })} class={cls} {...rest}>{children}</div>
 }
 
 export function Sidebar({ side, gap, class: cls, children, ...rest }: BoxProps & { side?: string | undefined, gap?: string | undefined }) {
-    return <div data-layout="sidebar" style={layoutStyle({ side, gap })} class={cls} {...rest}>{children}</div>
+  return <div data-layout="sidebar" style={layoutStyle({ side, gap })} class={cls} {...rest}>{children}</div>
 }
 
 export function Split({ gap, class: cls, children, ...rest }: BoxProps & { gap?: string | undefined }) {

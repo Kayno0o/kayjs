@@ -1,6 +1,6 @@
 import { describe, expect, spyOn, test } from 'bun:test'
 import { batch, computed, effect, onCleanup, root, selector, signal, snapshot, store } from '../src/index'
-import { createOwner, runWithOwner } from '../src/reactivity/index'
+import { createOwner, disposeOwner, runWithOwner } from '../src/reactivity/index'
 
 // A source's subscriber list, read to see whether a computed still holds on to it.
 const subscribed = (source: object): boolean => (source as { s?: unknown }).s !== undefined
@@ -537,5 +537,39 @@ describe('reactivity kernel', () => {
     outer.child = inner
     expect(outer.child).toBe(inner)
     expect(Object.getPrototypeOf(snapshot(outer).child)).toBe(Object.prototype)
+  })
+})
+
+describe('owned list disposal', () => {
+  test('a cleanup disposing its sibling still lets every other sibling dispose, newest first', () => {
+    const log: string[] = []
+    const dispose = root((d) => {
+      effect(() => onCleanup(() => log.push('E1')))
+      const other = createOwner()
+      runWithOwner(other, () => onCleanup(() => log.push('other')))
+      effect(() => onCleanup(() => {
+        log.push('E2')
+        disposeOwner(other)
+      }))
+      effect(() => onCleanup(() => log.push('E3')))
+      return d
+    })
+    dispose()
+    expect(log).toEqual(['E3', 'E2', 'other', 'E1'])
+  })
+
+  test('an effect created under a disposed owner never runs, and its cleanups run at once', () => {
+    const owner = createOwner(undefined)
+    disposeOwner(owner)
+    let runs = 0
+    let cleaned = 0
+    runWithOwner(owner, () => {
+      effect(() => {
+        runs++
+      })
+      onCleanup(() => cleaned++)
+    })
+    expect(runs).toBe(0)
+    expect(cleaned).toBe(1)
   })
 })

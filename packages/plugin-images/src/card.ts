@@ -36,8 +36,10 @@ export interface ShareCardInput {
 
 export const SHARE_CARD_CONFIG_SERVICE = 'kay.images.shareCardConfig'
 
+let magickFound: boolean | undefined
+
 export function hasMagick(): boolean {
-  return Bun.which('magick') !== null
+  return magickFound ??= Bun.which('magick') !== null
 }
 
 let standaloneCardConfig: ShareCardDefaults | undefined
@@ -59,7 +61,6 @@ function getCardConfig(): ShareCardDefaults {
     return { publicDir: appCtx.publicDir }
   return standaloneCardConfig ?? {}
 }
-
 
 function wrapLines(text: string, maxChars: number, maxLines: number): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean)

@@ -54,7 +54,6 @@ interface CachedImageMeta {
   files: { rel: string, width: number, format: string }[]
 }
 
-
 function identifyImage(filePath: string): { width: number, height: number } | undefined {
   const proc = Bun.spawnSync(['magick', 'identify', '-ping', '-format', '%w %h', `${filePath}[0]`], {
     stdout: 'pipe',

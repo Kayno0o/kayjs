@@ -857,3 +857,34 @@ describe('streamed Suspense boundaries', () => {
     expect(html.endsWith('</html>')).toBe(true)
   })
 })
+
+describe('fast static path', () => {
+  it('gives a Response returned by load() the security headers, with or without a cookie change', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-fast-load-response-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        export async function load() { return new Response(null, { status: 302, headers: { location: '/login' } }) }
+        export default function Page() { return <main>home</main> }
+      `)
+      writeFileSync(join(dir, 'src/routes/cookie.tsx'), `
+        import type { RequestContext } from 'kay/server'
+        export async function load(ctx: RequestContext) {
+          ctx.cookies.set('seen', '1')
+          return new Response(null, { status: 302, headers: { location: '/login' } })
+        }
+        export default function Page() { return <main>cookie</main> }
+      `)
+      await build({ root: dir, minify: false })
+      const app = await createServer({ root: dir })
+      for (const path of ['/', '/cookie']) {
+        const res = await app.handle(new Request(`http://localhost${path}`))
+        expect(res.status).toBe(302)
+        expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+      }
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})

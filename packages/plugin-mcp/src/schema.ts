@@ -403,4 +403,3 @@ export function schemaToJsonSchema(
 
   return { ...DEFAULT_INPUT_SCHEMA }
 }
-

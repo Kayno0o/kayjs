@@ -197,7 +197,7 @@ function rewriteFreeIdentifiers(
   replacements: ReadonlyMap<string, string>,
   onJsx?: (node: AstNode, rewrites: ReadonlyMap<string, string>) => string,
 ): string {
-  if (replacements.size === 0 && onJsx === undefined)
+  if (replacements.size === 0 && (onJsx === undefined || !containsJsx(rootNode)))
     return source.slice(rootNode.start, rootNode.end)
 
   const offset = rootNode.start as number
@@ -207,7 +207,7 @@ function rewriteFreeIdentifiers(
     if (!node || typeof node !== 'object')
       return
 
-    if (onJsx !== undefined && (isJsxNode(node))) {
+    if (onJsx !== undefined && isJsxNode(node)) {
       const active = shadowed.size === 0 ? replacements : new Map([...replacements].filter(([k]) => !shadowed.has(k)))
       editor.replace(node.start - offset, node.end - offset, onJsx(node, active))
       return
@@ -357,7 +357,6 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   // Client builds keep the `load` binding, so every export form stays valid, and drop its server-only code.
   for (const node of loadDeclarations(program))
     editor.replace(node.start, node.end, node.type === 'FunctionDeclaration' ? `const ${node.id.name as string} = undefined` : 'undefined')
-
 
   function extractBlockKeyExpr(block: AstNode): AstNode | undefined {
     let found: AstNode | undefined
