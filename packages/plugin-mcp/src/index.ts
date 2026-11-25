@@ -2,39 +2,26 @@
 // Exposes typed Kay v2 server `action()` handlers (and standalone tool handlers) as MCP tools
 // over a bearer-authenticated endpoint via `KayPlugin.server`, keeping core free of MCP code.
 
-import type { ActionContext, InferOutput, KayPlugin, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
+import type { ActionContext, InferOutput, KayPlugin, RequestContext, ServerAction, ServerPluginAPI, StandardSchemaV1 } from '@kayjs/kay/server'
+import type { McpBudgetOptions, McpFootprint } from './footprint'
+import type { McpPruneMode, McpToolResult } from './format'
+import type { ListedTool, McpToolAnnotations, ResolvedResource, ResolvedToolEntry } from './rpc'
+import type { CompactSchemaOptions, JsonSchemaObject } from './schema'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import type { CompactSchemaOptions, JsonSchemaObject } from './schema'
-import { definePlugin, formatSchemaIssues, nodeEnv, validateSchema } from '@kayjs/kay/server'
+import { definePlugin, nodeEnv } from '@kayjs/kay/server'
+import { collectBudgetViolations, computeFootprint, formatMcpFootprint } from './footprint'
+import { createRpcDispatcher } from './rpc'
 import { isPlainRecord, isStandardSchema, normalizeObjectSchema, schemaToJsonSchema } from './schema'
 
+export { formatMcpFootprint } from './footprint'
+export type { McpBudgetOptions, McpFootprint, McpToolFootprint } from './footprint'
+export { formatLines, formatTable, pruneEmpty, truncateOutput } from './format'
+export type { CompactListOptions, McpContentBlock, McpPruneMode, McpToolResult, PruneEmptyOptions } from './format'
+export { MAX_BATCH_SIZE, MCP_PROTOCOL_VERSION } from './rpc'
+export type { McpToolAnnotations } from './rpc'
 export { compactSchema, schemaToJsonSchema } from './schema'
 export type { CompactSchemaOptions, JsonSchemaObject } from './schema'
-
-export const MCP_PROTOCOL_VERSION = '2025-03-26'
-
-const DEFAULT_MAX_TOOL_BYTES = 2048
-
-export interface McpToolAnnotations {
-  title?: string | undefined
-  readOnlyHint?: boolean | undefined
-  destructiveHint?: boolean | undefined
-  idempotentHint?: boolean | undefined
-  openWorldHint?: boolean | undefined
-}
-
-export interface McpContentBlock {
-  type: 'text'
-  text: string
-}
-
-export interface McpToolResult {
-  content: McpContentBlock[]
-  isError?: boolean | undefined
-}
-
-export type McpPruneMode = false | 'nullish' | true
 
 export interface McpResource {
   /** Display name shown in `resources/list` (defaults to the resource URI/key). */
@@ -45,17 +32,6 @@ export interface McpResource {
   mimeType?: string | undefined
   /** Static text or lazy reader invoked on `resources/read`. */
   read: string | ((ctx: RequestContext) => string | Promise<string>)
-}
-
-export interface McpBudgetOptions {
-  /** Per-tool byte budget in `tools/list` (default: 2048). */
-  maxToolBytes?: number | undefined
-  /** Total `instructions` + `tools/list` byte budget (optional). */
-  maxTotalBytes?: number | undefined
-  /** When true, `kay check` fails with `ctx.error()` on budget overruns instead of warning (default: false). */
-  strict?: boolean | undefined
-  /** Custom warning sink for dev startup / non-strict `kay check` (default: `console.warn`). */
-  onWarn?: ((message: string) => void) | undefined
 }
 
 export interface McpActionTool<Input = unknown, Output = unknown> {
@@ -182,10 +158,6 @@ export interface McpOptions {
   path?: string | undefined
   /** Bearer token source: inline string, `{ env }`, `{ file }`, or resolver function. */
   token?: McpTokenSource | undefined
-  /** Convenience env var name holding the bearer token (used when `token` is omitted). */
-  tokenEnv?: string | undefined
-  /** Convenience file path holding the bearer token (used when `token` and `tokenEnv` are omitted). */
-  tokenFile?: string | undefined
   /** Map of MCP tool names to Kay `action()` or handler definitions. */
   tools: Record<string, McpTool>
   /** Optional on-demand MCP resources exposed via `resources/list` and `resources/read`. */
@@ -204,204 +176,6 @@ export interface McpOptions {
   formatResult?: ((output: unknown, toolName: string, input: unknown) => unknown) | undefined
   /** Tool & catalog byte budget checked in dev startup and `kay check` (default: `{ maxToolBytes: 2048 }`; `false` disables). */
   budget?: McpBudgetOptions | false | undefined
-}
-
-export interface PruneEmptyOptions {
-  /** Also drop empty arrays `[]` and empty objects `{}` (default: true). */
-  emptyCollections?: boolean | undefined
-  /** Also drop empty strings `""` (default: false). */
-  emptyStrings?: boolean | undefined
-}
-
-export interface CompactListOptions {
-  /** Total available items when the returned slice is paginated. */
-  total?: number | undefined
-  /** Next cursor/offset hint shown in the footer when more items exist. */
-  nextCursor?: string | number | null | undefined
-  /** Fallback text when the list is empty (default: '(none)'). */
-  empty?: string | undefined
-}
-
-export interface McpToolFootprint {
-  name: string
-  chars: number
-  bytes: number
-  descriptionBytes: number
-  schemaBytes: number
-  estimatedTokens: number
-}
-
-export interface McpFootprint {
-  instructionsChars: number
-  instructionsBytes: number
-  toolsChars: number
-  toolsBytes: number
-  totalChars: number
-  totalBytes: number
-  estimatedTokens: number
-  tools: McpToolFootprint[]
-}
-
-interface JsonRpcRequest {
-  jsonrpc: '2.0'
-  id?: string | number | null | undefined
-  method: string
-  params?: Record<string, unknown> | undefined
-}
-
-interface JsonRpcResponse {
-  jsonrpc: '2.0'
-  id: string | number | null
-  result?: unknown
-  error?: { code: number, message: string, data?: unknown }
-}
-
-interface ListedTool {
-  name: string
-  description: string
-  inputSchema: JsonSchemaObject
-  annotations?: McpToolAnnotations
-}
-
-interface ResolvedResource {
-  uri: string
-  name: string
-  description?: string
-  mimeType: string
-  read: (ctx: RequestContext) => string | Promise<string>
-}
-
-interface ResolvedToolEntry {
-  name: string
-  action?: ServerAction<unknown, unknown> | undefined
-  schema: StandardSchemaV1 | undefined
-  handler: (input: unknown, ctx: ActionContext) => unknown | Promise<unknown>
-  format: ((output: unknown, input: unknown) => unknown) | undefined
-  maxOutputChars: number | undefined
-  pruneEmpty: McpPruneMode
-}
-
-function utf8Bytes(str: string): number {
-  return Buffer.byteLength(str, 'utf8')
-}
-
-/** Recursively removes `null`/`undefined` (and by default empty `[]`/`{}`) to shrink JSON payloads. */
-export function pruneEmpty(value: unknown, options?: PruneEmptyOptions): unknown {
-  const dropCollections = options?.emptyCollections ?? true
-  const dropStrings = options?.emptyStrings ?? false
-
-  function walk(node: unknown, isRoot: boolean): unknown {
-    if (node === null || node === undefined)
-      return isRoot ? node : undefined
-    if (typeof node === 'string')
-      return !isRoot && dropStrings && node.length === 0 ? undefined : node
-    if (Array.isArray(node)) {
-      const out: unknown[] = []
-      for (const item of node) {
-        const cleaned = walk(item, false)
-        if (cleaned !== undefined)
-          out.push(cleaned)
-      }
-      if (!isRoot && dropCollections && out.length === 0)
-        return undefined
-      return out
-    }
-    if (typeof node === 'object') {
-      const proto = Object.getPrototypeOf(node)
-      if (proto !== Object.prototype && proto !== null)
-        return node
-      const out: Record<string, unknown> = {}
-      let count = 0
-      for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-        const cleaned = walk(v, false)
-        if (cleaned !== undefined) {
-          out[k] = cleaned
-          count++
-        }
-      }
-      if (!isRoot && dropCollections && count === 0)
-        return undefined
-      return out
-    }
-    return node
-  }
-
-  return walk(value, true)
-}
-
-function formatListFooter(count: number, options?: CompactListOptions): string {
-  const parts: string[] = []
-  if (options?.total !== undefined && options.total > count)
-    parts.push(`${count}/${options.total}`)
-  if (options?.nextCursor !== undefined && options.nextCursor !== null && String(options.nextCursor).length > 0)
-    parts.push(`next=${options.nextCursor}`)
-  return parts.length > 0 ? `\n--- ${parts.join(', ')}` : ''
-}
-
-/** Renders items as compact one-line-per-entry text with an optional pagination footer. */
-export function formatLines<T>(
-  items: readonly T[],
-  render: (item: T, index: number) => string,
-  options?: CompactListOptions,
-): string {
-  if (items.length === 0)
-    return options?.empty ?? '(none)'
-  return items.map(render).join('\n') + formatListFooter(items.length, options)
-}
-
-function escapeTsvCell(value: unknown): string {
-  if (value === null || value === undefined)
-    return ''
-  const raw = typeof value === 'string'
-    ? value
-    : (typeof value === 'object' ? JSON.stringify(value) : String(value))
-  return raw.replace(/[\t\r\n]+/g, ' ')
-}
-
-/** Renders tabular records as compact TSV (typically 50–65% fewer tokens than JSON object arrays). */
-export function formatTable<T extends Record<string, unknown>>(
-  rows: readonly T[],
-  columns?: readonly (keyof T & string)[],
-  options?: CompactListOptions,
-): string {
-  if (rows.length === 0)
-    return options?.empty ?? '(none)'
-  const cols: readonly string[] = columns && columns.length > 0
-    ? columns
-    : Object.keys(rows[0] ?? {})
-  if (cols.length === 0)
-    return options?.empty ?? '(none)'
-
-  const lines: string[] = [cols.join('\t')]
-  for (const row of rows)
-    lines.push(cols.map(col => escapeTsvCell(row[col])).join('\t'))
-  return lines.join('\n') + formatListFooter(rows.length, options)
-}
-
-/** Truncates oversized text outputs cleanly while leaving an actionable recovery hint. */
-export function truncateOutput(text: string, maxChars: number): string {
-  if (maxChars <= 0 || text.length <= maxChars)
-    return text
-  const reserve = 64
-  if (maxChars <= reserve)
-    return text.slice(0, maxChars)
-  let keep = maxChars - reserve
-  let omitted = text.length - keep
-  let suffix = `\n…[truncated ${omitted} chars — narrow query or paginate]`
-  if (keep + suffix.length > maxChars) {
-    keep = Math.max(0, maxChars - suffix.length)
-    omitted = text.length - keep
-    suffix = `\n…[truncated ${omitted} chars — narrow query or paginate]`
-  }
-  return text.slice(0, keep) + suffix
-}
-
-function applyPrune(value: unknown, mode: McpPruneMode): unknown {
-  if (mode === false)
-    return value
-  if (mode === 'nullish')
-    return pruneEmpty(value, { emptyCollections: false })
-  return pruneEmpty(value, { emptyCollections: true })
 }
 
 function cleanAnnotations(annotations: McpToolAnnotations | undefined): McpToolAnnotations | undefined {
@@ -566,95 +340,12 @@ function buildCatalog(
   return { listedTools, toolMap, resourceMap }
 }
 
-function computeFootprint(instructions: string | undefined, listedTools: readonly ListedTool[]): McpFootprint {
-  const instructionsText = instructions ?? ''
-  const instructionsChars = instructionsText.length
-  const instructionsBytes = utf8Bytes(instructionsText)
-  const tools: McpToolFootprint[] = []
-  let toolsChars = 0
-  let toolsBytes = 0
-
-  for (const listed of listedTools) {
-    const json = JSON.stringify(listed)
-    const chars = json.length
-    const bytes = utf8Bytes(json)
-    const descriptionBytes = utf8Bytes(listed.description)
-    const schemaBytes = utf8Bytes(JSON.stringify(listed.inputSchema))
-    toolsChars += chars
-    toolsBytes += bytes
-    tools.push({
-      name: listed.name,
-      chars,
-      bytes,
-      descriptionBytes,
-      schemaBytes,
-      estimatedTokens: Math.ceil(bytes / 4),
-    })
-  }
-
-  tools.sort((a, b) => b.bytes - a.bytes)
-  const totalChars = instructionsChars + toolsChars
-  const totalBytes = instructionsBytes + toolsBytes
-  return {
-    instructionsChars,
-    instructionsBytes,
-    toolsChars,
-    toolsBytes,
-    totalChars,
-    totalBytes,
-    estimatedTokens: Math.ceil(totalBytes / 4),
-    tools,
-  }
-}
-
 /** Measures the up-front `instructions` + `tools/list` byte/char/token footprint (sorted largest tool first). */
 export function inspectMcpFootprint(
   options: Pick<McpOptions, 'instructions' | 'tools' | 'resources' | 'schemas' | 'compactSchemas'>,
 ): McpFootprint {
   const { listedTools } = buildCatalog(options)
   return computeFootprint(options.instructions, listedTools)
-}
-
-function collectBudgetViolations(footprint: McpFootprint, budget: McpBudgetOptions | false | undefined): string[] {
-  if (budget === false)
-    return []
-  const maxToolBytes = budget?.maxToolBytes ?? DEFAULT_MAX_TOOL_BYTES
-  const maxTotalBytes = budget?.maxTotalBytes
-  const violations: string[] = []
-
-  if (maxToolBytes > 0) {
-    for (const tool of footprint.tools) {
-      if (tool.bytes > maxToolBytes) {
-        violations.push(
-          `[@kayjs/mcp] tool "${tool.name}" is ${tool.bytes} B (~${tool.estimatedTokens} tok; desc ${tool.descriptionBytes} B, schema ${tool.schemaBytes} B), exceeding ${maxToolBytes} B budget`,
-        )
-      }
-    }
-  }
-  if (maxTotalBytes !== undefined && maxTotalBytes > 0 && footprint.totalBytes > maxTotalBytes) {
-    violations.push(
-      `[@kayjs/mcp] total MCP surface is ${footprint.totalBytes} B (~${footprint.estimatedTokens} tok), exceeding ${maxTotalBytes} B budget`,
-    )
-  }
-  return violations
-}
-
-/** Formats an `McpFootprint` report as a compact table for CLI / CI output. */
-export function formatMcpFootprint(footprint: McpFootprint, budget?: McpBudgetOptions | false): string {
-  const maxToolBytes = budget === false ? undefined : (budget?.maxToolBytes ?? DEFAULT_MAX_TOOL_BYTES)
-  const lines = [
-    `@kayjs/mcp footprint: ${footprint.totalBytes} B (~${footprint.estimatedTokens} tok) — instructions: ${footprint.instructionsBytes} B, tools: ${footprint.toolsBytes} B (${footprint.tools.length} tools)`,
-  ]
-  const nameWidth = footprint.tools.reduce((max, t) => Math.max(max, t.name.length), 0)
-  for (const t of footprint.tools) {
-    const flag = maxToolBytes !== undefined && maxToolBytes > 0 && t.bytes > maxToolBytes
-      ? `  [OVER ${maxToolBytes} B]`
-      : ''
-    lines.push(
-      `  ${t.name.padEnd(nameWidth)}  ${String(t.bytes).padStart(6)} B (~${t.estimatedTokens} tok)  desc: ${t.descriptionBytes} B  schema: ${t.schemaBytes} B${flag}`,
-    )
-  }
-  return lines.join('\n')
 }
 
 function readTokenFile(filePath: string): string | undefined {
@@ -669,8 +360,9 @@ function readTokenFile(filePath: string): string | undefined {
   }
 }
 
-async function resolveConfiguredToken(options: McpOptions): Promise<string | undefined> {
-  const src = options.token
+async function resolveToken(src: McpTokenSource | undefined): Promise<string | undefined> {
+  if (src === undefined)
+    return undefined
   if (typeof src === 'function') {
     const val = (await src())?.trim()
     return val && val.length > 0 ? val : undefined
@@ -679,20 +371,12 @@ async function resolveConfiguredToken(options: McpOptions): Promise<string | und
     const val = src.trim()
     return val.length > 0 ? val : undefined
   }
-  if (src !== undefined && typeof src === 'object') {
-    if ('env' in src) {
-      const val = process.env[src.env]?.trim()
-      return val && val.length > 0 ? val : undefined
-    }
-    if ('file' in src)
-      return readTokenFile(src.file)
-  }
-  if (options.tokenEnv !== undefined) {
-    const val = process.env[options.tokenEnv]?.trim()
+  if ('env' in src) {
+    const val = process.env[src.env]?.trim()
     return val && val.length > 0 ? val : undefined
   }
-  if (options.tokenFile !== undefined)
-    return readTokenFile(options.tokenFile)
+  if ('file' in src)
+    return readTokenFile(src.file)
   return undefined
 }
 
@@ -713,90 +397,6 @@ function extractBearerToken(request: Request): string | undefined {
   return token && token.length > 0 ? token : undefined
 }
 
-function isMcpToolResult(value: unknown): value is McpToolResult {
-  if (typeof value !== 'object' || value === null || !('content' in value))
-    return false
-  const content = (value as { content: unknown }).content
-  return Array.isArray(content) && content.every(
-    item => typeof item === 'object' && item !== null && (item as { type?: unknown }).type === 'text' && typeof (item as { text?: unknown }).text === 'string',
-  )
-}
-
-function formatFieldErrors(fieldErrors: unknown): string {
-  if (fieldErrors === null || typeof fieldErrors !== 'object' || Array.isArray(fieldErrors))
-    return ''
-  return Object.entries(fieldErrors as Record<string, unknown>)
-    .filter(([, v]) => v !== undefined && v !== null && String(v).length > 0)
-    .map(([k, v]) => `${k}: ${String(v)}`)
-    .join('; ')
-}
-
-async function formatResponseResult(res: Response, pruneMode: McpPruneMode): Promise<McpToolResult> {
-  // 3xx redirects from reused Kay form actions indicate a completed mutation, not a failure.
-  if (res.status >= 300 && res.status < 400) {
-    const location = res.headers.get('location')
-    return { content: [{ type: 'text', text: location ? `ok -> ${location}` : 'ok' }] }
-  }
-
-  const rawText = await res.text()
-  if (!res.ok) {
-    let errorMsg = rawText || `${res.status} ${res.statusText}`.trim()
-    if (rawText.trimStart().startsWith('{')) {
-      try {
-        const parsed = JSON.parse(rawText) as { error?: unknown, message?: unknown, fieldErrors?: unknown }
-        const base = typeof parsed.error === 'string' && parsed.error.length > 0
-          ? parsed.error
-          : (typeof parsed.message === 'string' && parsed.message.length > 0 ? parsed.message : '')
-        const fields = formatFieldErrors(parsed.fieldErrors)
-        if (base && fields)
-          errorMsg = `${base} (${fields})`
-        else if (base)
-          errorMsg = base
-        else if (fields)
-          errorMsg = fields
-      }
-      catch {
-        // Keep rawText
-      }
-    }
-    return { content: [{ type: 'text', text: errorMsg }], isError: true }
-  }
-
-  if (rawText.length === 0 && res.status === 204)
-    return { content: [{ type: 'text', text: 'ok' }] }
-
-  const contentType = res.headers.get('content-type') ?? ''
-  if (contentType.includes('json')) {
-    try {
-      const parsed = JSON.parse(rawText) as unknown
-      return { content: [{ type: 'text', text: JSON.stringify(applyPrune(parsed, pruneMode)) }] }
-    }
-    catch {
-      // Keep rawText when body is not valid JSON
-    }
-  }
-  return { content: [{ type: 'text', text: rawText }] }
-}
-
-function applyOutputBudget(result: McpToolResult, maxChars: number | undefined): McpToolResult {
-  if (maxChars === undefined || maxChars <= 0)
-    return result
-  let remaining = maxChars
-  const nextContent: McpContentBlock[] = []
-  for (const block of result.content) {
-    if (remaining <= 0)
-      break
-    const text = truncateOutput(block.text, remaining)
-    remaining -= text.length
-    nextContent.push({ type: 'text', text })
-  }
-  return result.isError !== undefined
-    ? { content: nextContent, isError: result.isError }
-    : { content: nextContent }
-}
-
-const MAX_BATCH_SIZE = 50
-
 export function mcp<T extends Record<string, unknown>>(
   options: Omit<McpOptions, 'tools'> & { tools: McpToolsRecord<T> },
 ): KayPlugin
@@ -808,7 +408,6 @@ export function mcp(options: McpOptions): KayPlugin {
   const serverVersion = options.version ?? '1.0.0'
 
   const { listedTools, toolMap, resourceMap } = buildCatalog(options)
-  const hasResources = resourceMap.size > 0
   const listedResources = [...resourceMap.values()].map(r => ({
     uri: r.uri,
     name: r.name,
@@ -821,12 +420,23 @@ export function mcp(options: McpOptions): KayPlugin {
     ? options.budget.onWarn
     : (msg: string) => console.warn(msg)
 
-  const availableNamesHint = toolMap.size > 0 && toolMap.size <= 12
-    ? ` (available: ${[...toolMap.keys()].join(', ')})`
-    : ''
+  let serverApi: ServerPluginAPI | undefined
+
+  const rpc = createRpcDispatcher({
+    serverName,
+    serverVersion,
+    instructions: options.instructions,
+    listedTools,
+    toolMap,
+    resourceMap,
+    listedResources,
+    formatResult: options.formatResult,
+    mapError: options.mapError,
+    getServerApi: () => serverApi,
+  })
 
   async function authorize(request: Request): Promise<Response | undefined> {
-    const configured = await resolveConfiguredToken(options)
+    const configured = await resolveToken(options.token)
     if (configured === undefined)
       return new Response('Not Found', { status: 404 })
 
@@ -838,185 +448,6 @@ export function mcp(options: McpOptions): KayPlugin {
       )
     }
     return undefined
-  }
-
-  async function finalizeValue(value: unknown, pruneMode: McpPruneMode): Promise<McpToolResult> {
-    if (value instanceof Response)
-      return await formatResponseResult(value, pruneMode)
-    if (isMcpToolResult(value))
-      return value
-    if (typeof value === 'string')
-      return { content: [{ type: 'text', text: value }] }
-    if (value === undefined)
-      return { content: [{ type: 'text', text: 'ok' }] }
-    return { content: [{ type: 'text', text: JSON.stringify(applyPrune(value, pruneMode)) }] }
-  }
-
-  let serverApi: Parameters<NonNullable<KayPlugin['server']>>[0] | undefined
-
-  async function callTool(name: string, args: unknown, ctx: RequestContext): Promise<McpToolResult> {
-    const tool = toolMap.get(name)
-    if (tool === undefined)
-      throw Object.assign(new Error(`Unknown tool: ${name}${availableNamesHint}`), { rpcCode: -32602 })
-
-    let input: unknown = args ?? {}
-    if (tool.schema !== undefined) {
-      const checked = await validateSchema(tool.schema, input)
-      if (!checked.ok) {
-        return {
-          content: [{ type: 'text', text: `Invalid arguments: ${formatSchemaIssues(checked.issues)}` }],
-          isError: true,
-        }
-      }
-      input = checked.value
-    }
-
-    try {
-      let rawResult: unknown
-      if (tool.action !== undefined && serverApi !== undefined) {
-        const invoked = await serverApi.invokeAction(tool.action, input, ctx)
-        if (!invoked.ok) {
-          const fields = formatFieldErrors(invoked.fieldErrors)
-          const msg = fields ? `${invoked.error} (${fields})` : invoked.error
-          return applyOutputBudget({
-            content: [{ type: 'text', text: msg }],
-            isError: true,
-          }, tool.maxOutputChars)
-        }
-        rawResult = invoked.data
-      }
-      else {
-        rawResult = await tool.handler(input, ctx)
-      }
-      let mcpResult: McpToolResult
-      if (rawResult instanceof Response) {
-        mcpResult = await formatResponseResult(rawResult, tool.pruneEmpty)
-      }
-      else {
-        const formatted = tool.format !== undefined
-          ? tool.format(rawResult, input)
-          : (options.formatResult !== undefined ? options.formatResult(rawResult, name, input) : rawResult)
-        mcpResult = await finalizeValue(formatted, tool.pruneEmpty)
-      }
-      return applyOutputBudget(mcpResult, tool.maxOutputChars)
-    }
-    catch (err) {
-      const mapped = options.mapError?.(err)
-      const message = typeof mapped === 'string'
-        ? mapped
-        : mapped && typeof mapped.message === 'string'
-          ? mapped.message
-          : err instanceof Error
-            ? err.message
-            : String(err)
-      return applyOutputBudget({
-        content: [{ type: 'text', text: message }],
-        isError: true,
-      }, tool.maxOutputChars)
-    }
-  }
-
-  async function handleRpcMessage(msg: unknown, ctx: RequestContext): Promise<JsonRpcResponse | null> {
-    if (typeof msg !== 'object' || msg === null)
-      return { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } }
-
-    const req = msg as Partial<JsonRpcRequest>
-    const hasId = 'id' in req && req.id !== undefined
-    const id = hasId ? (req.id ?? null) : null
-
-    if (req.jsonrpc !== '2.0' || typeof req.method !== 'string')
-      return { jsonrpc: '2.0', id, error: { code: -32600, message: 'Invalid Request' } }
-
-    // JSON-RPC notifications (no `id`) receive no response payload (HTTP 202)
-    if (!hasId)
-      return null
-
-    switch (req.method) {
-      case 'initialize':
-        return {
-          jsonrpc: '2.0',
-          id,
-          result: {
-            protocolVersion: MCP_PROTOCOL_VERSION,
-            capabilities: {
-              tools: { listChanged: false },
-              ...(hasResources ? { resources: { subscribe: false, listChanged: false } } : {}),
-            },
-            serverInfo: { name: serverName, version: serverVersion },
-            ...(options.instructions !== undefined ? { instructions: options.instructions } : {}),
-          },
-        }
-
-      case 'ping':
-        return { jsonrpc: '2.0', id, result: {} }
-
-      case 'tools/list':
-        return {
-          jsonrpc: '2.0',
-          id,
-          result: {
-            tools: listedTools,
-          },
-        }
-
-      case 'tools/call': {
-        const params = req.params
-        const toolName = typeof params?.name === 'string' ? params.name : undefined
-        if (toolName === undefined)
-          return { jsonrpc: '2.0', id, error: { code: -32602, message: 'Missing tool name' } }
-        try {
-          const toolResult = await callTool(toolName, params?.arguments, ctx)
-          return { jsonrpc: '2.0', id, result: toolResult }
-        }
-        catch (err) {
-          const rpcCode = (err as { rpcCode?: number }).rpcCode ?? -32603
-          const message = err instanceof Error ? err.message : String(err)
-          return { jsonrpc: '2.0', id, error: { code: rpcCode, message } }
-        }
-      }
-
-      case 'resources/list': {
-        if (!hasResources)
-          return { jsonrpc: '2.0', id, error: { code: -32601, message: `Method not found: ${req.method}` } }
-        return {
-          jsonrpc: '2.0',
-          id,
-          result: { resources: listedResources },
-        }
-      }
-
-      case 'resources/read': {
-        if (!hasResources)
-          return { jsonrpc: '2.0', id, error: { code: -32601, message: `Method not found: ${req.method}` } }
-        const uri = typeof req.params?.uri === 'string' ? req.params.uri : undefined
-        if (uri === undefined)
-          return { jsonrpc: '2.0', id, error: { code: -32602, message: 'Missing resource uri' } }
-        const resource = resourceMap.get(uri)
-        if (resource === undefined)
-          return { jsonrpc: '2.0', id, error: { code: -32602, message: `Unknown resource: ${uri}` } }
-        try {
-          const text = await resource.read(ctx)
-          return {
-            jsonrpc: '2.0',
-            id,
-            result: {
-              contents: [{ uri: resource.uri, mimeType: resource.mimeType, text }],
-            },
-          }
-        }
-        catch (err) {
-          const message = err instanceof Error ? err.message : String(err)
-          return { jsonrpc: '2.0', id, error: { code: -32603, message } }
-        }
-      }
-
-      default:
-        return {
-          jsonrpc: '2.0',
-          id,
-          error: { code: -32601, message: `Method not found: ${req.method}` },
-        }
-    }
   }
 
   return definePlugin({
@@ -1033,41 +464,7 @@ export function mcp(options: McpOptions): KayPlugin {
         const denied = await authorize(ctx.request)
         if (denied !== undefined)
           return denied
-
-        let payload: unknown
-        try {
-          payload = await ctx.request.json()
-        }
-        catch {
-          return Response.json(
-            { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } },
-            { status: 400 },
-          )
-        }
-
-        if (Array.isArray(payload)) {
-          if (payload.length === 0 || payload.length > MAX_BATCH_SIZE) {
-            return Response.json(
-              { jsonrpc: '2.0', id: null, error: { code: -32600, message: payload.length === 0 ? 'Invalid Request' : `Batch size exceeds limit (${MAX_BATCH_SIZE})` } },
-              { status: 400 },
-            )
-          }
-          const responses: JsonRpcResponse[] = []
-          for (const item of payload) {
-            const res = await handleRpcMessage(item, ctx)
-            if (res !== null)
-              responses.push(res)
-          }
-          if (responses.length === 0)
-            return new Response(null, { status: 202 })
-          return Response.json(responses, { status: 200 })
-        }
-
-        const single = await handleRpcMessage(payload, ctx)
-        if (single === null)
-          return new Response(null, { status: 202 })
-        const status = single.error?.code === -32600 ? 400 : 200
-        return Response.json(single, { status })
+        return rpc.handlePost(ctx)
       }, { csrf: false })
 
       api.route('GET', endpoint, async (ctx) => {

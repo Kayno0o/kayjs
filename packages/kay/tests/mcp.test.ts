@@ -248,7 +248,7 @@ describe('@kayjs/mcp — Streamable HTTP (2025-03-26) plugin', () => {
       const fileApp = await testApp({
         root: fixtureDir,
         outDir: 'dist-file',
-        plugins: [mcp({ path: '/custom/mcp', tokenFile: keyFile, tools: { list: { action: listNotes, description: 'List notes' } } })],
+        plugins: [mcp({ path: '/custom/mcp', token: { file: keyFile }, tools: { list: { action: listNotes, description: 'List notes' } } })],
       })
       const fileOk = await fileApp.fetch('/custom/mcp', {
         method: 'POST',
@@ -257,6 +257,19 @@ describe('@kayjs/mcp — Streamable HTTP (2025-03-26) plugin', () => {
       })
       expect(fileOk.status).toBe(200)
       expect(await fileOk.json()).toEqual({ jsonrpc: '2.0', id: 2, result: {} })
+
+      const fnApp = await testApp({
+        root: fixtureDir,
+        outDir: 'dist-fn-token',
+        plugins: [mcp({ path: '/fn/mcp', token: async () => 'fn-token-999', tools: { list: { action: listNotes, description: 'List notes' } } })],
+      })
+      const fnOk = await fnApp.fetch('/fn/mcp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'authorization': 'Bearer fn-token-999' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'ping', params: {} }),
+      })
+      expect(fnOk.status).toBe(200)
+      expect(await fnOk.json()).toEqual({ jsonrpc: '2.0', id: 3, result: {} })
     }
     finally {
       if (prev === undefined)
@@ -736,5 +749,35 @@ describe('@kayjs/mcp — Streamable HTTP (2025-03-26) plugin', () => {
 
     const schemaRead = await call('resources/read', { uri: 'kay://schemas/note' })
     expect(JSON.parse(schemaRead.result.contents[0].text).required).toEqual(['title'])
+
+    // Batch requests work within cap and reject empty / oversized (>50) batches (#3563)
+    const batchOk = await app.fetch('/mcp/tools', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'authorization': `Bearer ${key}` },
+      body: JSON.stringify([
+        { jsonrpc: '2.0', id: 1, method: 'ping' },
+        { jsonrpc: '2.0', id: 2, method: 'ping' },
+      ]),
+    })
+    expect(batchOk.status).toBe(200)
+    expect(await batchOk.json()).toEqual([
+      { jsonrpc: '2.0', id: 1, result: {} },
+      { jsonrpc: '2.0', id: 2, result: {} },
+    ])
+
+    const batchEmpty = await app.fetch('/mcp/tools', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'authorization': `Bearer ${key}` },
+      body: '[]',
+    })
+    expect(batchEmpty.status).toBe(400)
+
+    const batchTooBig = await app.fetch('/mcp/tools', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'authorization': `Bearer ${key}` },
+      body: JSON.stringify(Array.from({ length: 51 }, (_, i) => ({ jsonrpc: '2.0', id: i, method: 'ping' }))),
+    })
+    expect(batchTooBig.status).toBe(400)
+    expect((await batchTooBig.json() as { error: { message: string } }).error.message).toContain('Batch size exceeds limit')
   })
 })

@@ -106,13 +106,7 @@ export function createRooms<TMessage, TMember = undefined>(
 
   const map = new Map<string, Set<Subscriber<TMember>>>()
   const clientCounts = new Map<string, number>()
-
-  function totalConnections(): number {
-    let total = 0
-    for (const set of map.values())
-      total += set.size
-    return total
-  }
+  let activeConnections = 0
 
   function join(room: string, sub: Subscriber<TMember>): void {
     let set = map.get(room)
@@ -120,14 +114,18 @@ export function createRooms<TMessage, TMember = undefined>(
       set = new Set()
       map.set(room, set)
     }
-    set.add(sub)
+    if (!set.has(sub)) {
+      set.add(sub)
+      activeConnections++
+    }
   }
 
   function leave(room: string, sub: Subscriber<TMember>): void {
     const set = map.get(room)
     if (set === undefined)
       return
-    set.delete(sub)
+    if (set.delete(sub))
+      activeConnections--
     if (set.size === 0)
       map.delete(room)
   }
@@ -196,7 +194,7 @@ export function createRooms<TMessage, TMember = undefined>(
       })
     }
 
-    if ((maxPerRoom > 0 && size(room) >= maxPerRoom) || (maxTotal > 0 && totalConnections() >= maxTotal)) {
+    if ((maxPerRoom > 0 && size(room) >= maxPerRoom) || (maxTotal > 0 && activeConnections >= maxTotal)) {
       return new Response('Service Unavailable', {
         status: 503,
         headers: { 'retry-after': '5' },

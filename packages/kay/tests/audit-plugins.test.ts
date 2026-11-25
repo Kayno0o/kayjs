@@ -45,20 +45,31 @@ function makeCtx(urlStr: string, locals: import('../src/server/index').KayLocals
 describe('Batch 5 Audit — Ecosystem Plugins & Publish Script (#3526)', () => {
   // ── Box 6 + Audit line 21: plugin-seo & plugin-i18n replace patterns + JSON-LD escaping ──
   describe('Box 6 + JSON-LD (@kayjs/seo & @kayjs/i18n)', () => {
-    it('keeps $&, $`, $\', $$ verbatim in seo titleTemplate and canonical/description replacements', async () => {
+    it('keeps $&, $`, $\', $$ verbatim in seo titleTemplate and canonical/description head additions', async () => {
       const plugin = seo({
         site: 'https://example.com',
         titleTemplate: '%s — Kay',
         description: { en: 'Cost is $& or $` or $\' or $$' },
       })
       const ctx = makeCtx('https://example.com/deals/$&/$$/$\'/end', { locale: 'en' })
-      const input = '<html><head><title>Save $& $` $\' $$ now</title></head><body><p>Body</p></body></html>'
-      const out = await plugin.transformHtml!(input, ctx)
+      const added: string[] = []
+      const docHead = {
+        lang: 'en',
+        htmlAttrs: {} as Record<string, string>,
+        title: 'Save $& $` $\' $$ now' as string | undefined,
+        get headHtml() {
+          return `<title>${this.title ?? ''}</title>${added.join('')}`
+        },
+        add(html: string) {
+          added.push(html)
+        },
+      }
+      await plugin.head!(docHead, ctx)
+      const out = docHead.headHtml
 
-      expect(out).toContain('<title>Save $& $` $\' $$ now — Kay</title>')
+      expect(docHead.title).toBe('Save $& $` $\' $$ now — Kay')
       expect(out).toContain('content="Cost is $&amp; or $` or $&#x27; or $$"')
       expect(out).toContain('href="https://example.com/deals/$&amp;/$$/$&#x27;/end"')
-      expect(out.match(/<\/head>/g)?.length).toBe(1)
     })
 
     it('escapes every < as \\u003c in JSON-LD so </SCRIPT> and <!--<script> cannot break out', () => {
@@ -78,19 +89,31 @@ describe('Batch 5 Audit — Ecosystem Plugins & Publish Script (#3526)', () => {
       })
     })
 
-    it('keeps $&, $`, $\', $$ verbatim in i18n hreflang replacements', async () => {
+    it('escapes alternate hreflang and href values in i18n head hook (#3559)', async () => {
       const plugin = i18n({
-        locales: ['en', 'fr'],
+        locales: ['en', 'fr"><script>'],
         defaultLocale: 'en',
         site: 'https://example.com',
       })
-      const ctx = makeCtx('https://example.com/price/$&/$\'/$$', { locale: 'en' })
-      const input = '<html lang="en"><head><title>Hi</title></head><body><p>Body</p></body></html>'
-      const out = await plugin.transformHtml!(input, ctx)
+      const ctx = makeCtx('https://example.com/price/$&/$\'/$$?a=1', { locale: 'en' })
+      const added: string[] = []
+      const docHead = {
+        lang: 'en',
+        htmlAttrs: {} as Record<string, string>,
+        title: 'Hi' as string | undefined,
+        get headHtml() {
+          return added.join('')
+        },
+        add(html: string) {
+          added.push(html)
+        },
+      }
+      await plugin.head!(docHead, ctx)
+      const out = added.join('')
 
-      expect(out).toContain('href="https://example.com/price/$&/$\'/$$"')
-      expect(out).toContain('href="https://example.com/fr/price/$&/$\'/$$"')
-      expect(out.match(/<\/head>/g)?.length).toBe(1)
+      expect(out).toContain('href="https://example.com/price/$&amp;/$&#x27;/$$"')
+      expect(out).toContain('hreflang="fr&quot;&gt;&lt;script&gt;"')
+      expect(out).not.toContain('<script>')
     })
   })
 
@@ -404,6 +427,33 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
       const rooms = createRooms<{ msg: string }, string>()
       expect(() => rooms.publish('r1', { msg: 'hi' }, 'update\ndata: injected')).toThrow()
       expect(() => rooms.publish('r1', { msg: 'hi' }, 'update\r\nevent: evil')).toThrow()
+    })
+
+    it('tracks total connections accurately with maxTotalConnections across rooms, joins, and disconnects (#3563)', () => {
+      const rooms = createRooms<{ n: number }, string>({
+        maxConnectionsPerRoom: 5,
+        maxConnectionsPerClient: 5,
+        maxTotalConnections: 2,
+      })
+      const ac1 = new AbortController()
+      const ac2 = new AbortController()
+      const ac3 = new AbortController()
+      const fromIp = (ip: string, signal: AbortSignal) => Object.assign(makeCtx('http://localhost/live', {}, { signal }), { ip })
+
+      const r1 = rooms.stream(fromIp('1.1.1.1', ac1.signal), { room: 'a', member: 'u1', pingMs: 0 })
+      const r2 = rooms.stream(fromIp('2.2.2.2', ac2.signal), { room: 'b', member: 'u2', pingMs: 0 })
+      const r3 = rooms.stream(fromIp('3.3.3.3', ac3.signal), { room: 'c', member: 'u3', pingMs: 0 })
+      expect(r1.status).toBe(200)
+      expect(r2.status).toBe(200)
+      expect(r3.status).toBe(503)
+
+      // Disconnecting one client frees a slot immediately
+      ac1.abort()
+      const ac4 = new AbortController()
+      const r4 = rooms.stream(fromIp('4.4.4.4', ac4.signal), { room: 'c', member: 'u4', pingMs: 0 })
+      expect(r4.status).toBe(200)
+      ac2.abort()
+      ac4.abort()
     })
 
     it('enforces per-room and per-client connection caps with 503/429', () => {

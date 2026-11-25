@@ -657,7 +657,36 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         return next()
       })
 
-      api.route('GET', `${basePath}/session`, async (ctx) => {
+      // Shared auth route wrapper: origin check (on POST), IP + optional email rate limiting, and body parsing.
+      function authRoute(
+        method: 'GET' | 'POST',
+        path: string,
+        routeCfg: { limit?: string, emailLimit?: string, readBody?: boolean },
+        handler: (ctx: RequestContext, body: Record<string, string>) => Response | Promise<Response>,
+      ): void {
+        api.route(method, `${basePath}${path}`, async (ctx) => {
+          if (routeCfg.limit !== undefined) {
+            const limited = limitIp(ctx, routeCfg.limit)
+            if (limited)
+              return limited
+          }
+          let body: Record<string, string> = {}
+          if (routeCfg.readBody) {
+            const parsed = await parseBody(ctx)
+            if (parsed instanceof Response)
+              return parsed
+            body = parsed
+          }
+          if (routeCfg.emailLimit !== undefined) {
+            const email = normalizeEmail(body.email ?? '')
+            if (email && !rateLimiter.allow(`${routeCfg.emailLimit}:email:${email}`))
+              return fail(ctx, 429, 'Too many requests')
+          }
+          return handler(ctx, body)
+        }, method === 'POST' ? authRouteOpts : undefined)
+      }
+
+      authRoute('GET', '/session', {}, async (ctx) => {
         const resolved = await resolveRequestSession(ctx)
         return ctx.json({
           user: resolved?.user ?? null,
@@ -665,19 +694,8 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         })
       })
 
-      api.route('POST', `${basePath}/signup`, async (ctx) => {
-        const limited = limitIp(ctx, 'signup')
-        if (limited)
-          return limited
-
-        const body = await parseBody(ctx)
-        if (body instanceof Response)
-          return body
-
+      authRoute('POST', '/signup', { limit: 'signup', emailLimit: 'signup', readBody: true }, async (ctx, body) => {
         const email = normalizeEmail(body.email ?? '')
-        if (email && !rateLimiter.allow(`signup:email:${email}`))
-          return fail(ctx, 429, 'Too many requests')
-
         const password = body.password ?? ''
         const name = body.name?.trim() || undefined
         const redirectTarget = safeRedirect(body.redirect ?? body.next, defaultRedirect)
@@ -710,45 +728,22 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         if (wantsJson(ctx.request))
           return ctx.json({ ok: true, user }, { status: 201 })
         return ctx.redirect(redirectTarget, 303)
-      }, authRouteOpts)
+      })
 
-      api.route('GET', `${basePath}/verify-email`, async (ctx) => {
-        const limited = limitIp(ctx, 'verify-email')
-        if (limited)
-          return limited
-
+      authRoute('GET', '/verify-email', { limit: 'verify-email' }, (ctx) => {
         const rawToken = ctx.url.searchParams.get('token') ?? ''
         const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
         return handleVerifyEmail(ctx, rawToken, redirectTarget, 302)
       })
 
-      api.route('POST', `${basePath}/verify-email`, async (ctx) => {
-        const limited = limitIp(ctx, 'verify-email')
-        if (limited)
-          return limited
-
-        const body = await parseBody(ctx)
-        if (body instanceof Response)
-          return body
-
+      authRoute('POST', '/verify-email', { limit: 'verify-email', readBody: true }, (ctx, body) => {
         const rawToken = body.token ?? ctx.url.searchParams.get('token') ?? ''
         const redirectTarget = safeRedirect(body.redirect ?? body.next ?? ctx.url.searchParams.get('redirect'), defaultRedirect)
         return handleVerifyEmail(ctx, rawToken, redirectTarget, 303)
-      }, authRouteOpts)
+      })
 
-      api.route('POST', `${basePath}/signin`, async (ctx) => {
-        const limited = limitIp(ctx, 'signin')
-        if (limited)
-          return limited
-
-        const body = await parseBody(ctx)
-        if (body instanceof Response)
-          return body
-
+      authRoute('POST', '/signin', { limit: 'signin', emailLimit: 'signin', readBody: true }, async (ctx, body) => {
         const email = normalizeEmail(body.email ?? '')
-        if (email && !rateLimiter.allow(`signin:email:${email}`))
-          return fail(ctx, 429, 'Too many requests')
-
         const password = body.password ?? ''
         const redirectTarget = safeRedirect(body.redirect ?? body.next, defaultRedirect)
 
@@ -767,27 +762,17 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         if (wantsJson(ctx.request))
           return ctx.json({ ok: true, user: pub }, { status: 200 })
         return ctx.redirect(redirectTarget, 303)
-      }, authRouteOpts)
+      })
 
-      api.route('POST', `${basePath}/signout`, async (ctx) => {
+      authRoute('POST', '/signout', {}, async (ctx) => {
         await signOut(ctx)
         if (wantsJson(ctx.request))
           return ctx.json({ ok: true })
         return ctx.redirect(safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect), 303)
-      }, authRouteOpts)
+      })
 
-      api.route('POST', `${basePath}/magic-link`, async (ctx) => {
-        const limited = limitIp(ctx, 'magic')
-        if (limited)
-          return limited
-
-        const body = await parseBody(ctx)
-        if (body instanceof Response)
-          return body
-
+      authRoute('POST', '/magic-link', { limit: 'magic', emailLimit: 'magic', readBody: true }, async (ctx, body) => {
         const email = normalizeEmail(body.email ?? '')
-        if (email && !rateLimiter.allow(`magic:email:${email}`))
-          return fail(ctx, 429, 'Too many requests')
         if (!isValidEmail(email))
           return fail(ctx, 400, 'Please enter a valid email address')
 
@@ -798,13 +783,9 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         }
         await sendMagicLink(email, linkOrigin, body.redirect ?? body.next)
         return ctx.json({ ok: true, message: 'If that address can sign in, a link has been sent.' })
-      }, authRouteOpts)
+      })
 
-      api.route('GET', `${basePath}/magic-link/verify`, async (ctx) => {
-        const limited = limitIp(ctx, 'magic-verify')
-        if (limited)
-          return limited
-
+      authRoute('GET', '/magic-link/verify', { limit: 'magic-verify' }, async (ctx) => {
         const rawToken = ctx.url.searchParams.get('token') ?? ''
         const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
         if (!rawToken)
