@@ -107,7 +107,7 @@ export default function DocPage({ data }: { data: DocPageData }) {
         <h1>{entry.data.title}</h1>
         <p class="docs-article-lead">{entry.data.description}</p>
 
-        <div class="docs-prose" innerHTML={{ __html: entry.html }} />
+        <div class="docs-prose" innerHTML={entry.html} />
         <script>{COPY_CODE_SCRIPT}</script>
 
         <nav class="docs-pager" aria-label="Page pagination">

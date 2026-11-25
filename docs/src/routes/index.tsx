@@ -94,15 +94,15 @@ export default function HomePage() {
         <div class="hero-code-card" role="group" aria-label="Kay v2 code examples">
           <input class="hero-code-input" type="radio" name="hero-code" id="hc-route" checked />
           <label class="hero-code-tab" for="hc-route">routes/index.tsx</label>
-          <div class="hero-code-panel" innerHTML={{ __html: routeHtml }} />
+          <div class="hero-code-panel" innerHTML={routeHtml} />
 
           <input class="hero-code-input" type="radio" name="hero-code" id="hc-island" />
           <label class="hero-code-tab" for="hc-island">Counter.tsx</label>
-          <div class="hero-code-panel" innerHTML={{ __html: islandHtml }} />
+          <div class="hero-code-panel" innerHTML={islandHtml} />
 
           <input class="hero-code-input" type="radio" name="hero-code" id="hc-action" />
           <label class="hero-code-tab" for="hc-action">actions/save.ts</label>
-          <div class="hero-code-panel" innerHTML={{ __html: actionHtml }} />
+          <div class="hero-code-panel" innerHTML={actionHtml} />
 
           <div class="hero-code-spacer">
             <span class="hero-pill">0 KB static</span>

@@ -28,13 +28,13 @@ bench-server:
 docs-dev:
 	cd docs && bun run dev
 
-# Export the static docs site (+ .br/.gz sidecars) to docs/dist/static
+# Export the static docs site (+ .br/.gz sidecars) to docs/dist
 docs-build:
 	cd docs && bun run build
 
 # Build docs and audit layout, contrast, overflow, and tap targets with `page check` (light + dark)
 docs-qa: docs-build
-	@bun -e 'import { resolve } from "node:path"; const dist = resolve("docs/dist/static"); const srv = Bun.serve({ port: 0, async fetch(req) { const u = new URL(req.url); const p = u.pathname === "/" ? "/index.html" : u.pathname; let f = Bun.file(resolve(dist, "." + p)); if (!(await f.exists())) f = Bun.file(resolve(dist, "." + p + "/index.html")); if (!(await f.exists())) return new Response(Bun.file(resolve(dist, "404.html")), { status: 404 }); if (u.searchParams.get("scheme") === "dark" && f.name?.endsWith(".html")) { const html = (await f.text()).replace("</head>", "<style>:root{color-scheme:dark;--buncss-light: ;--buncss-dark:initial}</style></head>"); return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } }); } return new Response(f); } }); const base = `http://127.0.0.1:${srv.port}`; const paths = ["/", "/docs/getting-started/quickstart", "/docs/core/signals-and-reactivity", "/docs/core/server-actions", "/docs/plugins/ui", "/docs/plugins/mcp", "/docs/production/deploy-and-compile", "/grammars", "/404.html"]; const urls = [...paths.map(p => `${base}${p}`), ...paths.map(p => `${base}${p}?scheme=dark`)]; const proc = Bun.spawn(["page", "check", "-w", "1440,1024,400", ...urls], { stdout: "inherit", stderr: "inherit" }); const code = await proc.exited; srv.stop(true); process.exit(code);'
+	@bun -e 'import { resolve } from "node:path"; const dist = resolve("docs/dist"); const srv = Bun.serve({ port: 0, async fetch(req) { const u = new URL(req.url); const p = u.pathname === "/" ? "/index.html" : u.pathname; let f = Bun.file(resolve(dist, "." + p)); if (!(await f.exists())) f = Bun.file(resolve(dist, "." + p + "/index.html")); if (!(await f.exists())) return new Response(Bun.file(resolve(dist, "404.html")), { status: 404 }); if (u.searchParams.get("scheme") === "dark" && f.name?.endsWith(".html")) { const html = (await f.text()).replace("</head>", "<style>:root{color-scheme:dark;--buncss-light: ;--buncss-dark:initial}</style></head>"); return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } }); } return new Response(f); } }); const base = `http://127.0.0.1:${srv.port}`; const paths = ["/", "/docs/getting-started/quickstart", "/docs/core/signals-and-reactivity", "/docs/core/server-actions", "/docs/plugins/ui", "/docs/plugins/mcp", "/docs/production/deploy-and-compile", "/grammars", "/404.html"]; const urls = [...paths.map(p => `${base}${p}`), ...paths.map(p => `${base}${p}?scheme=dark`)]; const proc = Bun.spawn(["page", "check", "-w", "1440,1024,400", ...urls], { stdout: "inherit", stderr: "inherit" }); const code = await proc.exited; srv.stop(true); process.exit(code);'
 
 # Build and start the docs Caddy container on 127.0.0.1:3650
 docs-up:
