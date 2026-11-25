@@ -40,7 +40,7 @@ export class SourceEditor {
     for (let i = 0; i < patches.length; i++) {
       const p = patches[i]!
       if (p.start < cursor)
-        continue
+        throw new Error(`kay compiler: overlapping source patch [${p.start}, ${p.end}] overlaps previous end ${cursor}`)
       out += this.#source.slice(cursor, p.start)
       out += p.text
       cursor = p.end

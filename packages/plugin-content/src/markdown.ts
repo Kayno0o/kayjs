@@ -46,7 +46,8 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
   readingMinutes: number
 } {
   const slots: string[] = []
-  const slotPrefix = `b${++slotBatchId}-`
+  // Cryptographically unguessable per-render slot prefix so untrusted markdown cannot forge or duplicate component slots.
+  const slotPrefix = `b${++slotBatchId}-${crypto.randomUUID().slice(0, 12)}-`
   let processed = body
 
   // 1. Extract fenced code blocks before component expansion so `<Tag>` inside ```code``` is never treated as a component

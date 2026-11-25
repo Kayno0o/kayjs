@@ -12,6 +12,9 @@ import { scaffoldProject } from './new'
 const args = Bun.argv.slice(2)
 const cmd = args[0]
 
+const BUILTIN_COMMANDS = new Set(['new', 'check', 'build', 'start', 'dev'])
+const VALID_TEMPLATES = new Set(['minimal', 'fullstack', 'blog', 'app'])
+
 function flagValue(name: string): string | undefined {
   const prefix = `${name}=`
   for (let i = 0; i < args.length; i++) {
@@ -37,14 +40,27 @@ function resolveHostname(): string {
   return process.env.HOST || '127.0.0.1'
 }
 
-const dirArg = args.slice(1).find((a, i, arr) => {
-  if (a.startsWith('-'))
-    return false
-  const prev = arr[i - 1]
-  if (prev === '--port' || prev === '--host' || prev === '--compile' || prev === '--template')
-    return false
-  return true
-})
+function parsePort(raw: string | number | undefined, fallback: number): number {
+  if (raw === undefined || raw === '')
+    return fallback
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 0 || n > 65535) {
+    console.error(`kay: invalid port "${raw}" (expected an integer between 0 and 65535)`)
+    process.exit(1)
+  }
+  return n
+}
+
+const dirArg = cmd !== undefined && BUILTIN_COMMANDS.has(cmd)
+  ? args.slice(1).find((a, i, arr) => {
+      if (a.startsWith('-'))
+        return false
+      const prev = arr[i - 1]
+      if (prev === '--port' || prev === '--host' || prev === '--compile' || prev === '--template')
+        return false
+      return true
+    })
+  : undefined
 const root = resolve(dirArg ?? process.cwd())
 
 if (cmd === 'new') {
@@ -52,8 +68,12 @@ if (cmd === 'new') {
     console.error('Usage: kay new <dir> [--template minimal|fullstack|blog|app] [--force]')
     process.exit(1)
   }
-  const tpl = flagValue('--template')
-  const template = tpl === 'fullstack' || tpl === 'blog' || tpl === 'app' ? tpl : 'minimal'
+  const tpl = flagValue('--template') ?? 'minimal'
+  if (!VALID_TEMPLATES.has(tpl)) {
+    console.error(`kay new: unknown template "${tpl}" (use minimal, fullstack, blog, or app)`)
+    process.exit(1)
+  }
+  const template = tpl as 'minimal' | 'fullstack' | 'blog' | 'app'
   const res = scaffoldProject(root, { template, force: hasFlag('--force') })
   console.log(`Created Kay (${template}) project in ${res.root} (${res.files.length} files)`)
   console.log(`\nNext steps:\n  cd ${dirArg}\n  bun install\n  bun run dev`)
@@ -86,26 +106,27 @@ else if (cmd === 'build') {
 else if (cmd === 'start') {
   process.env.NODE_ENV ??= 'production'
   const config = await loadConfig(root)
-  const port = Number(flagValue('--port') || process.env.PORT || config.port || 3000)
+  const port = parsePort(flagValue('--port') || process.env.PORT || config.port, 3000)
   const hostname = resolveHostname()
   const app = await createServer({ root })
   const server = app.serve(port, hostname)
   console.log(`kay server listening on http://${hostname}:${server.port}`)
 }
 else if (cmd === 'dev') {
-  const port = Number(flagValue('--port') || process.env.PORT || 3000)
+  const config = await loadConfig(root).catch(() => ({} as Awaited<ReturnType<typeof loadConfig>>))
+  const port = parsePort(flagValue('--port') || process.env.PORT || config.port, 3000)
   const hostname = resolveHostname()
   await devServer({ root, port, hostname })
 }
 else {
-  // Check plugin-registered CLI commands from kay.config.ts
-  const config = await loadConfig(root)
+  // Check plugin-registered CLI commands from kay.config.ts in current working directory
+  const config = await loadConfig(process.cwd())
   const pluginCmd = cmd !== undefined
     ? config.plugins?.flatMap(p => Object.entries(p.commands ?? {})).find(([name]) => name === cmd)?.[1]
     : undefined
 
   if (pluginCmd !== undefined) {
-    await pluginCmd(args.slice(1), root)
+    await pluginCmd(args.slice(1), process.cwd())
   }
   else {
     console.log(`Usage: kay <command> [dir] [options]

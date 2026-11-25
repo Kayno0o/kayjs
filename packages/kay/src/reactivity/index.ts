@@ -50,9 +50,16 @@ interface SubNode extends Owned {
   r(): void // run
 }
 
+export interface IdScope {
+  p: string
+  n: number
+}
+
 export interface Owner extends Owned {
   fs: Owned | undefined // first owned
   cl: (() => void)[] | undefined // cleanups
+  cx?: Map<symbol, unknown> | undefined // context values provided at this owner
+  id?: IdScope | undefined // deterministic useId() scope
 }
 
 export interface Signal<T> {
@@ -578,6 +585,10 @@ export function runWithOwner<T>(owner: Owner | undefined, fn: () => T): T {
 
 export function getOwner(): Owner | undefined {
   return currentOwner
+}
+
+export function isTracking(): boolean {
+  return currentSub !== undefined
 }
 
 export function root<T>(fn: (dispose: () => void) => T): T {

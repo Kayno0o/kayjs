@@ -32,6 +32,7 @@ export const auth = createAuth({
 
 - **`secret`**: In `NODE_ENV=production`, `secret` (or `AUTH_SECRET` env) is **required** and must be at least **32 UTF-8 bytes**. An empty string is rejected in all environments. In development, omitting `secret` generates an ephemeral key per process.
 - **`site`**: The public origin of the app. Mailed sign-in/verification links and OAuth callbacks are built from it, never from the request's `Host` header, which the client controls. Without it, mailed links only work on loopback hosts (`localhost` / `127.0.0.1`), and other hosts receive `500`.
+- **`minPasswordLength`**: Defaults to `12` (aligned with CNIL recommendations).
 - **`requireEmailVerification`**: Defaults to `true`. `POST /auth/signup` creates an unverified account, mails a one-time verification link (`kind: 'verify-email'`), and returns `202 { ok: true, verificationRequired: true }` without opening a session cookie. `POST /auth/signin` refuses unverified accounts with `403`. Set `requireEmailVerification: false` explicitly only if you intentionally allow unverified password sessions (for example, local development without mail).
 - **`trustProxy`**: Defaults to `false`. Rate limiting keys on `ctx.ip` (populated by Kay's server) plus the normalized email address on email-bearing endpoints, and covers sign-up, sign-in, magic-link, verification, and OAuth endpoints. Forwarded headers are ignored unless `trustProxy` is set: `true` trusts one proxy, a number trusts that many hops, and only the entry those hops wrote counts.
 
@@ -77,7 +78,7 @@ Inside any route, layout, or server `action()`, `ctx.locals.user` is automatical
 
 For session data minimization, you can configure:
 
-- `storeIp`: `true` (default), `'truncate'` (IPv4 `/24`, IPv6 `/48`), or `false` (omit IP).
+- `storeIp`: `'truncate'` (default — IPv4 `/24`, IPv6 `/48`), `true` (full IP), or `false` (omit IP).
 - `storeUserAgent`: `true` (default) or `false` (omit `User-Agent`).
 
 The `Auth` instance also exposes RGPD lifecycle methods delegating to your `AuthStore`:

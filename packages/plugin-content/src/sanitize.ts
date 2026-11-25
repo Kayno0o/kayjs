@@ -23,7 +23,7 @@ const ALLOWED_MD_TAGS = new Set([
 ])
 
 const URL_ATTRS = new Set(['href', 'src', 'cite', 'poster', 'action', 'formaction'])
-const FORBIDDEN_ATTRS = new Set(['srcdoc', 'action', 'formaction', 'xmlns', 'xlink:href'])
+const FORBIDDEN_ATTRS = new Set(['srcdoc', 'action', 'formaction', 'xmlns', 'xlink:href', 'style', 'is', 'data-persist'])
 const SAFE_DATA_IMAGE_RE = /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=\s]+$/i
 const SAFE_SCHEME_RE = /^(?:https?|mailto|tel):/i
 const HAS_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i
@@ -38,10 +38,13 @@ function decodeHtmlEntities(rawVal: string): string {
       const cp = Number.parseInt(dec, 10)
       return Number.isFinite(cp) && cp <= 0x10FFFF ? String.fromCodePoint(cp) : ''
     })
-    .replaceAll('&colon;', ':')
-    .replaceAll('&tab;', '\t')
-    .replaceAll('&newline;', '\n')
-    .replaceAll('&amp;', '&')
+    .replace(/&(colon|tab|newline|amp);/gi, (_, name: string) => {
+      const lower = name.toLowerCase()
+      if (lower === 'colon') return ':'
+      if (lower === 'tab') return '\t'
+      if (lower === 'newline') return '\n'
+      return '&'
+    })
 }
 
 function isSafeUrl(val: string): boolean {
@@ -110,10 +113,16 @@ function sanitizePass(html: string): string {
     }
     out += html.slice(i, lt)
 
-    // Strip HTML comments
+    // Strip HTML comments (including HTML5 `--!>` closer)
     if (html.startsWith('<!--', lt)) {
-      const end = html.indexOf('-->', lt + 4)
-      i = end === -1 ? len : end + 3
+      const endStd = html.indexOf('-->', lt + 4)
+      const endBang = html.indexOf('--!>', lt + 4)
+      if (endStd === -1 && endBang === -1)
+        i = len
+      else if (endBang !== -1 && (endStd === -1 || endBang < endStd))
+        i = endBang + 4
+      else
+        i = endStd + 3
       continue
     }
 
@@ -161,7 +170,7 @@ function sanitizePass(html: string): string {
     // Drop dangerous container tags together with their inner content
     if (!isClosing && DROP_CONTENT_TAGS.has(tagName)) {
       if (!selfClosing) {
-        const closeRe = new RegExp(`</${tagName}\\s*>`, 'gi')
+        const closeRe = new RegExp(`</${tagName}\\b[^>]*>`, 'gi')
         closeRe.lastIndex = i
         const m = closeRe.exec(html)
         i = m ? m.index + m[0].length : len
@@ -215,7 +224,7 @@ function sanitizePass(html: string): string {
       if (a.value === null)
         safeParts.push(a.name)
       else
-        safeParts.push(`${a.name}="${a.value.replaceAll('"', '&quot;')}"`)
+        safeParts.push(`${a.name}="${a.value.replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}"`)
     }
 
     const attrOut = safeParts.length > 0 ? ` ${safeParts.join(' ')}` : ''

@@ -3,14 +3,12 @@
 
 import type { ReadonlySignal, Signal } from 'kay'
 import type { Tone } from './static'
-import { computed, selector, signal } from 'kay'
+import { computed, selector, signal, useId } from 'kay'
 
-// ---- Stable unique IDs for ARIA wiring ----
-
-let uiIdSeq = 0
+// ---- Stable hydration-safe unique IDs for ARIA wiring ----
 
 export function nextUiId(prefix: string): string {
-  return `${prefix}-${++uiIdSeq}`
+  return useId(prefix)
 }
 
 // ---- Shared listbox / menu keyboard navigation ----

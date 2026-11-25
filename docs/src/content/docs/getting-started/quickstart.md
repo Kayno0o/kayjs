@@ -67,4 +67,4 @@ Pass `--analyze` to `kay build` to print per-route eager JS and CSS weights plus
 kay check
 ```
 
-`kay check` runs TypeScript checking, Kay compiler guardrails, route conflict checks, and every active plugin's `check` hook. Pass `--no-typecheck` to skip `tsc`/`tsgo` when iterating quickly.
+`kay check` runs TypeScript checking, Kay compiler guardrails, route conflict checks, and every active plugin's `check` hook. Pass `--no-typecheck` to skip `bun check`/`tsgo`/`tsc` when iterating quickly.

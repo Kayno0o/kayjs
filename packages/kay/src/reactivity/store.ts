@@ -1,7 +1,7 @@
 // Deep reactive proxy store (tree-shakable: 0 B if unused).
 
 import type { Signal } from './index'
-import { batch, signal, untrack } from './index'
+import { batch, isTracking, signal, untrack } from './index'
 
 const RAW = Symbol('kay.store.raw')
 const OWN_KEYS = Symbol('kay.store.keys')
@@ -65,17 +65,19 @@ function wrap<T extends object>(target: T): T {
       const mutator = Array.isArray(obj) ? batchedMutators.get(key) : undefined
       if (mutator !== undefined)
         return mutator
-      getDep(obj, key).value
-      // A reader of an array's length is walking it (a list loop reads entries untracked), so any entry write reaches it.
-      if (key === 'length' && Array.isArray(obj))
-        getDep(obj, OWN_KEYS).value
+      if (isTracking()) {
+        getDep(obj, key).value
+        // A reader of an array's length is walking it (a list loop reads entries untracked), so any entry write reaches it.
+        if (key === 'length' && Array.isArray(obj))
+          getDep(obj, OWN_KEYS).value
+      }
       const value = Reflect.get(obj, key, receiver)
       return isPlain(value) ? wrap(value) : value
     },
     set(obj, key, value, receiver) {
       const rawValue = unwrap(value)
       const had = Object.prototype.hasOwnProperty.call(obj, key)
-      const prev = Reflect.get(obj, key, receiver)
+      const prev = Reflect.get(obj, key, obj)
       const prevLength = Array.isArray(obj) ? obj.length : 0
       const ok = Reflect.set(obj, key, rawValue, receiver)
       if (!had || !Object.is(prev, rawValue)) {
@@ -100,11 +102,13 @@ function wrap<T extends object>(target: T): T {
     has(obj, key) {
       if (key === RAW)
         return true
-      getDep(obj, key).value
+      if (isTracking())
+        getDep(obj, key).value
       return Reflect.has(obj, key)
     },
     ownKeys(obj) {
-      getDep(obj, OWN_KEYS).value
+      if (isTracking())
+        getDep(obj, OWN_KEYS).value
       return Reflect.ownKeys(obj)
     },
   })

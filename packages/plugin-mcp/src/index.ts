@@ -211,6 +211,7 @@ interface ResolvedResource {
 
 interface ResolvedToolEntry {
   name: string
+  action?: ServerAction<unknown, unknown> | undefined
   schema: StandardSchemaV1 | undefined
   handler: (input: unknown, ctx: ActionContext) => unknown | Promise<unknown>
   format: ((output: unknown, input: unknown) => unknown) | undefined
@@ -456,6 +457,7 @@ function buildCatalog(
 
     toolMap.set(name, {
       name,
+      action: isActionTool(def) ? def.action as ServerAction<unknown, unknown> : undefined,
       schema,
       handler,
       format: def.format as ((output: unknown, input: unknown) => unknown) | undefined,
@@ -742,6 +744,8 @@ function applyOutputBudget(result: McpToolResult, maxChars: number | undefined):
     : { content: nextContent }
 }
 
+const MAX_BATCH_SIZE = 50
+
 function makeActionContext(ctx: RequestContext): ActionContext {
   return {
     request: ctx.request,
@@ -749,6 +753,7 @@ function makeActionContext(ctx: RequestContext): ActionContext {
     params: ctx.params,
     cookies: ctx.cookies,
     locals: ctx.locals,
+    ip: ctx.ip,
     redirect: ctx.redirect,
     deny(status, message, fieldErrors) {
       return Response.json(
@@ -810,6 +815,8 @@ export function mcp(options: McpOptions): KayPlugin {
     return { content: [{ type: 'text', text: JSON.stringify(applyPrune(value, pruneMode)) }] }
   }
 
+  let serverApi: Parameters<NonNullable<KayPlugin['server']>>[0] | undefined
+
   async function callTool(name: string, args: unknown, ctx: RequestContext): Promise<McpToolResult> {
     const tool = toolMap.get(name)
     if (tool === undefined)
@@ -829,7 +836,22 @@ export function mcp(options: McpOptions): KayPlugin {
 
     const actionCtx = makeActionContext(ctx)
     try {
-      const rawResult = await tool.handler(input, actionCtx)
+      let rawResult: unknown
+      if (tool.action !== undefined && serverApi !== undefined) {
+        const invoked = await serverApi.invokeAction(tool.action, input, ctx)
+        if (!invoked.ok) {
+          const fields = formatFieldErrors(invoked.fieldErrors)
+          const msg = fields ? `${invoked.error} (${fields})` : invoked.error
+          return applyOutputBudget({
+            content: [{ type: 'text', text: msg }],
+            isError: true,
+          }, tool.maxOutputChars)
+        }
+        rawResult = invoked.data
+      }
+      else {
+        rawResult = await tool.handler(input, actionCtx)
+      }
       let mcpResult: McpToolResult
       if (rawResult instanceof Response) {
         mcpResult = await formatResponseResult(rawResult, tool.pruneEmpty)
@@ -965,6 +987,7 @@ export function mcp(options: McpOptions): KayPlugin {
     name: '@kayjs/mcp',
 
     server(api) {
+      serverApi = api
       if (api.dev || nodeEnv() !== 'production') {
         for (const msg of collectBudgetViolations(footprint, options.budget))
           warnSink(msg)
@@ -987,9 +1010,9 @@ export function mcp(options: McpOptions): KayPlugin {
         }
 
         if (Array.isArray(payload)) {
-          if (payload.length === 0) {
+          if (payload.length === 0 || payload.length > MAX_BATCH_SIZE) {
             return Response.json(
-              { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } },
+              { jsonrpc: '2.0', id: null, error: { code: -32600, message: payload.length === 0 ? 'Invalid Request' : `Batch size exceeds limit (${MAX_BATCH_SIZE})` } },
               { status: 400 },
             )
           }

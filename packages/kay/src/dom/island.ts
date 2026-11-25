@@ -30,6 +30,40 @@ export function parseIslandProps(raw: string): Record<string, unknown> {
 
 type IslandModule = { default: (props: Record<string, unknown>) => Node | DocumentFragment | null }
 
+/** Finds this island's own `<kay-slot>` without descending into nested `<kay-island>` boundaries. */
+function findOwnSlot(root: Element): Element | null {
+  for (let child = root.firstElementChild; child !== null; child = child.nextElementSibling) {
+    const tag = child.tagName
+    if (tag === 'KAY-SLOT')
+      return child
+    if (tag === 'KAY-ISLAND')
+      continue
+    const nested = findOwnSlot(child)
+    if (nested !== null)
+      return nested
+  }
+  return null
+}
+
+function isAllowedChunkUrl(chunk: string): boolean {
+  if (chunk.startsWith('//'))
+    return false
+  if (chunk.startsWith('/'))
+    return true
+  if (typeof location !== 'undefined' && location.origin && location.origin !== 'null') {
+    try {
+      const parsed = new URL(chunk, location.href)
+      return parsed.origin === location.origin
+    }
+    catch {
+      return false
+    }
+  }
+  return !/^(?:javascript|data|vbscript):/i.test(chunk)
+}
+
+let clientIslandIdSeq = 0
+
 export function defineIslandElement(): void {
   if (typeof customElements === 'undefined' || customElements.get('kay-island'))
     return
@@ -122,7 +156,7 @@ export function defineIslandElement(): void {
     async _l(clientOnly: boolean, token: number): Promise<void> {
       this._clearStrategy()
       const chunk = this.getAttribute('c')
-      if (!chunk || token !== this._t || !this.isConnected || this._d !== undefined)
+      if (!chunk || !isAllowedChunkUrl(chunk) || token !== this._t || !this.isConnected || this._d !== undefined)
         return
 
       let dispose: (() => void) | undefined
@@ -133,13 +167,14 @@ export function defineIslandElement(): void {
 
         const p = this.getAttribute('p')
         const props: Record<string, unknown> = p ? parseIslandProps(p) : {}
-        const slot = this.querySelector('kay-slot')
+        const slot = findOwnSlot(this)
         if (slot !== null)
           props.children = slot
+        const idPrefix = this.getAttribute('i') ?? `c${clientIslandIdSeq++}-`
         const render = () => mod.default(props)
         dispose = (typeof KAY_CLIENT_ONLY === 'undefined' || KAY_CLIENT_ONLY) && clientOnly
-          ? mount(this, render)
-          : hydrate(this, render)
+          ? mount(this, render, idPrefix)
+          : hydrate(this, render, idPrefix)
         if (!this.isConnected || token !== this._t) {
           dispose()
           return

@@ -62,8 +62,10 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
       const state = resolved === undefined || !isTsFile(resolved)
         ? undefined
         : imp.specifiers.find((spec) => {
-            if (spec.imported === '*' || analysis.jsxTags.has(spec.local))
+            if (analysis.jsxTags.has(spec.local))
               return false
+            if (spec.imported === '*')
+              return graph.load(resolved).stateExports.length > 0
             const target = graph.exportTarget(resolved, spec.imported)
             return graph.load(target.file).stateExports.includes(target.exportName)
           })
@@ -107,6 +109,9 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
       pageBindings.set(file, bindings)
   }
 
+  const isStubbedActionFile = (file: string): boolean =>
+    !analyses.get(file)?.isInteractive && actionsByFile.has(file)
+
   // Component/page CSS & CSS Module imports reached from islands are bundled via island entrypoints.
   const cssFiles = new Set<string>()
   const cssSeen = new Set<string>()
@@ -122,7 +127,7 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
         continue
       if (target.endsWith('.css'))
         cssFiles.add(target)
-      else if (isTsFile(target))
+      else if (isTsFile(target) && !isStubbedActionFile(target))
         cssStack.push(target)
     }
   }
@@ -147,14 +152,24 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
     reachSeen.add(file)
     if (file.endsWith('.tsx'))
       reach.add(file)
-    reachStack.push(...graph.localDeps(file))
-    for (const imp of analyses.get(file)?.imports ?? []) {
+    for (const dep of graph.localDeps(file)) {
+      if (!isStubbedActionFile(dep))
+        reachStack.push(dep)
+    }
+    const analysis = analyses.get(file)
+    for (const imp of analysis?.imports ?? []) {
       // The client build swaps an action file for stubs of its actions, so any other export it has is missing there.
       const target = graph.resolve(file, imp.source)
-      const actions = target !== undefined && !analyses.get(target)?.isInteractive ? actionsByFile.get(target) : undefined
+      const actions = target !== undefined && isStubbedActionFile(target) ? actionsByFile.get(target) : undefined
       const missing = actions !== undefined ? imp.specifiers.find(s => s.imported !== '*' && !actions.some(a => a.exportName === s.imported)) : undefined
       if (missing !== undefined)
         throw new Error(`kay build: ${relPosix(root, file)} runs in the browser and imports ${missing.imported} from ${relPosix(root, target!)}, a file of server actions: the browser only gets its actions. Move ${missing.imported} into a module without actions.`)
+    }
+    for (const re of analysis?.reexports ?? []) {
+      const target = graph.resolve(file, re.source)
+      const actions = target !== undefined && isStubbedActionFile(target) ? actionsByFile.get(target) : undefined
+      if (actions !== undefined && re.local !== '*' && !actions.some(a => a.exportName === re.local))
+        throw new Error(`kay build: ${relPosix(root, file)} runs in the browser and re-exports ${re.local} from ${relPosix(root, target!)}, a file of server actions: the browser only gets its actions. Move ${re.local} into a module without actions.`)
     }
   }
 

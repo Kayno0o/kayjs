@@ -103,6 +103,35 @@
     gap: var(--ui-gap, 1rem);
   }
 
+  /* Layout scale tokens (0 KB JS, strict-CSP safe across all browsers) */
+  [data-layout][data-gap="none"] { --ui-gap: 0; }
+  [data-layout][data-gap="2xs"] { --ui-gap: var(--ui-space-2xs, 0.25rem); }
+  [data-layout][data-gap="xs"] { --ui-gap: var(--ui-space-xs, 0.5rem); }
+  [data-layout][data-gap="sm"] { --ui-gap: var(--ui-space-sm, 0.75rem); }
+  [data-layout][data-gap="md"] { --ui-gap: var(--ui-space-md, 1rem); }
+  [data-layout][data-gap="lg"] { --ui-gap: var(--ui-space-lg, 1.5rem); }
+  [data-layout][data-gap="xl"] { --ui-gap: var(--ui-space-xl, 2rem); }
+  [data-layout][data-gap="2xl"] { --ui-gap: var(--ui-space-2xl, 3rem); }
+
+  [data-layout="grid"][data-min="xs"] { --ui-min: 10rem; }
+  [data-layout="grid"][data-min="sm"] { --ui-min: 14rem; }
+  [data-layout="grid"][data-min="md"] { --ui-min: 16rem; }
+  [data-layout="grid"][data-min="lg"] { --ui-min: 20rem; }
+  [data-layout="grid"][data-min="xl"] { --ui-min: 24rem; }
+
+  [data-layout="sidebar"][data-side="xs"] { --ui-side: 10rem; }
+  [data-layout="sidebar"][data-side="sm"] { --ui-side: 12rem; }
+  [data-layout="sidebar"][data-side="md"] { --ui-side: 16rem; }
+  [data-layout="sidebar"][data-side="lg"] { --ui-side: 20rem; }
+  [data-layout="sidebar"][data-side="xl"] { --ui-side: 24rem; }
+
+  /* Progressive CSS Values 5 attr() support for custom CSS lengths without inline style attributes */
+  @supports (gap: attr(data-gap-value type(<length-percentage>))) {
+    [data-layout][data-gap-value] { --ui-gap: attr(data-gap-value type(<length-percentage>)); }
+    [data-layout="grid"][data-min-value] { --ui-min: attr(data-min-value type(<length-percentage>)); }
+    [data-layout="sidebar"][data-side-value] { --ui-side: attr(data-side-value type(<length-percentage>)); }
+  }
+
   /* Native top-layer & overlay positioning */
   dialog[data-ui="dialog"],
   dialog[data-ui="drawer"],
@@ -199,9 +228,12 @@
     cursor: pointer;
   }
 
-  /* DataTable scroll container */
+  /* DataTable scroll & pagination */
   [data-ui="datatable"] [data-part="scroll"] {
     overflow-x: auto;
+  }
+  [data-ui="datatable"] [data-part="pagination"] [data-layout="cluster"] {
+    --ui-gap: 0.4rem;
   }
   table[data-ui="table"] {
     width: 100%;
@@ -239,6 +271,16 @@
     flex-direction: column;
     gap: 0.5rem;
     max-inline-size: min(24rem, calc(100vw - 2rem));
+  }
+  [data-ui="toast"] [data-part="description"] {
+    margin: 0.2rem 0 0;
+  }
+  [data-ui="toast"] [data-part="close"] {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    padding: 0 0.25rem;
   }
 
   [hidden] {

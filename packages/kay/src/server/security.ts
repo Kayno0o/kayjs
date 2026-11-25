@@ -56,7 +56,11 @@ export function withCspHashes(
   }
 
   addHashes('style-src', styleHashes)
+  if (directives.has('style-src-elem'))
+    addHashes('style-src-elem', styleHashes)
   addHashes('script-src', scriptHashes)
+  if (directives.has('script-src-elem'))
+    addHashes('script-src-elem', scriptHashes)
 
   return order.map((name) => {
     const tokens = directives.get(name)!
@@ -66,11 +70,13 @@ export function withCspHashes(
 
 export const DEFAULT_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
 export const DEFAULT_HSTS = 'max-age=31536000; includeSubDomains'
+export const DEFAULT_PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=()'
 
 export interface SecurityHeadersOptions {
   frameOptions?: 'DENY' | 'SAMEORIGIN' | false | undefined
   referrerPolicy?: string | false | undefined
   contentTypeOptions?: boolean | undefined
+  permissionsPolicy?: string | false | undefined
   csp?: string | false | undefined
   hsts?: string | boolean | undefined
 }
@@ -102,7 +108,7 @@ function forwardedOrigin(request: Request, trustProxy: TrustProxy): string | und
     return new URL(`${proto}://${host}`).origin
   }
   catch {
-    return `${proto}://${host}`
+    return undefined
   }
 }
 
@@ -150,7 +156,7 @@ export function verifyOrigin(
   if (origin !== null) {
     if (isTrustedOrigin(origin, request, trustedOrigins, trustProxy))
       return { ok: true }
-    return { ok: false, reason: `Cross-site request blocked: origin ${origin} does not match ${forwardedOrigin(request, trustProxy) ?? new URL(request.url).origin}` }
+    return { ok: false, reason: `Cross-site request blocked: untrusted origin ${origin}` }
   }
 
   const fetchSite = request.headers.get('sec-fetch-site')
@@ -187,6 +193,8 @@ export function buildSecurityHeaderEntries(options: SecurityHeadersOptions | fal
     entries.push(['x-frame-options', opts.frameOptions ?? 'SAMEORIGIN'])
   if (opts.referrerPolicy !== false)
     entries.push(['referrer-policy', opts.referrerPolicy ?? 'strict-origin-when-cross-origin'])
+  if (opts.permissionsPolicy !== false)
+    entries.push(['permissions-policy', opts.permissionsPolicy ?? DEFAULT_PERMISSIONS_POLICY])
   if (opts.csp !== false)
     entries.push(['content-security-policy', opts.csp ?? DEFAULT_CSP])
   return entries

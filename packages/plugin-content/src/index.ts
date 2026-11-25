@@ -214,6 +214,9 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       pendingRenderOpts ??= loaded.then((cfg) => {
         resolvedRenderOpts = mergeRenderConfig(cfg)
         return resolvedRenderOpts
+      }).catch((err) => {
+        pendingRenderOpts = undefined
+        throw err
       })
       throw new Error(
         `@kayjs/content: collection "${options.dir}" uses an async "render" loader; call \`await entry.render()\` (e.g. in \`load()\`) before reading \`entry.html\` or \`entry.headings\`.`,
@@ -229,6 +232,9 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     pendingRenderOpts ??= Promise.resolve(options.render!()).then((cfg) => {
       resolvedRenderOpts = mergeRenderConfig(cfg)
       return resolvedRenderOpts
+    }).catch((err) => {
+      pendingRenderOpts = undefined
+      throw err
     })
     return pendingRenderOpts
   }
@@ -239,7 +245,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
   let cacheVersion = 0
 
   function isDevMode(): boolean {
-    return process.env.KAY_DEV === '1'
+    return getAppContext()?.dev ?? (process.env.KAY_DEV === '1')
   }
 
   function loadFile(absFile: string, baseDir: string, entryLocale?: string): ContentEntry<TData> | null {

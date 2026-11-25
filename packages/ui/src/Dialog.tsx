@@ -13,11 +13,12 @@ export interface DialogProps {
   description?: string | undefined
   triggerLabel?: string | undefined
   triggerVariant?: ButtonVariant | undefined
+  closeLabel?: string | undefined
   open?: Signal<boolean> | undefined
   children?: KayChild | undefined
 }
 
-export function Dialog({ id, title, ariaLabel, description, triggerLabel, triggerVariant = 'outline', open, children }: DialogProps) {
+export function Dialog({ id, title, ariaLabel, description, triggerLabel, triggerVariant = 'outline', closeLabel = 'Close', open, children }: DialogProps) {
   const baseId = id ?? nextUiId('kui-dialog')
   const titleId = `${baseId}-title`
   const descId = `${baseId}-desc`
@@ -69,7 +70,7 @@ export function Dialog({ id, title, ariaLabel, description, triggerLabel, trigge
               data-size="sm"
               data-part="close"
               type="button"
-              aria-label="Close"
+              aria-label={closeLabel}
               onClick={() => { isOpen.value = false }}
             >
               ✕

@@ -73,6 +73,8 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
     const app = await testApp({ root: dir, plugins, prebuilt: true })
     const html = await (await app.get('/')).text()
     expect(html).not.toContain('<script')
+    // Zero inline style="..." attributes — 100% compatible with strict zero-'unsafe-inline' CSP
+    expect(html).not.toContain(' style=')
     expect(html).toContain('data-ui="button"')
     expect(html).toContain('data-ui="card"')
     expect(html).toContain('data-ui="switch"')
@@ -81,6 +83,8 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
     expect(html).toContain('data-ui="accordion"')
     expect(html).toContain('popovertarget="info-pop"')
     expect(html).toContain('data-layout="stack"')
+    expect(html).toContain('data-gap-value="1.5rem"')
+    expect(html).toContain('data-min-value="14rem"')
   })
 
   it('ejects a complete standalone CSS Grammar file via ejectGrammar()', () => {
@@ -149,7 +153,7 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
       import { Head } from 'kay'
-      import { Card, CardBody, CardHeader, CommandPalette, DataTable, Dialog, Drawer, Menu, Select, Tabs, Toaster } from ${JSON.stringify(UI_ENTRY)}
+      import { Card, CardBody, CardHeader, CommandPalette, DataTable, Dialog, Drawer, Grid, Menu, Popover, Select, Stack, Tabs, Toaster } from ${JSON.stringify(UI_ENTRY)}
       import { ToastDemo } from '../components/ToastDemo'
 
       export default async function Demo() {
@@ -158,10 +162,17 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
             <Head>
               <link id="grammar-link" rel="stylesheet" href="/grammars/editorial.css" />
             </Head>
-            <Card id="demo-card">
-              <CardHeader>Profile</CardHeader>
-              <CardBody>Hello</CardBody>
-            </Card>
+            <Stack id="demo-stack" gap="lg">
+              <Grid id="demo-grid" min="sm" gap="1.25rem">
+                <Card id="demo-card">
+                  <CardHeader>Profile</CardHeader>
+                  <CardBody>Hello</CardBody>
+                </Card>
+              </Grid>
+              <Popover id="demo-popover" triggerLabel="Open popover">
+                <p>Anchored popover body</p>
+              </Popover>
+            </Stack>
             <Dialog title="Confirm action" triggerLabel="Open dialog">
               <p>Are you sure?</p>
             </Dialog>
@@ -237,8 +248,31 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
     try {
       const page = await browser.newPage()
       const errors: string[] = []
+      const cspViolations: string[] = []
       page.on('pageerror', err => errors.push(err.message))
+      await page.addInitScript(() => {
+        ;(window as unknown as { __csp: string[] }).__csp = []
+        document.addEventListener('securitypolicyviolation', (e) => {
+          ;(window as unknown as { __csp: string[] }).__csp.push(`${e.effectiveDirective}: ${e.blockedURI || e.sample}`)
+        })
+      })
       await page.goto(`http://127.0.0.1:${server.port}/`, { waitUntil: 'networkidle' })
+
+      // 0. Layout tokens + progressive CSS attr() + native implicit-anchor Popover under strict DEFAULT_CSP
+      expect(await page.locator('#demo-stack').evaluate(el => getComputedStyle(el).gap)).toBe('24px')
+      expect(await page.locator('#demo-grid').evaluate(el => getComputedStyle(el).gap)).toBe('20px')
+      const popTrigger = page.locator('[popovertarget="demo-popover"]')
+      await popTrigger.click()
+      expect(await page.locator('#demo-popover').isVisible()).toBe(true)
+      const popRects = await page.evaluate(() => {
+        const trigger = document.querySelector('[popovertarget="demo-popover"]')!.getBoundingClientRect()
+        const panel = document.getElementById('demo-popover')!.getBoundingClientRect()
+        return { triggerBottom: trigger.bottom, panelTop: panel.top, triggerLeft: trigger.left, panelLeft: panel.left }
+      })
+      expect(popRects.panelTop).toBeGreaterThanOrEqual(popRects.triggerBottom - 2)
+      expect(Math.abs(popRects.panelLeft - popRects.triggerLeft)).toBeLessThan(8)
+      await page.keyboard.press('Escape')
+      expect(await page.locator('#demo-popover').isVisible()).toBe(false)
 
       // 1. Dialog open + Escape close
       await page.click('[data-ui="dialog-root"] [data-part="trigger"]')
@@ -343,6 +377,8 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
       expect(consoleStyle.borderLeftWidth).toBe('1px')
       expect(consoleStyle.fontFamily.toLowerCase()).toContain('mono')
 
+      cspViolations.push(...await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp))
+      expect(cspViolations).toEqual([])
       expect(errors).toEqual([])
     }
     finally {

@@ -36,8 +36,8 @@ export default function LoginPage() {
                 <Field id="up-email" label="Email" required>
                   <input id="up-email" name="email" type="email" required />
                 </Field>
-                <Field id="up-pass" label="Password" hint="Min 8 characters" required>
-                  <input id="up-pass" name="password" type="password" minlength="8" required />
+                <Field id="up-pass" label="Password" hint="Min 12 characters" required>
+                  <input id="up-pass" name="password" type="password" minlength="12" required />
                 </Field>
                 <Button type="submit" tone="accent">Create account</Button>
               </Stack>

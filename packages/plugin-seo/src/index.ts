@@ -211,41 +211,44 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
     },
 
     transformHtml(html, ctx) {
-      let out = html
+      const headEnd = html.indexOf('</head>')
+      if (headEnd === -1)
+        return html
+      let head = html.slice(0, headEnd)
+      const rest = html.slice(headEnd)
 
-      // Title template / default title
+      // Title template / default title (strictly inside <head>, never matching inline <svg><title> in <body>)
       if (options.titleTemplate || options.name) {
-        const m = TITLE_TAG_RE.exec(out)
+        const m = TITLE_TAG_RE.exec(head)
         if (m !== null) {
           const inner = m[1]!
           if (options.titleTemplate && (!options.name || !inner.includes(options.name))) {
-            const formatted = options.titleTemplate.replace('%s', () => inner)
-            out = out.replace(TITLE_TAG_RE, () => `<title>${formatted}</title>`)
+            const safeTemplate = escAttr(options.titleTemplate)
+            const formatted = safeTemplate.replace('%s', () => inner)
+            head = head.replace(TITLE_TAG_RE, () => `<title>${formatted}</title>`)
           }
         }
         else if (options.name) {
           const defaultTitle = escAttr(options.name)
-          out = out.replace('</head>', () => `<title>${defaultTitle}</title></head>`)
+          head += `<title>${defaultTitle}</title>`
         }
       }
 
-      // Localized fallback description when page didn't emit its own <meta name="description">
-      if (options.description && typeof options.description === 'object' && !out.includes('name="description"')) {
+      // Localized fallback description when <head> didn't emit its own <meta name="description">
+      if (options.description && typeof options.description === 'object' && !head.includes('name="description"')) {
         const loc = typeof ctx.locals.locale === 'string' ? ctx.locals.locale : undefined
         const desc = (loc && options.description[loc]) ?? Object.values(options.description)[0]
-        if (desc) {
-          const tags = descriptionTags(desc)
-          out = out.replace('</head>', () => `${tags}</head>`)
-        }
+        if (desc)
+          head += descriptionTags(desc)
       }
 
       // Canonical URL
-      if (site && !out.includes('rel="canonical"')) {
+      if (site && !head.includes('rel="canonical"')) {
         const canonical = escAttr(`${site}${ctx.url.pathname}`)
-        out = out.replace('</head>', () => `<link rel="canonical" href="${canonical}"></head>`)
+        head += `<link rel="canonical" href="${canonical}">`
       }
 
-      return out
+      return head + rest
     },
   }
 }

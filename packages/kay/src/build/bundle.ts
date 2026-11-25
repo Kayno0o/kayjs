@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { isAbsolute, join, resolve } from 'node:path'
 import { compileDom, compileSsr } from '../compiler/index'
 import { readsPrivateEnv, SERVER_ONLY_FILTER } from '../compiler/server-only'
-import { isOutsideRoot, relPosix } from './files'
+import { isOutsideRoot, isTsFile, relPosix } from './files'
 import { islandKey } from './islands'
 import { resolveKaySpecifier } from './resolve'
 
@@ -258,17 +258,28 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     return abs
   }
 
-  // A process.env left in a chunk is a key the build did not inline: name the app module that put it there.
+  // A process.env or Bun.env left in a chunk is a key the build did not inline: name the app module that put it there.
   for (const output of clientResult.outputs) {
-    if (!output.path.endsWith('.js') || !(await output.text()).includes('process.env'))
+    if (!output.path.endsWith('.js'))
+      continue
+    const js = await output.text()
+    if (!js.includes('process.env') && !js.includes('Bun.env'))
       continue
     const relFile = relPosix(clientDir, output.path)
     const info = metafile?.outputs[relFile] ?? metafile?.outputs[`./${relFile}`]
     for (const [inKey, input] of Object.entries(info?.inputs ?? {})) {
+      if (input.bytesInOutput <= 0)
+        continue
       const abs = resolveMetaPath(inKey)
-      const program = input.bytesInOutput > 0 ? graph.analyses.get(abs)?.program : undefined
+      let program = graph.analyses.get(abs)?.program
+      if (program === undefined && existsSync(abs) && isTsFile(abs) && !/[\\/]node_modules[\\/]/.test(abs)) {
+        try {
+          program = graph.load(abs).program
+        }
+        catch {}
+      }
       if (program !== undefined && readsPrivateEnv(program, inlinedEnvKey))
-        clientLeaks.add(`${relPosix(root, abs)} reads process.env (only a process.env.PUBLIC_* set at build time is inlined)`)
+        clientLeaks.add(`${relPosix(root, abs)} reads process.env or Bun.env (only a process.env.PUBLIC_* set at build time is inlined)`)
     }
   }
   if (clientLeaks.size > 0)
@@ -323,7 +334,9 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
       return false
     visiting.add(file)
     const reaches = graph.localDeps(file).some(dep => reachesTsx(dep, visiting))
-    tsxReach.set(file, reaches)
+    // Only memoize at the top-level walk (when no cycle ancestor could have truncated a branch).
+    if (reaches || visiting.size === 1)
+      tsxReach.set(file, reaches)
     return reaches
   }
 

@@ -472,13 +472,18 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
       }
     })
 
-    test('storeIp (false / truncate) and storeUserAgent (false) minimize stored session PII', async () => {
+    test('storeIp defaults to truncate (RGPD Art. 25.2), supports true/false, storeUserAgent (false), and default minPasswordLength is 12 (CNIL)', async () => {
       const appDir = makeMinimalApp('box19-pii')
-      const authTrunc = createAuth({
+      const authDefault = createAuth({
         secret: 'audit-box19-pii-secret-32-bytes-min!!',
         trustProxy: true,
-        storeIp: 'truncate',
         storeUserAgent: false,
+        requireEmailVerification: false,
+      })
+      const authFullIp = createAuth({
+        secret: 'audit-box19-pii-secret-32-bytes-min!!',
+        trustProxy: true,
+        storeIp: true,
         requireEmailVerification: false,
       })
       const authNone = createAuth({
@@ -488,13 +493,21 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         requireEmailVerification: false,
       })
       try {
-        const app1 = await testApp({ root: appDir, plugins: [authTrunc.plugin] })
-        await app1.post('/auth/signup', { email: 'v4@example.com', password: 'password1234' }, {
+        const app1 = await testApp({ root: appDir, plugins: [authDefault.plugin] })
+
+        // Default CNIL minPasswordLength: 11 chars rejected, 12 chars accepted
+        const shortPw = await app1.post('/auth/signup', { email: 'short@example.com', password: '11chars-pw!' }, {
+          'x-forwarded-for': '203.0.113.42',
+        })
+        expect(shortPw.status).toBe(400)
+
+        const okV4 = await app1.post('/auth/signup', { email: 'v4@example.com', password: 'password1234' }, {
           'x-forwarded-for': '203.0.113.42',
           'user-agent': 'SecretBrowser/1.0',
         })
-        const u4 = (await authTrunc.store.getUserByEmail('v4@example.com'))!
-        const s4 = await authTrunc.listSessions(u4.id)
+        expect(okV4.status).toBe(201)
+        const u4 = (await authDefault.store.getUserByEmail('v4@example.com'))!
+        const s4 = await authDefault.listSessions(u4.id)
         expect(s4.length).toBe(1)
         expect(s4[0]!.ip).toBe('203.0.113.0')
         expect(s4[0]!.userAgent).toBeUndefined()
@@ -503,9 +516,17 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         await app1.post('/auth/signup', { email: 'v6@example.com', password: 'password1234' }, {
           'x-forwarded-for': '2001:db8:85a3:0:0:8a2e:370:7334',
         })
-        const u6 = (await authTrunc.store.getUserByEmail('v6@example.com'))!
-        const s6 = await authTrunc.listSessions(u6.id)
+        const u6 = (await authDefault.store.getUserByEmail('v6@example.com'))!
+        const s6 = await authDefault.listSessions(u6.id)
         expect(s6[0]!.ip).toBe('2001:db8:85a3::')
+
+        const appFull = await testApp({ root: appDir, plugins: [authFullIp.plugin] })
+        await appFull.post('/auth/signup', { email: 'fullip@example.com', password: 'password1234' }, {
+          'x-forwarded-for': '203.0.113.42',
+        })
+        const uFull = (await authFullIp.store.getUserByEmail('fullip@example.com'))!
+        const sFull = await authFullIp.listSessions(uFull.id)
+        expect(sFull[0]!.ip).toBe('203.0.113.42')
 
         const app2 = await testApp({ root: appDir, plugins: [authNone.plugin] })
         await app2.post('/auth/signup', { email: 'noip@example.com', password: 'password1234' }, {
@@ -516,7 +537,8 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         expect(sNone[0]!.ip).toBeUndefined()
       }
       finally {
-        authTrunc.dispose()
+        authDefault.dispose()
+        authFullIp.dispose()
         authNone.dispose()
       }
     })

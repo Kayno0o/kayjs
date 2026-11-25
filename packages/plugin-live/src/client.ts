@@ -18,6 +18,10 @@ export interface UseLiveOptions {
   maxDelayMs?: number | undefined
   /** Maximum random jitter added in milliseconds (default: 30% of current delay). */
   jitterMs?: number | undefined
+  /** Named SSE `event:` types to listen for in addition to default unnamed `message` events. */
+  events?: readonly string[] | undefined
+  /** Send cookies / credentials on cross-origin EventSource connections. */
+  withCredentials?: boolean | undefined
 }
 
 const DEFAULT_BASE_DELAY_MS = 1_000
@@ -55,7 +59,9 @@ export function useLive<TMessage>(
       return
     clearReconnectTimer()
     status.value = 'connecting'
-    const es = new EventSource(url)
+    const es = options?.withCredentials !== undefined
+      ? new EventSource(url, { withCredentials: options.withCredentials })
+      : new EventSource(url)
     source = es
 
     es.onopen = () => {
@@ -87,15 +93,21 @@ export function useLive<TMessage>(
       }
     }
 
-    es.onmessage = (ev) => {
+    const handleEvent = (ev: Event) => {
       if (source !== es || manuallyClosed)
         return
       try {
-        const parsed = JSON.parse(ev.data) as TMessage
+        const parsed = JSON.parse((ev as MessageEvent<string>).data) as TMessage
         last.value = parsed
         onMessage?.(parsed)
       }
       catch {}
+    }
+
+    es.onmessage = handleEvent
+    if (options?.events !== undefined) {
+      for (const name of options.events)
+        es.addEventListener(name, handleEvent)
     }
   }
 

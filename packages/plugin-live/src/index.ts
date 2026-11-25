@@ -215,11 +215,16 @@ export function createRooms<TMessage, TMember = undefined>(
     let timer: ReturnType<typeof setInterval> | undefined
     let sub: Subscriber<TMember> | undefined
     let countedClient = false
+    let abortHandler: (() => void) | undefined
 
     const cleanup = () => {
       if (cleaned)
         return
       cleaned = true
+      if (abortHandler !== undefined) {
+        ctx.request.signal.removeEventListener('abort', abortHandler)
+        abortHandler = undefined
+      }
       if (timer !== undefined) {
         clearInterval(timer)
         timer = undefined
@@ -271,20 +276,28 @@ export function createRooms<TMessage, TMember = undefined>(
         clientCounts.set(clientId, (clientCounts.get(clientId) ?? 0) + 1)
         countedClient = true
 
-        controller.enqueue(RETRY_CHUNK)
-        join(room, sub)
-        onJoin?.(room, member)
+        try {
+          controller.enqueue(RETRY_CHUNK)
+          join(room, sub)
+          onJoin?.(room, member)
+        }
+        catch (err) {
+          cleanup()
+          throw err
+        }
 
         if (pingMs > 0) {
           timer = setInterval(() => {
             sub?.send(PING_CHUNK)
           }, pingMs)
+          ;(timer as unknown as { unref?: () => void }).unref?.()
         }
 
         if (ctx.request.signal.aborted) {
           drop()
         }
         else {
+          abortHandler = drop
           ctx.request.signal.addEventListener('abort', drop, { once: true })
         }
       },

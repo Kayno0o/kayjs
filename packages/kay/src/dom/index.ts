@@ -1,23 +1,31 @@
 // Kay v2 minimal DOM & hydration core (loop -> kay/dom-loop, extras -> kay/dom-extras for fine-grained chunk splitting).
 
+import { isBlockedAttr, isStringBoolAttr, isUnsafeUrlAttr } from '../attrs'
 import { batch, createOwner, disposeOwner, runWithOwner } from '../reactivity/index'
 import { styleText } from '../style'
 import { assertRenderable } from '../unrenderable'
 
+export { isBlockedAttr } from '../attrs'
 export { effect } from '../reactivity/index'
 
 let hydrating = false
 let hydrateNode: Node | null = null
 
-export function claimLoop(parent: Node, fn: () => void, skip = 0): boolean {
+export function claimLoop(parent: Node, fn: () => void, skip = 0, startMarker?: Node | null): boolean {
   if (!hydrating)
     return false
   const prevCursor = hydrateNode
-  let cur = parent.firstChild
-  for (let i = 0; i < skip && cur !== null; i++) {
-    cur = cur.nextSibling
-    while (cur !== null && (cur as unknown as { __kayAnchor?: boolean }).__kayAnchor === true)
+  let cur: Node | null
+  if (startMarker !== undefined && startMarker !== null) {
+    cur = startMarker.nextSibling
+  }
+  else {
+    cur = parent.firstChild
+    for (let i = 0; i < skip && cur !== null; i++) {
       cur = cur.nextSibling
+      while (cur !== null && (cur as unknown as { __kayAnchor?: boolean }).__kayAnchor === true)
+        cur = cur.nextSibling
+    }
   }
   hydrateNode = cur
   try {
@@ -81,8 +89,10 @@ export function claimInsert<T>(
   return { result, marker: anchor, claimed, nodes: consumed ? between(claimed, anchor) : undefined }
 }
 
-export function hydrate(container: Element, render: () => Node | DocumentFragment | null): () => void {
+export function hydrate(container: Element, render: () => Node | DocumentFragment | null, idPrefix?: string): () => void {
   const owner = createOwner(undefined)
+  if (idPrefix !== undefined)
+    owner.id = { p: idPrefix, n: 0 }
   const prevHydrating = hydrating
   const prevNode = hydrateNode
   hydrating = true
@@ -105,8 +115,10 @@ export function hydrate(container: Element, render: () => Node | DocumentFragmen
   return () => disposeOwner(owner)
 }
 
-export function mount(container: Element, render: () => Node | DocumentFragment | null): () => void {
+export function mount(container: Element, render: () => Node | DocumentFragment | null, idPrefix?: string): () => void {
   const owner = createOwner(undefined)
+  if (idPrefix !== undefined)
+    owner.id = { p: idPrefix, n: 0 }
   const prevHydrating = hydrating
   hydrating = false
   try {
@@ -162,16 +174,25 @@ export function eachStatic<T>(
 ): void {
   if (!items || items.length === 0)
     return
+  let startMarker: Node | null | undefined
+  let insertBefore = marker
+  if (marker !== null && marker.nodeType === 8 && (marker as Comment).data === 'k[') {
+    const close = skipRange(marker)
+    if (close !== null) {
+      startMarker = marker
+      insertBefore = close
+    }
+  }
   if (claimLoop(parent, () => {
     for (let i = 0; i < items.length; i++)
       render(items[i]!, i)
-  }, skip)) {
+  }, skip, startMarker)) {
     return
   }
   const f = document.createDocumentFragment()
   for (let i = 0; i < items.length; i++)
     f.appendChild(render(items[i]!, i))
-  parent.insertBefore(f, marker)
+  parent.insertBefore(f, insertBefore)
 }
 
 export function firstText(el: Node): Text {
@@ -198,12 +219,24 @@ export function skipText(marker: Node): Node | null {
   return next !== null && next.nodeType === 3 ? next.nextSibling : next
 }
 
-/** Advance past an SSR-bracketed dynamic range (`<!---->...<!---->`) to its closing comment marker. */
+/** Advance past an SSR-bracketed dynamic range (`<!--k[-->...<!--k]-->` or `<!---->...<!---->`) to its closing comment marker. */
 export function skipRange(marker: Node): Node | null {
+  const balanced = marker.nodeType === 8 && (marker as Comment).data === 'k['
+  let depth = balanced ? 1 : 0
   let cur = marker.nextSibling
-  while (cur !== null && cur.nodeType !== 8)
+  while (cur !== null) {
+    if (cur.nodeType === 8) {
+      if (!balanced)
+        return cur
+      const data = (cur as Comment).data
+      if (data === 'k[')
+        depth++
+      else if (data === 'k]' && --depth === 0)
+        return cur
+    }
     cur = cur.nextSibling
-  return cur
+  }
+  return null
 }
 
 export function setText(node: Text, value: unknown): void {
@@ -232,29 +265,6 @@ export function setClass(el: Element, value: unknown): void {
   else {
     el.setAttribute('class', str)
   }
-}
-
-const VALID_ATTR_NAME = /^[A-Za-z_:][-\w:.]*$/
-const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href'])
-const UNSAFE_URL_RE = /^(?:javascript|vbscript):/i
-const STRING_BOOL_ATTRS = new Set(['draggable', 'spellcheck', 'contenteditable'])
-
-export function isBlockedAttr(name: string): boolean {
-  if (!VALID_ATTR_NAME.test(name))
-    return true
-  const lower = name.toLowerCase()
-  return lower.startsWith('on') || lower === 'innerhtml' || lower === 'srcdoc'
-}
-
-function isStringBoolAttr(name: string): boolean {
-  const lower = name.toLowerCase()
-  return lower.startsWith('aria-') || STRING_BOOL_ATTRS.has(lower)
-}
-
-function isUnsafeUrlAttr(name: string, value: unknown): boolean {
-  if (!URL_ATTRS.has(name.toLowerCase()))
-    return false
-  return UNSAFE_URL_RE.test(String(value).replace(/[\u0000-\u0020]+/g, ''))
 }
 
 export function setAttr(el: Element, name: string, value: unknown): void {
@@ -309,7 +319,7 @@ function dispatchEvent(event: Event): void {
 
   while (node !== null) {
     const handler = node[key]
-    if (handler !== undefined) {
+    if (typeof handler === 'function') {
       current = node
       batch(() => handler(event))
       if (event.cancelBubble)
@@ -331,7 +341,9 @@ export function delegate(events: string[]): void {
   }
 }
 
-export function on(el: Node, event: string, handler: (e: Event) => void): void {
+export function on(el: Node, event: string, handler: ((e: Event) => void) | false | null | undefined): void {
+  if (typeof handler !== 'function')
+    return
   el.addEventListener(event, (e) => {
     batch(() => handler(e))
   })

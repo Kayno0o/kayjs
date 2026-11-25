@@ -1,7 +1,7 @@
 // O(1) row selection primitive: zero WeakSet overhead per row.
 
 import type { Owner, Signal } from './index'
-import { effect, getOwner, onCleanup, signal } from './index'
+import { effect, getOwner, isTracking, onCleanup, signal } from './index'
 
 export interface Selector<K> {
   is(key: K): boolean
@@ -9,8 +9,7 @@ export interface Selector<K> {
 
 interface Entry {
   s: Signal<boolean>
-  o: Owner | undefined
-  r: number
+  owners: Set<Owner>
 }
 
 export function selector<K>(source: () => K): Selector<K> {
@@ -34,19 +33,22 @@ export function selector<K>(source: () => K): Selector<K> {
 
   return {
     is(key: K): boolean {
+      const owner = getOwner()
+      if (owner === undefined && !isTracking())
+        return Object.is(current, key)
+
       let entry = subs.get(key)
       if (entry === undefined) {
-        entry = { s: signal(Object.is(current, key)), o: undefined, r: 0 }
+        entry = { s: signal(Object.is(current, key)), owners: new Set() }
         subs.set(key, entry)
       }
 
-      const owner = getOwner()
-      if (owner !== undefined && entry.o !== owner) {
-        entry.o = owner
-        entry.r++
+      if (owner !== undefined && !entry.owners.has(owner)) {
+        entry.owners.add(owner)
         const target = entry
         onCleanup(() => {
-          if (--target.r === 0)
+          target.owners.delete(owner)
+          if (target.owners.size === 0)
             subs.delete(key)
         })
       }

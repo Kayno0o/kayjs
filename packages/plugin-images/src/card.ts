@@ -1,6 +1,6 @@
 // Build-time OG shareCard() generator for @kayjs/images:
-// Renders a crisp 1200x630 SVG social card and rasterizes to PNG via `magick` when available
-// (cached by content hash in `.kay-cache/images/`), with zero npm binary dependencies.
+// Renders a crisp 1200x630 SVG social card and rasterizes to PNG via `rsvg-convert` (preferred) or `magick`
+// when available (cached by content hash in `.kay-cache/images/`), with zero npm binary dependencies.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -37,9 +37,30 @@ export interface ShareCardInput {
 export const SHARE_CARD_CONFIG_SERVICE = 'kay.images.shareCardConfig'
 
 let magickFound: boolean | undefined
+let rsvgFound: boolean | undefined
 
 export function hasMagick(): boolean {
   return magickFound ??= Bun.which('magick') !== null
+}
+
+export function hasRsvgConvert(): boolean {
+  return rsvgFound ??= Bun.which('rsvg-convert') !== null
+}
+
+function rasterizeSvgToPng(tmpSvg: string, tmpPng: string): boolean {
+  if (hasRsvgConvert()) {
+    const proc = Bun.spawnSync(['rsvg-convert', '-o', tmpPng, tmpSvg], { stdout: 'pipe', stderr: 'pipe' })
+    if (proc.exitCode === 0 && existsSync(tmpPng))
+      return true
+    rmSync(tmpPng, { force: true })
+  }
+  if (hasMagick()) {
+    const proc = Bun.spawnSync(['magick', tmpSvg, tmpPng], { stdout: 'pipe', stderr: 'pipe' })
+    if (proc.exitCode === 0 && existsSync(tmpPng))
+      return true
+    rmSync(tmpPng, { force: true })
+  }
+  return false
 }
 
 let standaloneCardConfig: ShareCardDefaults | undefined
@@ -98,23 +119,30 @@ function buildCardSvg(input: ShareCardInput, cfg: ShareCardDefaults): string {
 
   const titleStartY = input.badge ? 235 : 210
   const titleSvg = titleLines
-    .map((line, i) => `<text x="80" y="${titleStartY + i * 76}" fill="${fg}" font-family="${escAttr(font)}" font-size="62" font-weight="700">${escAttr(line)}</text>`)
+    .map((line, i) => `<text x="80" y="${titleStartY + i * 76}" fill="${escAttr(fg)}" font-family="${escAttr(font)}" font-size="62" font-weight="700">${escAttr(line)}</text>`)
     .join('')
 
   const subStartY = titleStartY + titleLines.length * 76 + 26
   const subSvg = subLines
-    .map((line, i) => `<text x="80" y="${subStartY + i * 38}" fill="${muted}" font-family="${escAttr(font)}" font-size="28" font-weight="400">${escAttr(line)}</text>`)
+    .map((line, i) => `<text x="80" y="${subStartY + i * 38}" fill="${escAttr(muted)}" font-family="${escAttr(font)}" font-size="28" font-weight="400">${escAttr(line)}</text>`)
     .join('')
 
   const badgeSvg = input.badge
-    ? `<text x="80" y="135" fill="${accent}" font-family="${escAttr(font)}" font-size="24" font-weight="600" letter-spacing="3">${escAttr(input.badge.toUpperCase())}</text>`
+    ? `<text x="80" y="135" fill="${escAttr(accent)}" font-family="${escAttr(font)}" font-size="24" font-weight="600" letter-spacing="3">${escAttr(input.badge.toUpperCase())}</text>`
     : ''
 
   let graphicSvg = ''
   if (input.image) {
-    const rawImg = input.image.trim().startsWith('<svg')
-      ? input.image
-      : (existsSync(input.image) ? readFileSync(input.image, 'utf8') : '')
+    let rawImg = ''
+    if (input.image.trim().startsWith('<svg')) {
+      rawImg = input.image
+    }
+    else {
+      const rootDir = resolve(getAppContext()?.root ?? process.cwd())
+      const absImg = resolve(rootDir, input.image)
+      if ((absImg === rootDir || absImg.startsWith(`${rootDir}/`) || absImg.startsWith(`${rootDir}\\`)) && existsSync(absImg))
+        rawImg = readFileSync(absImg, 'utf8')
+    }
     if (rawImg.includes('<svg')) {
       const dataUri = `data:image/svg+xml;base64,${Buffer.from(rawImg, 'utf8').toString('base64')}`
       graphicSvg = `<image href="${dataUri}" x="${width - 340}" y="175" width="260" height="260" />`
@@ -122,9 +150,9 @@ function buildCardSvg(input: ShareCardInput, cfg: ShareCardDefaults): string {
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`
-    + `<rect width="${width}" height="${height}" fill="${bg}"/>`
-    + `<rect x="0" y="0" width="${width}" height="8" fill="${accent}"/>`
-    + `<rect x="44" y="44" width="${width - 88}" height="${height - 88}" fill="none" stroke="${muted}" stroke-opacity="0.2" stroke-width="1.5"/>`
+    + `<rect width="${width}" height="${height}" fill="${escAttr(bg)}"/>`
+    + `<rect x="0" y="0" width="${width}" height="8" fill="${escAttr(accent)}"/>`
+    + `<rect x="44" y="44" width="${width - 88}" height="${height - 88}" fill="none" stroke="${escAttr(muted)}" stroke-opacity="0.2" stroke-width="1.5"/>`
     + badgeSvg
     + titleSvg
     + subSvg
@@ -145,7 +173,7 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
 
   const site = cfg.site ? cfg.site.replace(/\/$/, '') : ''
 
-  if (hasMagick()) {
+  if (hasRsvgConvert() || hasMagick()) {
     const fileName = `${slug}-${hash}.png`
     const outPath = join(ogDir, fileName)
     if (existsSync(outPath)) {
@@ -167,9 +195,9 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
     const tmpSvg = join(cacheDir, `og-${slug}-${hash}-${nonce}.svg`)
     const tmpPng = join(cacheDir, `og-${slug}-${hash}-${nonce}.png`)
     writeFileSync(tmpSvg, svg)
-    const proc = Bun.spawnSync(['magick', tmpSvg, tmpPng], { stdout: 'pipe', stderr: 'pipe' })
+    const ok = rasterizeSvgToPng(tmpSvg, tmpPng)
     rmSync(tmpSvg, { force: true })
-    if (proc.exitCode === 0 && existsSync(tmpPng)) {
+    if (ok) {
       try {
         renameSync(tmpPng, cachedPng)
       }
@@ -181,9 +209,6 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
         appCtx?.registerPublicFile(`og/${fileName}`)
         return `${site}/og/${fileName}`
       }
-    }
-    else {
-      rmSync(tmpPng, { force: true })
     }
   }
 

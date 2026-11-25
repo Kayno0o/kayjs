@@ -1,5 +1,16 @@
-import type { ShikiTransformer, ThemeRegistration } from 'shiki'
-import { createHighlighter } from 'shiki'
+import type { ShikiTransformer, ThemeRegistration } from '@shikijs/core'
+import { createHighlighterCore } from '@shikijs/core'
+import { createOnigurumaEngine } from '@shikijs/engine-oniguruma'
+import wasm from '@shikijs/engine-oniguruma/wasm-inlined'
+import langBash from '@shikijs/langs/bash'
+import langCss from '@shikijs/langs/css'
+import langDiff from '@shikijs/langs/diff'
+import langHtml from '@shikijs/langs/html'
+import langJavascript from '@shikijs/langs/javascript'
+import langJson from '@shikijs/langs/json'
+import langTsx from '@shikijs/langs/tsx'
+import langTypescript from '@shikijs/langs/typescript'
+import langYaml from '@shikijs/langs/yaml'
 
 const surface = '#e4e9f1'
 
@@ -74,10 +85,11 @@ const light = orbitTheme(
 )
 
 const HL_KEY = Symbol.for('kay.docs.shiki')
-const g = globalThis as Record<symbol, Awaited<ReturnType<typeof createHighlighter>> | undefined>
-const highlighter = g[HL_KEY] ??= await createHighlighter({
+const g = globalThis as Record<symbol, Awaited<ReturnType<typeof createHighlighterCore>> | undefined>
+const highlighter = g[HL_KEY] ??= await createHighlighterCore({
   themes: [light, dark],
-  langs: ['typescript', 'tsx', 'javascript', 'json', 'yaml', 'bash', 'css', 'html', 'diff'],
+  langs: [langTypescript, langTsx, langJavascript, langJson, langYaml, langBash, langCss, langHtml, langDiff],
+  engine: createOnigurumaEngine(wasm),
 })
 
 const loaded = new Set(highlighter.getLoadedLanguages())

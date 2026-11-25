@@ -18,6 +18,13 @@ export interface DataTableProps {
   selectable?: boolean | undefined
   placeholder?: string | undefined
   searchLabel?: string | undefined
+  selectColumnLabel?: string | undefined
+  selectRowLabel?: string | undefined
+  rowsLabel?: string | undefined
+  selectedLabel?: string | undefined
+  pageLabel?: string | undefined
+  prevLabel?: string | undefined
+  nextLabel?: string | undefined
 }
 
 export function DataTable({
@@ -29,6 +36,13 @@ export function DataTable({
   selectable = false,
   placeholder = 'Filter rows...',
   searchLabel = 'Search',
+  selectColumnLabel = 'Select',
+  selectRowLabel = 'Select row',
+  rowsLabel = 'rows',
+  selectedLabel = 'selected',
+  pageLabel = 'Page',
+  prevLabel = 'Prev',
+  nextLabel = 'Next',
 }: DataTableProps) {
   const table = createDataTable({
     rows: () => rows,
@@ -55,8 +69,8 @@ export function DataTable({
           <span data-part="meta">
             {table.filtered.value.length}
             {' '}
-            rows
-            {selectable && table.selected.value.size > 0 ? ` · ${table.selected.value.size} selected` : ''}
+            {rowsLabel}
+            {selectable && table.selected.value.size > 0 ? ` · ${table.selected.value.size} ${selectedLabel}` : ''}
           </span>
         </div>
       )}
@@ -65,7 +79,7 @@ export function DataTable({
         <table data-ui="table">
           <thead>
             <tr>
-              {selectable && <th data-part="select-col" aria-label="Select" />}
+              {selectable && <th data-part="select-col" aria-label={selectColumnLabel} />}
               {columns.map(col => (
                 <th
                   key={col.key}
@@ -100,7 +114,7 @@ export function DataTable({
                     <input
                       type="checkbox"
                       checked={table.isSelected(String(row[rowKey] ?? ''))}
-                      aria-label={`Select row ${String(row[rowKey] ?? '')}`}
+                      aria-label={`${selectRowLabel} ${String(row[rowKey] ?? '')}`}
                       onChange={() => table.toggleSelect(String(row[rowKey] ?? ''))}
                     />
                   </td>
@@ -117,9 +131,9 @@ export function DataTable({
       {table.totalPages.value > 1 && (
         <div data-part="pagination" data-layout="split">
           <span data-part="meta">
-            Page {table.page.value} / {table.totalPages.value}
+            {pageLabel} {table.page.value} / {table.totalPages.value}
           </span>
-          <div data-layout="cluster" style="--ui-gap:0.4rem">
+          <div data-layout="cluster">
             <button
               data-ui="button"
               data-variant="outline"
@@ -128,7 +142,7 @@ export function DataTable({
               disabled={table.page.value <= 1}
               onClick={() => { table.page.value = Math.max(1, table.page.value - 1) }}
             >
-              Prev
+              {prevLabel}
             </button>
             <button
               data-ui="button"
@@ -138,7 +152,7 @@ export function DataTable({
               disabled={table.page.value >= table.totalPages.value}
               onClick={() => { table.page.value = Math.min(table.totalPages.value, table.page.value + 1) }}
             >
-              Next
+              {nextLabel}
             </button>
           </div>
         </div>

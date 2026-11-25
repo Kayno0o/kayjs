@@ -88,11 +88,23 @@ export async function prefetch(url: string): Promise<void> {
   await task
 }
 
-const SYNC_HEAD_SELECTOR = 'meta[name="description"],meta[property^="og:"],meta[name^="twitter:"],link[rel="canonical"],link[rel="alternate"][hreflang]'
+const SYNC_HEAD_SELECTOR = 'meta[name="description"],meta[name="robots"],meta[property^="og:"],meta[name^="twitter:"],link[rel="canonical"],link[rel="alternate"][hreflang],script[type="application/ld+json"]'
 const ANNOUNCER_ID = '__kay-spa-announcer'
-const SR_ONLY_STYLE = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0'
 
-function announcePageTitle(title: string): void {
+function applySrOnlyStyle(el: HTMLElement): void {
+  const s = el.style
+  s.position = 'absolute'
+  s.width = '1px'
+  s.height = '1px'
+  s.padding = '0'
+  s.margin = '-1px'
+  s.overflow = 'hidden'
+  s.clip = 'rect(0,0,0,0)'
+  s.whiteSpace = 'nowrap'
+  s.border = '0'
+}
+
+function getOrCreateAnnouncer(): HTMLElement {
   let region = document.getElementById(ANNOUNCER_ID)
   if (region === null) {
     region = document.createElement('div')
@@ -100,10 +112,28 @@ function announcePageTitle(title: string): void {
     region.setAttribute('role', 'status')
     region.setAttribute('aria-live', 'polite')
     region.setAttribute('aria-atomic', 'true')
-    region.setAttribute('style', SR_ONLY_STYLE)
+    applySrOnlyStyle(region)
     document.body.appendChild(region)
   }
+  return region
+}
+
+function announcePageTitle(title: string): void {
+  const region = getOrCreateAnnouncer()
   region.textContent = title
+}
+
+function resolveSuspenseTemplates(doc: Document): void {
+  for (const tpl of doc.querySelectorAll<HTMLTemplateElement>('template[data-ks]')) {
+    const id = tpl.dataset.ks
+    if (!id)
+      continue
+    const slot = doc.getElementById(`k-s-${id}`)
+    if (slot !== null) {
+      slot.replaceWith(tpl.content)
+      tpl.remove()
+    }
+  }
 }
 
 function focusPrimaryLandmark(): void {
@@ -120,7 +150,7 @@ function focusPrimaryLandmark(): void {
   }
 }
 
-async function prepareHeadStyles(nextDoc: Document): Promise<() => void> {
+async function prepareHeadStyles(nextDoc: Document): Promise<{ commit: () => void, abort: () => void }> {
   const currentLinks = [...document.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
   const currentByHref = new Map<string, HTMLLinkElement>()
   for (const el of currentLinks)
@@ -151,21 +181,34 @@ async function prepareHeadStyles(nextDoc: Document): Promise<() => void> {
   if (waitLoads.length > 0)
     await Promise.race([Promise.all(waitLoads), new Promise<void>(r => setTimeout(r, 1500))])
 
-  return () => {
-    for (const [href, el] of currentByHref) {
-      if (!nextHrefs.has(href))
+  return {
+    abort() {
+      for (const el of added)
         el.remove()
-    }
-    // Sync <html lang>, <title>, and head metadata tags
-    const nextLang = nextDoc.documentElement.getAttribute('lang')
-    if (nextLang)
-      document.documentElement.setAttribute('lang', nextLang)
-    document.title = nextDoc.title
+    },
+    commit() {
+      for (const [href, el] of currentByHref) {
+        if (!nextHrefs.has(href))
+          el.remove()
+      }
+      // Ensure required inline core <style> tags (e.g. kay-island display:contents) exist if navigating from an island-less page.
+      const existingStyles = new Set([...document.head.querySelectorAll('style')].map(s => s.textContent ?? ''))
+      for (const nextStyle of nextDoc.head.querySelectorAll('style')) {
+        const txt = nextStyle.textContent ?? ''
+        if (txt && !existingStyles.has(txt))
+          document.head.appendChild(document.importNode(nextStyle, true))
+      }
+      // Sync <html lang>, <title>, and head metadata tags
+      const nextLang = nextDoc.documentElement.getAttribute('lang')
+      if (nextLang)
+        document.documentElement.setAttribute('lang', nextLang)
+      document.title = nextDoc.title
 
-    for (const oldMeta of document.head.querySelectorAll(SYNC_HEAD_SELECTOR))
-      oldMeta.remove()
-    for (const nextMeta of nextDoc.head.querySelectorAll(SYNC_HEAD_SELECTOR))
-      document.head.appendChild(document.importNode(nextMeta, true))
+      for (const oldMeta of document.head.querySelectorAll(SYNC_HEAD_SELECTOR))
+        oldMeta.remove()
+      for (const nextMeta of nextDoc.head.querySelectorAll(SYNC_HEAD_SELECTOR))
+        document.head.appendChild(document.importNode(nextMeta, true))
+    },
   }
 }
 
@@ -219,9 +262,12 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
       return
 
     const nextDoc = new DOMParser().parseFromString(html, 'text/html')
-    const commitHead = await prepareHeadStyles(nextDoc)
-    if (controller.signal.aborted)
+    resolveSuspenseTemplates(nextDoc)
+    const headPrep = await prepareHeadStyles(nextDoc)
+    if (controller.signal.aborted) {
+      headPrep.abort()
       return
+    }
 
     const nextFullUrl = hash && !finalUrl.includes('#') ? `${finalUrl}${hash}` : finalUrl
     const nextParsed = new URL(nextFullUrl, location.href)
@@ -229,6 +275,8 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
     const applySwap = () => {
       if (push)
         saveScrollState()
+
+      const existingAnnouncer = document.getElementById(ANNOUNCER_ID)
 
       // Preserve live [data-persist] elements (e.g. persistent audio player or counter island) across navigations
       const persisted = new Map<string, Element>()
@@ -238,7 +286,7 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
           persisted.set(key, el)
       }
 
-      commitHead()
+      headPrep.commit()
 
       for (const incoming of nextDoc.querySelectorAll('[data-persist]')) {
         const key = incoming.getAttribute('data-persist')
@@ -246,6 +294,9 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
         if (existing !== undefined)
           incoming.replaceWith(existing)
       }
+
+      if (existingAnnouncer !== null)
+        nextDoc.body.appendChild(existingAnnouncer)
 
       document.body.replaceWith(nextDoc.body)
       if (push)

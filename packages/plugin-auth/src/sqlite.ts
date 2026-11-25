@@ -154,8 +154,9 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
   const qInsertToken = db.query<null, [string, string | null, string, TokenKind, number]>(
     'INSERT INTO kay_auth_tokens (token_hash, user_id, email, kind, expires_at) VALUES (?, ?, ?, ?, ?)',
   )
-  const qGetToken = db.query<TokenRow, [string, TokenKind]>('SELECT * FROM kay_auth_tokens WHERE token_hash = ? AND kind = ?')
-  const qDelToken = db.query<null, [string]>('DELETE FROM kay_auth_tokens WHERE token_hash = ?')
+  const qConsumeToken = db.query<TokenRow, [string, TokenKind]>(
+    'DELETE FROM kay_auth_tokens WHERE token_hash = ? AND kind = ? RETURNING *',
+  )
   const qDelUserTokens = db.query<null, [string]>('DELETE FROM kay_auth_tokens WHERE user_id = ?')
   const qDelEmailTokens = db.query<null, [string]>('DELETE FROM kay_auth_tokens WHERE email = ?')
 
@@ -285,10 +286,9 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
       qInsertToken.run(token.tokenHash, token.userId ?? null, normalizeEmail(token.email), token.kind, token.expiresAt)
     },
     consumeToken(tokenHash, kind) {
-      const row = qGetToken.get(tokenHash, kind)
+      const row = qConsumeToken.get(tokenHash, kind)
       if (!row)
         return undefined
-      qDelToken.run(tokenHash)
       if (row.expires_at <= Date.now())
         return undefined
       return {

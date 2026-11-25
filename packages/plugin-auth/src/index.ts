@@ -67,7 +67,7 @@ export interface AuthOptions {
   sessionTtlSeconds?: number | undefined
   /** Magic-link / verification token lifetime in seconds (default: 15 minutes). */
   tokenTtlSeconds?: number | undefined
-  /** Minimum password length (default: 8). */
+  /** Minimum password length (default: 12, aligned with CNIL guidance). */
   minPasswordLength?: number | undefined
   /** Default role assigned to newly created users (default: 'user'). */
   defaultRole?: string | undefined
@@ -97,8 +97,8 @@ export interface AuthOptions {
   pruneIntervalMs?: number | false | undefined
   /**
    * Control recording of client IP addresses on sessions (RGPD data minimization):
-   * - `true`: store full client IP (default)
-   * - `'truncate'`: anonymize IPv4 to /24 (`a.b.c.0`) and IPv6 to /48 (`a:b:c::`)
+   * - `'truncate'`: anonymize IPv4 to /24 (`a.b.c.0`) and IPv6 to /48 (`a:b:c::`) (default)
+   * - `true`: store full client IP
    * - `false`: do not record IP on sessions
    */
   storeIp?: boolean | 'truncate' | undefined
@@ -155,17 +155,17 @@ export function createAuth(options: AuthOptions = {}): Auth {
   const oauthCookieName = `${cookieName}_oauth`
   const sessionTtlMs = (options.sessionTtlSeconds ?? 60 * 60 * 24 * 30) * 1000
   const tokenTtlMs = (options.tokenTtlSeconds ?? 60 * 15) * 1000
-  const minPasswordLength = options.minPasswordLength ?? 8
+  const minPasswordLength = options.minPasswordLength ?? 12
   const defaultRole = options.defaultRole ?? 'user'
   const defaultRedirect = options.defaultRedirect ?? '/'
   const authRouteOpts = {
     ...(options.trustedOrigins !== undefined ? { trustedOrigins: options.trustedOrigins } : {}),
-    trustProxy: options.trustProxy ?? false,
+    ...(options.trustProxy !== undefined ? { trustProxy: options.trustProxy } : {}),
   }
   const site = options.site !== undefined ? siteOrigin(options.site) : undefined
   const requireEmailVerification = options.requireEmailVerification !== false
-  const trustProxy = options.trustProxy ?? false
-  const storeIp = options.storeIp ?? true
+  let trustProxy = options.trustProxy ?? false
+  const storeIp = options.storeIp ?? 'truncate'
   const storeUserAgent = options.storeUserAgent !== false
   const rateLimiter = createRateLimiter(options.rateLimit)
   const limitIp = (ctx: RequestContext, scope: string): Response | undefined =>
@@ -417,9 +417,20 @@ export function createAuth(options: AuthOptions = {}): Auth {
     return ctx.redirect(redirectTarget, redirectStatus)
   }
 
+  const dispose = (): void => {
+    if (pruneTimer !== undefined) {
+      clearInterval(pruneTimer)
+      pruneTimer = undefined
+    }
+  }
+
   const plugin: KayPlugin = {
     name: '@kayjs/auth',
     server(api) {
+      if (options.trustProxy === undefined)
+        trustProxy = api.trustProxy
+      api.onShutdown(dispose)
+
       // Populate ctx.locals.user & ctx.locals.session on every route and server action
       api.use(async (ctx, next) => {
         await resolveRequestSession(ctx)
@@ -641,11 +652,6 @@ export function createAuth(options: AuthOptions = {}): Auth {
       await store.pruneExpired?.()
       rateLimiter.sweep()
     },
-    dispose() {
-      if (pruneTimer !== undefined) {
-        clearInterval(pruneTimer)
-        pruneTimer = undefined
-      }
-    },
+    dispose,
   }
 }

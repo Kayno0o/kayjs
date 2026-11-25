@@ -90,6 +90,7 @@ function parseRootTokens(css: string): GrammarTokens {
 let builtDir = ''
 let mountFn!: (container: Element, render: () => Node | DocumentFragment | null) => () => void
 let signal!: <T>(initial: T) => Signal<T>
+let toastApi!: { show: (title: string, description?: string, durationMs?: number) => string, clear: () => void }
 let uiMods: Record<string, (...args: any[]) => any> = {}
 let ssrHtml = ''
 
@@ -98,11 +99,12 @@ beforeAll(async () => {
   mkdirSync(join(builtDir, 'src/routes'), { recursive: true })
   mkdirSync(join(builtDir, 'src/components'), { recursive: true })
 
-  // A tiny island that exposes `mount` and `signal` from the exact same bundled client runtime used by the UI islands.
+  // A tiny island that exposes `mount`, `signal`, and `toast` from the exact same bundled client runtime used by the UI islands.
   writeFileSync(join(builtDir, 'src/components/SigHost.tsx'), `
     import { signal } from 'kay'
     import { mount } from 'kay/dom'
-    ;(globalThis as Record<string, unknown>).__kayAuditTest = { mount, signal }
+    import { toast } from ${JSON.stringify(UI_ENTRY)}
+    ;(globalThis as Record<string, unknown>).__kayAuditTest = { mount, signal, toast }
     export function SigHost() {
       const s = signal(0)
       return <span>{s.value}</span>
@@ -110,7 +112,7 @@ beforeAll(async () => {
   `)
 
   writeFileSync(join(builtDir, 'src/routes/index.tsx'), `
-    import { CommandPalette, DataTable, Dialog, Drawer, Field, Menu, Select } from ${JSON.stringify(UI_ENTRY)}
+    import { CommandPalette, DataTable, Dialog, Drawer, Field, Menu, Select, Toaster } from ${JSON.stringify(UI_ENTRY)}
     import { SigHost } from '../components/SigHost'
 
     export default async function AuditPage() {
@@ -156,6 +158,7 @@ beforeAll(async () => {
             rows={[{ id: '1', name: 'Alice' }]}
             columns={[{ key: 'name', label: 'Name' }]}
           />
+          <Toaster />
         </main>
       )
     }
@@ -177,11 +180,12 @@ beforeAll(async () => {
   }
 
   await loadIsland('SigHost')
-  const helpers = (globalThis as Record<string, unknown>).__kayAuditTest as { mount: typeof mountFn, signal: typeof signal }
+  const helpers = (globalThis as Record<string, unknown>).__kayAuditTest as { mount: typeof mountFn, signal: typeof signal, toast: typeof toastApi }
   mountFn = helpers.mount
   signal = helpers.signal
+  toastApi = helpers.toast
 
-  for (const name of ['Menu', 'Select', 'CommandPalette', 'Dialog', 'Drawer', 'DataTable']) {
+  for (const name of ['Menu', 'Select', 'CommandPalette', 'Dialog', 'Drawer', 'DataTable', 'Toaster']) {
     const mod = await loadIsland(name)
     uiMods[name] = mod[name] ?? mod.default
   }
@@ -514,25 +518,59 @@ describe('Box 21 — Dialog, Drawer, Field, DataTable search & CommandPalette la
     const cmdDialog = doc.querySelector('dialog[data-ui="command"]')!
     expect(Boolean(cmdDialog.getAttribute('aria-label') || cmdDialog.getAttribute('aria-labelledby'))).toBe(true)
 
-    // Configurable labels via props
+    // Configurable labels via props (for i18n / RGAA in non-English apps)
     const TableComp = uiMods.DataTable!
     const CommandComp = uiMods.CommandPalette!
+    const DialogComp = uiMods.Dialog!
+    const DrawerComp = uiMods.Drawer!
+    const ToasterComp = uiMods.Toaster!
     const t = mountInBody(() => TableComp({
-      rows: [{ id: '1', name: 'A' }],
+      rows: [{ id: '1', name: 'A' }, { id: '2', name: 'B' }],
       columns: [{ key: 'name', label: 'Name' }],
-      searchLabel: 'Filter users',
+      pageSize: 1,
+      selectable: true,
+      searchLabel: 'Filtrer les utilisateurs',
+      selectColumnLabel: 'Sélectionner',
+      selectRowLabel: 'Sélectionner la ligne',
+      rowsLabel: 'lignes',
+      prevLabel: 'Précédent',
+      nextLabel: 'Suivant',
     }))
     const c = mountInBody(() => CommandComp({
-      items: [{ id: 'a', label: 'Alpha' }],
-      inputLabel: 'Find action',
+      items: [],
+      inputLabel: 'Rechercher une action',
+      emptyLabel: 'Aucune commande.',
+      noResultsLabel: 'Aucun résultat',
     }))
+    const dlg = mountInBody(() => DialogComp({
+      title: 'Paramètres',
+      closeLabel: 'Fermer',
+    }))
+    const drw = mountInBody(() => DrawerComp({
+      title: 'Navigation',
+      closeLabel: 'Fermer le panneau',
+    }))
+    toastApi.show('Enregistré', undefined, 0)
+    const tst = mountInBody(() => ToasterComp({ dismissLabel: 'Ignorer' }))
     try {
-      expect(t.host.querySelector('[data-part="search"]')?.getAttribute('aria-label')).toBe('Filter users')
-      expect(c.host.querySelector('[data-part="input"]')?.getAttribute('aria-label')).toBe('Find action')
+      expect(t.host.querySelector('[data-part="search"]')?.getAttribute('aria-label')).toBe('Filtrer les utilisateurs')
+      expect(t.host.querySelector('th[data-part="select-col"]')?.getAttribute('aria-label')).toBe('Sélectionner')
+      expect(t.host.querySelector('td[data-part="select-col"] input')?.getAttribute('aria-label')).toBe('Sélectionner la ligne 1')
+      expect(t.host.textContent).toContain('Précédent')
+      expect(t.host.textContent).toContain('Suivant')
+      expect(c.host.querySelector('[data-part="input"]')?.getAttribute('aria-label')).toBe('Rechercher une action')
+      expect(c.host.querySelector('[data-part="empty"]')?.textContent).toBe('Aucune commande.')
+      expect(dlg.host.querySelector('[data-part="close"]')?.getAttribute('aria-label')).toBe('Fermer')
+      expect(drw.host.querySelector('[data-part="close"]')?.getAttribute('aria-label')).toBe('Fermer le panneau')
+      expect(tst.host.querySelector('[data-part="close"]')?.getAttribute('aria-label')).toBe('Ignorer')
     }
     finally {
+      toastApi.clear()
       t.dispose()
       c.dispose()
+      dlg.dispose()
+      drw.dispose()
+      tst.dispose()
     }
   })
 })

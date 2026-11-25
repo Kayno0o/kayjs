@@ -551,10 +551,13 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
           process.env.NODE_ENV = prevEnv
       }
 
-      // 5. csp: false disables default CSP
-      const noCspApp = await createServer({ root: dir, security: { csp: false } })
+      // 5. Default Permissions-Policy and disabling via security options
+      expect(homeRes.headers.get('permissions-policy')).toBe('camera=(), microphone=(), geolocation=()')
+
+      const noCspApp = await createServer({ root: dir, security: { csp: false, permissionsPolicy: false } })
       const noCspRes = await noCspApp.handle(new Request('http://localhost/'))
       expect(noCspRes.headers.get('content-security-policy')).toBeNull()
+      expect(noCspRes.headers.get('permissions-policy')).toBeNull()
     })
   })
 

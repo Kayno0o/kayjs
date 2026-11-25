@@ -16,8 +16,13 @@ export interface RouteMatch<T> {
   params: Record<string, string>
 }
 
+function normalizePath(path: string): string {
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
+}
+
 function compileRoutePattern<T>(path: string, data: T): RoutePattern<T> {
-  const clean = path === '/' ? '' : path.replace(/^\/|\/$/g, '')
+  const norm = normalizePath(path)
+  const clean = norm === '/' ? '' : norm.replace(/^\/|\/$/g, '')
   const segments = clean === '' ? [] : clean.split('/')
   let isStatic = true
   let hasCatchAll = false
@@ -39,7 +44,7 @@ function compileRoutePattern<T>(path: string, data: T): RoutePattern<T> {
     }
   }
 
-  return { path, segments, isStatic, hasCatchAll, score, data }
+  return { path: norm, segments, isStatic, hasCatchAll, score, data }
 }
 
 export class Router<T> {
@@ -49,20 +54,27 @@ export class Router<T> {
   add(path: string, data: T): void {
     const compiled = compileRoutePattern(path, data)
     if (compiled.isStatic) {
-      this.#staticRoutes.set(path, data)
+      this.#staticRoutes.set(compiled.path, data)
     }
     else {
-      this.#dynamicRoutes.push(compiled)
+      const existing = this.#dynamicRoutes.findIndex(r => r.path === compiled.path)
+      if (existing !== -1)
+        this.#dynamicRoutes[existing] = compiled
+      else
+        this.#dynamicRoutes.push(compiled)
       this.#dynamicRoutes.sort((a, b) => b.score - a.score || b.segments.length - a.segments.length)
     }
   }
 
   match(pathname: string): RouteMatch<T> | undefined {
-    const norm = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+    const norm = normalizePath(pathname)
 
     const exact = this.#staticRoutes.get(norm)
     if (exact !== undefined)
       return { data: exact, params: {} }
+
+    if (this.#dynamicRoutes.length === 0)
+      return undefined
 
     const parts = norm === '/' ? [] : norm.slice(1).split('/')
 

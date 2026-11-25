@@ -3,7 +3,11 @@
 // Emit only semantic `data-ui`, `data-part`, `data-variant`, `data-tone`, `data-layout` attributes.
 
 import type { Html, KayChild } from 'kay'
-import { escAttr } from 'kay/ssr'
+import { createContext, provideContext, useContext } from 'kay'
+
+function escAttr(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+}
 
 export type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger'
 export type ButtonVariant = 'solid' | 'outline' | 'ghost'
@@ -91,11 +95,17 @@ export interface FieldProps {
   children?: KayChild | undefined
 }
 
-interface FieldControlWiring {
+export interface FieldControlWiring {
   id: string
   describedBy: string | undefined
   invalid: boolean
   required: boolean
+}
+
+export const FieldContext = createContext<FieldControlWiring | undefined>(undefined)
+
+export function useFieldContext(): FieldControlWiring | undefined {
+  return useContext(FieldContext)
 }
 
 function mergeTokenAttr(existing: string | null | undefined, addition: string): string {
@@ -185,29 +195,27 @@ function findFieldControlInNode(node: Node): Element | null {
 
 const RAW_HTML_BRAND = Symbol.for('kay.html')
 
-function wireFieldChildren(children: KayChild, wiring: FieldControlWiring): KayChild {
-  if (children == null || typeof children === 'boolean' || typeof children === 'string' || typeof children === 'number')
+function wireFieldChildren(children: KayChild, wiring: FieldControlWiring, state: { done: boolean } = { done: false }): KayChild {
+  if (state.done || children == null || typeof children === 'boolean' || typeof children === 'string' || typeof children === 'number')
     return children
   if (Array.isArray(children)) {
-    let done = false
-    return children.map((child) => {
-      if (done)
-        return child
-      const next = wireFieldChildren(child, wiring)
-      if (next !== child)
-        done = true
-      return next
-    })
+    return children.map(child => (state.done ? child : wireFieldChildren(child, wiring, state)))
   }
   if (typeof children === 'object' && '__html' in children && (children as unknown as Record<symbol, unknown>)[RAW_HTML_BRAND] === true) {
     const src = (children as Html).__html
     const patched = wireFieldHtml(src, wiring)
-    return patched === src ? children : ({ [RAW_HTML_BRAND]: true, __html: patched } as unknown as Html)
+    if (patched !== src) {
+      state.done = true
+      return { [RAW_HTML_BRAND]: true, __html: patched } as unknown as Html
+    }
+    return children
   }
   if (typeof Node !== 'undefined' && children instanceof Node) {
     const ctrl = findFieldControlInNode(children)
-    if (ctrl !== null)
+    if (ctrl !== null) {
       wireFieldElement(ctrl, wiring)
+      state.done = true
+    }
     return children
   }
   return children
@@ -215,12 +223,13 @@ function wireFieldChildren(children: KayChild, wiring: FieldControlWiring): KayC
 
 export function Field({ id, label, hint, error, required, class: cls, children }: FieldProps) {
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
-  const wiredChildren = wireFieldChildren(children, {
+  const wiring: FieldControlWiring = {
     id,
     describedBy,
     invalid: Boolean(error),
     required: Boolean(required),
-  })
+  }
+  const wiredChildren = provideContext(FieldContext, wiring, () => wireFieldChildren(children, wiring))
 
   return (
     <div data-ui="field" data-invalid={error ? 'true' : undefined} class={cls}>
@@ -244,7 +253,6 @@ export interface PopoverProps {
 }
 
 export function Popover({ id, triggerLabel, triggerVariant = 'outline', children }: PopoverProps) {
-  const anchor = `--kui-anchor-${id}`
   return (
     <>
       <button
@@ -252,7 +260,6 @@ export function Popover({ id, triggerLabel, triggerVariant = 'outline', children
         data-variant={triggerVariant}
         type="button"
         popovertarget={id}
-        style={`anchor-name: ${anchor}`}
       >
         {triggerLabel}
       </button>
@@ -260,7 +267,6 @@ export function Popover({ id, triggerLabel, triggerVariant = 'outline', children
         id={id}
         data-ui="popover"
         popover="auto"
-        style={`position-anchor: ${anchor}`}
       >
         {children}
       </div>
@@ -338,29 +344,89 @@ export function RadioGroup({ name, legend, options, defaultValue, class: cls }: 
   )
 }
 
-// ---- Every Layout primitives (pure CSS, 0 KB JS) ----
+// ---- Every Layout primitives (pure CSS, 0 KB JS, strict-CSP safe) ----
 
-function layoutStyle(vars: Record<string, string | undefined>): string | undefined {
-  const decls = Object.entries(vars).filter(([, v]) => v).map(([k, v]) => `--ui-${k}:${v}`)
-  return decls.length > 0 ? decls.join(';') : undefined
+export type SpaceToken = 'none' | '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+export type TrackSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+export type SpaceValue = SpaceToken | (string & {})
+export type TrackValue = TrackSize | (string & {})
+
+const SPACE_TOKENS = new Set<string>(['none', '2xs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl'])
+const TRACK_TOKENS = new Set<string>(['xs', 'sm', 'md', 'lg', 'xl'])
+
+const isSpaceToken = (v: string | undefined): boolean => v !== undefined && SPACE_TOKENS.has(v)
+const isTrackToken = (v: string | undefined): boolean => v !== undefined && TRACK_TOKENS.has(v)
+
+export function Stack({ gap, class: cls, children, ...rest }: BoxProps & { gap?: SpaceValue | undefined }) {
+  return (
+    <div
+      data-layout="stack"
+      data-gap={isSpaceToken(gap) ? gap : undefined}
+      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
+      class={cls}
+      {...rest}
+    >
+      {children}
+    </div>
+  )
 }
 
-export function Stack({ gap, class: cls, children, ...rest }: BoxProps & { gap?: string | undefined }) {
-  return <div data-layout="stack" style={layoutStyle({ gap })} class={cls} {...rest}>{children}</div>
+export function Cluster({ gap, class: cls, children, ...rest }: BoxProps & { gap?: SpaceValue | undefined }) {
+  return (
+    <div
+      data-layout="cluster"
+      data-gap={isSpaceToken(gap) ? gap : undefined}
+      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
+      class={cls}
+      {...rest}
+    >
+      {children}
+    </div>
+  )
 }
 
-export function Cluster({ gap, class: cls, children, ...rest }: BoxProps & { gap?: string | undefined }) {
-  return <div data-layout="cluster" style={layoutStyle({ gap })} class={cls} {...rest}>{children}</div>
+export function Grid({ min, gap, class: cls, children, ...rest }: BoxProps & { min?: TrackValue | undefined, gap?: SpaceValue | undefined }) {
+  return (
+    <div
+      data-layout="grid"
+      data-min={isTrackToken(min) ? min : undefined}
+      data-min-value={min && !isTrackToken(min) ? min : undefined}
+      data-gap={isSpaceToken(gap) ? gap : undefined}
+      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
+      class={cls}
+      {...rest}
+    >
+      {children}
+    </div>
+  )
 }
 
-export function Grid({ min, gap, class: cls, children, ...rest }: BoxProps & { min?: string | undefined, gap?: string | undefined }) {
-  return <div data-layout="grid" style={layoutStyle({ min, gap })} class={cls} {...rest}>{children}</div>
+export function Sidebar({ side, gap, class: cls, children, ...rest }: BoxProps & { side?: TrackValue | undefined, gap?: SpaceValue | undefined }) {
+  return (
+    <div
+      data-layout="sidebar"
+      data-side={isTrackToken(side) ? side : undefined}
+      data-side-value={side && !isTrackToken(side) ? side : undefined}
+      data-gap={isSpaceToken(gap) ? gap : undefined}
+      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
+      class={cls}
+      {...rest}
+    >
+      {children}
+    </div>
+  )
 }
 
-export function Sidebar({ side, gap, class: cls, children, ...rest }: BoxProps & { side?: string | undefined, gap?: string | undefined }) {
-  return <div data-layout="sidebar" style={layoutStyle({ side, gap })} class={cls} {...rest}>{children}</div>
-}
-
-export function Split({ gap, class: cls, children, ...rest }: BoxProps & { gap?: string | undefined }) {
-  return <div data-layout="split" style={layoutStyle({ gap })} class={cls} {...rest}>{children}</div>
+export function Split({ gap, class: cls, children, ...rest }: BoxProps & { gap?: SpaceValue | undefined }) {
+  return (
+    <div
+      data-layout="split"
+      data-gap={isSpaceToken(gap) ? gap : undefined}
+      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
+      class={cls}
+      {...rest}
+    >
+      {children}
+    </div>
+  )
 }

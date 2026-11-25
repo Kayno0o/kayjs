@@ -115,7 +115,15 @@ async function parseActionBody(boundedReq: Request): Promise<unknown> {
     const fields = new Map<string, FormDataEntryValue | FormDataEntryValue[]>()
     for (const [key, val] of (await boundedReq.formData()).entries()) {
       const prev = fields.get(key)
-      fields.set(key, prev === undefined ? val : Array.isArray(prev) ? [...prev, val] : [prev, val])
+      if (prev === undefined) {
+        fields.set(key, val)
+      }
+      else if (Array.isArray(prev)) {
+        prev.push(val)
+      }
+      else {
+        fields.set(key, [prev, val])
+      }
     }
     return Object.fromEntries(fields)
   }
@@ -223,8 +231,10 @@ function buildActionErrorFlash(
       }
       values[k] = v
       const candidate: ActionErrorFlash = { ...base, values }
-      if (encodedFlashSize(candidate) > MAX_FLASH_COOKIE_BYTES)
+      if (encodedFlashSize(candidate) > MAX_FLASH_COOKIE_BYTES) {
         delete values[k]
+        break
+      }
     }
   }
 
@@ -233,6 +243,56 @@ function buildActionErrorFlash(
     ...(Object.keys(values).length > 0 ? { values } : {}),
   }
   return JSON.stringify(finalFlash)
+}
+
+/** Programmatic action invocation with Standard Schema validation (used by `ServerPluginAPI.invokeAction` inside middleware chains). */
+export async function invokeActionCore<I, O>(
+  act: ServerAction<I, O>,
+  input: I,
+  ctx: ActionContext,
+): Promise<ActionResult<O>> {
+  let validated: unknown = input
+  if (act.schema !== undefined) {
+    const checked = await validateSchema(act.schema, input)
+    if (!checked.ok) {
+      return {
+        ok: false,
+        status: 400,
+        error: 'Validation failed',
+        fieldErrors: checked.fieldErrors,
+        issues: checked.issues,
+      }
+    }
+    validated = checked.value
+  }
+
+  const result = await act.handler(validated as never, ctx)
+  if (result instanceof Response) {
+    if (result.status >= 300 && result.status < 400)
+      return { ok: true, data: result as unknown as O }
+    const ok = result.status >= 200 && result.status < 300
+    const ct = result.headers.get('content-type') ?? ''
+    if (ct.includes('application/json')) {
+      try {
+        const body = await result.clone().json() as Record<string, unknown>
+        if (typeof body === 'object' && body !== null && 'ok' in body)
+          return body as unknown as ActionResult<O>
+        return ok
+          ? { ok: true, data: body as O }
+          : {
+              ok: false,
+              status: result.status,
+              error: typeof body.error === 'string' ? body.error : result.statusText,
+              ...(body.fieldErrors !== undefined ? { fieldErrors: body.fieldErrors as Record<string, string> } : {}),
+            }
+      }
+      catch {}
+    }
+    return ok
+      ? { ok: true, data: undefined as O }
+      : { ok: false, status: result.status, error: (await result.clone().text().catch(() => '')) || result.statusText }
+  }
+  return { ok: true, data: result as O }
 }
 
 export async function executeAction(
@@ -255,7 +315,7 @@ export async function executeAction(
     }
 
     let checked = await validateSchema(act.schema, rawBody)
-    if (!checked.ok && !isJsonBody(request))
+    if (!checked.ok && !isJsonBody(request) && rawBody !== null && typeof rawBody === 'object' && !Array.isArray(rawBody))
       checked = await retryWithFormArrays(act.schema, rawBody as Record<string, unknown>, checked)
     if (!checked.ok) {
       // Zero-JS progressive HTML <form> submit: flash fieldErrors + safe submitted values (<4KB) and redirect 303 back to trusted Referer
@@ -266,7 +326,7 @@ export async function executeAction(
           sameSite: 'lax',
           maxAge: 60,
         })
-        return Response.redirect(back.href, 303)
+        return new Response(null, { status: 303, headers: { location: back.href } })
       }
       return Response.json(
         { ok: false, status: 400, error: 'Validation failed', fieldErrors: checked.fieldErrors, issues: checked.issues },
@@ -282,7 +342,7 @@ export async function executeAction(
 
   const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy)
   if (back !== undefined)
-    return Response.redirect(back.href, 303)
+    return new Response(null, { status: 303, headers: { location: back.href } })
 
   return Response.json({ ok: true, data: result }, { status: 200 })
 }

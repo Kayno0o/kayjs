@@ -1,14 +1,15 @@
-// `kay check [dir]`: validates routes, Kay compiler & island rules, config, and runs TypeScript type-checking.
+// `kay check [dir]`: validates routes, Kay compiler & island rules (unified with `kay build`), config, and TypeScript types.
 
-import type { AstNode, ModuleAnalysis } from '../compiler/analyze'
+import type { ModuleAnalysis } from '../compiler/analyze'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
-import { isTsFile, relPosix, walkFiles } from '../build/files'
+import { isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
-import { fileToRoutePath, normalizeRoutePattern, routeExportProblem } from '../build/routes'
+import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
 import { analyzeModule, walk } from '../compiler/analyze'
 import { readsPrivateEnv, SERVER_ONLY_MODULES } from '../compiler/server-only'
-import { loadConfig } from '../plugins/index'
+import { jsxTagName } from '../compiler/shared'
+import { createAppContext, loadConfig, runWithAppContext } from '../plugins/index'
 
 export interface CheckResult {
   ok: boolean
@@ -18,6 +19,7 @@ export interface CheckResult {
 }
 
 const SERIALIZABLE_NEW_CTORS = new Set(['Date', 'Map', 'Set', 'URL', 'RegExp'])
+const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
 
 function walkTsFiles(dir: string): string[] {
   return walkFiles(dir, {
@@ -26,7 +28,6 @@ function walkTsFiles(dir: string): string[] {
   })
 }
 
-// A module outside the scanned folders (a workspace or npm package an island imports) is analysed when first reached. One that fails to parse is not parsed again.
 function analysisOf(file: string, analyses: Map<string, ModuleAnalysis>, unparsable: Set<string>): ModuleAnalysis | undefined {
   if (!analyses.has(file) && !unparsable.has(file) && isTsFile(file)) {
     try {
@@ -49,8 +50,7 @@ function checkIslandReach(island: string, root: string, graph: ModuleGraph, unpa
     if (seen.has(file))
       continue
     seen.add(file)
-    // Like the build, an npm package's own imports are its business: only project and workspace files are checked.
-    if (file.includes('/node_modules/'))
+    if (NODE_MODULES_RE.test(file))
       continue
     const analysis = analysisOf(file, graph.analyses, unparsable)
     if (analysis === undefined || (file !== island && !analysis.isInteractive && analysis.exportedActions.length > 0))
@@ -62,14 +62,31 @@ function checkIslandReach(island: string, root: string, graph: ModuleGraph, unpa
       reported.add(`${file}\0${key}`)
       errors.push(message)
     }
-    for (const source of [...analysis.imports.map(i => i.source), ...analysis.reexports.map(r => r.source)]) {
-      if (SERVER_ONLY_MODULES.has(source)) {
-        report(source, file === island
-          ? `kay check: ${rel}: interactive island imports server-only module "${source}". Move server logic to a server action or async server component.`
-          : `kay check: ${rel}: imports server-only module "${source}" and is reachable from the island in ${islandRel}. Move server logic to a server action or async server component.`)
+    for (const imp of analysis.imports) {
+      if (SERVER_ONLY_MODULES.has(imp.source)) {
+        report(imp.source, file === island
+          ? `kay check: ${rel}: interactive island imports server-only module "${imp.source}". Move server logic to a server action or async server component.`
+          : `kay check: ${rel}: imports server-only module "${imp.source}" and is reachable from the island in ${islandRel}. Move server logic to a server action or async server component.`)
         continue
       }
-      const target = graph.resolve(file, source)
+      const target = graph.resolve(file, imp.source)
+      if (target !== undefined) {
+        const targetAnalysis = analysisOf(target, graph.analyses, unparsable)
+        if (targetAnalysis !== undefined && !targetAnalysis.isInteractive && targetAnalysis.exportedActions.length > 0) {
+          const missing = imp.specifiers.find(s => s.imported !== '*' && !targetAnalysis.exportedActions.includes(s.imported))
+          if (missing !== undefined)
+            report(`action-export:${target}:${missing.imported}`, `kay check: ${rel}: imports non-action "${missing.imported}" from server action file ${relPosix(root, target)}. Move ${missing.imported} into a module without actions.`)
+          continue
+        }
+        stack.push(target)
+      }
+    }
+    for (const re of analysis.reexports) {
+      if (SERVER_ONLY_MODULES.has(re.source)) {
+        report(re.source, `kay check: ${rel}: re-exports from server-only module "${re.source}" and is reachable from the island in ${islandRel}.`)
+        continue
+      }
+      const target = graph.resolve(file, re.source)
       if (target !== undefined)
         stack.push(target)
     }
@@ -84,12 +101,18 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
 
   // 1. Validate kay.config.ts
   let routesDir = resolve(root, 'src/routes')
+  let outDir = resolve(root, 'dist')
+  let assetPrefix = '/_kay'
   let plugins: Awaited<ReturnType<typeof loadConfig>>['plugins'] = []
   try {
     const cfg = await loadConfig(root)
     plugins = cfg.plugins ?? []
     if (cfg.routesDir !== undefined)
       routesDir = resolve(root, cfg.routesDir)
+    if (cfg.outDir !== undefined)
+      outDir = resolve(root, cfg.outDir)
+    if (cfg.assetPrefix !== undefined)
+      assetPrefix = cfg.assetPrefix.replace(/\/$/, '')
   }
   catch (err) {
     errors.push(`kay.config.ts: ${err instanceof Error ? err.message : String(err)}`)
@@ -99,9 +122,18 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   if (!existsSync(routesDir))
     errors.push(`missing routes directory: ${relative(root, routesDir) || routesDir}`)
 
-  // 3. Parse & run Kay static compiler analysis across src/
+  // 3. Parse & run Kay static compiler analysis across src/ AND custom routesDir
   const srcDir = resolve(root, 'src')
-  const files = walkTsFiles(existsSync(srcDir) ? srcDir : routesDir)
+  const fileSet = new Set<string>()
+  if (existsSync(srcDir)) {
+    for (const f of walkTsFiles(srcDir))
+      fileSet.add(f)
+  }
+  if (existsSync(routesDir)) {
+    for (const f of walkTsFiles(routesDir))
+      fileSet.add(f)
+  }
+  const files = [...fileSet].sort()
   const graph = new ModuleGraph()
   const { analyses } = graph
   const unparsable = new Set<string>()
@@ -119,56 +151,119 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     }
   }
 
-  // 3b. Static guardrails: server-only imports in islands, non-serializable island props, route conflicts, missing paths()
+  // 3a. Promote components reading imported reactive state (same rule as `planIslands` in `kay build`)
+  for (const [file, analysis] of [...analyses]) {
+    if (!file.endsWith('.tsx') || analysis.isInteractive)
+      continue
+    for (const imp of analysis.imports) {
+      const resolved = graph.resolve(file, imp.source)
+      if (resolved === undefined || !isTsFile(resolved))
+        continue
+      const state = imp.specifiers.find((spec) => {
+        if (analysis.jsxTags.has(spec.local))
+          return false
+        try {
+          if (spec.imported === '*')
+            return (analysisOf(resolved, analyses, unparsable)?.stateExports.length ?? 0) > 0
+          const target = graph.exportTarget(resolved, spec.imported)
+          return analysisOf(target.file, analyses, unparsable)?.stateExports.includes(target.exportName) === true
+        }
+        catch {
+          return false
+        }
+      })
+      if (state !== undefined) {
+        const reason = `reads ${state.local} from '${imp.source}'`
+        if (analysis.hasAsyncDefault)
+          errors.push(`kay check: async route component in ${relPosix(root, file)} cannot use browser interactivity (${reason}).`)
+        else
+          analyses.set(file, { ...analysis, isInteractive: true, interactiveReason: reason })
+        break
+      }
+    }
+  }
+
+  // Exact route discovery matching `kay build` (`walkRoutes` skips `_components/` dirs, `.d.ts`, `.test.ts`)
+  const routeFiles = existsSync(routesDir) ? walkRoutes(routesDir).sort() : []
+  const routeFileSet = new Set(routeFiles)
+
+  // 3b. Static guardrails: server-only imports in islands, non-serializable island props, special files, route conflicts, missing paths()
   const seenRoutes = new Map<string, string>()
   const reported = new Set<string>()
 
-  // A snapshot: the guardrails analyse packages they reach, and those are not checked as project files.
   for (const [file, analysis] of [...analyses]) {
     const rel = relPosix(root, file)
+
+    // Special route files (`_layout.tsx`, `_error.tsx`, `_404.tsx`) cannot be interactive
+    if (routeFileSet.has(file) && SPECIAL_ROUTE_FILES.has(basename(file)) && analysis.isInteractive) {
+      errors.push(`kay check: ${rel} uses browser interactivity (${analysis.interactiveReason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`)
+    }
 
     // Guardrail 1: server-only imports and private env reads in an island or any module it imports
     if (analysis.isInteractive)
       checkIslandReach(file, root, graph, unparsable, reported, errors)
 
-    // Guardrail 2: non-serializable props (functions / unsupported class instances) passed from static server code into an island
+    // Guardrail 2: non-serializable props passed from static server code into an island (including barrels & namespaces)
     if (!analysis.isInteractive && file.endsWith('.tsx')) {
       const islandTags = new Set<string>()
+      const islandNamespaces = new Map<string, string>() // localNs -> resolved file
       for (const imp of analysis.imports) {
-        const target = graph.resolve(file, imp.source)
-        if (target === undefined)
+        const resolved = graph.resolve(file, imp.source)
+        if (resolved === undefined || !isTsFile(resolved))
           continue
-        const targetAnalysis = analysisOf(target, analyses, unparsable)
-        if (targetAnalysis?.isInteractive) {
-          for (const spec of imp.specifiers)
-            islandTags.add(spec.local)
+        for (const spec of imp.specifiers) {
+          if (spec.imported === '*') {
+            islandNamespaces.set(spec.local, resolved)
+            continue
+          }
+          try {
+            const target = graph.exportTarget(resolved, spec.imported)
+            if (analysisOf(target.file, analyses, unparsable)?.isInteractive)
+              islandTags.add(spec.local)
+          }
+          catch {}
         }
       }
 
-      if (islandTags.size > 0) {
-        walk(analysis.program, (node: AstNode) => {
-          if (node.type !== 'JSXOpeningElement' || node.name?.type !== 'JSXIdentifier')
+      const isIslandTag = (tag: string): boolean => {
+        if (islandTags.has(tag))
+          return true
+        if (tag.includes('.')) {
+          const [ns, member] = tag.split('.')
+          const nsFile = ns !== undefined ? islandNamespaces.get(ns) : undefined
+          if (nsFile !== undefined && member !== undefined) {
+            try {
+              const target = graph.exportTarget(nsFile, member)
+              return analysisOf(target.file, analyses, unparsable)?.isInteractive === true
+            }
+            catch {}
+          }
+        }
+        return false
+      }
+
+      if (islandTags.size > 0 || islandNamespaces.size > 0) {
+        walk(analysis.program, (node) => {
+          if (node.type !== 'JSXOpeningElement')
             return
-          const tag = node.name.name as string
-          if (!islandTags.has(tag))
+          const tag = jsxTagName(node.name)
+          if (!isIslandTag(tag))
             return
-          for (const attr of (node.attributes ?? []) as AstNode[]) {
-            if (attr.type !== 'JSXAttribute' || attr.name?.type !== 'JSXIdentifier')
+          for (const attr of node.attributes) {
+            if (attr.type !== 'JSXAttribute' || attr.name.type !== 'JSXIdentifier')
               continue
-            const attrName = attr.name.name as string
+            const attrName = attr.name.name
             if (attrName === 'key' || attrName === '$hydrate')
               continue
-            if (attr.value?.type !== 'JSXExpressionContainer')
+            if (attr.value?.type !== 'JSXExpressionContainer' || attr.value.expression.type === 'JSXEmptyExpression')
               continue
-            const expr = attr.value.expression as AstNode | undefined
-            if (expr === undefined)
-              continue
+            const expr = attr.value.expression
             if (expr.type === 'ArrowFunctionExpression' || expr.type === 'FunctionExpression') {
               errors.push(
                 `kay check: ${rel}: cannot pass function prop "${attrName}" from a server component into island <${tag}>. Define the handler inside the island or pass serializable data.`,
               )
             }
-            else if (expr.type === 'NewExpression' && expr.callee?.type === 'Identifier' && !SERIALIZABLE_NEW_CTORS.has(expr.callee.name as string)) {
+            else if (expr.type === 'NewExpression' && expr.callee.type === 'Identifier' && !SERIALIZABLE_NEW_CTORS.has(expr.callee.name)) {
               errors.push(
                 `kay check: ${rel}: cannot pass non-serializable \`new ${expr.callee.name}()\` prop "${attrName}" into island <${tag}>.`,
               )
@@ -178,32 +273,39 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       }
     }
 
-    // Route-specific guardrails
-    const relFromRoutes = relative(routesDir, file)
-    const isRouteFile = !relFromRoutes.startsWith('..') && !basename(file).startsWith('_')
-    if (isRouteFile) {
-      const conflictKey = normalizeRoutePattern(fileToRoutePath(routesDir, file))
-      const prev = seenRoutes.get(conflictKey)
-      if (prev !== undefined) {
-        errors.push(`kay check: conflicting routes "${prev}" and "${rel}" both match "${conflictKey}".`)
-      }
-      else {
-        seenRoutes.set(conflictKey, rel)
-      }
-
+    // Route-specific guardrails (only real route files matching `kay build`)
+    if (routeFileSet.has(file) && !basename(file).startsWith('_')) {
       const problem = routeExportProblem(analysis, rel)
       if (problem !== undefined)
         errors.push(`kay check: ${problem}`)
 
-      // Guardrail 4: dynamic prerender = true route missing paths()
-      if (analysis.hasPrerender && (conflictKey.includes(':') || conflictKey.includes('*')) && !analysis.hasPaths) {
-        errors.push(`kay check: ${rel}: dynamic route exports \`prerender = true\` without exporting \`paths()\`.`)
+      if (hasRouteHandlerExport(analysis)) {
+        const conflictKey = normalizeRoutePattern(fileToRoutePath(routesDir, file))
+        const prev = seenRoutes.get(conflictKey)
+        if (prev !== undefined) {
+          errors.push(`kay check: conflicting routes "${prev}" and "${rel}" both match "${conflictKey}".`)
+        }
+        else {
+          seenRoutes.set(conflictKey, rel)
+        }
+
+        // Guardrail 4: dynamic prerender = true route missing paths()
+        if (analysis.hasPrerender && (conflictKey.includes(':') || conflictKey.includes('*')) && !analysis.hasPaths) {
+          errors.push(`kay check: ${rel}: dynamic route exports \`prerender = true\` without exporting \`paths()\`.`)
+        }
       }
     }
   }
 
-  // 3c. Run plugin check(ctx) hooks
+  // 3c. Run plugin check(ctx) hooks inside a real AppRuntimeContext
   if (plugins && plugins.length > 0) {
+    const appCtx = createAppContext({
+      root,
+      outDir,
+      publicDir: join(outDir, 'public'),
+      assetPrefix,
+      dev: false,
+    })
     const pluginCtx = {
       root,
       routesDir,
@@ -214,7 +316,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     for (const plugin of plugins) {
       if (plugin.check !== undefined) {
         try {
-          await plugin.check(pluginCtx)
+          await runWithAppContext(appCtx, () => plugin.check!(pluginCtx))
         }
         catch (err) {
           errors.push(`${plugin.name}: ${err instanceof Error ? err.message : String(err)}`)
@@ -223,27 +325,41 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     }
   }
 
-  // 4. Run TypeScript check (`tsgo` preferred, fallback to `tsc`) when tsconfig.json exists
+  // 4. Run TypeScript check (`bun check` preferred, fallback to `tsgo` then `tsc`) when tsconfig.json exists
   const tsconfigPath = join(root, 'tsconfig.json')
   if (!options.skipTypecheck && existsSync(tsconfigPath)) {
-    const candidates = [
-      join(root, 'node_modules/.bin/tsgo'),
-      join(root, 'node_modules/.bin/tsc'),
-      'tsgo',
-      'tsc',
-    ]
-    let bin: string | undefined
-    for (const c of candidates) {
-      if (c.includes('/') ? existsSync(c) : Bun.which(c) !== null) {
-        bin = c
-        break
-      }
+    const bunCheck = Bun.spawnSync([process.execPath, 'check', '--no-script', '-p', tsconfigPath], { cwd: root })
+    if (bunCheck.exitCode === 0) {
+      // Typecheck passed via built-in `bun check`
     }
-    if (bin !== undefined) {
-      const proc = Bun.spawnSync([bin, '--noEmit', '-p', tsconfigPath], { cwd: root })
-      if (proc.exitCode !== 0) {
-        const out = (proc.stdout.toString() + proc.stderr.toString()).trim()
-        errors.push(out || `${bin} exited with code ${proc.exitCode}`)
+    else {
+      const bunOut = (bunCheck.stdout.toString() + bunCheck.stderr.toString()).trim()
+      // Only fall back to tsgo/tsc if this Bun binary does not support `bun check`
+      const unsupported = bunOut.includes('Script not found "check"') || bunOut.includes('Unknown command')
+      if (!unsupported) {
+        errors.push(bunOut || `bun check exited with code ${bunCheck.exitCode}`)
+      }
+      else {
+        const candidates = [
+          join(root, 'node_modules/.bin/tsgo'),
+          join(root, 'node_modules/.bin/tsc'),
+          'tsgo',
+          'tsc',
+        ]
+        let bin: string | undefined
+        for (const c of candidates) {
+          if (c.includes('/') ? existsSync(c) : Bun.which(c) !== null) {
+            bin = c
+            break
+          }
+        }
+        if (bin !== undefined) {
+          const proc = Bun.spawnSync([bin, '--noEmit', '-p', tsconfigPath], { cwd: root })
+          if (proc.exitCode !== 0) {
+            const out = (proc.stdout.toString() + proc.stderr.toString()).trim()
+            errors.push(out || `${bin} exited with code ${proc.exitCode}`)
+          }
+        }
       }
     }
   }

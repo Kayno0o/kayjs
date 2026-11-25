@@ -48,7 +48,7 @@ Kay attaches safe security headers to every response out of the box:
 
 - `Content-Security-Policy`: Defaults to `DEFAULT_CSP` (`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'`).
 - **Automatic SHA-256 hashes**: Pages that render islands or `<Suspense>` automatically append only the exact SHA-256 hashes Kay needs — no `'unsafe-inline'` required.
-- `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and `Referrer-Policy: strict-origin-when-cross-origin`.
+- `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
 - `Strict-Transport-Security`: Sent on HTTPS requests (`max-age=31536000; includeSubDomains` by default).
 
 Override individual headers or turn one off with `false`:

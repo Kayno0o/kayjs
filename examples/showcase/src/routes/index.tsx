@@ -155,8 +155,8 @@ export default function ShowcasePage({ data, locals, url }: { data?: { prefs: Pr
                       <Field id="auth-email" label="Email" required>
                         <input id="auth-email" name="email" type="email" placeholder="you@example.com" required />
                       </Field>
-                      <Field id="auth-pass" label="Password" hint="Min 8 characters" required>
-                        <input id="auth-pass" name="password" type="password" minlength="8" required />
+                      <Field id="auth-pass" label="Password" hint="Min 12 characters" required>
+                        <input id="auth-pass" name="password" type="password" minlength="12" required />
                       </Field>
                       <Button type="submit" tone="accent">Create account &amp; enter /account</Button>
                     </Stack>

@@ -48,6 +48,8 @@ export type Middleware = (ctx: RequestContext, next: () => Promise<Response>) =>
 export interface KayApp {
   handle: (request: Request, remoteIp?: string) => Promise<Response>
   serve: (port?: number, hostname?: string) => ReturnType<typeof Bun.serve>
+  /** Runs plugin shutdown hooks and releases timers/resources (safe to call multiple times). */
+  dispose?: () => Promise<void>
 }
 
 export type EmbeddedBody = Uint8Array<ArrayBuffer> | string
@@ -149,20 +151,49 @@ const text: RequestContext['text'] = (body, init) => {
 const redirect: RequestContext['redirect'] = (location, status = 302) => new Response(null, { status, headers: { location } })
 const deny: RequestContext['deny'] = (status, message, fieldErrors) => Response.json({ ok: false, status, error: message, fieldErrors }, { status })
 
+/** RFC 9110 weak ETag comparison supporting `*`, comma-separated lists, and `W/` prefixes. */
+export function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
+  if (!ifNoneMatch)
+    return false
+  const trimmed = ifNoneMatch.trim()
+  if (trimmed === '*')
+    return true
+  const stripWeak = (v: string) => (v.startsWith('W/') || v.startsWith('w/') ? v.slice(2) : v)
+  const target = stripWeak(etag)
+  for (const part of trimmed.split(',')) {
+    if (stripWeak(part.trim()) === target)
+      return true
+  }
+  return false
+}
+
 export function makeRequestContext(
   request: Request,
   params: Record<string, string>,
   opts?: RequestContextOptions,
 ): { ctx: RequestContext, cookieStore: CookieStore } {
   const trustProxy = opts?.trustProxy ?? false
+  const remoteIp = opts?.remoteIp
   const cookieStore = new CookieStore(request.headers.get('cookie'), isHttpsRequest(request, trustProxy))
+  let cachedIp: string | undefined
+  let ipComputed = false
   const ctx: RequestContext = {
     request,
     url: opts?.url ?? new URL(request.url),
     params,
     cookies: cookieStore,
     locals: {},
-    ip: getClientIp(request, trustProxy, opts?.remoteIp),
+    get ip() {
+      if (!ipComputed) {
+        ipComputed = true
+        cachedIp = getClientIp(request, trustProxy, remoteIp)
+      }
+      return cachedIp
+    },
+    set ip(val: string | undefined) {
+      ipComputed = true
+      cachedIp = val
+    },
     json,
     text,
     redirect,
@@ -229,12 +260,14 @@ export async function enforceRequestBodyLimit(
     offset += chunk.byteLength
   }
 
+  headers.delete('transfer-encoding')
   return {
     ok: true,
     request: new Request(request.url, {
       method: request.method,
       headers,
       body: combined,
+      signal: request.signal,
     }),
   }
 }
@@ -244,8 +277,10 @@ export function applyHstsHeader(
   request: Request,
   hstsValue: string | undefined,
   trustProxy: TrustProxy,
+  isDev = false,
 ): Response {
-  if (hstsValue === undefined || nodeEnv() !== 'production' || !isHttpsRequest(request, trustProxy))
+  const env = nodeEnv()
+  if (hstsValue === undefined || isDev || env === 'development' || env === 'test' || !isHttpsRequest(request, trustProxy))
     return res
   if (res.headers.has('strict-transport-security'))
     return res

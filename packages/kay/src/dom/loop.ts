@@ -3,7 +3,7 @@
 
 import type { Owner, Signal } from '../reactivity/index'
 import { createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, signal, untrack } from '../reactivity/index'
-import { claimLoop } from './index'
+import { claimLoop, skipRange } from './index'
 
 interface Row<T> {
   key: unknown
@@ -37,6 +37,7 @@ export function loop<T>(
   const parentOwner = getOwner()
   const needsIndex = renderRow.length >= 2
   let rows: Row<T>[] = []
+  let firstRun = true
   if (parentOwner !== undefined) {
     onCleanup(() => {
       rows = []
@@ -52,6 +53,18 @@ export function loop<T>(
   }
 
   effect(() => {
+    let startMarker: Node | null | undefined
+    if (firstRun) {
+      firstRun = false
+      if (marker !== null && marker.nodeType === 8 && (marker as Comment).data === 'k[') {
+        const close = skipRange(marker)
+        if (close !== null) {
+          startMarker = marker
+          marker = close
+        }
+      }
+    }
+
     const list = each()
     const next = list === false || list == null ? EMPTY : list
     const nextLen = next.length
@@ -83,7 +96,7 @@ export function loop<T>(
             const item = next[i]!
             created[i] = makeRow(item, i, keyFn(item, i))
           }
-        }, skip)) {
+        }, skip, startMarker)) {
           rows = created
           return
         }

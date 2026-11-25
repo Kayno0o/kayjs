@@ -1,8 +1,9 @@
-// Per-request SSR context for <Head> metadata collection and streaming <Suspense> boundaries.
-// Zero cost on pages that don't use <Head> or <Suspense>.
+// Per-request SSR context for <Head> metadata, streaming <Suspense>, rendered island tracking,
+// universal createContext/useContext, and deterministic hydration-safe useId().
 
 import type { Html, KayChild } from '../jsx-runtime'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { registerServerContextBridge } from '../context'
 import { raw, ssrChild } from './index'
 
 export interface SettledChunk {
@@ -23,13 +24,72 @@ export interface RenderContext {
   pending: PendingChunk[]
   nextId: number
   islandDepth: number
+  islandSeq: number
+  idPrefix: string
+  idSeq: number
+  contexts: Map<symbol, unknown>
+  /** Maps island chunk URL -> eager (true if hydrate is undefined/'load'). */
+  renderedIslands: Map<string, boolean>
+  hasIslands: boolean
+  htmlAttrs: Record<string, string>
 }
 
 const STORAGE_KEY = Symbol.for('kay.render.storage')
 const renderStorage: AsyncLocalStorage<RenderContext> = ((globalThis as Record<symbol, AsyncLocalStorage<RenderContext> | undefined>)[STORAGE_KEY] ??= new AsyncLocalStorage<RenderContext>())
 
+registerServerContextBridge({
+  getContext(key: symbol) {
+    const ctx = renderStorage.getStore()
+    if (ctx !== undefined && ctx.contexts.has(key))
+      return { found: true, value: ctx.contexts.get(key) }
+    return undefined
+  },
+  runWithContext<T>(key: symbol, value: unknown, fn: () => T): T {
+    const ctx = renderStorage.getStore()
+    if (ctx === undefined)
+      return fn()
+    const had = ctx.contexts.has(key)
+    const prev = ctx.contexts.get(key)
+    ctx.contexts.set(key, value)
+    try {
+      return fn()
+    }
+    finally {
+      if (had)
+        ctx.contexts.set(key, prev)
+      else
+        ctx.contexts.delete(key)
+    }
+  },
+  nextId() {
+    const ctx = renderStorage.getStore()
+    if (ctx === undefined)
+      return undefined
+    return `${ctx.idPrefix}${ctx.idSeq++}`
+  },
+  head(props) {
+    return Head(props)
+  },
+  suspense(props) {
+    return Suspense(props)
+  },
+})
+
 export function createRenderContext(): RenderContext {
-  return { headParts: [], title: undefined, pending: [], nextId: 0, islandDepth: 0 }
+  return {
+    headParts: [],
+    title: undefined,
+    pending: [],
+    nextId: 0,
+    islandDepth: 0,
+    islandSeq: 0,
+    idPrefix: '',
+    idSeq: 0,
+    contexts: new Map(),
+    renderedIslands: new Map(),
+    hasIslands: false,
+    htmlAttrs: {},
+  }
 }
 
 export function runWithRenderContext<T>(ctx: RenderContext, fn: () => T): T {
@@ -40,7 +100,7 @@ export function currentRenderContext(): RenderContext | undefined {
   return renderStorage.getStore()
 }
 
-const TITLE_RE = /<title>([\s\S]*?)<\/title>/i
+const TITLE_RE = /<title\b[^>]*>([\s\S]*?)<\/title>/gi
 
 /** Collects document <head> tags during SSR; innermost <title> wins. */
 export function Head(props: { children?: KayChild }): Html {
@@ -49,10 +109,12 @@ export function Head(props: { children?: KayChild }): Html {
     return raw('')
 
   let html = ssrChild(props.children)
+  TITLE_RE.lastIndex = 0
   const titleMatch = TITLE_RE.exec(html)
   if (titleMatch !== null) {
     // Inner page renders before outer layouts, so the first (innermost) <title> wins.
     ctx.title ??= titleMatch[0]
+    TITLE_RE.lastIndex = 0
     html = html.replace(TITLE_RE, '')
   }
   if (html !== '')
@@ -83,23 +145,25 @@ export function Suspense(props: { fallback?: KayChild, error?: KayChild | ((erro
     return raw(ssrChild(props.fallback))
 
   const id = ctx.nextId++
+  // Capture RenderContext so timeout / error fallback renders still run inside the request context.
   const renderError = (error: unknown): string => {
     try {
-      return ssrChild(typeof props.error === 'function' ? props.error(error) : props.error)
+      return runWithRenderContext(ctx, () => ssrChild(typeof props.error === 'function' ? props.error(error) : props.error))
     }
     catch {
       return ''
     }
   }
-  ctx.pending.push({ id, settled: settle(child, renderError), renderError })
+  ctx.pending.push({ id, settled: settle(ctx, child, renderError), renderError })
 
   const fallbackHtml = ssrChild(props.fallback)
   return raw(`<kay-s id="k-s-${id}">${fallbackHtml}</kay-s>`)
 }
 
-async function settle(child: Promise<KayChild>, renderError: (error: unknown) => string): Promise<SettledChunk> {
+async function settle(ctx: RenderContext, child: Promise<KayChild>, renderError: (error: unknown) => string): Promise<SettledChunk> {
   try {
-    return { html: ssrChild(await child) }
+    const resolved = await child
+    return { html: runWithRenderContext(ctx, () => ssrChild(resolved)) }
   }
   catch (error) {
     return { html: renderError(error), error }

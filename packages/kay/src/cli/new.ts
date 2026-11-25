@@ -170,6 +170,14 @@ export const greet = action(nameSchema, async ({ name }) => {
   return { message: \`Hello, \${name}!\` }
 })
 `
+    files['src/styles/app.css'] += `
+.greet-form {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+`
     files['src/components/GreetForm.tsx'] = `import { signal } from 'kay'
 import { greet } from '../actions/greet'
 
@@ -184,7 +192,7 @@ export function GreetForm() {
   }
 
   return (
-    <form action={greet.url} method="post" onSubmit={onSubmit} style="margin-top:1.5rem;display:flex;gap:.5rem;align-items:center">
+    <form class="greet-form" action={greet.url} method="post" onSubmit={onSubmit}>
       <input
         name="name"
         placeholder="Your name"
@@ -214,8 +222,19 @@ export default async function Home() {
   }
 
   else if (template === 'blog') {
-    delete files['src/styles/app.css']
     delete files['src/components/Counter.tsx']
+
+    files['src/styles/app.css'] = `body { margin: 0; background: var(--ui-paper); color: var(--ui-ink); font-family: var(--ui-font-body); }
+.wrap { max-width: 46rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+.site-header { padding-bottom: 1.25rem; margin-bottom: 2rem; border-bottom: 1px solid var(--ui-line); }
+.site-brand { font-family: var(--ui-font-display); font-size: 1.35rem; font-weight: 700; text-decoration: none; color: inherit; }
+.site-rss { font-size: 0.9rem; color: var(--ui-muted); }
+.page-title { margin: 0; font-family: var(--ui-font-display); }
+.post-link { color: inherit; text-decoration: none; }
+.post-desc { margin: 0; color: var(--ui-muted); }
+.post-title { font-family: var(--ui-font-display); margin-bottom: 0.25rem; }
+.post-meta { color: var(--ui-muted); margin-top: 0; }
+`
 
     files['content/posts/welcome.md'] = `---
 title: Welcome to ${name}
@@ -271,21 +290,18 @@ export default defineConfig({
 `
     files['src/routes/_layout.tsx'] = `import type { KayChild } from 'kay'
 import { Head } from 'kay'
+import '../styles/app.css'
 
 export default function Layout({ children }: { children: KayChild }) {
   return (
     <>
       <Head>
         <title>${name}</title>
-        <style>{\`
-          body { margin: 0; background: var(--ui-paper); color: var(--ui-ink); font-family: var(--ui-font-body); }
-          .wrap { max-width: 46rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
-        \`}</style>
       </Head>
       <div class="wrap">
-        <header data-layout="split" style="padding-bottom:1.25rem;margin-bottom:2rem;border-bottom:1px solid var(--ui-line)">
-          <a href="/" style="font-family:var(--ui-font-display);font-size:1.35rem;font-weight:700;text-decoration:none;color:inherit">${name}</a>
-          <a href="/rss.xml" style="font-size:0.9rem;color:var(--ui-muted)">RSS</a>
+        <header data-layout="split" class="site-header">
+          <a href="/" class="site-brand">${name}</a>
+          <a href="/rss.xml" class="site-rss">RSS</a>
         </header>
         <main>{children}</main>
       </div>
@@ -301,15 +317,15 @@ export const prerender = true
 export default async function BlogIndex() {
   const list = posts.all()
   return (
-    <Stack gap="1.5rem">
-      <h1 style="margin:0;font-family:var(--ui-font-display)">Articles</h1>
+    <Stack gap="lg">
+      <h1 class="page-title">Articles</h1>
       {list.map(post => (
         <Card key={post.slug}>
           <CardHeader>
-            <a href={\`/blog/\${post.slug}\`} style="color:inherit;text-decoration:none">{post.data.title}</a>
+            <a href={\`/blog/\${post.slug}\`} class="post-link">{post.data.title}</a>
           </CardHeader>
           <CardBody>
-            <p style="margin:0;color:var(--ui-muted)">{post.data.description ?? ''}</p>
+            <p class="post-desc">{post.data.description ?? ''}</p>
           </CardBody>
           <CardFooter>
             <Cluster>
@@ -343,11 +359,11 @@ export async function load(ctx: RequestContext) {
 export default function PostPage({ data }: { data: { post: NonNullable<ReturnType<typeof posts.get>> } }) {
   const { post } = data
   return (
-    <Stack gap="1.25rem">
+    <Stack gap="md">
       <Head><title>{post.data.title}</title></Head>
       <article>
-        <h1 style="font-family:var(--ui-font-display);margin-bottom:0.25rem">{post.data.title}</h1>
-        <p style="color:var(--ui-muted);margin-top:0">{post.data.date} · {post.readingMinutes} min read</p>
+        <h1 class="post-title">{post.data.title}</h1>
+        <p class="post-meta">{post.data.date} · {post.readingMinutes} min read</p>
         <div innerHTML={post.html} />
       </article>
       <div><Button href="/" variant="outline">← All posts</Button></div>
@@ -357,8 +373,16 @@ export default function PostPage({ data }: { data: { post: NonNullable<ReturnTyp
 `
   }
   else if (template === 'app') {
-    delete files['src/styles/app.css']
     delete files['src/components/Counter.tsx']
+
+    files['src/styles/app.css'] = `body { margin: 0; background: var(--ui-paper); color: var(--ui-ink); font-family: var(--ui-font-body); }
+.wrap { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+.site-header { padding-bottom: 1.25rem; margin-bottom: 2rem; border-bottom: 1px solid var(--ui-line); }
+.site-brand { font-family: var(--ui-font-display); font-size: 1.3rem; font-weight: 700; text-decoration: none; color: inherit; }
+.page-title { margin: 0; font-family: var(--ui-font-display); }
+.page-lead { margin: 0; color: var(--ui-muted); }
+.m-0 { margin: 0; }
+`
 
     files['src/auth.ts'] = `import { join } from 'node:path'
 import { createAuth } from '@kayjs/auth'
@@ -396,6 +420,7 @@ export default defineConfig({
 import type { KayChild } from 'kay'
 import { Button, Cluster, Toaster } from '@kayjs/ui'
 import { Head } from 'kay'
+import '../styles/app.css'
 
 export default function Layout({ children, locals }: { children: KayChild, locals?: { user?: PublicUser } }) {
   const user = locals?.user
@@ -403,14 +428,10 @@ export default function Layout({ children, locals }: { children: KayChild, local
     <>
       <Head>
         <title>${name}</title>
-        <style>{\`
-          body { margin: 0; background: var(--ui-paper); color: var(--ui-ink); font-family: var(--ui-font-body); }
-          .wrap { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
-        \`}</style>
       </Head>
       <div class="wrap">
-        <header data-layout="split" style="padding-bottom:1.25rem;margin-bottom:2rem;border-bottom:1px solid var(--ui-line)">
-          <a href="/" style="font-family:var(--ui-font-display);font-size:1.3rem;font-weight:700;text-decoration:none;color:inherit">${name}</a>
+        <header data-layout="split" class="site-header">
+          <a href="/" class="site-brand">${name}</a>
           {user
             ? (
                 <Cluster>
@@ -433,10 +454,10 @@ export default function Layout({ children, locals }: { children: KayChild, local
 
 export default async function Home() {
   return (
-    <Stack gap="1.25rem">
+    <Stack gap="md">
       <Cluster><Badge tone="accent">Kay v2</Badge><Badge>SQLite Auth</Badge></Cluster>
-      <h1 style="margin:0;font-family:var(--ui-font-display)">Welcome to ${name}</h1>
-      <p style="margin:0;color:var(--ui-muted)">Zero-dependency Argon2id auth, @kayjs/ui pure CSS grammar, and Bun speed.</p>
+      <h1 class="page-title">Welcome to ${name}</h1>
+      <p class="page-lead">Zero-dependency Argon2id auth, @kayjs/ui pure CSS grammar, and Bun speed.</p>
       <Cluster>
         <Button href="/login" tone="accent">Get started</Button>
         <Button href="/dashboard" variant="outline">Dashboard</Button>
@@ -449,12 +470,12 @@ export default async function Home() {
 
 export default function LoginPage() {
   return (
-    <Grid min="18rem" gap="1.5rem">
+    <Grid min="md" gap="lg">
       <Card>
         <CardHeader>Sign in</CardHeader>
         <CardBody>
           <form action="/auth/signin" method="post">
-            <Stack gap="0.9rem">
+            <Stack gap="sm">
               <input type="hidden" name="redirect" value="/dashboard" />
               <Field id="in-email" label="Email" required><input id="in-email" name="email" type="email" required /></Field>
               <Field id="in-pass" label="Password" required><input id="in-pass" name="password" type="password" required /></Field>
@@ -467,10 +488,10 @@ export default function LoginPage() {
         <CardHeader>Create account</CardHeader>
         <CardBody>
           <form action="/auth/signup" method="post">
-            <Stack gap="0.9rem">
+            <Stack gap="sm">
               <input type="hidden" name="redirect" value="/dashboard" />
               <Field id="up-email" label="Email" required><input id="up-email" name="email" type="email" required /></Field>
-              <Field id="up-pass" label="Password" hint="Min 8 characters" required><input id="up-pass" name="password" type="password" minlength="8" required /></Field>
+              <Field id="up-pass" label="Password" hint="Min 12 characters" required><input id="up-pass" name="password" type="password" minlength="12" required /></Field>
               <Button type="submit" tone="accent">Create account</Button>
             </Stack>
           </form>
@@ -492,7 +513,7 @@ export default async function DashboardPage({ locals }: { locals: { user?: Publi
     <Card>
       <CardHeader>Dashboard</CardHeader>
       <CardBody>
-        <p style="margin:0">Signed in as <strong>{locals.user?.email}</strong>.</p>
+        <p class="m-0">Signed in as <strong>{locals.user?.email}</strong>.</p>
       </CardBody>
     </Card>
   )

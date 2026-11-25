@@ -94,7 +94,7 @@ Core stays tiny (`~6.9k LOC`). Every optional capability plugs in cleanly throug
 | **`@kayjs/content`** | `Bun.markdown` GFM collections, YAML frontmatter + Standard Schema, lazy `render()`, heading TOC, `paths()` prerender, RSS XML | Zero external deps |
 | **`@kayjs/mcp`** | Streamable HTTP (`2025-03-26`) MCP server exposing typed `action()` tools with schema compaction, shared schemas, `resources`, output shaping, and `kay mcp-footprint` | Zero external deps |
 | **`@kayjs/mail`** | Resend HTTP transport, custom transports, and dev-only `/_kay/mail` outbox preview | Zero external deps |
-| **`@kayjs/images`** | Build-time responsive AVIF/WebP pipeline + content-hash cache + `<Picture>` + OG `shareCard()` | Sharp-backed |
+| **`@kayjs/images`** | Build-time responsive AVIF/WebP pipeline + content-hash cache + `<Picture>` + OG `shareCard()` | ImageMagick / librsvg-backed (zero npm deps) |
 | **`@kayjs/icons`** | Virtual `~icons/<set>/<name>` imports + browser-pure `<Icon>` | Iconify JSON sets |
 | **`@kayjs/seo`** | `titleTemplate`, OpenGraph/Twitter meta, JSON-LD, sitemap, redirects, self-hosted fonts | Zero external deps |
 | **`@kayjs/tailwind`** | Tailwind v4 CSS integration (auto-loads `bun-plugin-tailwind`) | Opt-in |

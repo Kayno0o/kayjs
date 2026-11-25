@@ -14,6 +14,7 @@ export interface DrawerProps {
   side?: 'right' | 'left' | 'bottom' | undefined
   triggerLabel?: string | undefined
   triggerVariant?: ButtonVariant | undefined
+  closeLabel?: string | undefined
   open?: Signal<boolean> | undefined
   children?: KayChild | undefined
 }
@@ -26,6 +27,7 @@ export function Drawer({
   side = 'right',
   triggerLabel,
   triggerVariant = 'outline',
+  closeLabel = 'Close',
   open,
   children,
 }: DrawerProps) {
@@ -81,7 +83,7 @@ export function Drawer({
               data-size="sm"
               data-part="close"
               type="button"
-              aria-label="Close"
+              aria-label={closeLabel}
               onClick={() => { isOpen.value = false }}
             >
               ✕

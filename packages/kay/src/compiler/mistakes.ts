@@ -1,12 +1,12 @@
 // Refuses JSX that compiles but does the wrong thing, mostly habits from React, Solid and Astro, with an error naming the fix.
 
-import type { AstNode } from './analyze'
+import type { JSXAttribute, JSXAttributeItem, JSXElement, Node, Program } from 'oxc-parser'
 import { walk } from './analyze'
-import { cleanJsxText, isComponentTag, jsxTagName, unwrapParens, VOID_ELEMENTS } from './shared'
+import { EVENT_ATTR, filterMeaningfulChildren, isComponentTag, jsxTagName, unwrapParens, VOID_ELEMENTS } from './shared'
 
 // The kay prop for each DOM event, keyed by the event name kay binds (`onKeyDown` binds `keydown`).
 const EVENT_PROPS = new Map(Object.entries({
-  abort: 'onAbort', animationend: 'onAnimationEnd', animationiteration: 'onAnimationIteration', animationstart: 'onAnimationStart',
+  abort: 'onAbort', animationcancel: 'onAnimationCancel', animationend: 'onAnimationEnd', animationiteration: 'onAnimationIteration', animationstart: 'onAnimationStart',
   auxclick: 'onAuxClick', beforeinput: 'onBeforeInput', beforetoggle: 'onBeforeToggle', blur: 'onBlur', cancel: 'onCancel',
   canplay: 'onCanPlay', canplaythrough: 'onCanPlayThrough', change: 'onChange', click: 'onClick', close: 'onClose',
   compositionend: 'onCompositionEnd', compositionstart: 'onCompositionStart', compositionupdate: 'onCompositionUpdate',
@@ -40,9 +40,7 @@ const EVENT_PROPS = new Map(Object.entries({
 // React names whose DOM event is spelled differently.
 const RENAMED_EVENTS = new Map([['doubleclick', 'dblclick']])
 const CAPTURE_SUFFIX = 'capture'
-
 const LOWERCASE_EVENT = /^on[a-z]/
-const EVENT_ATTR = /^on[A-Z]/
 
 function eventProp(event: string): string {
   return EVENT_PROPS.get(event) ?? `on${event.charAt(0).toUpperCase()}${event.slice(1)}`
@@ -61,12 +59,14 @@ export function checkHydrateMode(mode: string, what: string, filename: string): 
     throw mistake(what, filename, 'use load, visible, idle, interaction, client or media(<query>)')
 }
 
-function checkHandler(name: string, value: AstNode | null, filename: string, code: string): void {
-  if (value?.type === 'Literal')
+function checkHandler(name: string, value: JSXAttribute['value'], filename: string, code: string): void {
+  if (value === null)
+    throw mistake(name, filename, `pass a function, ${name}={() => ...}`)
+  if (value.type === 'Literal')
     throw mistake(`${name}="..."`, filename, `pass a function, ${name}={() => ...}`)
-  if (value?.type !== 'JSXExpressionContainer')
+  if (value.type !== 'JSXExpressionContainer')
     return
-  const expr = value.expression as AstNode
+  const expr = unwrapParens(value.expression)
   if ((expr.type === 'Literal' && typeof expr.value === 'string') || expr.type === 'TemplateLiteral')
     throw mistake(`${name}="..."`, filename, `pass a function, ${name}={() => ...}`)
   if (expr.type === 'UpdateExpression' || expr.type === 'AssignmentExpression') {
@@ -94,14 +94,16 @@ const BOOLEAN_ATTRS = new Set([
   'playsinline', 'readonly', 'required', 'reversed', 'selected',
 ])
 
-function checkRef(value: AstNode | null, filename: string): void {
-  if (value?.type === 'Literal')
+function checkRef(value: JSXAttribute['value'], filename: string): void {
+  if (value === null)
+    throw mistake('ref', filename, 'pass a function, ref={el => ...}')
+  if (value.type === 'Literal')
     throw mistake('ref="..."', filename, 'pass a function, ref={el => ...}')
-  if (value?.type === 'JSXExpressionContainer' && unwrapParens(value.expression as AstNode).type === 'ObjectExpression')
+  if (value.type === 'JSXExpressionContainer' && unwrapParens(value.expression).type === 'ObjectExpression')
     throw mistake('ref={{ ... }}', filename, 'pass a function, ref={el => ...}, kay has no ref objects')
 }
 
-function checkSpelling(name: string, value: AstNode | null, filename: string): void {
+function checkSpelling(name: string, value: JSXAttribute['value'], filename: string): void {
   const kebab = name.replace(CAMEL_HUMP, hump => `-${hump.toLowerCase()}`)
   if (kebab !== name && KEBAB_SVG_ATTRS.has(kebab))
     throw mistake(name, filename, `write ${kebab}={...}, SVG attributes are case-sensitive`)
@@ -141,33 +143,36 @@ function checkNamespacedAttribute(namespace: string, name: string, filename: str
 }
 
 // The source of `x` in React's `{{ __html: x }}`, or undefined when the attribute holds something else.
-function reactHtmlSource(value: AstNode | null, code: string): string | undefined {
+function reactHtmlSource(value: JSXAttribute['value'], code: string): string | undefined {
   if (value?.type !== 'JSXExpressionContainer')
     return undefined
-  const expr = unwrapParens(value.expression as AstNode)
+  const expr = unwrapParens(value.expression)
   if (expr.type !== 'ObjectExpression')
     return undefined
-  const html = (expr.properties as AstNode[]).find(p => p.type === 'Property' && (p.key?.name ?? p.key?.value) === '__html')
-  return html === undefined ? undefined : code.slice(html.value.start, html.value.end)
+  for (const p of expr.properties) {
+    if (p.type !== 'Property')
+      continue
+    const keyName = p.key.type === 'Identifier' ? p.key.name : p.key.type === 'Literal' ? String(p.key.value) : undefined
+    if (keyName === '__html')
+      return code.slice(p.value.start, p.value.end)
+  }
+  return undefined
 }
 
-function countChildren(element: AstNode): number {
-  return (element.children as AstNode[]).filter(child =>
-    child.type === 'JSXText' ? cleanJsxText(child.value as string) !== '' : !(child.type === 'JSXExpressionContainer' && child.expression.type === 'JSXEmptyExpression')).length
-}
-
-function checkInnerHtml(element: AstNode, tag: string, attr: AstNode, filename: string, code: string): void {
+function checkInnerHtml(element: JSXElement, tag: string, attr: JSXAttribute, filename: string, code: string): void {
   const html = reactHtmlSource(attr.value, code)
   if (html !== undefined)
     throw mistake('innerHTML={{ __html }}', filename, `write innerHTML={${html}}, kay takes the HTML string itself`)
   if (VOID_ELEMENTS.has(tag))
     throw mistake(`innerHTML on <${tag}>`, filename, 'a void element has no content, drop innerHTML')
-  if (countChildren(element) > 0)
+  if (filterMeaningfulChildren(element.children).length > 0)
     throw mistake('innerHTML with children', filename, 'keep one, the children or innerHTML')
 }
 
-function checkElementAttribute(attr: AstNode, isCustomElement: boolean, filename: string, code: string): void {
-  const name = attr.name.name as string
+function checkElementAttribute(attr: JSXAttribute, isCustomElement: boolean, filename: string, code: string): void {
+  if (attr.name.type !== 'JSXIdentifier')
+    return
+  const name = attr.name.name
   if (name === 'dangerouslySetInnerHTML')
     throw mistake(name, filename, `write innerHTML={${reactHtmlSource(attr.value, code) ?? '...'}}`)
   if (name === 'classList')
@@ -205,12 +210,19 @@ const FOCUS_EVENTS = new Map([['onFocus', 'onFocusIn'], ['onBlur', 'onFocusOut']
 // Input types whose change event waits for the field to lose focus.
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number'])
 
-function staticAttr(attributes: AstNode[], name: string): AstNode | undefined {
-  return attributes.find(a => a.type === 'JSXAttribute' && a.name?.name === name)
+function staticAttr(attributes: readonly JSXAttributeItem[], name: string): JSXAttribute | undefined {
+  for (const a of attributes) {
+    if (a.type === 'JSXAttribute' && a.name.type === 'JSXIdentifier' && a.name.name === name)
+      return a
+  }
+  return undefined
 }
 
-function checkFocusAndChange(tag: string, attributes: AstNode[], filename: string, warnings: string[]): void {
-  const canFocus = !UNFOCUSABLE_TAGS.has(tag) || attributes.some(a => a.type === 'JSXSpreadAttribute' || ['tabIndex', 'tabindex', 'contentEditable', 'contenteditable'].includes(a.name?.name as string))
+function checkFocusAndChange(tag: string, attributes: readonly JSXAttributeItem[], filename: string, warnings: string[]): void {
+  const canFocus = !UNFOCUSABLE_TAGS.has(tag) || attributes.some(a =>
+    a.type === 'JSXSpreadAttribute'
+    || (a.name.type === 'JSXIdentifier' && ['tabIndex', 'tabindex', 'contentEditable', 'contenteditable'].includes(a.name.name)),
+  )
   for (const [prop, bubbling] of FOCUS_EVENTS) {
     if (!canFocus && staticAttr(attributes, prop) !== undefined)
       throw mistake(`${prop} on <${tag}>`, filename, `focus does not bubble, write ${bubbling}={...}, or give the <${tag}> a tabIndex`)
@@ -218,23 +230,23 @@ function checkFocusAndChange(tag: string, attributes: AstNode[], filename: strin
   if (staticAttr(attributes, 'onChange') === undefined)
     return
   const type = staticAttr(attributes, 'type')?.value
-  const isTextField = tag === 'textarea' || (tag === 'input' && (type === undefined || (type?.type === 'Literal' && TEXT_INPUT_TYPES.has(type.value as string))))
+  const isTextField = tag === 'textarea' || (tag === 'input' && (type === undefined || (type?.type === 'Literal' && typeof type.value === 'string' && TEXT_INPUT_TYPES.has(type.value))))
   if (isTextField)
     warnings.push(`kay compiler: onChange on <${tag}> in ${filename} fires when the field loses focus, not per keystroke; write onInput={...} for every keystroke.`)
 }
 
 /** Throws when a JSX element would compile into something other than what its author meant, and adds to `warnings` what may be meant but usually is not. */
-export function checkMistakes(element: AstNode, filename: string, code: string, warnings: string[]): void {
+export function checkMistakes(element: JSXElement, filename: string, code: string, warnings: string[]): void {
   const tag = jsxTagName(element.openingElement.name)
   const isElement = tag !== '' && !isComponentTag(tag)
   const isCustomElement = tag.includes('-')
   if (tag === 'Suspense') {
-    const children = countChildren(element)
+    const children = filterMeaningfulChildren(element.children).length
     if (children > 1)
       throw mistake(`<Suspense> with ${children} children`, filename, 'give it one child, and one <Suspense> per async component')
   }
-  const attributes = element.openingElement.attributes as AstNode[]
-  if (isElement && attributes.some(a => a.name?.name === 'class') && attributes.some(a => a.name?.name === 'className'))
+  const attributes = element.openingElement.attributes
+  if (isElement && staticAttr(attributes, 'class') !== undefined && staticAttr(attributes, 'className') !== undefined)
     throw mistake('class and className', filename, 'keep one, they set the same attribute')
   if (isElement)
     checkFocusAndChange(tag, attributes, filename, warnings)
@@ -242,7 +254,7 @@ export function checkMistakes(element: AstNode, filename: string, code: string, 
     if (attr.type !== 'JSXAttribute')
       continue
     if (attr.name.type === 'JSXNamespacedName')
-      checkNamespacedAttribute(attr.name.namespace.name as string, attr.name.name.name as string, filename)
+      checkNamespacedAttribute(attr.name.namespace.name, attr.name.name.name, filename)
     else if (isElement && attr.name.name === 'innerHTML')
       checkInnerHtml(element, tag, attr, filename, code)
     else if (isElement)
@@ -250,31 +262,32 @@ export function checkMistakes(element: AstNode, filename: string, code: string, 
   }
 }
 
-function calleeName(callee: AstNode): string {
+function calleeName(callee: Node): string {
   if (callee.type === 'Identifier')
-    return callee.name as string
-  if (callee.type === 'MemberExpression' && callee.object?.type === 'Identifier')
-    return `${callee.object.name as string}.${callee.property?.name as string}`
+    return callee.name
+  if (callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier')
+    return `${callee.object.name}.${callee.property.name}`
   return ''
 }
 
 // Names bound once in the file to a signal() or computed() call; a name bound twice may be shadowed, so it is left out.
-function signalNames(program: AstNode, signalCallees: ReadonlySet<string>): Set<string> {
+function signalNames(program: Program, signalCallees: ReadonlySet<string>): Set<string> {
   const bindings = new Map<string, number>()
   const signals = new Set<string>()
-  const bind = (id: AstNode | null | undefined): void => {
+  const bind = (id: Node | null | undefined): void => {
     if (id?.type === 'Identifier')
-      bindings.set(id.name as string, (bindings.get(id.name as string) ?? 0) + 1)
+      bindings.set(id.name, (bindings.get(id.name) ?? 0) + 1)
   }
   walk(program, (node) => {
     if (node.type === 'VariableDeclarator') {
       bind(node.id)
-      if (node.id?.type === 'Identifier' && node.init?.type === 'CallExpression' && signalCallees.has(calleeName(node.init.callee as AstNode)))
-        signals.add(node.id.name as string)
+      if (node.id.type === 'Identifier' && node.init?.type === 'CallExpression' && signalCallees.has(calleeName(node.init.callee)))
+        signals.add(node.id.name)
     }
     else if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
-      bind(node.id)
-      for (const param of node.params as AstNode[])
+      if (node.type !== 'ArrowFunctionExpression')
+        bind(node.id)
+      for (const param of node.params)
         walk(param, (p) => { if (p.type === 'Identifier') bind(p) })
     }
   })
@@ -286,18 +299,18 @@ function signalNames(program: AstNode, signalCallees: ReadonlySet<string>): Set<
 }
 
 // The signal an expression reads without `.value` where JSX would print or test it.
-function bareSignal(expr: AstNode, signals: ReadonlySet<string>): string | undefined {
+function bareSignal(expr: Node, signals: ReadonlySet<string>): string | undefined {
   const node = unwrapParens(expr)
   if (node.type === 'Identifier')
-    return signals.has(node.name as string) ? node.name as string : undefined
+    return signals.has(node.name) ? node.name : undefined
   if (node.type === 'LogicalExpression' || node.type === 'BinaryExpression')
-    return bareSignal(node.left as AstNode, signals) ?? bareSignal(node.right as AstNode, signals)
+    return bareSignal(node.left, signals) ?? bareSignal(node.right, signals)
   if (node.type === 'ConditionalExpression')
-    return bareSignal(node.test as AstNode, signals)
+    return bareSignal(node.test, signals)
   if (node.type === 'UnaryExpression')
-    return bareSignal(node.argument as AstNode, signals)
+    return bareSignal(node.argument, signals)
   if (node.type === 'TemplateLiteral') {
-    for (const part of node.expressions as AstNode[]) {
+    for (const part of node.expressions) {
       const found = bareSignal(part, signals)
       if (found !== undefined)
         return found
@@ -307,13 +320,13 @@ function bareSignal(expr: AstNode, signals: ReadonlySet<string>): string | undef
 }
 
 /** Throws when JSX prints or tests a local signal or computed without `.value`, on an element's children or attributes. */
-export function checkBareSignals(program: AstNode, signalCallees: ReadonlySet<string>, filename: string): void {
+export function checkBareSignals(program: Program, signalCallees: ReadonlySet<string>, filename: string): void {
   if (signalCallees.size === 0)
     return
   const signals = signalNames(program, signalCallees)
   if (signals.size === 0)
     return
-  const refuse = (expr: AstNode): void => {
+  const refuse = (expr: Node): void => {
     const name = bareSignal(expr, signals)
     if (name !== undefined)
       throw mistake(`${name} without .value`, filename, `write ${name}.value`)
@@ -324,16 +337,18 @@ export function checkBareSignals(program: AstNode, signalCallees: ReadonlySet<st
     const tag = node.type === 'JSXElement' ? jsxTagName(node.openingElement.name) : ''
     if (isComponentTag(tag))
       return
-    for (const child of node.children as AstNode[]) {
+    for (const child of node.children) {
       if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression')
-        refuse(child.expression as AstNode)
+        refuse(child.expression)
     }
     if (node.type !== 'JSXElement')
       return
-    for (const attr of node.openingElement.attributes as AstNode[]) {
-      const name = attr.type === 'JSXAttribute' && attr.name.type === 'JSXIdentifier' ? attr.name.name as string : ''
-      if (name !== '' && name !== 'ref' && name !== 'key' && !EVENT_ATTR.test(name) && attr.value?.type === 'JSXExpressionContainer')
-        refuse(attr.value.expression as AstNode)
+    for (const attr of node.openingElement.attributes) {
+      if (attr.type !== 'JSXAttribute' || attr.name.type !== 'JSXIdentifier')
+        continue
+      const name = attr.name.name
+      if (name !== '' && name !== 'ref' && name !== 'key' && !EVENT_ATTR.test(name) && attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
+        refuse(attr.value.expression)
     }
   })
 }

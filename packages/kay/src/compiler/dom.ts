@@ -1,16 +1,56 @@
 // Kay v2 Client DOM compiler: compiles TSX to hoisted template() clones, child-path walks,
-// delegated events, compiler-safe destructured props, and fine-grained keyed .map() loops.
+// delegated events, compiler-safe destructured props, reactive spreads, and shared balanced hydration markers.
 
-import type { AstNode, ModuleAnalysis } from './analyze'
+import type {
+  ArrowFunctionExpression,
+  BlockStatement,
+  Function as OxcFunction,
+  JSXElement,
+  JSXFragment,
+  Node,
+  ObjectPattern,
+  ParamPattern,
+  Program,
+} from 'oxc-parser'
+import type { ModuleAnalysis } from './analyze'
 import { analyzeModule, loadDeclarations, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
-import { cleanJsxText, containsJsx, escapeStaticAttr, escapeStaticText, isComponentTag, isJsxNode, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
+import {
+  classifyJsxChild,
+  cleanJsxText,
+  collectPatternNames,
+  containsJsx,
+  DOM_PROPS,
+  escapeRawText,
+  escapeStaticAttr,
+  escapeStaticText,
+  EVENT_ATTR,
+  filterMeaningfulChildren,
+  isBlockedAttr,
+  isComponentTag,
+  isJsxNode,
+  isNodeCapableExpr,
+  isStringBoolAttr,
+  isUnsafeUrlAttr,
+  jsxTagName,
+  RAW_TEXT_ELEMENTS,
+  staticLiteral,
+  unwrapParens,
+  unwrapTsExpr,
+  VOID_ELEMENTS,
+} from './shared'
 
 const SVG_CHILD_TAGS = new Set([
   'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse',
-  'g', 'defs', 'use', 'text', 'tspan', 'clipPath', 'mask',
-  'linearGradient', 'radialGradient', 'stop', 'pattern', 'symbol',
-  'marker', 'filter', 'feGaussianBlur', 'foreignObject', 'animate',
+  'g', 'defs', 'use', 'text', 'tspan', 'textPath', 'clipPath', 'mask',
+  'linearGradient', 'radialGradient', 'stop', 'pattern', 'symbol', 'image',
+  'marker', 'filter', 'feBlend', 'feColorMatrix', 'feComponentTransfer',
+  'feComposite', 'feConvolveMatrix', 'feDiffuseLighting', 'feDisplacementMap',
+  'feDistantLight', 'feDropShadow', 'feFlood', 'feFuncA', 'feFuncB', 'feFuncG',
+  'feFuncR', 'feGaussianBlur', 'feImage', 'feMerge', 'feMergeNode',
+  'feMorphology', 'feOffset', 'fePointLight', 'feSpecularLighting',
+  'feSpotLight', 'feTile', 'feTurbulence', 'foreignObject', 'animate',
+  'animateMotion', 'animateTransform', 'set', 'mpath', 'desc', 'metadata', 'switch',
 ])
 
 const DELEGATED_EVENTS = new Set([
@@ -19,8 +59,6 @@ const DELEGATED_EVENTS = new Set([
   'pointerdown', 'pointerup', 'touchstart', 'touchend',
 ])
 
-const DOM_PROPS = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
-const EVENT_ATTR = /^on([A-Z]\w*)$/
 const HTML_ENTITIES: Record<string, string> = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: '\u00A0',
   ndash: '\u2013', mdash: '\u2014', lsquo: '\u2018', rsquo: '\u2019',
@@ -38,6 +76,10 @@ const HTML_ENTITIES: Record<string, string> = {
   ne: '\u2260', le: '\u2264', ge: '\u2265', approx: '\u2248', infin: '\u221E',
   larr: '\u2190', uarr: '\u2191', rarr: '\u2192', darr: '\u2193',
   harr: '\u2194', crarr: '\u21B5', check: '\u2713', cross: '\u2717',
+  eacute: '\u00E9', egrave: '\u00E8', ecirc: '\u00EA', agrave: '\u00E0',
+  acirc: '\u00E2', ccedil: '\u00E7', ocirc: '\u00F4', ugrave: '\u00F9',
+  ucirc: '\u00FB', iuml: '\u00EF', icirc: '\u00EE', oelig: '\u0153',
+  Eacute: '\u00C9', Egrave: '\u00C8', Agrave: '\u00C0', Ccedil: '\u00C7',
 }
 
 const ENTITY_RE = /&(?:#(\d+)|#x([0-9a-fA-F]+)|([A-Za-z][A-Za-z0-9]*));/g
@@ -60,53 +102,6 @@ function decodeHtmlEntities(str: string): string {
   })
 }
 
-const PRIMITIVE_GLOBALS = new Set([
-  'String', 'Number', 'Boolean', 'parseInt', 'parseFloat',
-  'encodeURI', 'encodeURIComponent', 'decodeURI', 'decodeURIComponent',
-])
-
-const PRIMITIVE_METHODS = new Set([
-  'toString', 'toFixed', 'toPrecision', 'toExponential', 'toLocaleString',
-  'toLocaleDateString', 'toLocaleTimeString', 'toISOString', 'toUpperCase',
-  'toLowerCase', 'toLocaleUpperCase', 'toLocaleLowerCase', 'trim', 'trimStart',
-  'trimEnd', 'join', 'padStart', 'padEnd', 'repeat', 'replace', 'replaceAll',
-  'substring', 'substr', 'charAt', 'charCodeAt', 'codePointAt', 'indexOf',
-  'lastIndexOf', 'includes', 'startsWith', 'endsWith', 'getTime', 'getFullYear',
-  'getMonth', 'getDate', 'getHours', 'getMinutes', 'getSeconds',
-])
-
-function isKnownPrimitiveCall(node: AstNode): boolean {
-  const callee = node.callee as AstNode | undefined
-  if (!callee)
-    return false
-  if (callee.type === 'Identifier' && PRIMITIVE_GLOBALS.has(callee.name as string))
-    return true
-  if (callee.type === 'MemberExpression' && !callee.computed && callee.property?.type === 'Identifier') {
-    const prop = callee.property.name as string
-    if (callee.object?.type === 'Identifier') {
-      const obj = callee.object.name as string
-      if (obj === 'Math' || (obj === 'JSON' && prop === 'stringify') || (obj === 'Date' && prop === 'now'))
-        return true
-    }
-    if (PRIMITIVE_METHODS.has(prop))
-      return true
-  }
-  return false
-}
-
-function mayReturnNode(node: AstNode): boolean {
-  const cur = unwrapParens(node)
-  if (cur.type === 'TSAsExpression' || cur.type === 'TSNonNullExpression' || cur.type === 'TSSatisfiesExpression' || cur.type === 'TSTypeAssertion')
-    return mayReturnNode(cur.expression as AstNode)
-  if (cur.type === 'CallExpression')
-    return !isKnownPrimitiveCall(cur)
-  if (cur.type === 'LogicalExpression')
-    return mayReturnNode(cur.left as AstNode) || mayReturnNode(cur.right as AstNode)
-  if (cur.type === 'ConditionalExpression')
-    return mayReturnNode(cur.consequent as AstNode) || mayReturnNode(cur.alternate as AstNode)
-  return false
-}
-
 export interface CompileDomOptions {
   analysis?: ModuleAnalysis | undefined
 }
@@ -116,35 +111,7 @@ export interface CompileDomResult {
   analysis: ModuleAnalysis
 }
 
-function collectPatternNames(pattern: AstNode, out: Set<string>): void {
-  if (!pattern)
-    return
-  if (pattern.type === 'Identifier') {
-    out.add(pattern.name as string)
-  }
-  else if (pattern.type === 'AssignmentPattern') {
-    collectPatternNames(pattern.left, out)
-  }
-  else if (pattern.type === 'RestElement') {
-    collectPatternNames(pattern.argument, out)
-  }
-  else if (pattern.type === 'ArrayPattern') {
-    for (const el of pattern.elements as (AstNode | null)[]) {
-      if (el !== null)
-        collectPatternNames(el, out)
-    }
-  }
-  else if (pattern.type === 'ObjectPattern') {
-    for (const prop of pattern.properties as AstNode[]) {
-      if (prop.type === 'RestElement')
-        collectPatternNames(prop.argument, out)
-      else
-        collectPatternNames(prop.value, out)
-    }
-  }
-}
-
-function withoutBindings(rewrites: ReadonlyMap<string, string>, patterns: AstNode[]): Map<string, string> {
+function withoutBindings(rewrites: ReadonlyMap<string, string>, patterns: readonly Node[]): Map<string, string> {
   const names = new Set<string>()
   for (const pattern of patterns)
     collectPatternNames(pattern, names)
@@ -154,32 +121,33 @@ function withoutBindings(rewrites: ReadonlyMap<string, string>, patterns: AstNod
   return kept
 }
 
-// Names whose every binding in the file is a `const` holding an array literal: only those can be looped once without tracking, since a store, an import or a reassigned binding may change.
-function literalArrayConsts(program: AstNode): Set<string> {
+// Names whose every binding in the file is a `const` holding an array literal: only those can be looped once without tracking.
+function literalArrayConsts(program: Program): Set<string> {
   const literal = new Set<string>()
   const other = new Set<string>()
-  const bindOther = (pattern: AstNode | null | undefined): void => {
-    if (pattern)
+  const bindOther = (pattern: Node | null | undefined): void => {
+    if (pattern !== null && pattern !== undefined)
       collectPatternNames(pattern, other)
   }
   walk(program, (node) => {
     if (node.type === 'VariableDeclaration') {
-      for (const decl of node.declarations as AstNode[]) {
-        let init = decl.init as AstNode | null
-        while (init && (init.type === 'TSAsExpression' || init.type === 'TSSatisfiesExpression' || init.type === 'ParenthesizedExpression'))
-          init = init.expression as AstNode
+      for (const decl of node.declarations) {
+        const init = decl.init !== null ? unwrapTsExpr(decl.init) : null
         if (node.kind === 'const' && decl.id.type === 'Identifier' && init?.type === 'ArrayExpression')
-          literal.add(decl.id.name as string)
+          literal.add(decl.id.name)
         else
           bindOther(decl.id)
       }
     }
-    else if (node.type === 'ImportSpecifier' || node.type === 'ImportDefaultSpecifier' || node.type === 'ImportNamespaceSpecifier' || node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') {
-      bindOther(node.type.startsWith('Import') ? node.local : node.id)
+    else if (node.type === 'ImportSpecifier' || node.type === 'ImportDefaultSpecifier' || node.type === 'ImportNamespaceSpecifier') {
+      bindOther(node.local)
+    }
+    else if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') {
+      bindOther(node.id)
     }
     if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
-      for (const param of node.params as AstNode[])
-        bindOther(param.type === 'TSParameterProperty' ? param.parameter : param)
+      for (const param of node.params)
+        bindOther(param)
     }
     else if (node.type === 'CatchClause') {
       bindOther(node.param)
@@ -190,32 +158,140 @@ function literalArrayConsts(program: AstNode): Set<string> {
   return literal
 }
 
-/** Rewrites free identifier reads inside an AST node while respecting shadowing and property keys; `onJsx` compiles each nested JSX root under the rewrites still unshadowed there. */
+/** Collects free identifier references inside a node (ignoring shadowed locals and property keys). */
+function referencesAny(rootNode: Node, names: ReadonlySet<string>): boolean {
+  if (names.size === 0)
+    return false
+  let found = false
+  function visit(node: Node | null | undefined, shadowed: Set<string>): void {
+    if (found || node === null || node === undefined)
+      return
+    switch (node.type) {
+      case 'Identifier':
+        if (!shadowed.has(node.name) && names.has(node.name))
+          found = true
+        return
+      case 'MemberExpression':
+        visit(node.object, shadowed)
+        if (node.computed)
+          visit(node.property, shadowed)
+        return
+      case 'Property':
+        if (node.computed)
+          visit(node.key, shadowed)
+        visit(node.value, shadowed)
+        return
+      case 'ArrowFunctionExpression':
+      case 'FunctionExpression':
+      case 'FunctionDeclaration': {
+        const next = new Set(shadowed)
+        if (node.type !== 'ArrowFunctionExpression' && node.id !== null)
+          next.add(node.id.name)
+        for (const p of node.params)
+          collectPatternNames(p, next)
+        visit(node.body, next)
+        return
+      }
+      case 'BlockStatement': {
+        const next = new Set(shadowed)
+        for (const stmt of node.body) {
+          if (stmt.type === 'VariableDeclaration') {
+            for (const d of stmt.declarations) {
+              visit(d.init, next)
+              collectPatternNames(d.id, next)
+            }
+          }
+          else {
+            visit(stmt, next)
+          }
+        }
+        return
+      }
+      default: {
+        if (node.type.startsWith('TS'))
+          return
+        for (const [k, v] of Object.entries(node)) {
+          if (k === 'start' || k === 'end' || k === 'type')
+            continue
+          if (Array.isArray(v)) {
+            for (const item of v) {
+              if (item !== null && typeof item === 'object' && 'type' in item)
+                visit(item as Node, shadowed)
+            }
+          }
+          else if (v !== null && typeof v === 'object' && 'type' in v) {
+            visit(v as Node, shadowed)
+          }
+        }
+      }
+    }
+  }
+  visit(rootNode, new Set())
+  return found
+}
+
+/** Rewrites free identifier reads inside an AST node while respecting lexical scopes, class/object keys, labels, and nested JSX/components. */
 function rewriteFreeIdentifiers(
   source: string,
-  rootNode: AstNode,
+  rootNode: Node,
   replacements: ReadonlyMap<string, string>,
-  onJsx?: (node: AstNode, rewrites: ReadonlyMap<string, string>) => string,
+  onJsx?: (node: JSXElement | JSXFragment, rewrites: ReadonlyMap<string, string>) => string,
+  onFunction?: (fn: ArrowFunctionExpression | OxcFunction, rewrites: ReadonlyMap<string, string>) => string | undefined,
 ): string {
   if (replacements.size === 0 && (onJsx === undefined || !containsJsx(rootNode)))
     return source.slice(rootNode.start, rootNode.end)
 
-  const offset = rootNode.start as number
+  const offset = rootNode.start
   const editor = new SourceEditor(source.slice(rootNode.start, rootNode.end))
 
-  function visit(node: AstNode | null | undefined, shadowed: Set<string>): void {
-    if (!node || typeof node !== 'object')
+  function visitPatternDefaults(pattern: Node | null | undefined, shadowed: Set<string>): void {
+    if (pattern === null || pattern === undefined)
+      return
+    switch (pattern.type) {
+      case 'AssignmentPattern':
+        visitPatternDefaults(pattern.left, shadowed)
+        visit(pattern.right, shadowed)
+        return
+      case 'RestElement':
+        visitPatternDefaults(pattern.argument, shadowed)
+        return
+      case 'TSParameterProperty':
+        visitPatternDefaults(pattern.parameter, shadowed)
+        return
+      case 'ArrayPattern':
+        for (const el of pattern.elements)
+          visitPatternDefaults(el, shadowed)
+        return
+      case 'ObjectPattern':
+        for (const prop of pattern.properties) {
+          if (prop.type === 'RestElement') {
+            visitPatternDefaults(prop.argument, shadowed)
+          }
+          else {
+            if (prop.computed)
+              visit(prop.key, shadowed)
+            visitPatternDefaults(prop.value, shadowed)
+          }
+        }
+    }
+  }
+
+  function activeMap(shadowed: Set<string>): ReadonlyMap<string, string> {
+    return shadowed.size === 0 ? replacements : new Map([...replacements].filter(([k]) => !shadowed.has(k)))
+  }
+
+  function visit(node: Node | null | undefined, shadowed: Set<string>): void {
+    if (node === null || node === undefined)
       return
 
     if (onJsx !== undefined && isJsxNode(node)) {
-      const active = shadowed.size === 0 ? replacements : new Map([...replacements].filter(([k]) => !shadowed.has(k)))
-      editor.replace(node.start - offset, node.end - offset, onJsx(node, active))
+      editor.replace(node.start - offset, node.end - offset, onJsx(node, activeMap(shadowed)))
       return
     }
 
     switch (node.type) {
       case 'Identifier': {
-        const name = node.name as string
+        const name = node.name
         if (!shadowed.has(name)) {
           const rep = replacements.get(name)
           if (rep !== undefined)
@@ -229,11 +305,19 @@ function rewriteFreeIdentifiers(
           visit(node.property, shadowed)
         return
       }
+      case 'MetaProperty':
+      case 'BreakStatement':
+      case 'ContinueStatement':
+        return
+      case 'LabeledStatement': {
+        visit(node.body, shadowed)
+        return
+      }
       case 'Property': {
         if (node.computed)
           visit(node.key, shadowed)
-        if (node.shorthand && node.value?.type === 'Identifier') {
-          const name = node.value.name as string
+        if (node.shorthand && node.value.type === 'Identifier') {
+          const name = node.value.name
           if (!shadowed.has(name) && replacements.has(name)) {
             editor.replace(node.start - offset, node.end - offset, `${name}: ${replacements.get(name)}`)
             return
@@ -242,30 +326,99 @@ function rewriteFreeIdentifiers(
         visit(node.value, shadowed)
         return
       }
+      case 'MethodDefinition':
+      case 'PropertyDefinition': {
+        if (node.computed)
+          visit(node.key, shadowed)
+        visit(node.value, shadowed)
+        return
+      }
+      case 'ClassDeclaration':
+      case 'ClassExpression': {
+        const next = new Set(shadowed)
+        if (node.id !== null)
+          next.add(node.id.name)
+        visit(node.superClass, shadowed)
+        visit(node.body, next)
+        return
+      }
+      case 'CatchClause': {
+        const next = new Set(shadowed)
+        visitPatternDefaults(node.param, next)
+        collectPatternNames(node.param, next)
+        visit(node.body, next)
+        return
+      }
+      case 'ForStatement': {
+        const next = new Set(shadowed)
+        if (node.init !== null) {
+          if (node.init.type === 'VariableDeclaration') {
+            for (const d of node.init.declarations) {
+              visit(d.init, next)
+              visitPatternDefaults(d.id, next)
+              collectPatternNames(d.id, next)
+            }
+          }
+          else {
+            visit(node.init, next)
+          }
+        }
+        visit(node.test, next)
+        visit(node.update, next)
+        visit(node.body, next)
+        return
+      }
+      case 'ForInStatement':
+      case 'ForOfStatement': {
+        visit(node.right, shadowed)
+        const next = new Set(shadowed)
+        if (node.left.type === 'VariableDeclaration') {
+          for (const d of node.left.declarations) {
+            visitPatternDefaults(d.id, next)
+            collectPatternNames(d.id, next)
+          }
+        }
+        else {
+          visit(node.left, next)
+        }
+        visit(node.body, next)
+        return
+      }
       case 'ArrowFunctionExpression':
       case 'FunctionExpression':
       case 'FunctionDeclaration': {
+        if (node !== rootNode && onFunction !== undefined) {
+          const compiled = onFunction(node, activeMap(shadowed))
+          if (compiled !== undefined) {
+            editor.replace(node.start - offset, node.end - offset, compiled)
+            return
+          }
+        }
         const nextShadow = new Set(shadowed)
-        if (node.id?.name)
-          nextShadow.add(node.id.name as string)
-        for (const p of node.params as AstNode[])
+        if (node.type !== 'ArrowFunctionExpression' && node.id !== null)
+          nextShadow.add(node.id.name)
+        for (const p of node.params) {
+          visitPatternDefaults(p, nextShadow)
           collectPatternNames(p, nextShadow)
+        }
         visit(node.body, nextShadow)
         return
       }
       case 'BlockStatement': {
         const nextShadow = new Set(shadowed)
-        for (const stmt of node.body as AstNode[]) {
+        for (const stmt of node.body) {
+          if (stmt.type === 'FunctionDeclaration' && stmt.id !== null)
+            nextShadow.add(stmt.id.name)
+          else if (stmt.type === 'ClassDeclaration' && stmt.id !== null)
+            nextShadow.add(stmt.id.name)
+        }
+        for (const stmt of node.body) {
           if (stmt.type === 'VariableDeclaration') {
-            for (const d of stmt.declarations as AstNode[]) {
+            for (const d of stmt.declarations) {
               visit(d.init, nextShadow)
+              visitPatternDefaults(d.id, nextShadow)
               collectPatternNames(d.id, nextShadow)
             }
-          }
-          else if (stmt.type === 'FunctionDeclaration') {
-            if (stmt.id?.name)
-              nextShadow.add(stmt.id.name as string)
-            visit(stmt, nextShadow)
           }
           else {
             visit(stmt, nextShadow)
@@ -275,6 +428,7 @@ function rewriteFreeIdentifiers(
       }
       case 'VariableDeclarator': {
         visit(node.init, shadowed)
+        visitPatternDefaults(node.id, shadowed)
         return
       }
       case 'TSAsExpression':
@@ -286,19 +440,20 @@ function rewriteFreeIdentifiers(
         return
       }
       default: {
-        // Skip pure TypeScript type annotation nodes
-        if (typeof node.type === 'string' && node.type.startsWith('TS'))
+        if (node.type.startsWith('TS'))
           return
-        for (const key of Object.keys(node)) {
+        for (const [key, val] of Object.entries(node)) {
           if (key === 'start' || key === 'end' || key === 'type')
             continue
-          const val = node[key]
           if (Array.isArray(val)) {
-            for (let i = 0; i < val.length; i++)
-              visit(val[i] as AstNode, shadowed)
+            for (let i = 0; i < val.length; i++) {
+              const item = val[i]
+              if (item !== null && typeof item === 'object' && 'type' in item)
+                visit(item as Node, shadowed)
+            }
           }
-          else if (val !== null && typeof val === 'object') {
-            visit(val as AstNode, shadowed)
+          else if (val !== null && typeof val === 'object' && 'type' in val) {
+            visit(val as Node, shadowed)
           }
         }
       }
@@ -317,6 +472,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     return { code, analysis }
 
   const staticArrays = literalArrayConsts(program)
+  const loadNodes = new Set<Node>(loadDeclarations(program))
 
   const editor = new SourceEditor(code)
   const used = new Set<string>()
@@ -330,18 +486,26 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   }
   const freshVar = (prefix = '_e'): string => `${prefix}${varCounter++}`
 
-  // How each name a destructuring pattern binds is read from `source` on every access, so reads stay reactive. Plain `{ a }` and `{ a = d }` keys read the property; any other shape re-runs the pattern: `(({ a: { b } }) => b)(source)`.
-  function patternReads(pattern: AstNode, source: string): Map<string, string> {
+  // How each name a destructuring pattern binds is read from `source` on every access, so reads stay reactive.
+  function patternReads(pattern: Node, source: string, outerRewrites: ReadonlyMap<string, string>): Map<string, string> {
     const reads = new Map<string, string>()
+    const running = new Map(outerRewrites)
     if (pattern.type === 'ObjectPattern') {
-      for (const prop of pattern.properties as AstNode[]) {
-        if (prop.type !== 'Property' || prop.computed || prop.key?.type !== 'Identifier')
+      for (const prop of pattern.properties) {
+        if (prop.type !== 'Property' || prop.computed || prop.key.type !== 'Identifier')
           continue
-        const read = `${source}.${prop.key.name as string}`
-        if (prop.value.type === 'Identifier')
-          reads.set(prop.value.name as string, read)
-        else if (prop.value.type === 'AssignmentPattern' && prop.value.left?.type === 'Identifier')
-          reads.set(prop.value.left.name as string, `(${read} === undefined ? ${code.slice(prop.value.right.start, prop.value.right.end)} : ${read})`)
+        const read = `${source}.${prop.key.name}`
+        if (prop.value.type === 'Identifier') {
+          reads.set(prop.value.name, read)
+          running.set(prop.value.name, read)
+        }
+        else if (prop.value.type === 'AssignmentPattern' && prop.value.left.type === 'Identifier') {
+          const defExpr = compileExpression(prop.value.right, running)
+          const simpleDef = prop.value.right.type === 'Literal' || prop.value.right.type === 'Identifier'
+          const expr = `(${read} === undefined ? ${simpleDef ? defExpr : `(${defExpr})`} : ${read})`
+          reads.set(prop.value.left.name, expr)
+          running.set(prop.value.left.name, expr)
+        }
       }
     }
     const names = new Set<string>()
@@ -355,20 +519,49 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   }
 
   // Client builds keep the `load` binding, so every export form stays valid, and drop its server-only code.
-  for (const node of loadDeclarations(program))
-    editor.replace(node.start, node.end, node.type === 'FunctionDeclaration' ? `const ${node.id.name as string} = undefined` : 'undefined')
+  for (const node of loadNodes) {
+    if (node.type === 'FunctionDeclaration' && node.id !== null)
+      editor.replace(node.start, node.end, `const ${node.id.name} = undefined`)
+    else
+      editor.replace(node.start, node.end, 'undefined')
+  }
 
-  function extractBlockKeyExpr(block: AstNode): AstNode | undefined {
-    let found: AstNode | undefined
+  function extractKeyExpr(jsxEl: Node): Node | undefined {
+    if (jsxEl.type !== 'JSXElement')
+      return undefined
+    for (const attr of jsxEl.openingElement.attributes) {
+      if (attr.type === 'JSXAttribute' && attr.name.type === 'JSXIdentifier' && attr.name.name === 'key') {
+        if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
+          return attr.value.expression
+        if (attr.value?.type === 'Literal')
+          return attr.value
+      }
+    }
+    return undefined
+  }
+
+  function extractBlockKeyExpr(block: BlockStatement): Node | undefined {
+    const blockLocals = new Set<string>()
+    for (const stmt of block.body) {
+      if (stmt.type === 'VariableDeclaration') {
+        for (const d of stmt.declarations)
+          collectPatternNames(d.id, blockLocals)
+      }
+      else if ((stmt.type === 'FunctionDeclaration' || stmt.type === 'ClassDeclaration') && stmt.id !== null) {
+        blockLocals.add(stmt.id.name)
+      }
+    }
+    let found: Node | undefined
     walk(block, (child) => {
       if (found !== undefined)
         return false
       if (child.type === 'ArrowFunctionExpression' || child.type === 'FunctionExpression' || child.type === 'FunctionDeclaration')
         return false
-      if (child.type === 'ReturnStatement' && child.argument) {
-        const arg = unwrapParens(child.argument as AstNode)
+      if (child.type === 'ReturnStatement' && child.argument !== null) {
+        const arg = unwrapParens(child.argument)
         const k = extractKeyExpr(arg)
-        if (k !== undefined) {
+        // Only hoist key expressions that don't depend on block-local variables.
+        if (k !== undefined && !referencesAny(k, blockLocals)) {
           found = k
           return false
         }
@@ -378,17 +571,38 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     return found
   }
 
-  function compileExpression(node: AstNode, scopeRewrites: ReadonlyMap<string, string>): string {
-    return rewriteFreeIdentifiers(code, node, scopeRewrites, compileRootJsx)
+  function compileNestedComponent(fn: ArrowFunctionExpression | OxcFunction, outerRewrites: ReadonlyMap<string, string>): string | undefined {
+    if (!containsJsx(fn.body))
+      return undefined
+    const firstParam = fn.params[0]
+    const destructured = extractDestructuredParam(firstParam)
+    if (destructured === undefined)
+      return undefined
+    return buildCompiledFunction(fn, outerRewrites)
   }
 
-  function compileComponentCall(node: AstNode, scopeRewrites: ReadonlyMap<string, string>): string {
-    const tag = jsxTagName(node.openingElement.name)
-    const propEntries: string[] = []
+  function compileExpression(node: Node, scopeRewrites: ReadonlyMap<string, string>): string {
+    return rewriteFreeIdentifiers(code, node, scopeRewrites, compileRootJsx, compileNestedComponent)
+  }
 
-    for (const attr of node.openingElement.attributes as AstNode[]) {
+  function compileComponentCall(node: JSXElement, scopeRewrites: ReadonlyMap<string, string>): string {
+    const tag = jsxTagName(node.openingElement.name)
+    const attrs = node.openingElement.attributes
+    const hasSpread = attrs.some(a => a.type === 'JSXSpreadAttribute')
+    const segments: string[] = []
+    let currentObj: string[] = []
+
+    const flushObj = () => {
+      if (currentObj.length > 0) {
+        segments.push(`{ ${currentObj.join(', ')} }`)
+        currentObj = []
+      }
+    }
+
+    for (const attr of attrs) {
       if (attr.type === 'JSXSpreadAttribute') {
-        propEntries.push(`...(${compileExpression(attr.argument, scopeRewrites)})`)
+        flushObj()
+        segments.push(`(${compileExpression(attr.argument, scopeRewrites)})`)
         continue
       }
       const name = jsxTagName(attr.name)
@@ -397,112 +611,103 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
       const propKey = /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name)
       if (attr.value === null) {
-        propEntries.push(`${propKey}: true`)
+        currentObj.push(`${propKey}: true`)
       }
       else if (attr.value.type === 'Literal') {
-        propEntries.push(`${propKey}: ${JSON.stringify(attr.value.value)}`)
+        currentObj.push(`${propKey}: ${JSON.stringify(attr.value.value)}`)
       }
-      else if (attr.value.type === 'JSXExpressionContainer') {
-        const expr = attr.value.expression as AstNode
+      else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+        const expr = attr.value.expression
         const exprCode = compileExpression(expr, scopeRewrites)
-        // Reactive getter for dynamic expressions; plain property for literals, functions, and bare identifiers (signals)
+        // Reactive getter for dynamic expressions; plain property for literals and inline functions.
         const isStatic = expr.type === 'Literal'
           || expr.type === 'ArrowFunctionExpression'
           || expr.type === 'FunctionExpression'
         if (isStatic)
-          propEntries.push(`${propKey}: ${exprCode}`)
+          currentObj.push(`${propKey}: ${exprCode}`)
         else
-          propEntries.push(`get ${propKey}() { return ${exprCode} }`)
+          currentObj.push(`get ${propKey}() { return ${exprCode} }`)
       }
     }
 
-    const meaningful = filterChildren(node.children as AstNode[])
+    const meaningful = filterMeaningfulChildren(node.children)
     if (meaningful.length === 1) {
       const child = meaningful[0]!
       if (child.type === 'JSXText')
-        propEntries.push(`children: ${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value as string)))}`)
+        currentObj.push(`children: ${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value)))}`)
       else if (isJsxNode(child))
-        propEntries.push(`get children() { return ${compileRootJsx(child, scopeRewrites)} }`)
-      else if (child.type === 'JSXExpressionContainer')
-        propEntries.push(`get children() { return ${compileExpression(child.expression, scopeRewrites)} }`)
+        currentObj.push(`get children() { return ${compileRootJsx(child, scopeRewrites)} }`)
+      else if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression')
+        currentObj.push(`get children() { return ${compileExpression(child.expression, scopeRewrites)} }`)
     }
     else if (meaningful.length > 1) {
       const items = meaningful.map((c) => {
         if (c.type === 'JSXText')
-          return JSON.stringify(decodeHtmlEntities(cleanJsxText(c.value as string)))
+          return JSON.stringify(decodeHtmlEntities(cleanJsxText(c.value)))
         if (isJsxNode(c))
           return compileRootJsx(c, scopeRewrites)
-        return compileExpression(c.expression, scopeRewrites)
+        if (c.type === 'JSXExpressionContainer' && c.expression.type !== 'JSXEmptyExpression')
+          return compileExpression(c.expression, scopeRewrites)
+        return 'null'
       })
-      propEntries.push(`get children() { return [${items.join(', ')}] }`)
+      currentObj.push(`get children() { return [${items.join(', ')}] }`)
     }
 
-    const propsObj = propEntries.length > 0 ? `{ ${propEntries.join(', ')} }` : '{}'
-    return `${tag}(${propsObj})`
-  }
+    flushObj()
 
-  function filterChildren(children: AstNode[]): AstNode[] {
-    return children.filter((c) => {
-      if (c.type === 'JSXText')
-        return cleanJsxText(c.value as string) !== ''
-      if (c.type === 'JSXExpressionContainer' && c.expression.type === 'JSXEmptyExpression')
-        return false
-      return true
-    })
-  }
-
-  function extractKeyExpr(jsxEl: AstNode): AstNode | undefined {
-    if (jsxEl.type !== 'JSXElement')
-      return undefined
-    for (const attr of jsxEl.openingElement.attributes as AstNode[]) {
-      if (attr.type === 'JSXAttribute' && attr.name?.name === 'key') {
-        if (attr.value?.type === 'JSXExpressionContainer')
-          return attr.value.expression as AstNode
-        if (attr.value?.type === 'Literal')
-          return attr.value as AstNode
-      }
+    if (!hasSpread) {
+      const propsObj = segments[0] ?? '{}'
+      return `${tag}(${propsObj})`
     }
-    return undefined
+    if (segments.length === 1)
+      return `${tag}(${segments[0]!})`
+    return `${tag}(${use('mergeProps')}(${segments.join(', ')}))`
   }
 
-  function compileElementTree(rootEl: AstNode, scopeRewrites: ReadonlyMap<string, string>): string {
+  function compileElementTree(rootEl: JSXElement, scopeRewrites: ReadonlyMap<string, string>): string {
     const ops: string[] = []
     const rootVar = freshVar('_e')
     const childRefs = new Map<string, string>() // "parentVar:index" -> varName
-    const childMaxIdx = new Map<string, number>()
-
-    function ensureNode(parentVar: string, index: number): string {
-      const key = `${parentVar}:${index}`
-      const existing = childRefs.get(key)
-      if (existing !== undefined)
-        return existing
-      const v = freshVar('_e')
-      childRefs.set(key, v)
-      const prevMax = childMaxIdx.get(parentVar) ?? -1
-      if (index > prevMax)
-        childMaxIdx.set(parentVar, index)
-      return v
-    }
 
     const walkPlan: { parentVar: string, index: number, varName: string }[] = []
-    const dynamicTextSlots = new Set<string>() // "parentVar:textIndex" for optional SSR text between <!---->...<!---->
-    const dynamicRangeSlots = new Set<string>() // "parentVar:closeIndex" for SSR range between <!---->...<!---->
+    const textSlotsByParent = new Map<string, Set<number>>()
+    const rangeSlotsByParent = new Map<string, Set<number>>()
+
+    const addTextSlot = (parentVar: string, idx: number) => {
+      let s = textSlotsByParent.get(parentVar)
+      if (s === undefined) {
+        s = new Set()
+        textSlotsByParent.set(parentVar, s)
+      }
+      s.add(idx)
+    }
+
+    const addRangeSlot = (parentVar: string, idx: number) => {
+      let s = rangeSlotsByParent.get(parentVar)
+      if (s === undefined) {
+        s = new Set()
+        rangeSlotsByParent.set(parentVar, s)
+      }
+      s.add(idx)
+    }
 
     function requestChild(parentVar: string, index: number): string {
       const key = `${parentVar}:${index}`
       const existing = childRefs.get(key)
       if (existing !== undefined)
         return existing
-      const v = ensureNode(parentVar, index)
+      const v = freshVar('_e')
+      childRefs.set(key, v)
       walkPlan.push({ parentVar, index, varName: v })
       return v
     }
 
-    function buildHtml(el: AstNode, elVar: string): string {
+    function buildHtml(el: JSXElement, elVar: string): string {
       const tag = jsxTagName(el.openingElement.name)
+      const rawTextTag = RAW_TEXT_ELEMENTS.has(tag) ? tag as 'style' | 'script' : undefined
       let html = `<${tag}`
 
-      for (const attr of el.openingElement.attributes as AstNode[]) {
+      for (const attr of el.openingElement.attributes) {
         if (attr.type === 'JSXSpreadAttribute') {
           ops.push(`${use('spread')}(${elVar}, () => (${compileExpression(attr.argument, scopeRewrites)}));`)
           continue
@@ -511,35 +716,42 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         if (rawName === 'key' || rawName === '$hydrate')
           continue
 
-        if (rawName === 'ref' && attr.value?.type === 'JSXExpressionContainer') {
-          const refCode = compileExpression(attr.value.expression, scopeRewrites)
-          ops.push(`(${refCode})(${elVar});`)
+        if (rawName === 'ref') {
+          if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+            const refCode = compileExpression(attr.value.expression, scopeRewrites)
+            ops.push(`(${refCode})(${elVar});`)
+          }
           continue
         }
 
         if (rawName === 'innerHTML') {
           if (attr.value?.type === 'Literal')
             ops.push(`${use('setInnerHtml')}(${elVar}, ${JSON.stringify(String(attr.value.value))});`)
-          else if (attr.value?.type === 'JSXExpressionContainer')
+          else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
             ops.push(`${use('effect')}(() => ${use('setInnerHtml')}(${elVar}, ${compileExpression(attr.value.expression, scopeRewrites)}));`)
           continue
         }
 
         const eventMatch = EVENT_ATTR.exec(rawName)
-        if (eventMatch !== null && attr.value?.type === 'JSXExpressionContainer') {
-          const eventName = eventMatch[1]!.toLowerCase()
-          const handlerCode = compileExpression(attr.value.expression, scopeRewrites)
-          if (DELEGATED_EVENTS.has(eventName)) {
-            delegatedEvents.add(eventName)
-            ops.push(`${elVar}.$$${eventName} = ${handlerCode};`)
-          }
-          else {
-            ops.push(`${use('on')}(${elVar}, ${JSON.stringify(eventName)}, ${handlerCode});`)
+        if (eventMatch !== null) {
+          if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+            const eventName = eventMatch[1]!.toLowerCase()
+            const handlerCode = compileExpression(attr.value.expression, scopeRewrites)
+            if (DELEGATED_EVENTS.has(eventName)) {
+              delegatedEvents.add(eventName)
+              ops.push(`${elVar}.$$${eventName} = ${handlerCode};`)
+            }
+            else {
+              ops.push(`${use('on')}(${elVar}, ${JSON.stringify(eventName)}, ${handlerCode});`)
+            }
           }
           continue
         }
 
         const name = rawName === 'className' ? 'class' : rawName === 'htmlFor' ? 'for' : rawName
+        if (isBlockedAttr(name))
+          continue
+
         if (attr.value === null) {
           html += isStringBoolAttr(name) ? ` ${name}="true"` : ` ${name}`
         }
@@ -547,9 +759,9 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           if (!isUnsafeUrlAttr(name, attr.value.value))
             html += ` ${name}="${escapeStaticAttr(String(attr.value.value))}"`
         }
-        else if (attr.value.type === 'JSXExpressionContainer') {
-          const expr = attr.value.expression as AstNode
-          const lit = !DOM_PROPS.has(name) && name !== 'style' ? staticLiteral(expr) : { ok: false as const }
+        else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+          const expr = attr.value.expression
+          const lit = !DOM_PROPS.has(name) ? staticLiteral(expr) : { ok: false as const }
           if (lit.ok) {
             if (typeof lit.value === 'boolean') {
               if (isStringBoolAttr(name))
@@ -578,25 +790,22 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       if (VOID_ELEMENTS.has(tag))
         return html
 
-      const meaningful = filterChildren(el.children as AstNode[])
+      const meaningful = filterMeaningfulChildren(el.children)
+      const slots = meaningful.map(c => classifyJsxChild(c)).filter(s => s !== undefined)
+      const hasSiblings = slots.length > 1
       let domIndex = 0
       let prevWasStaticText = false
+      let hadVariableRange = false
 
-      for (let i = 0; i < meaningful.length; i++) {
-        const child = meaningful[i]!
-        const isLast = i === meaningful.length - 1
+      for (let i = 0; i < slots.length; i++) {
+        const slot = slots[i]!
+        const isLast = i === slots.length - 1
 
-        if (child.type === 'JSXText') {
-          html += cleanJsxText(child.value as string)
-          if (!prevWasStaticText) {
-            domIndex++
-            prevWasStaticText = true
-          }
-          continue
-        }
-
-        if (child.type === 'JSXExpressionContainer' && child.expression?.type === 'Literal' && typeof child.expression.value === 'string') {
-          html += escapeStaticText(child.expression.value)
+        if (slot.kind === 'static-text') {
+          if (rawTextTag !== undefined)
+            html += escapeRawText(slot.text, rawTextTag)
+          else
+            html += slot.fromLiteral ? escapeStaticText(slot.text) : slot.text
           if (!prevWasStaticText) {
             domIndex++
             prevWasStaticText = true
@@ -606,227 +815,211 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
         prevWasStaticText = false
 
-        if (child.type === 'JSXElement') {
-          const childTag = jsxTagName(child.openingElement.name)
-          if (isComponentTag(childTag)) {
-            const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
-            if (!isLast) {
-              html += '<!---->'
-              domIndex++
+        if (slot.kind === 'element') {
+          const subOpsBefore = ops.length
+          const subWalkBefore = walkPlan.length
+          const placeholderVar = `__SUB_${varCounter++}`
+          const subHtml = buildHtml(slot.node, placeholderVar)
+          const needed = ops.length > subOpsBefore || walkPlan.length > subWalkBefore
+          if (needed) {
+            const realVar = requestChild(elVar, domIndex)
+            for (let k = subOpsBefore; k < ops.length; k++)
+              ops[k] = ops[k]!.replaceAll(placeholderVar, realVar)
+            for (let k = subWalkBefore; k < walkPlan.length; k++) {
+              if (walkPlan[k]!.parentVar === placeholderVar)
+                walkPlan[k]!.parentVar = realVar
             }
-            const callCode = compileComponentCall(child, scopeRewrites)
-            ops.push(`${use('insert')}(${elVar}, () => ${callCode}, ${anchorVar});`)
+            const tSlots = textSlotsByParent.get(placeholderVar)
+            if (tSlots !== undefined) {
+              textSlotsByParent.delete(placeholderVar)
+              textSlotsByParent.set(realVar, tSlots)
+            }
+            const rSlots = rangeSlotsByParent.get(placeholderVar)
+            if (rSlots !== undefined) {
+              rangeSlotsByParent.delete(placeholderVar)
+              rangeSlotsByParent.set(realVar, rSlots)
+            }
+          }
+          html += subHtml
+          domIndex++
+          continue
+        }
+
+        if (slot.kind === 'component' || slot.kind === 'fragment') {
+          const renderedCode = slot.kind === 'component'
+            ? compileComponentCall(slot.node, scopeRewrites)
+            : compileRootJsx(slot.node, scopeRewrites)
+          if (!hasSiblings) {
+            ops.push(`${use('insert')}(${elVar}, () => ${renderedCode}, null, null);`)
+          }
+          else if (isLast) {
+            const startVar = requestChild(elVar, domIndex)
+            html += '<!--k[-->'
+            domIndex++
+            ops.push(`${use('insert')}(${elVar}, () => ${renderedCode}, null, ${startVar});`)
           }
           else {
-            // Check if child element (or any descendant) needs bindings before allocating a var
-            const subOpsBefore = ops.length
-            const subWalkBefore = walkPlan.length
-            const placeholderVar = `__SUB_${varCounter++}`
-            const subHtml = buildHtml(child, placeholderVar)
-            const needed = ops.length > subOpsBefore || walkPlan.length > subWalkBefore
-            if (needed) {
-              const realVar = requestChild(elVar, domIndex)
-              for (let k = subOpsBefore; k < ops.length; k++)
-                ops[k] = ops[k]!.replaceAll(placeholderVar, realVar)
-              for (let k = subWalkBefore; k < walkPlan.length; k++) {
-                if (walkPlan[k]!.parentVar === placeholderVar)
-                  walkPlan[k]!.parentVar = realVar
-              }
-              const prefix = `${placeholderVar}:`
-              for (const slot of [...dynamicTextSlots]) {
-                if (slot.startsWith(prefix)) {
-                  dynamicTextSlots.delete(slot)
-                  dynamicTextSlots.add(`${realVar}:${slot.slice(prefix.length)}`)
-                }
-              }
-              for (const slot of [...dynamicRangeSlots]) {
-                if (slot.startsWith(prefix)) {
-                  dynamicRangeSlots.delete(slot)
-                  dynamicRangeSlots.add(`${realVar}:${slot.slice(prefix.length)}`)
-                }
-              }
-            }
-            html += subHtml
-            domIndex++
+            const startVar = requestChild(elVar, domIndex)
+            const endVar = requestChild(elVar, domIndex + 1)
+            html += '<!--k[--><!--k]-->'
+            addRangeSlot(elVar, domIndex + 1)
+            domIndex += 2
+            ops.push(`${use('insert')}(${elVar}, () => ${renderedCode}, ${endVar}, ${startVar});`)
           }
+          hadVariableRange = true
           continue
         }
 
-        if (child.type === 'JSXFragment') {
-          const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
-          if (!isLast) {
-            html += '<!---->'
-            domIndex++
+        if (slot.kind === 'loop') {
+          const { match } = slot
+          const needsBracket = !isLast || hadVariableRange
+          let anchorVar: string
+          let skipArg = ''
+          if (needsBracket) {
+            anchorVar = requestChild(elVar, domIndex)
+            html += '<!--k[--><!--k]-->'
+            addRangeSlot(elVar, domIndex + 1)
+            domIndex += 2
           }
-          const fragCode = compileRootJsx(child, scopeRewrites)
-          ops.push(`${use('insert')}(${elVar}, () => ${fragCode}, ${anchorVar});`)
-          continue
-        }
-
-        if (child.type === 'JSXExpressionContainer') {
-          const expr = child.expression as AstNode
-
-          // Case 1: Keyed `.map((item, idx?) => <jsx> | { ... return <jsx> })` → `__loop(...)`
-          if (
-            expr.type === 'CallExpression'
-            && expr.callee?.type === 'MemberExpression'
-            && !expr.callee.computed
-            && expr.callee.property?.name === 'map'
-            && expr.arguments?.length === 1
-          ) {
-            const cb = expr.arguments[0] as AstNode
-            const cbBody = cb.body?.type === 'ParenthesizedExpression' ? cb.body.expression : cb.body
-            const isJsxBody = isJsxNode(cbBody)
-            const isBlockJsxBody = cbBody?.type === 'BlockStatement' && containsJsx(cbBody)
-            if (
-              (cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression')
-              && (isJsxBody || isBlockJsxBody)
-            ) {
-              const loopSkip = domIndex
-              const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
-              if (!isLast) {
-                html += '<!---->'
-                domIndex++
-              }
-
-              const eachCode = compileExpression(expr.callee.object, scopeRewrites)
-              const params = cb.params as AstNode[]
-              const firstParam = params[0]
-              const idxParam = params[1]?.type === 'Identifier' ? params[1].name as string : undefined
-              const skipArg = loopSkip > 0 ? `, ${loopSkip}` : ''
-
-              // Fast path: a const array literal (e.g. `NAV.map(...)`) renders once through `eachStatic`, without the keyed reconciler.
-              const isStaticArr = expr.callee.object.type === 'Identifier' && staticArrays.has(expr.callee.object.name as string) && !scopeRewrites.has(expr.callee.object.name as string)
-              if (isStaticArr) {
-                const rawParams = params.map(p => code.slice(p.start, p.end)).join(', ')
-                const shadowed = withoutBindings(scopeRewrites, params)
-                const rowBody = isJsxBody ? compileRootJsx(cbBody, shadowed) : compileExpression(cbBody, shadowed)
-                ops.push(`${use('eachStatic')}(${elVar}, ${anchorVar}, ${eachCode}, (${rawParams}) => ${rowBody}${skipArg});`)
-                continue
-              }
-
-              const keyAst = isJsxBody ? extractKeyExpr(cbBody) : extractBlockKeyExpr(cbBody)
-
-              const rowSig = freshVar('_r')
-              const idxSig = idxParam !== undefined ? freshVar('_i') : undefined
-              const rowRewrites = new Map(scopeRewrites)
-              let keyFn: string
-
-              const keyRewrites = withoutBindings(scopeRewrites, params)
-
-              if (firstParam !== undefined && firstParam.type !== 'Identifier') {
-                const patCode = code.slice(firstParam.start, firstParam.end)
-                keyFn = keyAst !== undefined
-                  ? `(${patCode}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
-                  : `(_item) => _item`
-                for (const [name, read] of patternReads(firstParam, `${rowSig}.value`))
-                  rowRewrites.set(name, read)
-              }
-              else {
-                const itemParam = firstParam?.type === 'Identifier' ? firstParam.name as string : '_item'
-                keyFn = keyAst !== undefined
-                  ? `(${itemParam}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
-                  : `(${itemParam}) => ${itemParam}`
-                rowRewrites.set(itemParam, `${rowSig}.value`)
-              }
-              if (idxParam !== undefined && idxSig !== undefined)
-                rowRewrites.set(idxParam, `${idxSig}.value`)
-
-              const rowBody = isJsxBody ? compileRootJsx(cbBody, rowRewrites) : compileExpression(cbBody, rowRewrites)
-              const rowParams = idxSig !== undefined ? `${rowSig}, ${idxSig}` : rowSig
-              ops.push(`${use('loop')}(${elVar}, ${anchorVar}, () => ${eachCode}, ${keyFn}, (${rowParams}) => ${rowBody}${skipArg});`)
-              continue
-            }
+          else {
+            anchorVar = 'null'
+            if (domIndex > 0)
+              skipArg = `, ${domIndex}`
           }
 
-          // Case 2: `cond && <jsx>` → `__show(...)`
-          if (expr.type === 'LogicalExpression' && expr.operator === '&&') {
-            const right = unwrapParens(expr.right)
-            if (isJsxNode(right)) {
-              const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
-              if (!isLast) {
-                html += '<!---->'
-                domIndex++
-              }
-              const whenCode = compileExpression(expr.left, scopeRewrites)
-              const trueCode = compileRootJsx(right, scopeRewrites)
-              ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode});`)
-              continue
-            }
-          }
+          const eachCode = compileExpression(match.target, scopeRewrites)
+          const params = match.params
+          const firstParam = params[0]
+          const secondParam = params[1]
+          const idxParam = secondParam?.type === 'Identifier'
+            ? secondParam.name
+            : secondParam?.type === 'AssignmentPattern' && secondParam.left.type === 'Identifier'
+              ? secondParam.left.name
+              : undefined
 
-          // Case 3: `cond ? <a/> : <b/>` → `__show(...)`
-          if (expr.type === 'ConditionalExpression') {
-            const consNode = unwrapParens(expr.consequent)
-            const altNode = unwrapParens(expr.alternate)
-            if (isJsxNode(consNode) || isJsxNode(altNode)) {
-              const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
-              if (!isLast) {
-                html += '<!---->'
-                domIndex++
-              }
-              const whenCode = compileExpression(expr.test, scopeRewrites)
-              const trueCode = isJsxNode(consNode)
-                ? compileRootJsx(consNode, scopeRewrites)
-                : compileExpression(consNode, scopeRewrites)
-              const falseCode = isJsxNode(altNode)
-                ? compileRootJsx(altNode, scopeRewrites)
-                : compileExpression(altNode, scopeRewrites)
-              ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode}, () => ${falseCode});`)
-              continue
-            }
-          }
-
-          // Case 4: Dynamic children slot / Node insertion (`{children}`, `{props.children}`, JSX expressions, or call expressions)
-          const isChildrenExpr = (expr.type === 'Identifier' && expr.name === 'children')
-            || (expr.type === 'MemberExpression' && !expr.computed && expr.property?.name === 'children')
-          const exprCode = compileExpression(expr, scopeRewrites)
-          if (isChildrenExpr || containsJsx(expr) || mayReturnNode(expr)) {
-            if (meaningful.length === 1) {
-              ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, null);`)
-            }
-            else if (isLast) {
-              const startVar = requestChild(elVar, domIndex)
-              html += '<!---->'
-              domIndex++
-              ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, ${startVar});`)
-            }
-            else {
-              const startVar = requestChild(elVar, domIndex)
-              const endVar = requestChild(elVar, domIndex + 1)
-              html += '<!----><!---->'
-              dynamicRangeSlots.add(`${elVar}:${domIndex + 1}`)
-              domIndex += 2
-              ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, ${endVar}, ${startVar});`)
-            }
+          // Fast path: a const array literal (e.g. `NAV.map(...)`) renders once through `eachStatic`.
+          const isStaticArr = match.target.type === 'Identifier' && staticArrays.has(match.target.name) && !scopeRewrites.has(match.target.name)
+          if (isStaticArr) {
+            const rawParams = params.map(p => code.slice(p.start, p.end)).join(', ')
+            const shadowed = withoutBindings(scopeRewrites, params)
+            const rowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, shadowed) : compileExpression(match.body, shadowed)
+            ops.push(`${use('eachStatic')}(${elVar}, ${anchorVar}, ${eachCode}, (${rawParams}) => ${rowBody}${skipArg});`)
+            hadVariableRange = true
             continue
           }
 
-          // Case 5: Dynamic text / expression binding
-          if (meaningful.length === 1) {
-            // Sole dynamic child: 0 comment markers!
-            html += ' '
-            domIndex++
-            const txtVar = freshVar('_txt')
-            ops.push(`const ${txtVar} = ${use('firstText')}(${elVar});`)
-            ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
+          const keyAst = match.isJsxBody ? extractKeyExpr(match.body) : extractBlockKeyExpr(match.body as BlockStatement)
+          const rowSig = freshVar('_r')
+          const idxSig = idxParam !== undefined ? freshVar('_i') : undefined
+          const rowRewrites = new Map(scopeRewrites)
+          const keyRewrites = withoutBindings(scopeRewrites, params)
+          let keyFn: string
+
+          if (firstParam !== undefined && firstParam.type !== 'Identifier') {
+            const patCode = code.slice(firstParam.start, firstParam.end)
+            keyFn = keyAst !== undefined
+              ? `(${patCode}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
+              : `(_item) => _item`
+            for (const [name, read] of patternReads(firstParam, `${rowSig}.value`, scopeRewrites))
+              rowRewrites.set(name, read)
           }
           else {
-            // Sibling dynamic child: open comment + optional text (+ closing comment if followed by more siblings)
-            const markerVar = requestChild(elVar, domIndex)
-            if (isLast) {
-              html += '<!----> '
-              domIndex += 2
-            }
-            else {
-              html += '<!----> <!---->'
-              dynamicTextSlots.add(`${elVar}:${domIndex + 1}`)
-              domIndex += 3
-            }
-            const txtVar = freshVar('_txt')
-            ops.push(`const ${txtVar} = ${use('textAfter')}(${markerVar});`)
-            ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
+            const itemParam = firstParam?.type === 'Identifier' ? firstParam.name : '_item'
+            keyFn = keyAst !== undefined
+              ? `(${itemParam}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
+              : `(${itemParam}) => ${itemParam}`
+            rowRewrites.set(itemParam, `${rowSig}.value`)
           }
+          if (idxParam !== undefined && idxSig !== undefined)
+            rowRewrites.set(idxParam, `${idxSig}.value`)
+
+          const rowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, rowRewrites) : compileExpression(match.body, rowRewrites)
+          const rowParams = idxSig !== undefined ? `${rowSig}, ${idxSig}` : rowSig
+          ops.push(`${use('loop')}(${elVar}, ${anchorVar}, () => ${eachCode}, ${keyFn}, (${rowParams}) => ${rowBody}${skipArg});`)
+          hadVariableRange = true
+          continue
+        }
+
+        if (slot.kind === 'and-show') {
+          let anchorVar = 'null'
+          if (hasSiblings) {
+            anchorVar = requestChild(elVar, domIndex)
+            html += '<!--k[--><!--k]-->'
+            addRangeSlot(elVar, domIndex + 1)
+            domIndex += 2
+          }
+          const whenCode = compileExpression(slot.expr.left, scopeRewrites)
+          const trueCode = compileRootJsx(slot.right, scopeRewrites)
+          ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode});`)
+          hadVariableRange = true
+          continue
+        }
+
+        if (slot.kind === 'ternary-show') {
+          let anchorVar = 'null'
+          if (hasSiblings) {
+            anchorVar = requestChild(elVar, domIndex)
+            html += '<!--k[--><!--k]-->'
+            addRangeSlot(elVar, domIndex + 1)
+            domIndex += 2
+          }
+          const whenCode = compileExpression(slot.expr.test, scopeRewrites)
+          const trueCode = isJsxNode(slot.cons)
+            ? compileRootJsx(slot.cons, scopeRewrites)
+            : compileExpression(slot.cons, scopeRewrites)
+          const falseCode = isJsxNode(slot.alt)
+            ? compileRootJsx(slot.alt, scopeRewrites)
+            : compileExpression(slot.alt, scopeRewrites)
+          ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode}, () => ${falseCode});`)
+          hadVariableRange = true
+          continue
+        }
+
+        // Generic expression slot
+        const exprCode = compileExpression(slot.expr, scopeRewrites)
+        if (isNodeCapableExpr(slot.expr)) {
+          if (!hasSiblings) {
+            ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, null);`)
+          }
+          else if (isLast) {
+            const startVar = requestChild(elVar, domIndex)
+            html += '<!--k[-->'
+            domIndex++
+            ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, ${startVar});`)
+          }
+          else {
+            const startVar = requestChild(elVar, domIndex)
+            const endVar = requestChild(elVar, domIndex + 1)
+            html += '<!--k[--><!--k]-->'
+            addRangeSlot(elVar, domIndex + 1)
+            domIndex += 2
+            ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, ${endVar}, ${startVar});`)
+          }
+          hadVariableRange = true
+        }
+        else if (!hasSiblings) {
+          // Sole dynamic child: 0 comment markers!
+          html += ' '
+          domIndex++
+          const txtVar = freshVar('_txt')
+          ops.push(`const ${txtVar} = ${use('firstText')}(${elVar});`)
+          ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
+        }
+        else {
+          // Sibling dynamic text: open comment + optional text (+ closing comment if followed by more siblings)
+          const markerVar = requestChild(elVar, domIndex)
+          if (isLast) {
+            html += '<!----> '
+            domIndex += 2
+          }
+          else {
+            html += '<!----> <!---->'
+            addTextSlot(elVar, domIndex + 1)
+            domIndex += 3
+          }
+          const txtVar = freshVar('_txt')
+          ops.push(`const ${txtVar} = ${use('textAfter')}(${markerVar});`)
+          ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
         }
       }
 
@@ -839,7 +1032,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     const tmplName = `_t${templates.length}`
     templates.push({ name: tmplName, html, isSvg: SVG_CHILD_TAGS.has(rootTag) })
 
-    // Emit efficient parent->child sibling walks grouped by parentVar (breadth-first / parent-first order)
+    // Emit parent->child sibling walks grouped by parentVar (breadth-first / parent-first order)
     const walkStmts: string[] = []
     const byParent = new Map<string, { index: number, varName: string }[]>()
     for (const item of walkPlan) {
@@ -851,7 +1044,6 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       arr.push({ index: item.index, varName: item.varName })
     }
 
-    // Emit walks in topological order (root first)
     const emittedParents = new Set<string>([rootVar])
     const queue = [rootVar]
     while (queue.length > 0) {
@@ -861,6 +1053,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         continue
       list.sort((a, b) => a.index - b.index)
 
+      const tSlots = textSlotsByParent.get(pVar)
+      const rSlots = rangeSlotsByParent.get(pVar)
       let prevVar: string | undefined
       let prevIdx = -1
       for (const { index, varName } of list) {
@@ -875,11 +1069,11 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           pos = prevIdx
         }
         while (pos < index) {
-          if (dynamicTextSlots.has(`${pVar}:${pos + 1}`) && pos + 2 <= index) {
+          if (tSlots?.has(pos + 1) && pos + 2 <= index) {
             expr = `${use('skipText')}(${expr})`
             pos += 2
           }
-          else if (dynamicRangeSlots.has(`${pVar}:${pos + 1}`)) {
+          else if (rSlots?.has(pos + 1)) {
             expr = `${use('skipRange')}(${expr})`
             pos += 1
           }
@@ -904,20 +1098,35 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     return `(() => { const ${rootVar} = ${tmplName}(); ${walkStmts.join(' ')} ${ops.join(' ')} return ${rootVar}; })()`
   }
 
-  function compileRootJsx(node: AstNode, scopeRewrites: ReadonlyMap<string, string>): string {
+  function compileRootJsx(node: JSXElement | JSXFragment, scopeRewrites: ReadonlyMap<string, string>): string {
     if (node.type === 'JSXFragment') {
-      const meaningful = filterChildren(node.children as AstNode[])
+      const meaningful = filterMeaningfulChildren(node.children)
       if (meaningful.length === 0)
         return 'null'
-      if (meaningful.length === 1 && meaningful[0]!.type === 'JSXElement')
-        return compileRootJsx(meaningful[0]!, scopeRewrites)
+      if (meaningful.length === 1) {
+        const only = meaningful[0]!
+        if (isJsxNode(only))
+          return compileRootJsx(only, scopeRewrites)
+        if (only.type === 'JSXText')
+          return `document.createTextNode(${JSON.stringify(decodeHtmlEntities(cleanJsxText(only.value)))})`
+        if (only.type === 'JSXExpressionContainer' && only.expression.type !== 'JSXEmptyExpression') {
+          const exprCode = compileExpression(only.expression, scopeRewrites)
+          return `(() => { const _f = document.createDocumentFragment(); ${use('insert')}(_f, () => (${exprCode}), null, null); return _f; })()`
+        }
+      }
 
       const items = meaningful.map((child) => {
         if (isJsxNode(child))
           return compileRootJsx(child, scopeRewrites)
         if (child.type === 'JSXText')
-          return `document.createTextNode(${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value as string)))})`
-        return `document.createTextNode(String(${compileExpression(child.expression, scopeRewrites)} ?? ""))`
+          return `document.createTextNode(${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value)))})`
+        if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression') {
+          const exprCode = compileExpression(child.expression, scopeRewrites)
+          if (isNodeCapableExpr(child.expression))
+            return `(() => { const _f = document.createDocumentFragment(); ${use('insert')}(_f, () => (${exprCode}), null, null); return _f; })()`
+          return `(() => { const _t = document.createTextNode(""); ${use('effect')}(() => ${use('setText')}(_t, (${exprCode}))); return _t; })()`
+        }
+        return 'document.createTextNode("")'
       })
       return `${use('frag')}(${items.join(', ')})`
     }
@@ -929,53 +1138,109 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     return compileElementTree(node, scopeRewrites)
   }
 
-  // Handle component functions with destructured props + JSX compilation
-  function processFunction(fn: AstNode): void {
-    if (!containsJsx(fn.body))
-      return
-
-    const propRewrites = new Map<string, string>()
-    const firstParam = (fn.params as AstNode[])[0]
-    if (firstParam !== undefined && firstParam.type === 'ObjectPattern') {
-      const pVar = '__p'
+  function extractDestructuredParam(firstParam: ParamPattern | undefined): {
+    pattern: ObjectPattern
+    defaultExpr: Node | undefined
+    replaceStart: number
+    replaceEnd: number
+    typeAnn: string
+  } | undefined {
+    if (firstParam === undefined)
+      return undefined
+    if (firstParam.type === 'ObjectPattern') {
       const typeAnn = firstParam.typeAnnotation ? code.slice(firstParam.typeAnnotation.start, firstParam.typeAnnotation.end) : ''
-      editor.replace(firstParam.start, firstParam.end, `${pVar}${typeAnn}`)
+      return { pattern: firstParam, defaultExpr: undefined, replaceStart: firstParam.start, replaceEnd: firstParam.end, typeAnn }
+    }
+    if (firstParam.type === 'AssignmentPattern' && firstParam.left.type === 'ObjectPattern') {
+      const pat = firstParam.left
+      const typeAnn = pat.typeAnnotation ? code.slice(pat.typeAnnotation.start, pat.typeAnnotation.end) : ''
+      return { pattern: pat, defaultExpr: firstParam.right, replaceStart: firstParam.start, replaceEnd: firstParam.end, typeAnn }
+    }
+    return undefined
+  }
 
-      for (const [name, read] of patternReads(firstParam, pVar))
-        propRewrites.set(name, read)
+  function computePropRewrites(
+    destructured: { pattern: ObjectPattern, defaultExpr: Node | undefined },
+    pVar: string,
+    outerRewrites: ReadonlyMap<string, string>,
+  ): Map<string, string> {
+    const propRewrites = new Map(outerRewrites)
+    for (const [name, read] of patternReads(destructured.pattern, pVar, outerRewrites))
+      propRewrites.set(name, read)
 
-      // A rest beside static keys stays a live view of the props; beside a computed key it keeps the pattern's own copy.
-      const extractedKeys: string[] = []
-      let restName: string | undefined
-      let staticKeys = true
-      for (const prop of firstParam.properties as AstNode[]) {
-        if (prop.type === 'RestElement')
-          restName = prop.argument?.type === 'Identifier' ? prop.argument.name as string : undefined
-        else if (!prop.computed && prop.key?.type === 'Identifier')
-          extractedKeys.push(prop.key.name as string)
-        else if (!prop.computed && typeof prop.key?.value === 'string')
-          extractedKeys.push(prop.key.value)
-        else
-          staticKeys = false
-      }
-      if (restName !== undefined && staticKeys)
-        propRewrites.set(restName, `${use('omit')}(${pVar}, ${JSON.stringify(extractedKeys)})`)
+    const extractedKeys: string[] = []
+    let restName: string | undefined
+    let staticKeys = true
+    for (const prop of destructured.pattern.properties) {
+      if (prop.type === 'RestElement')
+        restName = prop.argument.type === 'Identifier' ? prop.argument.name : undefined
+      else if (!prop.computed && prop.key.type === 'Identifier')
+        extractedKeys.push(prop.key.name)
+      else if (!prop.computed && prop.key.type === 'Literal' && typeof prop.key.value === 'string')
+        extractedKeys.push(prop.key.value)
+      else
+        staticKeys = false
+    }
+    if (restName !== undefined && staticKeys)
+      propRewrites.set(restName, `${use('omit')}(${pVar}, ${JSON.stringify(extractedKeys)})`)
+    return propRewrites
+  }
+
+  function buildCompiledFunction(fn: ArrowFunctionExpression | OxcFunction, outerRewrites: ReadonlyMap<string, string>): string {
+    const fnEditor = new SourceEditor(code.slice(fn.start, fn.end))
+    const offset = fn.start
+    const destructured = extractDestructuredParam(fn.params[0])
+    const pVar = freshVar('__p')
+    let propRewrites = new Map(outerRewrites)
+
+    if (destructured !== undefined) {
+      const defSuffix = destructured.defaultExpr !== undefined
+        ? ` = ${compileExpression(destructured.defaultExpr, outerRewrites)}`
+        : ''
+      fnEditor.replace(destructured.replaceStart - offset, destructured.replaceEnd - offset, `${pVar}${destructured.typeAnn}${defSuffix}`)
+      propRewrites = computePropRewrites(destructured, pVar, outerRewrites)
     }
 
-    // Rewrite prop reads in non-JSX statements of the function body, and compile JSX roots with propRewrites
-    if (propRewrites.size > 0 && fn.body?.type === 'BlockStatement') {
+    if (fn.body !== null)
+      fnEditor.replace(fn.body.start - offset, fn.body.end - offset, compileExpression(fn.body, propRewrites))
+    return fnEditor.toString()
+  }
+
+  // Handle top-level component functions with destructured props + JSX compilation
+  function processFunction(fn: ArrowFunctionExpression | OxcFunction): void {
+    if (fn.body === null || !containsJsx(fn.body))
+      return
+
+    const destructured = extractDestructuredParam(fn.params[0])
+    let propRewrites = new Map<string, string>()
+
+    if (destructured !== undefined) {
+      const pVar = '__p'
+      const defSuffix = destructured.defaultExpr !== undefined
+        ? ` = ${compileExpression(destructured.defaultExpr, new Map())}`
+        : ''
+      editor.replace(destructured.replaceStart, destructured.replaceEnd, `${pVar}${destructured.typeAnn}${defSuffix}`)
+      propRewrites = computePropRewrites(destructured, pVar, new Map())
+    }
+
+    if (propRewrites.size > 0 && fn.body.type === 'BlockStatement') {
       const shadowed = new Set<string>()
-      for (const stmt of fn.body.body as AstNode[]) {
+      for (const stmt of fn.body.body) {
+        if (stmt.type === 'FunctionDeclaration' && stmt.id !== null)
+          shadowed.add(stmt.id.name)
+        else if (stmt.type === 'ClassDeclaration' && stmt.id !== null)
+          shadowed.add(stmt.id.name)
+      }
+      for (const stmt of fn.body.body) {
         const active = new Map<string, string>()
         for (const [k, v] of propRewrites) {
           if (!shadowed.has(k))
             active.set(k, v)
         }
-        // A statement holding JSX also reads props around it (`if (on) return <b/>`): compile both in one pass.
         if (active.size > 0 || containsJsx(stmt))
           editor.replace(stmt.start, stmt.end, compileExpression(stmt, active))
         if (stmt.type === 'VariableDeclaration') {
-          for (const d of stmt.declarations as AstNode[])
+          for (const d of stmt.declarations)
             collectPatternNames(d.id, shadowed)
         }
       }
@@ -986,6 +1251,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   }
 
   walk(program, (node) => {
+    if (loadNodes.has(node))
+      return false
     if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
       processFunction(node)
       return false
@@ -1006,7 +1273,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   if (used.size > 0) {
     const hasLoop = used.delete('loop')
-    const EXTRA_HELPERS = ['insert', 'omit', 'setInnerHtml', 'show', 'spread']
+    const EXTRA_HELPERS = ['insert', 'mergeProps', 'omit', 'setInnerHtml', 'show', 'spread']
     const usedExtras: string[] = []
     for (const name of EXTRA_HELPERS) {
       if (used.delete(name))

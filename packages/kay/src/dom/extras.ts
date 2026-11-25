@@ -2,7 +2,8 @@
 // so Bun.build({ splitting: true }) keeps them out of minimal islands that don't use them.
 
 import type { Owner } from '../reactivity/index'
-import { batch, createOwner, disposeOwner, effect, getOwner, runWithOwner, untrack } from '../reactivity/index'
+import { DOM_PROPS } from '../attrs'
+import { batch, createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, untrack } from '../reactivity/index'
 import { assertRenderable } from '../unrenderable'
 import { claimInsert, isBlockedAttr, setAttr, setClass, setProp, setStyle, skipRange } from './index'
 
@@ -26,8 +27,25 @@ export function setInnerHtml(el: Element, value: unknown): void {
     el.innerHTML = html
 }
 
-const SPREAD_DOM_PROPS = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
 const EVENT_PROP = /^on([A-Z]\w*)$/
+
+/** Merges prop objects while preserving getter descriptors so reactive props stay lazy across component spreads. */
+export function mergeProps(...sources: (Record<string, unknown> | null | undefined)[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i]
+    if (src == null || typeof src !== 'object')
+      continue
+    const keys = Object.keys(src)
+    for (let j = 0; j < keys.length; j++) {
+      const key = keys[j]!
+      const desc = Object.getOwnPropertyDescriptor(src, key)
+      if (desc !== undefined)
+        Object.defineProperty(out, key, desc)
+    }
+  }
+  return out
+}
 
 export function omit(props: Record<string, unknown>, excluded: string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}
@@ -44,6 +62,7 @@ export function omit(props: Record<string, unknown>, excluded: string[]): Record
 
 export function spread(el: Element, getProps: () => Record<string, unknown> | null | undefined): void {
   let prevKeys: string[] = []
+  let lastRef: unknown
   // One listener per event type, calling whichever handler the props hold now.
   const handlers = new Map<string, (e: Event) => void>()
   const listen = (e: Event): void => {
@@ -51,6 +70,12 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
     if (handler !== undefined)
       batch(() => handler(e))
   }
+
+  onCleanup(() => {
+    for (const type of handlers.keys())
+      el.removeEventListener(type, listen)
+    handlers.clear()
+  })
 
   effect(() => {
     const types = new Set<string>()
@@ -69,8 +94,11 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
       }
       else if (k !== 'key' && k !== 'ref' && k !== '$hydrate' && k !== 'children') {
         const name = k === 'htmlFor' ? 'for' : k
-        if (!isBlockedAttr(name))
+        if (!isBlockedAttr(name)) {
+          if (DOM_PROPS.has(name))
+            setProp(el, name, name === 'value' ? '' : false)
           el.removeAttribute(name)
+        }
       }
     }
 
@@ -82,8 +110,10 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
         throw new TypeError('kay: dangerouslySetInnerHTML in a spread: write innerHTML={html} on the element.')
       const v = props[k]
       if (k === 'ref') {
-        if (typeof v === 'function')
-          (v as (node: Element) => void)(el)
+        if (typeof v === 'function' && v !== lastRef) {
+          lastRef = v
+          ;(v as (node: Element) => void)(el)
+        }
         continue
       }
       const event = typeof v === 'function' ? EVENT_PROP.exec(k) : null
@@ -101,7 +131,7 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
         setClass(el, v)
       else if (name === 'style')
         setStyle(el as HTMLElement, v)
-      else if (SPREAD_DOM_PROPS.has(name))
+      else if (DOM_PROPS.has(name))
         setProp(el, name, v)
       else
         setAttr(el, name, v)
@@ -287,6 +317,7 @@ export function show(
   let branch: 0 | 1 | 2 = 0
   let owner: Owner | undefined
   let nodes: Node[] = []
+  let firstRun = true
 
   const clear = () => {
     if (owner !== undefined) {
@@ -304,6 +335,18 @@ export function show(
     if (branch === nextBranch)
       return
 
+    let startMarker: Node | null | undefined
+    if (firstRun) {
+      firstRun = false
+      if (marker !== null && marker.nodeType === 8 && (marker as Comment).data === 'k[') {
+        const close = skipRange(marker)
+        if (close !== null) {
+          startMarker = marker
+          marker = close
+        }
+      }
+    }
+
     clear()
     branch = nextBranch
 
@@ -312,7 +355,7 @@ export function show(
       return
 
     owner = createOwner(parentOwner)
-    const res = claimInsert(parent, marker, () => untrack(() => runWithOwner(owner, fn)))
+    const res = claimInsert(parent, marker, () => untrack(() => runWithOwner(owner, fn)), startMarker)
     marker = res.marker
     const rendered = res.result
     if (rendered == null || typeof rendered === 'boolean') {

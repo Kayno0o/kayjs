@@ -22,6 +22,10 @@ export interface CommandPaletteProps {
   inputLabel?: string | undefined
   ariaLabel?: string | undefined
   triggerLabel?: string | undefined
+  emptyLabel?: string | undefined
+  noResultsLabel?: string | undefined
+  resultLabel?: string | undefined
+  resultsLabel?: string | undefined
   shortcutKey?: string | undefined
   open?: Signal<boolean> | undefined
   onSelect?: ((id: string) => void) | undefined
@@ -34,6 +38,10 @@ export function CommandPalette({
   inputLabel = 'Search commands',
   ariaLabel = 'Command palette',
   triggerLabel = 'Search (⌘K)',
+  emptyLabel = 'No matching commands.',
+  noResultsLabel = 'No results',
+  resultLabel = 'result',
+  resultsLabel = 'results',
   shortcutKey = 'k',
   open,
   onSelect,
@@ -70,8 +78,8 @@ export function CommandPalette({
       return ''
     const n = filtered.value.length
     if (n === 0)
-      return 'No results'
-    return n === 1 ? '1 result' : `${n} results`
+      return noResultsLabel
+    return n === 1 ? `1 ${resultLabel}` : `${n} ${resultsLabel}`
   }
 
   const onOpened = () => {
@@ -186,7 +194,7 @@ export function CommandPalette({
             ))}
           </div>
           {filtered.value.length === 0 && (
-            <p data-part="empty">No matching commands.</p>
+            <p data-part="empty">{emptyLabel}</p>
           )}
           <div class="kui-sr-only" role="status" aria-live="polite" aria-atomic="true">
             {statusText()}

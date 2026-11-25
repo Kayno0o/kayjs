@@ -21,7 +21,10 @@ export interface CompileExecutableOptions {
 export async function compileExecutable(opts: CompileExecutableOptions): Promise<void> {
   const { root, outDir, clientDir, manifest, assetPrefix, outfile, kaySrcRoot, resolveKaySpecifier, bunPlugins = [] } = opts
   const entryPath = join(outDir, '__compile_entry.ts')
-  const imports: string[] = []
+  const prodEnvPath = join(outDir, '__compile_prod_env.ts')
+  // Evaluated first via ESM static import order so `kay.config.ts` and route modules see NODE_ENV=production!
+  writeFileSync(prodEnvPath, `const _envKey = 'NODE_ENV';\nprocess.env[_envKey] ??= 'production';\n`)
+  const imports: string[] = [`import ${JSON.stringify(prodEnvPath)};`]
   const modEntries: string[] = []
   const seenFiles = new Set<string>()
   let idx = 0
@@ -97,11 +100,9 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins, trustProxy: _kayConfig?.trustProxy, maxRequestBodySize: _kayConfig?.maxRequestBodySize, streamTimeout: _kayConfig?.streamTimeout, compress: _kayConfig?.compress, onError: _kayConfig?.onError`
     : ''
 
-  // Default NODE_ENV to 'production' in compiled binaries (dynamic key avoids Bun.build constant-folding).
   const code = [
-    `import { createServerFromEmbedded } from ${JSON.stringify(join(kaySrcRoot, 'server/index.ts'))};`,
     ...imports,
-    `const _envKey = 'NODE_ENV'; process.env[_envKey] ??= 'production';`,
+    `import { createServerFromEmbedded } from ${JSON.stringify(join(kaySrcRoot, 'server/index.ts'))};`,
     `const manifest = ${JSON.stringify(manifest)};`,
     `const modules = { ${modEntries.join(', ')} };`,
     `const assets = { ${embeddedAssets.join(', ')} };`,
@@ -109,9 +110,9 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     `const publicEtags = { ${embeddedPublicEtags.join(', ')} };`,
     `const prerendered = {};`,
     `const prerenderedFiles = { ${embeddedPrerenderedFiles.join(', ')} };`,
-    `const port = Number(process.env.PORT ?? ${hasConfig ? '_kayConfig?.port ?? ' : ''}3000);`,
+    `const port = Number(process.env.PORT || ${hasConfig ? '_kayConfig?.port || ' : ''}3000);`,
     `const hostname = process.env.HOST || undefined;`,
-    `if (Bun.argv.includes('--health')) { const r = await fetch(\`http://\${hostname ?? '127.0.0.1'}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
+    `if (Bun.argv.includes('--health')) { const probeHost = !hostname || hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname; const r = await fetch(\`http://\${probeHost}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
     `const app = await createServerFromEmbedded({ manifest, modules, assets, publicAssets, publicEtags, prerendered, prerenderedFiles, assetPrefix: ${JSON.stringify(assetPrefix)}${cfgSpread} });`,
     `const server = app.serve(port, hostname);`,
     `console.log(\`kay server listening on http://\${hostname ?? 'localhost'}:\${server.port}\`);`,
@@ -141,5 +142,6 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   }
   finally {
     rmSync(entryPath, { force: true })
+    rmSync(prodEnvPath, { force: true })
   }
 }

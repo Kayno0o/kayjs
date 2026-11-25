@@ -127,18 +127,26 @@ function shrink(bytes: Uint8Array<ArrayBuffer>, encoding: CompressionEncoding): 
   return compressed.byteLength < bytes.byteLength ? compressed : undefined
 }
 
+const DEFAULT_MAX_FILE_CACHE_BYTES = 8 * 1024 * 1024
+
 export class CompressionCache {
-  // Path-keyed build files (assets, public, prerendered pages): bounded by the build, so each variant is kept for the process. `null` marks a file that does not shrink.
+  // Path-keyed build files (assets, public, prerendered pages): bounded byte-budget LRU + in-flight dedup. `null` marks a file that does not shrink.
   readonly #files = new Map<string, Uint8Array<ArrayBuffer> | null>()
+  readonly #fileInflight = new Map<string, Promise<Uint8Array<ArrayBuffer> | undefined>>()
+  readonly #maxFileBytes: number
+  readonly #maxFileEntryBytes: number
+  #fileBytes = 0
   // Content-hashed HTML of routes rendered per request: a byte-budget LRU.
   readonly #map = new Map<string, Uint8Array<ArrayBuffer>>()
   readonly #maxBytes: number
   readonly #maxEntryBytes: number
   #totalBytes = 0
 
-  constructor(maxBytes = DEFAULT_MAX_CACHE_BYTES) {
+  constructor(maxBytes = DEFAULT_MAX_CACHE_BYTES, maxFileBytes = DEFAULT_MAX_FILE_CACHE_BYTES) {
     this.#maxBytes = maxBytes
     this.#maxEntryBytes = Math.floor(maxBytes / 4)
+    this.#maxFileBytes = maxFileBytes
+    this.#maxFileEntryBytes = Math.floor(maxFileBytes / 4)
   }
 
   get(key: string): Uint8Array<ArrayBuffer> | undefined {
@@ -184,16 +192,50 @@ export class CompressionCache {
     return compressed
   }
 
-  /** The compressed variant of a build file, read and compressed on its first request only; `undefined` when it does not shrink. */
+  /** The compressed variant of a build file, read and compressed on its first request only (deduped + bounded LRU); `undefined` when it does not shrink. */
   async file(key: string, encoding: CompressionEncoding, read: () => Uint8Array<ArrayBuffer> | Promise<Uint8Array<ArrayBuffer>>): Promise<Uint8Array<ArrayBuffer> | undefined> {
     const variantKey = `${encoding}:${key}`
-    let variant = this.#files.get(variantKey)
-    if (variant === undefined) {
-      const bytes = await read()
-      variant = shrink(bytes, encoding) ?? null
-      this.#files.set(variantKey, variant)
+    if (this.#files.has(variantKey)) {
+      const hit = this.#files.get(variantKey)!
+      // Refresh LRU recency
+      this.#files.delete(variantKey)
+      this.#files.set(variantKey, hit)
+      return hit ?? undefined
     }
-    return variant ?? undefined
+    const inflight = this.#fileInflight.get(variantKey)
+    if (inflight !== undefined)
+      return inflight
+
+    const task = (async () => {
+      const bytes = await read()
+      const variant = shrink(bytes, encoding) ?? null
+      if (variant === null) {
+        this.#files.set(variantKey, null)
+        return undefined
+      }
+      if (variant.byteLength <= this.#maxFileEntryBytes) {
+        this.#files.set(variantKey, variant)
+        this.#fileBytes += variant.byteLength
+        while (this.#fileBytes > this.#maxFileBytes) {
+          const oldest = this.#files.keys().next()
+          if (oldest.done)
+            break
+          const evicted = this.#files.get(oldest.value)
+          this.#files.delete(oldest.value)
+          if (evicted !== null && evicted !== undefined)
+            this.#fileBytes -= evicted.byteLength
+        }
+      }
+      return variant
+    })()
+
+    this.#fileInflight.set(variantKey, task)
+    try {
+      return await task
+    }
+    finally {
+      this.#fileInflight.delete(variantKey)
+    }
   }
 }
 
@@ -227,8 +269,10 @@ export function compressedHtmlResponse(
       if (compressed !== undefined) {
         const headers: Record<string, string> = { ...baseHeaders, 'content-encoding': enc, 'vary': 'Accept-Encoding' }
         const etag = headers.etag ?? headers.ETag
-        if (etag !== undefined)
+        if (etag !== undefined) {
+          delete headers.ETag
           headers.etag = toWeakEtag(etag)
+        }
         return new Response(compressed, { status, headers })
       }
     }

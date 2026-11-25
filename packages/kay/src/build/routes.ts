@@ -1,6 +1,5 @@
 // Route files: their URL patterns, conflicts, and the `_layout`/`_middleware` chain that wraps them.
 
-import type { AstNode } from '../compiler/analyze'
 import type { ModuleAnalysis } from '../compiler/index'
 import { existsSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
@@ -63,16 +62,16 @@ export function routeExportProblem(analysis: ModuleAnalysis, file: string): stri
     if (fix !== undefined)
       return `export ${name} in ${file}: ${fix}.`
   }
-  for (const stmt of analysis.program.body as AstNode[]) {
+  for (const stmt of analysis.program.body) {
     if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration')
       continue
-    for (const d of stmt.declaration.declarations as AstNode[]) {
-      const name = d.id?.name as string | undefined
-      const init = d.init as AstNode | null
+    for (const d of stmt.declaration.declarations) {
+      const name = d.id.type === 'Identifier' ? d.id.name : undefined
+      const init = d.init
       if (name === 'paths' && init !== null && init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression')
         return `export const paths in ${file}: export function paths() returning the URLs, such as () => ['/posts/a'].`
       if (name === 'prerender' && !(init?.type === 'Literal' && typeof init.value === 'boolean'))
-        return `${init?.type === 'Literal' ? `prerender = ${init.raw as string}` : 'prerender set at runtime'} in ${file}: write prerender = true or prerender = false.`
+        return `${init?.type === 'Literal' ? `prerender = ${init.raw ?? String(init.value)}` : 'prerender set at runtime'} in ${file}: write prerender = true or prerender = false.`
     }
   }
   return undefined

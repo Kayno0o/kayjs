@@ -4,8 +4,10 @@
 
 import type { BunPlugin } from 'bun'
 import type { RouteManifestEntry } from '../build/index'
+import type { ActionResult, ServerAction } from '../server/action'
 import type { Middleware, RequestContext } from '../server/index'
 import type { SecurityHeadersOptions, TrustProxy } from '../server/security'
+import type { AppRuntimeContext } from './context'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { createAppContext, getAppContext, runWithAppContext } from './context'
@@ -82,13 +84,21 @@ export interface PluginRouteOptions {
   trustProxy?: TrustProxy | undefined
 }
 
+export interface MiddlewareOptions {
+  /** `'all'` (default) runs on every route; `'dynamic'` skips static/prerendered fast paths; a string prefix scopes to matching pathnames. */
+  scope?: 'all' | 'dynamic' | string | undefined
+}
+
 export interface ServerPluginAPI {
   readonly root: string
   readonly outDir: string
   readonly assetPrefix: string
   readonly dev: boolean
-  /** Register global middleware that runs before route handlers. */
-  use(middleware: Middleware): void
+  /** Readonly server security configuration so plugins inherit `trustProxy` / `trustedOrigins` without overriding them. */
+  readonly trustProxy: TrustProxy
+  readonly trustedOrigins: readonly string[]
+  /** Register global (or scoped) middleware that runs before route handlers. */
+  use(middleware: Middleware, options?: MiddlewareOptions): void
   /** Register a custom HTTP route (e.g. GET /sitemap.xml, POST /auth/callback). */
   route(method: string, path: string, handler: (ctx: RequestContext) => Response | Promise<Response>, options?: PluginRouteOptions): void
   /** Rewrite an incoming pathname before route matching (e.g. strip /fr locale prefix). */
@@ -99,6 +109,10 @@ export interface ServerPluginAPI {
   inject<T>(key: string): T | undefined
   /** Read persisted build data from `manifest.pluginData` (defaults to the current plugin's name). */
   getBuildData<T = Record<string, unknown>>(pluginName?: string): T | undefined
+  /** Register a shutdown cleanup callback run when `app.dispose()` is called (dev reloads, tests, graceful exit). */
+  onShutdown(fn: () => void | Promise<void>): void
+  /** Invoke a ServerAction with Standard Schema validation and directory-scoped `_middleware.ts` checks. */
+  invokeAction<I, O>(action: ServerAction<I, O>, input: I, ctx: RequestContext): Promise<ActionResult<O>>
 }
 
 export interface ServerErrorInfo {
@@ -111,6 +125,8 @@ export interface KayPlugin {
   name: string
   /** Register server routes, global middleware, URL rewrites, or runtime services. */
   server?: (api: ServerPluginAPI) => void | Promise<void>
+  /** Optional cleanup hook called when a server instance is disposed (dev reloads, tests, graceful shutdown). */
+  dispose?: () => void | Promise<void>
   /** Error hook called whenever a route, action, or plugin handler throws an unhandled error. */
   onError?: (info: ServerErrorInfo) => void
   /** Build hook run after route compilation, before prerender / --static / --compile. */
@@ -174,13 +190,13 @@ function configSpecifier(configPath: string, fresh: boolean): string {
   return configPath
 }
 
-export async function loadConfig(root: string, options?: { fresh?: boolean }): Promise<KayConfig> {
+export async function loadConfig(root: string, options?: { fresh?: boolean, appContext?: AppRuntimeContext }): Promise<KayConfig> {
   const absRoot = resolve(root)
   const configPath = join(absRoot, 'kay.config.ts')
   if (!existsSync(configPath))
     return {}
   const spec = configSpecifier(configPath, options?.fresh === true)
-  const active = getAppContext()
+  const active = options?.appContext ?? getAppContext()
   const ctx = active !== undefined && active.root === absRoot
     ? active
     : createAppContext({

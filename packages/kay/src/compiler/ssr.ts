@@ -1,26 +1,39 @@
 // Kay v2 SSR compiler: compiles TSX directly to flat string concatenation, inline for-loops,
-// static attribute literal folding, and compile-time static island props.
+// static attribute literal folding, compile-time static island props, and shared balanced hydration markers.
 
-import type { AstNode, ModuleAnalysis } from './analyze'
+import type {
+  JSXAttributeItem,
+  JSXChild,
+  JSXElement,
+  JSXFragment,
+  Node,
+} from 'oxc-parser'
+import type { ModuleAnalysis } from './analyze'
 import { analyzeModule, parseTsx, walk } from './analyze'
-import { SourceEditor } from './patch'
 import { mistake } from './mistakes'
-import { cleanJsxText, containsJsx, escapeStaticAttr, escapeStaticText, isComponentTag, isJsxNode, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
+import { SourceEditor } from './patch'
+import {
+  classifyJsxChild,
+  containsJsx,
+  escapeRawText,
+  escapeStaticAttr,
+  escapeStaticText,
+  EVENT_ATTR,
+  filterMeaningfulChildren,
+  isBlockedAttr,
+  isComponentTag,
+  isJsxNode,
+  isNodeCapableExpr,
+  isStringBoolAttr,
+  isUnsafeUrlAttr,
+  jsxTagName,
+  RAW_TEXT_ELEMENTS,
+  staticLiteral,
+  unwrapParens,
+  VOID_ELEMENTS,
+} from './shared'
 
-const RAW_TEXT_ELEMENTS = new Set(['style', 'script'])
-const CLOSE_STYLE_RE = /<\/(style)/gi
-const SCRIPT_UNSAFE_RE = /<(\/script|script|!--)/gi
-
-function escapeRawText(str: string, tag: 'style' | 'script'): string {
-  if (tag === 'script') {
-    return str.replace(SCRIPT_UNSAFE_RE, (_, body: string) =>
-      body.charCodeAt(0) === 47 ? `<\\${body}` : `\\u003c${body}`)
-  }
-  return str.replace(CLOSE_STYLE_RE, '<\\/$1')
-}
-
-const EVENT_ATTR = /^on[A-Z]/
-function containsDirectAwait(root: AstNode): boolean {
+function containsDirectAwait(root: Node): boolean {
   let found = false
   walk(root, (child) => {
     if (found)
@@ -93,12 +106,14 @@ class StringParts {
   }
 }
 
-function isStaticNullish(node: AstNode): boolean {
+function isStaticNullish(node: Node): boolean {
   return (node.type === 'Identifier' && node.name === 'undefined')
     || (node.type === 'Literal' && node.value === null)
 }
 
-function formatStaticAttrBranch(attrName: string, node: AstNode): string | undefined {
+function formatStaticAttrBranch(attrName: string, node: Node): string | undefined {
+  if (isBlockedAttr(attrName))
+    return '""'
   if (isStaticNullish(node))
     return '""'
   if (node.type === 'Literal') {
@@ -135,12 +150,12 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   const islands = options.islands
   const emitMarkers = options.emitMarkers ?? options.isIsland ?? analysis.isInteractive
 
-  function compileSubExpression(node: AstNode): string {
+  function compileSubExpression(node: Node): string {
     if (!containsJsx(node))
       return code.slice(node.start, node.end)
 
     const sub = new SourceEditor(code.slice(node.start, node.end))
-    const offset = node.start as number
+    const offset = node.start
     walk(node, (child) => {
       if (isJsxNode(child)) {
         sub.replace(child.start - offset, child.end - offset, compileRootJsx(child))
@@ -151,10 +166,86 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     return sub.toString()
   }
 
+  function serializeComponentProps(attrs: readonly JSXAttributeItem[]): {
+    propEntries: string[]
+    allStaticProps: boolean
+    staticPropsObj: Record<string, unknown>
+    hydrateExpr: string | undefined
+    staticHydrate: string | undefined
+  } {
+    const propEntries: string[] = []
+    let allStaticProps = true
+    const staticPropsObj: Record<string, unknown> = {}
+    let hydrateExpr: string | undefined
+    let staticHydrate: string | undefined
+
+    for (const attr of attrs) {
+      if (attr.type === 'JSXSpreadAttribute') {
+        allStaticProps = false
+        propEntries.push(`...(${compileSubExpression(attr.argument)})`)
+        continue
+      }
+      const name = jsxTagName(attr.name)
+      if (name === 'key')
+        continue
+      if (name === '$hydrate') {
+        if (attr.value?.type === 'Literal' && typeof attr.value.value === 'string') {
+          staticHydrate = attr.value.value
+          hydrateExpr = JSON.stringify(attr.value.value)
+        }
+        else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+          hydrateExpr = compileSubExpression(attr.value.expression)
+        }
+        continue
+      }
+
+      const propKey = /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name)
+      if (attr.value === null) {
+        propEntries.push(`${propKey}: true`)
+        staticPropsObj[name] = true
+      }
+      else if (attr.value.type === 'Literal') {
+        propEntries.push(`${propKey}: ${JSON.stringify(attr.value.value)}`)
+        staticPropsObj[name] = attr.value.value
+      }
+      else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+        const expr = attr.value.expression
+        const lit = staticLiteral(expr)
+        if (lit.ok)
+          staticPropsObj[name] = lit.value
+        else
+          allStaticProps = false
+        propEntries.push(`${propKey}: ${compileSubExpression(expr)}`)
+      }
+    }
+
+    return { propEntries, allStaticProps, staticPropsObj, hydrateExpr, staticHydrate }
+  }
+
+  function compileChildrenListToStringExpr(children: readonly JSXChild[]): string {
+    const bufVar = `_o${loopCounter++}`
+    const stmts: string[] = []
+    const parts = new StringParts()
+    const flush = () => {
+      if (!parts.isEmpty()) {
+        stmts.push(`${bufVar} += ${parts.toExpr()};`)
+        parts.clear()
+      }
+    }
+    emitChildrenIntoBuffer(children, bufVar, parts, flush, s => stmts.push(s))
+    if (stmts.length === 0)
+      return parts.toExpr()
+    flush()
+    const hasAwait = children.some(c => containsDirectAwait(c))
+    if (hasAwait)
+      return `(await (async () => { let ${bufVar} = ""; ${stmts.join(' ')} return ${bufVar}; })())`
+    return `(() => { let ${bufVar} = ""; ${stmts.join(' ')} return ${bufVar}; })()`
+  }
+
   // Emits JSX directly into a string accumulator variable `_out` (zero closures on nested `.map()` loops!)
-  function emitIntoBuffer(node: AstNode, bufVar: string, parts: StringParts, flushParts: () => void, pushStmt: (stmt: string) => void): void {
+  function emitIntoBuffer(node: JSXElement | JSXFragment, bufVar: string, parts: StringParts, flushParts: () => void, pushStmt: (stmt: string) => void): void {
     if (node.type === 'JSXFragment') {
-      emitChildrenIntoBuffer(node.children as AstNode[], bufVar, parts, flushParts, pushStmt)
+      emitChildrenIntoBuffer(node.children, bufVar, parts, flushParts, pushStmt)
       return
     }
 
@@ -167,7 +258,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     parts.pushStatic(`<${tag}`)
     let innerHtmlExpr: string | undefined
 
-    for (const attr of node.openingElement.attributes as AstNode[]) {
+    for (const attr of node.openingElement.attributes) {
       if (attr.type === 'JSXSpreadAttribute') {
         parts.pushExpr(`${use('ssrSpread')}(${compileSubExpression(attr.argument)})`)
         continue
@@ -178,12 +269,15 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       if (rawName === 'innerHTML') {
         if (attr.value?.type === 'Literal')
           innerHtmlExpr = JSON.stringify(String(attr.value.value))
-        else if (attr.value?.type === 'JSXExpressionContainer')
+        else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
           innerHtmlExpr = `${use('ssrRaw')}(${compileSubExpression(attr.value.expression)})`
         continue
       }
 
       const name = rawName === 'className' ? 'class' : rawName === 'htmlFor' ? 'for' : rawName
+      if (isBlockedAttr(name))
+        continue
+
       if (attr.value === null) {
         parts.pushStatic(isStringBoolAttr(name) ? ` ${name}="true"` : ` ${name}`)
       }
@@ -191,8 +285,8 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         if (!isUnsafeUrlAttr(name, attr.value.value))
           parts.pushStatic(` ${name}="${escapeStaticAttr(String(attr.value.value))}"`)
       }
-      else if (attr.value.type === 'JSXExpressionContainer') {
-        const expr = attr.value.expression as AstNode
+      else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+        const expr = attr.value.expression
 
         // Fold static ternary attribute branches (`class={cond ? 'stock out' : 'stock in'}`) with 0 runtime escaping!
         if (name !== 'style' && expr.type === 'ConditionalExpression') {
@@ -219,260 +313,215 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     if (innerHtmlExpr !== undefined)
       parts.pushExpr(innerHtmlExpr)
     else
-      emitChildrenIntoBuffer(node.children as AstNode[], bufVar, parts, flushParts, pushStmt, RAW_TEXT_ELEMENTS.has(tag) ? tag as 'style' | 'script' : undefined)
+      emitChildrenIntoBuffer(node.children, bufVar, parts, flushParts, pushStmt, RAW_TEXT_ELEMENTS.has(tag) ? tag as 'style' | 'script' : undefined)
     parts.pushStatic(`</${tag}>`)
   }
 
   function emitChildrenIntoBuffer(
-    children: AstNode[],
+    children: readonly JSXChild[],
     bufVar: string,
     parts: StringParts,
     flushParts: () => void,
     pushStmt: (stmt: string) => void,
     rawTextTag?: 'style' | 'script',
   ): void {
-    const meaningful = children.filter((c) => {
-      if (c.type === 'JSXText')
-        return cleanJsxText(c.value as string) !== ''
-      if (c.type === 'JSXExpressionContainer' && c.expression.type === 'JSXEmptyExpression')
-        return false
-      return true
-    })
-    const hasSiblings = meaningful.length > 1
+    const meaningful = filterMeaningfulChildren(children)
+    const slots = meaningful.map(c => ({ child: c, slot: classifyJsxChild(c) })).filter(s => s.slot !== undefined)
+    const hasSiblings = slots.length > 1
+    let hadVariableRange = false
 
-    for (let i = 0; i < meaningful.length; i++) {
-      const child = meaningful[i]!
-      const isLast = i === meaningful.length - 1
-      if (child.type === 'JSXText') {
-        const text = cleanJsxText(child.value as string)
-        parts.pushStatic(rawTextTag !== undefined ? escapeRawText(text, rawTextTag) : text)
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i]!.slot!
+      const isLast = i === slots.length - 1
+
+      if (slot.kind === 'static-text') {
+        if (rawTextTag !== undefined)
+          parts.pushStatic(escapeRawText(slot.text, rawTextTag))
+        else
+          parts.pushStatic(slot.fromLiteral ? escapeStaticText(slot.text) : slot.text)
+        continue
       }
-      else if (isJsxNode(child)) {
-        emitIntoBuffer(child, bufVar, parts, flushParts, pushStmt)
-      }
-      else if (child.type === 'JSXExpressionContainer') {
-        const expr = child.expression as AstNode
 
-        // Fold static string literal expressions like `{' '}` or `<style>{':root { ... }'}</style>` directly into static text
-        if (expr.type === 'Literal' && typeof expr.value === 'string') {
-          parts.pushStatic(rawTextTag !== undefined ? escapeRawText(expr.value, rawTextTag) : escapeStaticText(expr.value))
-          continue
-        }
-
-        // Fold static no-substitution template literals inside `<style>`/`<script>` directly into raw text
-        if (
-          rawTextTag !== undefined
-          && expr.type === 'TemplateLiteral'
-          && (expr.expressions as AstNode[]).length === 0
-          && (expr.quasis as AstNode[]).length === 1
-        ) {
-          const cooked = expr.quasis[0]?.value?.cooked
-          if (typeof cooked === 'string') {
-            parts.pushStatic(escapeRawText(cooked, rawTextTag))
-            continue
+      if (rawTextTag !== undefined) {
+        const rawChild = slots[i]!.child
+        if (rawChild.type === 'JSXExpressionContainer' && rawChild.expression.type !== 'JSXEmptyExpression') {
+          const expr = rawChild.expression
+          if (expr.type === 'TemplateLiteral' && expr.expressions.length === 0 && expr.quasis.length === 1) {
+            const cooked = expr.quasis[0]?.value.cooked
+            if (typeof cooked === 'string') {
+              parts.pushStatic(escapeRawText(cooked, rawTextTag))
+              continue
+            }
           }
-        }
-
-        if (rawTextTag !== undefined) {
           parts.pushExpr(`${use('ssrRawText')}(${JSON.stringify(rawTextTag)}, ${compileSubExpression(expr)})`)
           continue
         }
+      }
 
-        // Inline `.map((item, idx?) => <jsx>)` directly into a flat `for` loop on `bufVar`!
-        if (
-          expr.type === 'CallExpression'
-          && expr.callee?.type === 'MemberExpression'
-          && !expr.callee.computed
-          && expr.callee.property?.name === 'map'
-          && expr.arguments?.length === 1
-        ) {
-          const cb = expr.arguments[0] as AstNode
-          if ((cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression') && !cb.async && cb.body !== null) {
-            const body = (cb.body.type === 'ParenthesizedExpression' ? cb.body.expression : cb.body) as AstNode
-            if (isJsxNode(body)) {
-              const target = compileSubExpression(expr.callee.object)
-              const params = cb.params as AstNode[]
-              const itemParam = params[0]?.type === 'Identifier' ? params[0].name as string : undefined
-              const idxParam = params[1]?.type === 'Identifier' ? params[1].name as string : undefined
+      if (slot.kind === 'element') {
+        emitIntoBuffer(slot.node, bufVar, parts, flushParts, pushStmt)
+        continue
+      }
 
-              // Only `(item)` and `(item, index)` inline; any other shape goes through ssrLoop with its params as written.
-              if (itemParam !== undefined && params.length <= 2 && (params.length < 2 || idxParam !== undefined)) {
-                flushParts()
-                const n = loopCounter++
-                const arrVar = `_a${n}`
-                const idxVar = idxParam ?? `_i${n}`
-                const innerStmts: string[] = []
-                const innerParts = new StringParts()
-                const flushInner = () => {
-                  if (!innerParts.isEmpty()) {
-                    innerStmts.push(`${bufVar} += ${innerParts.toExpr()};`)
-                    innerParts.clear()
-                  }
-                }
-                emitIntoBuffer(body, bufVar, innerParts, flushInner, s => innerStmts.push(s))
-                flushInner()
+      if (slot.kind === 'component' || slot.kind === 'fragment') {
+        if (emitMarkers && hasSiblings) {
+          parts.pushStatic('<!--k[-->')
+          emitIntoBuffer(slot.node, bufVar, parts, flushParts, pushStmt)
+          if (!isLast)
+            parts.pushStatic('<!--k]-->')
+        }
+        else {
+          emitIntoBuffer(slot.node, bufVar, parts, flushParts, pushStmt)
+        }
+        hadVariableRange = true
+        continue
+      }
 
-                pushStmt(
-                  `const ${arrVar} = ${target}; if (${arrVar}) for (let ${idxVar} = 0; ${idxVar} < ${arrVar}.length; ${idxVar}++) { const ${itemParam} = ${arrVar}[${idxVar}]; ${innerStmts.join(' ')} }`,
-                )
-                if (emitMarkers && !isLast)
-                  parts.pushStatic('<!---->')
-                continue
-              }
+      if (slot.kind === 'loop') {
+        const { match } = slot
+        const needsBracket = emitMarkers && (!isLast || hadVariableRange)
+        if (needsBracket)
+          parts.pushStatic('<!--k[-->')
+
+        const itemParam = match.params[0]?.type === 'Identifier' ? match.params[0].name : undefined
+        const idxParam = match.params[1]?.type === 'Identifier' ? match.params[1].name : undefined
+
+        if (match.isJsxBody && itemParam !== undefined && match.params.length <= 2 && (match.params.length < 2 || idxParam !== undefined)) {
+          flushParts()
+          const n = loopCounter++
+          const arrVar = `_a${n}`
+          const idxVar = idxParam ?? `_i${n}`
+          const innerStmts: string[] = []
+          const innerParts = new StringParts()
+          const flushInner = () => {
+            if (!innerParts.isEmpty()) {
+              innerStmts.push(`${bufVar} += ${innerParts.toExpr()};`)
+              innerParts.clear()
             }
           }
+          emitIntoBuffer(match.body as JSXElement | JSXFragment, bufVar, innerParts, flushInner, s => innerStmts.push(s))
+          flushInner()
+
+          const target = compileSubExpression(match.target)
+          pushStmt(
+            `const ${arrVar} = ${target}; if (${arrVar}) for (let ${idxVar} = 0; ${idxVar} < ${arrVar}.length; ${idxVar}++) { const ${itemParam} = ${arrVar}[${idxVar}]; ${innerStmts.join(' ')} }`,
+          )
+        }
+        else if (match.isJsxBody) {
+          const target = compileSubExpression(match.target)
+          const params = match.params.map(p => code.slice(p.start, p.end)).join(', ')
+          parts.pushExpr(`${use('ssrLoop')}(${target}, (${params}) => ${compileJsxToStringExpr(match.body as JSXElement | JSXFragment)})`)
+        }
+        else {
+          parts.pushExpr(`${use('esc')}(${compileSubExpression(match.call)})`)
         }
 
-        parts.pushExpr(compileExpressionAsString(expr, hasSiblings, isLast))
+        if (needsBracket)
+          parts.pushStatic('<!--k]-->')
+        hadVariableRange = true
+        continue
+      }
+
+      if (slot.kind === 'and-show') {
+        const left = compileSubExpression(slot.expr.left)
+        const right = compileJsxToStringExpr(slot.right)
+        if (emitMarkers && hasSiblings) {
+          parts.pushStatic('<!--k[-->')
+          parts.pushExpr(`((${left}) ? (${right}) : "")`)
+          parts.pushStatic('<!--k]-->')
+        }
+        else {
+          parts.pushExpr(`((${left}) ? (${right}) : "")`)
+        }
+        hadVariableRange = true
+        continue
+      }
+
+      if (slot.kind === 'ternary-show') {
+        const test = compileSubExpression(slot.expr.test)
+        const cons = compileExpressionAsString(slot.cons)
+        const alt = compileExpressionAsString(slot.alt)
+        if (emitMarkers && hasSiblings) {
+          parts.pushStatic('<!--k[-->')
+          parts.pushExpr(`((${test}) ? (${cons}) : (${alt}))`)
+          parts.pushStatic('<!--k]-->')
+        }
+        else {
+          parts.pushExpr(`((${test}) ? (${cons}) : (${alt}))`)
+        }
+        hadVariableRange = true
+        continue
+      }
+
+      // Generic expression slot
+      const exprCode = compileSubExpression(slot.expr)
+      const rendered = `${use('esc')}(${exprCode})`
+      if (isNodeCapableExpr(slot.expr)) {
+        if (emitMarkers && hasSiblings) {
+          parts.pushStatic('<!--k[-->')
+          parts.pushExpr(rendered)
+          if (!isLast)
+            parts.pushStatic('<!--k]-->')
+        }
+        else {
+          parts.pushExpr(rendered)
+        }
+        hadVariableRange = true
+      }
+      else if (emitMarkers && hasSiblings) {
+        parts.pushStatic('<!---->')
+        parts.pushExpr(rendered)
+        if (!isLast)
+          parts.pushStatic('<!---->')
+      }
+      else {
+        parts.pushExpr(rendered)
       }
     }
   }
 
-  function compileExpressionAsString(expr: AstNode, hasSiblings: boolean, isLast = true): string {
+  function compileExpressionAsString(expr: Node): string {
     if (isJsxNode(expr))
       return compileJsxToStringExpr(expr)
-
-    if (
-      expr.type === 'CallExpression'
-      && expr.callee?.type === 'MemberExpression'
-      && !expr.callee.computed
-      && expr.callee.property?.name === 'map'
-      && expr.arguments?.length === 1
-    ) {
-      const cb = expr.arguments[0] as AstNode
-      if ((cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression') && !cb.async && cb.body !== null) {
-        const body = (cb.body.type === 'ParenthesizedExpression' ? cb.body.expression : cb.body) as AstNode
-        if (isJsxNode(body)) {
-          const target = compileSubExpression(expr.callee.object)
-          const params = (cb.params as AstNode[]).map(p => code.slice(p.start, p.end)).join(', ')
-          const rendered = `${use('ssrLoop')}(${target}, (${params}) => ${compileJsxToStringExpr(body)})`
-          return emitMarkers && !isLast ? `(${rendered}) + "<!---->"` : rendered
-        }
-        if (body.type === 'BlockStatement') {
-          let blockHasJsx = false
-          walk(body, (c) => {
-            if (isJsxNode(c)) {
-              blockHasJsx = true
-              return false
-            }
-            return undefined
-          })
-          if (blockHasJsx) {
-            const rendered = `${use('esc')}(${compileSubExpression(expr)})`
-            return emitMarkers && !isLast ? `(${rendered}) + "<!---->"` : rendered
-          }
-        }
-      }
-    }
-
     if (expr.type === 'LogicalExpression' && expr.operator === '&&') {
       const right = unwrapParens(expr.right)
-      if (isJsxNode(right)) {
-        const left = compileSubExpression(expr.left)
-        const emptyVal = emitMarkers && !isLast ? '"<!---->"' : '""'
-        return `((${left}) ? (${compileJsxToStringExpr(right)}) : ${emptyVal})`
-      }
+      if (isJsxNode(right))
+        return `((${compileSubExpression(expr.left)}) ? (${compileJsxToStringExpr(right)}) : "")`
     }
-
     if (expr.type === 'ConditionalExpression') {
       const consNode = unwrapParens(expr.consequent)
       const altNode = unwrapParens(expr.alternate)
-      if (isJsxNode(consNode) || isJsxNode(altNode)) {
-        const test = compileSubExpression(expr.test)
-        const cons = compileExpressionAsString(consNode, false, true)
-        const alt = compileExpressionAsString(altNode, false, true)
-        const base = `((${test}) ? (${cons}) : (${alt}))`
-        return emitMarkers && !isLast ? `(${base} || "<!---->")` : base
-      }
+      if (isJsxNode(consNode) || isJsxNode(altNode))
+        return `((${compileSubExpression(expr.test)}) ? (${compileExpressionAsString(consNode)}) : (${compileExpressionAsString(altNode)}))`
     }
-
-    const exprCode = compileSubExpression(expr)
-    const rendered = `${use('esc')}(${exprCode})`
-    if (emitMarkers && hasSiblings)
-      return isLast ? `"<!---->" + ${rendered}` : `"<!---->" + ${rendered} + "<!---->"`
-    return rendered
+    return `${use('esc')}(${compileSubExpression(expr)})`
   }
 
-  function emitComponent(node: AstNode, tag: string, parts: StringParts): void {
-    const attrs = node.openingElement.attributes as AstNode[]
-    const propEntries: string[] = []
-    let allStaticProps = true
-    const staticPropsObj: Record<string, unknown> = {}
-    let hydrateExpr: string | undefined
-    let staticHydrate: string | undefined
-
-    for (const attr of attrs) {
-      if (attr.type === 'JSXSpreadAttribute') {
-        allStaticProps = false
-        propEntries.push(`...(${compileSubExpression(attr.argument)})`)
-        continue
-      }
-      const name = jsxTagName(attr.name)
-      if (name === 'key')
-        continue
-      if (name === '$hydrate') {
-        if (attr.value?.type === 'Literal' && typeof attr.value.value === 'string') {
-          staticHydrate = attr.value.value
-          hydrateExpr = JSON.stringify(attr.value.value)
-        }
-        else if (attr.value?.type === 'JSXExpressionContainer') {
-          hydrateExpr = compileSubExpression(attr.value.expression)
-        }
-        continue
-      }
-
-      const propKey = /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name)
-      if (attr.value === null) {
-        propEntries.push(`${propKey}: true`)
-        staticPropsObj[name] = true
-      }
-      else if (attr.value.type === 'Literal') {
-        propEntries.push(`${propKey}: ${JSON.stringify(attr.value.value)}`)
-        staticPropsObj[name] = attr.value.value
-      }
-      else if (attr.value.type === 'JSXExpressionContainer') {
-        const expr = attr.value.expression as AstNode
-        const lit = staticLiteral(expr)
-        if (lit.ok)
-          staticPropsObj[name] = lit.value
-        else
-          allStaticProps = false
-        propEntries.push(`${propKey}: ${compileSubExpression(expr)}`)
-      }
-    }
-
-    const childNodes = node.children as AstNode[]
-    const meaningfulChildren = childNodes.filter(c =>
-      !(c.type === 'JSXText' && cleanJsxText(c.value as string) === '')
-      && !(c.type === 'JSXExpressionContainer' && c.expression.type === 'JSXEmptyExpression'),
-    )
+  function emitComponent(node: JSXElement, tag: string, parts: StringParts): void {
+    const { propEntries, allStaticProps, staticPropsObj, hydrateExpr, staticHydrate } = serializeComponentProps(node.openingElement.attributes)
+    const childNodes = node.children
+    const meaningfulChildren = filterMeaningfulChildren(childNodes)
     const hasChildren = meaningfulChildren.length > 0
 
-    // Special case: <Suspense fallback={...}><AsyncComp /></Suspense> passes the raw component call/Promise!
+    // Special case: <Suspense fallback={...}><AsyncComp .../></Suspense> passes the raw component call/Promise!
     if (tag === 'Suspense') {
       if (meaningfulChildren.length === 1) {
         const only = meaningfulChildren[0]!
         if (only.type === 'JSXElement' && isComponentTag(jsxTagName(only.openingElement.name))) {
           const innerTag = jsxTagName(only.openingElement.name)
-          const innerProps: string[] = []
-          for (const attr of only.openingElement.attributes as AstNode[]) {
-            if (attr.type === 'JSXAttribute') {
-              const n = jsxTagName(attr.name)
-              const k = /^[A-Za-z_$][\w$]*$/.test(n) ? n : JSON.stringify(n)
-              if (attr.value === null)
-                innerProps.push(`${k}: true`)
-              else if (attr.value.type === 'Literal')
-                innerProps.push(`${k}: ${JSON.stringify(attr.value.value)}`)
-              else if (attr.value.type === 'JSXExpressionContainer')
-                innerProps.push(`${k}: ${compileSubExpression(attr.value.expression)}`)
-            }
+          const inner = serializeComponentProps(only.openingElement.attributes)
+          const innerMeaningful = filterMeaningfulChildren(only.children)
+          if (innerMeaningful.length > 0) {
+            const innerChildExpr = compileChildrenListToStringExpr(only.children)
+            inner.propEntries.push(`children: ${use('raw')}(${innerChildExpr})`)
           }
-          propEntries.push(`children: ${innerTag}({ ${innerProps.join(', ')} })`)
+          const innerObj = inner.propEntries.length > 0 ? `{ ${inner.propEntries.join(', ')} }` : '{}'
+          propEntries.push(`children: ${innerTag}(${innerObj})`)
         }
-        else if (only.type === 'JSXExpressionContainer') {
+        else if (only.type === 'JSXExpressionContainer' && only.expression.type !== 'JSXEmptyExpression') {
           propEntries.push(`children: ${compileSubExpression(only.expression)}`)
         }
-        else {
+        else if (isJsxNode(only)) {
           propEntries.push(`children: ${use('raw')}(${compileJsxToStringExpr(only)})`)
         }
       }
@@ -481,11 +530,13 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       return
     }
 
-    const childExpr = hasChildren ? compileJsxToStringExpr({ type: 'JSXFragment', children: childNodes }) : '""'
+    const childrenHaveAwait = hasChildren && childNodes.some(c => containsDirectAwait(c))
+    const childExpr = hasChildren ? compileChildrenListToStringExpr(childNodes) : '""'
 
     const islandInfo = islands?.get(tag)
     if (islandInfo === undefined && islands !== undefined && hydrateExpr !== undefined)
       throw mistake(`$hydrate on <${tag}>`, filename, `${tag} is not an island, so it never hydrates; drop $hydrate, or give ${tag} state or handlers`)
+
     if (islandInfo !== undefined) {
       const propsCode = `{ ${propEntries.join(', ')} }`
       const callPropsCode = hasChildren
@@ -493,9 +544,9 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         : propsCode
       const resolvedHydrate = staticHydrate ?? (hydrateExpr === undefined ? islandInfo.defaultHydrate : undefined)
 
-      // Compile-time static island props fast path (only when not inside an island-reachable component):
-      // 0 JSON.stringify / Object.keys / escAttr at runtime, while still incrementing island depth!
-      if (!emitMarkers && allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
+      // Compile-time static island props fast path (only when not inside an island-reachable component and children don't contain direct `await`):
+      // 0 JSON.stringify / Object.keys / escAttr at runtime, while still recording rendered islands & island ID scope!
+      if (!emitMarkers && !childrenHaveAwait && allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
         const pAttr = Object.keys(staticPropsObj).length > 0
           ? ` p="${escapeStaticAttr(JSON.stringify(staticPropsObj))}"`
           : ''
@@ -503,29 +554,30 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
           ? ` h="${escapeStaticAttr(resolvedHydrate)}"`
           : ''
         const openTag = `<kay-island c="${escapeStaticAttr(islandInfo.chunk)}"${pAttr}${hAttr}>`
-        parts.pushStatic(openTag)
-        if (resolvedHydrate !== 'client')
-          parts.pushExpr(`${use('ssrInIsland')}(() => ${use('ssrChild')}(${tag}(${callPropsCode})))`)
-        parts.pushStatic('</kay-island>')
+        const hydrateArg = resolvedHydrate !== undefined ? JSON.stringify(resolvedHydrate) : 'undefined'
+        const renderArg = resolvedHydrate === 'client'
+          ? 'undefined'
+          : `() => ${use('ssrChild')}(${tag}(${callPropsCode}))`
+        parts.pushExpr(`${use('ssrIslandStatic')}(${JSON.stringify(islandInfo.chunk)}, ${JSON.stringify(openTag)}, ${renderArg}, ${hydrateArg})`)
         return
       }
 
       const hydrateArg = hydrateExpr ?? (islandInfo.defaultHydrate !== undefined ? JSON.stringify(islandInfo.defaultHydrate) : 'undefined')
-      if (allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
+      if (!childrenHaveAwait && allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
         parts.pushExpr(
           `${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg})`,
         )
         return
       }
 
-      // Hoist dynamic island props into a single binding so expressions (side effects & await) evaluate once!
+      // Hoist dynamic island props / awaited children into a single binding so expressions evaluate once!
       const pVar = `_p${loopCounter++}`
       const argNames = [pVar]
       const argExprs = [propsCode]
       let callArg = pVar
       if (hasChildren) {
         let childSlotVal = childExpr
-        if (containsDirectAwait({ type: 'JSXFragment', children: childNodes })) {
+        if (childrenHaveAwait) {
           const cVar = `_c${loopCounter++}`
           argNames.push(cVar)
           argExprs.push(childExpr)
@@ -546,6 +598,28 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       return
     }
 
+    const childrenHaveDynamic = hasChildren && childNodes.some((c) => {
+      let dynamic = false
+      walk(c, (n) => {
+        if (dynamic)
+          return false
+        if (n.type === 'JSXExpressionContainer' && n.expression.type !== 'JSXEmptyExpression')
+          dynamic = true
+        else if (n.type === 'JSXElement' && isComponentTag(jsxTagName(n.openingElement.name)))
+          dynamic = true
+        return undefined
+      })
+      return dynamic
+    })
+
+    // Lazy memoized getter for non-async dynamic/component children so Providers & context components run before their children!
+    if (childrenHaveDynamic && !childrenHaveAwait) {
+      const cVar = `_c${loopCounter++}`
+      const propsWithGetter = [...propEntries, `get children() { return ${cVar} === undefined ? (${cVar} = ${use('raw')}(${childExpr})) : ${cVar} }`].join(', ')
+      parts.pushExpr(`${use('ssrChild')}(${tag}((() => { let ${cVar}; return { ${propsWithGetter} }; })()))`)
+      return
+    }
+
     if (hasChildren)
       propEntries.push(`children: ${use('raw')}(${childExpr})`)
 
@@ -553,7 +627,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     parts.pushExpr(`${use('ssrChild')}(${tag}(${propsObj}))`)
   }
 
-  function compileJsxToStringExpr(node: AstNode): string {
+  function compileJsxToStringExpr(node: JSXElement | JSXFragment): string {
     const bufVar = `_o${loopCounter++}`
     const stmts: string[] = []
     const parts = new StringParts()
@@ -577,7 +651,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     return `(() => { let ${bufVar} = ""; ${stmts.join(' ')} return ${bufVar}; })()`
   }
 
-  function compileRootJsx(node: AstNode): string {
+  function compileRootJsx(node: JSXElement | JSXFragment): string {
     return `${use('raw')}(${compileJsxToStringExpr(node)})`
   }
 

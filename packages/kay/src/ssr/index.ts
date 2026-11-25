@@ -1,6 +1,7 @@
 // Kay v2 SSR runtime: flat string concatenation with fast-path escaping and zero-overhead islands.
 
 import type { Html, HydrateStrategy, KayChild } from '../jsx-runtime'
+import { isBlockedAttr, isStringBoolAttr, isUnsafeUrlAttr } from '../attrs'
 import { styleText } from '../style'
 import { assertRenderable } from '../unrenderable'
 import { currentRenderContext, KAY_STREAM_SCRIPT } from './context'
@@ -96,29 +97,6 @@ export function raw(html: string): Html {
   return { __html: html, [RAW_HTML]: true } as unknown as Html
 }
 
-const VALID_ATTR_NAME = /^[A-Za-z_:][-\w:.]*$/
-const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href'])
-const UNSAFE_URL_RE = /^(?:javascript|vbscript):/i
-const STRING_BOOL_ATTRS = new Set(['draggable', 'spellcheck', 'contenteditable'])
-
-function isBlockedAttr(name: string): boolean {
-  if (!VALID_ATTR_NAME.test(name))
-    return true
-  const lower = name.toLowerCase()
-  return lower.startsWith('on') || lower === 'innerhtml' || lower === 'srcdoc'
-}
-
-function isStringBoolAttr(name: string): boolean {
-  const lower = name.toLowerCase()
-  return lower.startsWith('aria-') || STRING_BOOL_ATTRS.has(lower)
-}
-
-function isUnsafeUrlAttr(name: string, value: unknown): boolean {
-  if (!URL_ATTRS.has(name.toLowerCase()))
-    return false
-  return UNSAFE_URL_RE.test(String(value).replace(/[\u0000-\u0020]+/g, ''))
-}
-
 export function ssrAttr(name: string, value: unknown): string {
   if (value == null || isBlockedAttr(name))
     return ''
@@ -197,7 +175,7 @@ function serializeIslandProps(props: Record<string, unknown>): string {
   return JSON.stringify(props, function (this: Record<string, unknown>, key: string, value: unknown) {
     const orig = key !== '' && this != null && typeof this === 'object' ? this[key] : value
     if (orig instanceof Date)
-      return { __k: 'D', v: orig.toISOString() }
+      return { __k: 'D', v: Number.isNaN(orig.getTime()) ? 'NaN' : orig.toISOString() }
     if (orig instanceof Set)
       return { __k: 'S', v: [...orig] }
     if (orig instanceof Map)
@@ -223,9 +201,23 @@ function getIslandDepth(): number {
   return ctx !== undefined ? ctx.islandDepth : fallbackIslandDepth
 }
 
-export function ssrInIsland(render: () => string): string {
+export function recordRenderedIsland(chunk: string, hydrate?: HydrateStrategy): void {
+  const ctx = currentRenderContext()
+  if (ctx === undefined)
+    return
+  ctx.hasIslands = true
+  const eager = hydrate === undefined || hydrate === 'load'
+  if (eager)
+    ctx.renderedIslands.set(chunk, true)
+  else if (!ctx.renderedIslands.has(chunk))
+    ctx.renderedIslands.set(chunk, false)
+}
+
+export function ssrInIsland(render: () => string, chunk?: string, hydrate?: HydrateStrategy): string {
   const ctx = currentRenderContext()
   if (ctx !== undefined) {
+    if (chunk !== undefined && ctx.islandDepth === 0)
+      recordRenderedIsland(chunk, hydrate)
     ctx.islandDepth++
     try {
       return render()
@@ -243,6 +235,64 @@ export function ssrInIsland(render: () => string): string {
   }
 }
 
+/** Lazily evaluates non-async component children on first read inside the component's dynamic context, memoizing the result. */
+export function ssrChildProp<P extends Record<string, unknown>>(props: P, fn: () => Html): P {
+  let cached: Html | undefined
+  let evaluated = false
+  return Object.defineProperty(props, 'children', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      if (!evaluated) {
+        evaluated = true
+        cached = fn()
+      }
+      return cached
+    },
+  })
+}
+
+export function ssrIslandStatic(
+  chunk: string,
+  openTag: string,
+  render: (() => string) | undefined,
+  hydrate?: HydrateStrategy,
+): string {
+  if (getIslandDepth() > 0)
+    return render !== undefined ? render() : ''
+
+  const ctx = currentRenderContext()
+  if (ctx !== undefined)
+    recordRenderedIsland(chunk, hydrate)
+
+  let idAttr = ''
+  let inner = ''
+  if (render !== undefined && hydrate !== 'client') {
+    if (ctx !== undefined) {
+      const prevPrefix = ctx.idPrefix
+      const prevSeq = ctx.idSeq
+      const islandPrefix = `i${ctx.islandSeq++}-`
+      ctx.idPrefix = islandPrefix
+      ctx.idSeq = 0
+      try {
+        inner = ssrInIsland(render)
+        if (ctx.idSeq > 0)
+          idAttr = ` i="${islandPrefix}"`
+      }
+      finally {
+        ctx.idPrefix = prevPrefix
+        ctx.idSeq = prevSeq
+      }
+    }
+    else {
+      inner = ssrInIsland(render)
+    }
+  }
+
+  const tag = idAttr === '' ? openTag : `${openTag.slice(0, -1)}${idAttr}>`
+  return `${tag}${inner}</kay-island>`
+}
+
 export function ssrIsland(
   chunk: string,
   render: () => string,
@@ -252,15 +302,42 @@ export function ssrIsland(
   if (getIslandDepth() > 0)
     return render()
 
+  const ctx = currentRenderContext()
+  if (ctx !== undefined)
+    recordRenderedIsland(chunk, hydrate)
+
   const propsAttr = Object.keys(props).length > 0
     ? ` p="${escAttr(serializeIslandProps(props))}"`
     : ''
   const hydrateAttr = hydrate !== undefined && hydrate !== 'load'
     ? ` h="${escAttr(hydrate)}"`
     : ''
-  const inner = hydrate === 'client' ? '' : ssrInIsland(render)
 
-  return `<kay-island c="${escAttr(chunk)}"${propsAttr}${hydrateAttr}>${inner}</kay-island>`
+  let idAttr = ''
+  let inner = ''
+  if (hydrate !== 'client') {
+    if (ctx !== undefined) {
+      const prevPrefix = ctx.idPrefix
+      const prevSeq = ctx.idSeq
+      const islandPrefix = `i${ctx.islandSeq++}-`
+      ctx.idPrefix = islandPrefix
+      ctx.idSeq = 0
+      try {
+        inner = ssrInIsland(render)
+        if (ctx.idSeq > 0)
+          idAttr = ` i="${islandPrefix}"`
+      }
+      finally {
+        ctx.idPrefix = prevPrefix
+        ctx.idSeq = prevSeq
+      }
+    }
+    else {
+      inner = ssrInIsland(render)
+    }
+  }
+
+  return `<kay-island c="${escAttr(chunk)}"${propsAttr}${hydrateAttr}${idAttr}>${inner}</kay-island>`
 }
 
 export interface DocumentOptions {
@@ -268,6 +345,7 @@ export interface DocumentOptions {
   head?: string | undefined
   headTags?: Iterable<string> | undefined
   lang?: string | undefined
+  htmlAttrs?: Record<string, string> | undefined
   runtimeScript?: string | undefined
   alwaysLoadRuntime?: boolean | undefined
   preloadChunks?: Iterable<string> | undefined
@@ -277,7 +355,7 @@ export interface DocumentOptions {
 }
 
 export function renderDocument(options: DocumentOptions): string {
-  const { body, head = '', headTags, lang = 'en', runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands, hasSuspense } = options
+  const { body, head = '', headTags, lang = 'en', htmlAttrs, runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands, hasSuspense } = options
   let headExtra = head
 
   if (headTags !== undefined) {
@@ -304,5 +382,15 @@ export function renderDocument(options: DocumentOptions): string {
   if (runtimeScript !== undefined && (hasIslands || alwaysLoadRuntime))
     headExtra += `<script type="module" src="${escAttr(runtimeScript)}"></script>`
 
-  return `<!DOCTYPE html><html lang="${escAttr(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${headExtra}</head><body>${body}</body></html>`
+  let attrStr = ''
+  const effectiveLang = htmlAttrs?.lang ?? lang
+  attrStr += ` lang="${escAttr(effectiveLang)}"`
+  if (htmlAttrs !== undefined) {
+    for (const [k, v] of Object.entries(htmlAttrs)) {
+      if (k !== 'lang' && !isBlockedAttr(k))
+        attrStr += ` ${k}="${escAttr(v)}"`
+    }
+  }
+
+  return `<!DOCTYPE html><html${attrStr}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${headExtra}</head><body>${body}</body></html>`
 }

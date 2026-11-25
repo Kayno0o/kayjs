@@ -151,10 +151,6 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const serverDir = join(outDir, 'server')
   const isStatic = options.static === true
 
-  rmSync(outDir, { recursive: true, force: true })
-  mkdirSync(clientDir, { recursive: true })
-  mkdirSync(serverDir, { recursive: true })
-
   const allRouteFiles = walkRoutes(routesDir).sort()
   const specialFiles = allRouteFiles.filter(f => SPECIAL_ROUTE_FILES.has(basename(f)))
   const candidatePageFiles = allRouteFiles.filter(f => !basename(f).startsWith('_'))
@@ -163,7 +159,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const hasErrorFile = existsSync(errorSrc)
   const hasNotFoundFile = existsSync(notFoundSrc)
 
-  // Every reachable .ts/.tsx file is analyzed once.
+  // Every reachable .ts/.tsx file is analyzed & validated BEFORE wiping outDir, so build errors keep the last working dist/.
   const graph = new ModuleGraph(options.cache)
   for (const f of [...specialFiles, ...candidatePageFiles])
     graph.load(f)
@@ -194,6 +190,10 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   }
 
   const islands = planIslands(graph, root, pageFiles, specialFiles, actionsByFile)
+
+  rmSync(outDir, { recursive: true, force: true })
+  mkdirSync(clientDir, { recursive: true })
+  mkdirSync(serverDir, { recursive: true })
   const pluginCssFiles = plugins
     .flatMap(p => p.css ?? [])
     .map(c => resolve(root, c))
@@ -297,27 +297,32 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     ? await prerender({ root, outDir, assetPrefix, plugins, isDev, isStatic, prerenderDir, routes: prerenderRoutes })
     : undefined
 
-  const ranAfterPrerender = await host.runAfterPrerender()
-  host.precompressAssets()
-  if (Object.keys(host.pluginData).length > 0)
-    manifest.pluginData = host.pluginData
+  try {
+    const ranAfterPrerender = await host.runAfterPrerender()
+    host.precompressAssets()
+    if (Object.keys(host.pluginData).length > 0)
+      manifest.pluginData = host.pluginData
 
-  if (isStatic) {
-    await exportStatic({
-      stageDir: prerenderDir,
-      finalOutDir: run.finalOutDir,
-      outDir,
-      clientDir,
-      assetPrefix,
-      assets,
-      publicFiles,
-      app,
-      hasNotFoundFile,
-      stageSuffix: run.stageSuffix,
-    })
+    if (isStatic) {
+      await exportStatic({
+        stageDir: prerenderDir,
+        finalOutDir: run.finalOutDir,
+        outDir,
+        clientDir,
+        assetPrefix,
+        assets,
+        publicFiles,
+        app,
+        hasNotFoundFile,
+        stageSuffix: run.stageSuffix,
+      })
+    }
+    else if (prerenderRoutes.length > 0 || ranAfterPrerender) {
+      writeManifest()
+    }
   }
-  else if (prerenderRoutes.length > 0 || ranAfterPrerender) {
-    writeManifest()
+  finally {
+    await app?.dispose?.()
   }
 
   if (options.compile) {

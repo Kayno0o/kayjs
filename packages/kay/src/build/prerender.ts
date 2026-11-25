@@ -3,12 +3,28 @@
 import type { KayPlugin } from '../plugins/index'
 import type { RouteManifestEntry } from './manifest'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { relPosix } from './files'
 import { assertPathUrls } from './routes'
 
 const CONCURRENCY = 8
 const SLASH_EDGES_RE = /^\/|\/$/g
+
+let prerenderImportSeq = 0
+
+function resolvePrerenderHtmlPath(prerenderDir: string, urlStr: string, isStatic: boolean): string {
+  const pathname = new URL(urlStr, 'http://localhost').pathname
+  const rel = pathname === '/'
+    ? 'index.html'
+    : (isStatic && pathname === '/404')
+        ? '404.html'
+        : `${pathname.replace(SLASH_EDGES_RE, '')}/index.html`
+  const absRoot = resolve(prerenderDir)
+  const abs = resolve(absRoot, rel)
+  if (!abs.startsWith(`${absRoot}/`) && !abs.startsWith(`${absRoot}\\`))
+    throw new Error(`kay build: prerender path "${urlStr}" escapes output directory.`)
+  return abs
+}
 
 export interface PrerenderOptions {
   root: string
@@ -29,20 +45,22 @@ export async function prerender(options: PrerenderOptions) {
   const app = await createServer({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, plugins: options.plugins, dev: options.isDev })
   mkdirSync(prerenderDir, { recursive: true })
 
-  const stamp = Date.now()
+  const stamp = `${Date.now()}-${++prerenderImportSeq}`
   for (const route of options.routes) {
-    const mod = await import(`${join(outDir, route.file)}?v=${stamp}`) as { paths?: () => Promise<string[]> | string[] }
     let urls: string[] = []
     if (!route.path.includes(':') && !route.path.includes('*')) {
       urls = [route.path]
     }
-    else if (typeof mod.paths === 'function') {
-      const returned: unknown = await mod.paths()
-      assertPathUrls(returned, route.file)
-      urls = returned
-    }
-    else if (isStatic) {
-      console.warn(`kay build --static: skipping dynamic route "${route.path}" (${route.file}) because it does not export a paths() function.`)
+    else {
+      const mod = await import(`${join(outDir, route.file)}?v=${stamp}`) as { paths?: () => Promise<string[]> | string[] }
+      if (typeof mod.paths === 'function') {
+        const returned: unknown = await mod.paths()
+        assertPathUrls(returned, route.file)
+        urls = returned
+      }
+      else {
+        console.warn(`kay build${isStatic ? ' --static' : ''}: skipping dynamic route "${route.path}" (${route.file}) because it does not export a paths() function.`)
+      }
     }
 
     if (urls.length === 0)
@@ -59,11 +77,11 @@ export async function prerender(options: PrerenderOptions) {
         const res = await app.handle(new Request(`http://localhost${u}`))
         const isExplicit404 = u === '/404' && res.status === 404
         if (res.status !== 200 && !isExplicit404) {
-          if (isStatic)
-            throw new Error(`kay build --static: route "${u}" returned HTTP ${res.status} (expected 200).`)
+          if (isStatic || res.status >= 500)
+            throw new Error(`kay build${isStatic ? ' --static' : ''}: prerender route "${u}" returned HTTP ${res.status} (expected 200).`)
           return
         }
-        const absHtml = join(prerenderDir, u === '/' ? 'index.html' : `${u.replace(SLASH_EDGES_RE, '')}/index.html`)
+        const absHtml = resolvePrerenderHtmlPath(prerenderDir, u, isStatic)
         mkdirSync(dirname(absHtml), { recursive: true })
         writeFileSync(absHtml, await res.text())
         map[u] = relPosix(isStatic ? prerenderDir : outDir, absHtml)

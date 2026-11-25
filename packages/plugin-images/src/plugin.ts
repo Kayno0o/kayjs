@@ -101,6 +101,28 @@ function encodeVariant(srcPath: string, dstPath: string, width: number, quality:
   return false
 }
 
+async function encodeVariantAsync(srcPath: string, dstPath: string, width: number, quality: number): Promise<boolean> {
+  const ext = extname(dstPath)
+  const stem = ext !== '' ? dstPath.slice(0, -ext.length) : dstPath
+  const tmpPath = `${stem}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}${ext}`
+  const proc = Bun.spawn(
+    ['magick', `${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), tmpPath],
+    { stdout: 'pipe', stderr: 'pipe' },
+  )
+  const exitCode = await proc.exited
+  if (exitCode === 0 && existsSync(tmpPath)) {
+    try {
+      renameSync(tmpPath, dstPath)
+    }
+    catch {
+      rmSync(tmpPath, { force: true })
+    }
+    return existsSync(dstPath)
+  }
+  rmSync(tmpPath, { force: true })
+  return false
+}
+
 interface PersistedImagesConfig {
   cacheDirRel: string
   widths: number[]
@@ -134,7 +156,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       return [{
         name: 'kayjs-images',
         setup(b) {
-          b.onLoad({ filter: /\.(?:png|jpe?g|webp|avif)$/i }, (args) => {
+          b.onLoad({ filter: /\.(?:png|jpe?g|webp|avif)$/i }, async (args) => {
             if (args.path.includes('/node_modules/'))
               return undefined
 
@@ -177,17 +199,25 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
 
               const targetWidths = widths.filter(w => w < dims.width)
               targetWidths.push(dims.width)
-              const files: CachedImageMeta['files'] = []
-
+              const jobs: { fileName: string, cachedFile: string, width: number, format: 'avif' | 'webp', quality: number }[] = []
               for (const w of targetWidths) {
                 for (const fmt of formats) {
                   const fileName = `${stem}-${hash}-${w}w.${fmt}`
-                  const cachedFile = join(cacheRoot, fileName)
-                  const q = fmt === 'avif' ? avifQuality : quality
-                  if (existsSync(cachedFile) || encodeVariant(args.path, cachedFile, w, q))
-                    files.push({ rel: `img/${fileName}`, width: w, format: fmt })
+                  jobs.push({
+                    fileName,
+                    cachedFile: join(cacheRoot, fileName),
+                    width: w,
+                    format: fmt,
+                    quality: fmt === 'avif' ? avifQuality : quality,
+                  })
                 }
               }
+
+              const encoded = await Promise.all(jobs.map(async (job) => {
+                const ok = existsSync(job.cachedFile) || await encodeVariantAsync(args.path, job.cachedFile, job.width, job.quality)
+                return ok ? { rel: `img/${job.fileName}`, width: job.width, format: job.format } : undefined
+              }))
+              const files: CachedImageMeta['files'] = encoded.filter((entry): entry is NonNullable<typeof entry> => entry !== undefined)
 
               if (files.length === 0) {
                 const rel = `img/${stem}-${hash}${extname(args.path).toLowerCase()}`

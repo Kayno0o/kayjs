@@ -119,12 +119,40 @@ export class ModuleGraph {
     return analysis
   }
 
-  /** Follows `export { x } from './y'` chains to the module that declares the export. */
-  exportTarget(file: string, exportName: string, depth = 0): { file: string, exportName: string } {
+  /** Follows `export { x } from './y'` and `export * from './y'` chains to the module that declares the export. */
+  exportTarget(file: string, exportName: string, depth = 0, seen = new Set<string>()): { file: string, exportName: string } {
     if (depth > MAX_REEXPORT_DEPTH)
       return { file, exportName }
-    const re = this.load(file).reexports.find(r => r.exported === exportName)
-    const next = re === undefined ? undefined : this.resolve(file, re.source)
-    return re !== undefined && next !== undefined ? this.exportTarget(next, re.local, depth + 1) : { file, exportName }
+    const key = `${file}\0${exportName}`
+    if (seen.has(key))
+      return { file, exportName }
+    seen.add(key)
+
+    const analysis = this.load(file)
+    const direct = analysis.reexports.find(r => r.exported === exportName)
+    if (direct !== undefined) {
+      const next = this.resolve(file, direct.source)
+      if (next !== undefined && isTsFile(next))
+        return this.exportTarget(next, direct.local, depth + 1, seen)
+    }
+
+    if (analysis.exportedNames.includes(exportName))
+      return { file, exportName }
+
+    // Follow `export * from './y'` barrel re-exports (named exports only, per ESM spec `export *` never re-exports `default`).
+    if (exportName !== 'default') {
+      for (const re of analysis.reexports) {
+        if (re.exported !== '*')
+          continue
+        const next = this.resolve(file, re.source)
+        if (next === undefined || !isTsFile(next))
+          continue
+        const candidate = this.exportTarget(next, exportName, depth + 1, seen)
+        if (this.load(candidate.file).exportedNames.includes(candidate.exportName))
+          return candidate
+      }
+    }
+
+    return { file, exportName }
   }
 }

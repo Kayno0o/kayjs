@@ -5,12 +5,12 @@
     "packages/*"
   ],
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "bun check",
     "test": "bun test packages/kay/tests",
     "bench": "bun bench-app/bench.ts",
     "bench:server": "bun bench-app/server-bench.ts",
     "bench:weight": "bun scripts/bundle-weight.ts",
-    "verify": "tsc --noEmit && bun test packages/kay/tests && bun bench-app/build.ts"
+    "verify": "bun check --no-script && bun test packages/kay/tests && bun bench-app/build.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^21.0.4",
