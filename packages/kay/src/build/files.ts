@@ -1,0 +1,136 @@
+// File-system helpers of the build: directory walks, the outDir safety check, and precompressed sidecars.
+
+import type { Dirent } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
+import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
+
+const TEST_FILE_RE = /\.(?:test|spec)\.(?:tsx|ts)$/
+const BACKSLASH_RE = /\\/g
+const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.mjs', '.css', '.svg', '.xml', '.json', '.txt', '.webmanifest', '.wasm'])
+
+/** `relative(from, to)` with forward slashes, the form manifests and messages use. */
+export function relPosix(from: string, to: string): string {
+  return relative(from, to).replace(BACKSLASH_RE, '/')
+}
+
+export function isTsFile(file: string): boolean {
+  return file.endsWith('.tsx') || file.endsWith('.ts')
+}
+
+/** The size of a file in bytes, or undefined when it does not exist. */
+export function fileSize(file: string): number | undefined {
+  try {
+    return statSync(file).size
+  }
+  catch {
+    return undefined
+  }
+}
+
+interface WalkOptions {
+  skipDir?: (name: string) => boolean
+  keep?: (entry: Dirent) => boolean
+}
+
+/** Every kept file under `dir`, depth first; a missing `dir` is empty. */
+export function walkFiles(dir: string, options: WalkOptions = {}, out: string[] = []): string[] {
+  if (!existsSync(dir))
+    return out
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (options.skipDir?.(entry.name) !== true)
+        walkFiles(full, options, out)
+    }
+    else if (options.keep === undefined || options.keep(entry)) {
+      out.push(full)
+    }
+  }
+  return out
+}
+
+/** Route sources: `.ts`/`.tsx` outside `_`-prefixed folders, without declarations and tests. */
+export function walkRoutes(dir: string): string[] {
+  return walkFiles(dir, {
+    skipDir: name => name.startsWith('_'),
+    keep: entry => isTsFile(entry.name) && !entry.name.endsWith('.d.ts') && !TEST_FILE_RE.test(entry.name),
+  })
+}
+
+export function walkAllFiles(dir: string): string[] {
+  return walkFiles(dir, { keep: entry => entry.isFile() })
+}
+
+function isOutside(base: string, target: string): boolean {
+  const rel = relative(base, target)
+  return rel === '..' || rel.startsWith('../') || rel.startsWith('..\\') || isAbsolute(rel)
+}
+
+function isStrictDescendant(base: string, target: string): boolean {
+  return relative(base, target) !== '' && !isOutside(base, target)
+}
+
+export function isOutsideRoot(root: string, outDir: string): boolean {
+  const rel = relative(root, outDir)
+  return rel !== '' && (rel.startsWith('..') || isAbsolute(rel))
+}
+
+export function assertSafeOutDir(root: string, outDir: string, routesDir: string, publicDir: string): void {
+  // Refuse filesystem root, home dir, tmpdir root, or root/ancestors of root
+  if (dirname(outDir) === outDir || outDir === tmpdir() || outDir === resolve(process.env.HOME ?? '\0')) {
+    throw new Error(`kay build: refusing unsafe outDir "${outDir}" — cannot wipe a root or shared system directory.`)
+  }
+  if (!isOutside(outDir, root)) {
+    throw new Error(`kay build: refusing unsafe outDir "${outDir}" — outDir cannot be or contain project root "${root}".`)
+  }
+  if (existsSync(outDir)) {
+    try {
+      const realRoot = realpathSync(root)
+      const realOut = realpathSync(outDir)
+      if (dirname(realOut) === realOut || !isOutside(realOut, realRoot)) {
+        throw new Error(`kay build: refusing unsafe outDir "${outDir}" — resolved target "${realOut}" is or contains project root "${realRoot}".`)
+      }
+    }
+    catch (err) {
+      if (err instanceof Error && err.message.startsWith('kay build: refusing unsafe outDir'))
+        throw err
+    }
+  }
+  const protectedTargets: [string, string][] = [
+    ['src', resolve(root, 'src')],
+    ['routesDir', routesDir],
+    ['publicDir', publicDir],
+    ['kay.config.ts', resolve(root, 'kay.config.ts')],
+    ['package.json', resolve(root, 'package.json')],
+  ]
+  for (const [label, target] of protectedTargets) {
+    if (!isOutside(outDir, target)) {
+      throw new Error(`kay build: refusing unsafe outDir "${outDir}" — it equals or contains protected path ${label} ("${target}").`)
+    }
+  }
+  // If outDir is outside root (e.g. an external temp build dir), refuse it if it looks like another project directory.
+  if (!isStrictDescendant(root, outDir) && existsSync(outDir)) {
+    for (const marker of ['package.json', 'kay.config.ts', 'src']) {
+      if (existsSync(join(outDir, marker))) {
+        throw new Error(`kay build: refusing unsafe external outDir "${outDir}" — it contains "${marker}".`)
+      }
+    }
+  }
+}
+
+/** Writes `.br` and `.gz` sidecars next to a compressible file of at least `minBytes`, when they come out smaller. */
+export function precompressFile(abs: string, minBytes: number): void {
+  if (!COMPRESSIBLE_EXTS.has(extname(abs).toLowerCase()))
+    return
+  const raw = readFileSync(abs)
+  if (raw.byteLength < minBytes)
+    return
+  const br = brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } })
+  if (br.byteLength < raw.byteLength)
+    writeFileSync(`${abs}.br`, br)
+  const gz = Bun.gzipSync(raw, { level: 9 })
+  if (gz.byteLength < raw.byteLength)
+    writeFileSync(`${abs}.gz`, gz)
+}
