@@ -35,17 +35,17 @@
 
     "@iconify/types": ["@iconify/types@2.0.0", "", {}, "sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg=="],
 
-    "@kayjs/content": ["@kayjs/content@file:../packages/plugin-content", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.1" } }],
+    "@kayjs/content": ["@kayjs/content@file:../packages/plugin-content", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.2" } }],
 
-    "@kayjs/icons": ["@kayjs/icons@file:../packages/plugin-icons", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.1" } }],
+    "@kayjs/icons": ["@kayjs/icons@file:../packages/plugin-icons", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.2" } }],
 
-    "@kayjs/images": ["@kayjs/images@file:../packages/plugin-images", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.1" } }],
+    "@kayjs/images": ["@kayjs/images@file:../packages/plugin-images", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.2" } }],
 
     "@kayjs/kay": ["@kayjs/kay@file:../packages/kay", { "dependencies": { "oxc-parser": "^0.155.0" }, "bin": { "kay": "./src/cli/index.ts" } }],
 
-    "@kayjs/seo": ["@kayjs/seo@file:../packages/plugin-seo", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.1" } }],
+    "@kayjs/seo": ["@kayjs/seo@file:../packages/plugin-seo", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.2" } }],
 
-    "@kayjs/ui": ["@kayjs/ui@file:../packages/ui", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.1" } }],
+    "@kayjs/ui": ["@kayjs/ui@file:../packages/ui", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.2" } }],
 
     "@oxc-parser/binding-android-arm-eabi": ["@oxc-parser/binding-android-arm-eabi@0.155.0", "", { "os": "android", "cpu": "arm" }, "sha512-A6xv7hDtnTm+xlZ7utn6rRQpRMJHRhVr3gjRGqlx0RUX84mNk0pAsy6YN/wWhuOTkaZhRrrzaLxf0NfbH77j2w=="],
 

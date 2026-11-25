@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/spa",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "description": "Opt-in SPA navigation with persistent islands plugin for Kay v2",
   "license": "MIT",
   "type": "module",
@@ -23,6 +23,6 @@
     "directory": "packages/plugin-spa"
   },
   "peerDependencies": {
-    "@kayjs/kay": "^2.0.0-beta.1"
+    "@kayjs/kay": "^2.0.0-beta.2"
   }
 }
