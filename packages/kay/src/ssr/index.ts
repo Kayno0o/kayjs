@@ -17,14 +17,17 @@ const ESC_TEXT = /[&<>]/
 const ESC_ATTR = /[&"<>]/
 const bunEscape = typeof Bun !== 'undefined' && typeof Bun.escapeHTML === 'function' ? Bun.escapeHTML : undefined
 
+function escText(str: string): string {
+  if (bunEscape !== undefined)
+    return bunEscape(str)
+  if (!ESC_TEXT.test(str))
+    return str
+  return str.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+}
+
 export function esc(value: unknown): string {
-  if (typeof value === 'string') {
-    if (bunEscape !== undefined)
-      return bunEscape(value)
-    if (!ESC_TEXT.test(value))
-      return value
-    return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-  }
+  if (typeof value === 'string')
+    return escText(value)
   if (typeof value === 'number')
     return String(value)
   if (value == null || typeof value === 'boolean')
@@ -37,12 +40,7 @@ export function esc(value: unknown): string {
       out += esc(value[i])
     return out
   }
-  const str = String(value)
-  if (bunEscape !== undefined)
-    return bunEscape(str)
-  if (!ESC_TEXT.test(str))
-    return str
-  return str.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+  return escText(String(value))
 }
 
 export function ssrRaw(value: unknown): string {
@@ -66,11 +64,7 @@ export function ssrRawText(tag: 'style' | 'script', value: unknown): string {
       out += ssrRawText(tag, value[i])
     return out
   }
-  const str = typeof value === 'string'
-    ? value
-    : isRawHtml(value)
-      ? String(value.__html)
-      : String(value)
+  const str = isRawHtml(value) ? String(value.__html) : String(value)
   if (tag === 'script') {
     return str.replace(SCRIPT_UNSAFE_RE, (_, body: string) =>
       body.charCodeAt(0) === 47 ? `<\\${body}` : `\\u003c${body}`)
