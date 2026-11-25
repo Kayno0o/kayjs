@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/auth",
-  "version": "2.0.0-beta.0",
+  "version": "2.0.0-beta.1",
   "description": "Zero-dependency Bun-native auth plugin for Kay v2 (Argon2id, hashed sessions, SQLite, magic links, OAuth2 PKCE)",
   "license": "MIT",
   "type": "module",
@@ -22,6 +22,6 @@
     "directory": "packages/plugin-auth"
   },
   "peerDependencies": {
-    "@kayjs/kay": "^2.0.0-beta.0"
+    "@kayjs/kay": "^2.0.0-beta.1"
   }
 }
