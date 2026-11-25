@@ -31,55 +31,73 @@ export interface ButtonProps {
   [attr: string]: unknown
 }
 
-export function Button({ variant = 'solid', tone, size = 'md', href, type = 'button', children, ...rest }: ButtonProps) {
-  if (href !== undefined) {
+function restProps(props: Record<string, unknown>, skip: readonly string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const k of Object.keys(props)) {
+    if (k !== 'children' && !skip.includes(k))
+      out[k] = props[k]
+  }
+  return out
+}
+
+export function Button(props: ButtonProps) {
+  const rest = restProps(props as unknown as Record<string, unknown>, ['variant', 'tone', 'size', 'href', 'type', 'disabled', 'class'])
+  if (props.href !== undefined) {
     return (
-      <a data-ui="button" data-variant={variant} data-tone={tone} data-size={size} href={href} {...rest}>
-        {children}
+      <a data-ui="button" data-variant={props.variant ?? 'solid'} data-tone={props.tone} data-size={props.size ?? 'md'} href={props.href} class={props.class} {...rest}>
+        {props.children}
       </a>
     )
   }
   return (
-    <button data-ui="button" data-variant={variant} data-tone={tone} data-size={size} type={type} {...rest}>
-      {children}
+    <button data-ui="button" data-variant={props.variant ?? 'solid'} data-tone={props.tone} data-size={props.size ?? 'md'} type={props.type ?? 'button'} disabled={props.disabled} class={props.class} {...rest}>
+      {props.children}
     </button>
   )
 }
 
-export function Badge({ tone, class: cls, children, ...rest }: BoxProps & { tone?: Tone | undefined }) {
-  return <span data-ui="badge" data-tone={tone} class={cls} {...rest}>{children}</span>
+export function Badge(props: BoxProps & { tone?: Tone | undefined }) {
+  const rest = restProps(props, ['tone', 'class'])
+  return <span data-ui="badge" data-tone={props.tone} class={props.class} {...rest}>{props.children}</span>
 }
 
-export function Notice({ tone, role = 'status', class: cls, children, ...rest }: BoxProps & { tone?: Tone | undefined, role?: 'status' | 'alert' | 'note' | undefined }) {
-  return <div data-ui="notice" data-tone={tone} role={role} class={cls} {...rest}>{children}</div>
+export function Notice(props: BoxProps & { tone?: Tone | undefined, role?: 'status' | 'alert' | 'note' | undefined }) {
+  const rest = restProps(props, ['tone', 'role', 'class'])
+  return <div data-ui="notice" data-tone={props.tone} role={props.role ?? 'status'} class={props.class} {...rest}>{props.children}</div>
 }
 
-export function Card({ class: cls, children, ...rest }: BoxProps) {
-  return <section data-ui="card" class={cls} {...rest}>{children}</section>
+export function Card(props: BoxProps) {
+  const rest = restProps(props, ['class'])
+  return <section data-ui="card" class={props.class} {...rest}>{props.children}</section>
 }
 
-export function CardHeader({ class: cls, children, ...rest }: BoxProps) {
-  return <header data-part="header" class={cls} {...rest}>{children}</header>
+export function CardHeader(props: BoxProps) {
+  const rest = restProps(props, ['class'])
+  return <header data-part="header" class={props.class} {...rest}>{props.children}</header>
 }
 
-export function CardBody({ class: cls, children, ...rest }: BoxProps) {
-  return <div data-part="body" class={cls} {...rest}>{children}</div>
+export function CardBody(props: BoxProps) {
+  const rest = restProps(props, ['class'])
+  return <div data-part="body" class={props.class} {...rest}>{props.children}</div>
 }
 
-export function CardFooter({ class: cls, children, ...rest }: BoxProps) {
-  return <footer data-part="footer" class={cls} {...rest}>{children}</footer>
+export function CardFooter(props: BoxProps) {
+  const rest = restProps(props, ['class'])
+  return <footer data-part="footer" class={props.class} {...rest}>{props.children}</footer>
 }
 
 /** Zero-JS native `<details>` accordion (`name` enables exclusive mode natively in the browser). */
-export function Accordion({ class: cls, children, ...rest }: BoxProps) {
-  return <div data-ui="accordion" class={cls} {...rest}>{children}</div>
+export function Accordion(props: BoxProps) {
+  const rest = restProps(props, ['class'])
+  return <div data-ui="accordion" class={props.class} {...rest}>{props.children}</div>
 }
 
-export function AccordionItem({ title, group, open, children, ...rest }: { title: string, group?: string | undefined, open?: boolean | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
+export function AccordionItem(props: { title: string, group?: string | undefined, open?: boolean | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {
+  const rest = restProps(props, ['title', 'group', 'open'])
   return (
-    <details name={group} open={open} {...rest}>
-      <summary data-part="trigger">{title}</summary>
-      <div data-part="content">{children}</div>
+    <details name={props.group} open={props.open} {...rest}>
+      <summary data-part="trigger">{props.title}</summary>
+      <div data-part="content">{props.children}</div>
     </details>
   )
 }
@@ -283,25 +301,31 @@ function wireFieldChildren(children: KayChild, wiring: FieldControlWiring, state
   return children
 }
 
-export function Field({ id, label, hint, error, required, class: cls, children }: FieldProps) {
-  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
-  const wiring: FieldControlWiring = {
-    id,
-    describedBy,
-    invalid: Boolean(error),
-    required: Boolean(required),
+export function Field(props: FieldProps) {
+  const isBrowser = typeof document !== 'undefined'
+  const buildWiring = (): FieldControlWiring => {
+    const err = isBrowser ? undefined : props.error
+    const describedBy = err ? `${props.id}-error` : props.hint ? `${props.id}-hint` : undefined
+    return {
+      id: props.id,
+      describedBy,
+      invalid: Boolean(err),
+      required: Boolean(props.required),
+    }
   }
-  const wiredChildren = provideContext(FieldContext, wiring, () => wireFieldChildren(children, wiring))
 
   return (
-    <div data-ui="field" data-invalid={error ? 'true' : undefined} class={cls}>
-      <label data-part="label" for={id}>
-        {label}
-        {required && <span aria-hidden="true"> *</span>}
+    <div data-ui="field" data-invalid={props.error ? 'true' : undefined} class={props.class}>
+      <label data-part="label" for={props.id}>
+        {props.label}
+        {props.required && <span aria-hidden="true"> *</span>}
       </label>
-      {wiredChildren}
-      {hint && !error && <p data-part="hint" id={`${id}-hint`}>{hint}</p>}
-      {error && <p data-part="error" id={`${id}-error`} role="alert">{error}</p>}
+      {(() => {
+        const wiring = buildWiring()
+        return provideContext(FieldContext, wiring, () => wireFieldChildren(props.children, wiring))
+      })()}
+      {props.hint && !props.error && <p data-part="hint" id={`${props.id}-hint`}>{props.hint}</p>}
+      {props.error && <p data-part="error" id={`${props.id}-error`} role="alert">{props.error}</p>}
     </div>
   )
 }
@@ -419,76 +443,81 @@ const TRACK_TOKENS = new Set<string>(['xs', 'sm', 'md', 'lg', 'xl'])
 const isSpaceToken = (v: string | undefined): boolean => v !== undefined && SPACE_TOKENS.has(v)
 const isTrackToken = (v: string | undefined): boolean => v !== undefined && TRACK_TOKENS.has(v)
 
-export function Stack({ gap, class: cls, children, ...rest }: BoxProps & { gap?: SpaceValue | undefined }) {
+export function Stack(props: BoxProps & { gap?: SpaceValue | undefined }) {
+  const rest = restProps(props, ['gap', 'class'])
   return (
     <div
       data-layout="stack"
-      data-gap={isSpaceToken(gap) ? gap : undefined}
-      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
-      class={cls}
+      data-gap={isSpaceToken(props.gap) ? props.gap : undefined}
+      data-gap-value={props.gap && !isSpaceToken(props.gap) ? props.gap : undefined}
+      class={props.class}
       {...rest}
     >
-      {children}
+      {props.children}
     </div>
   )
 }
 
-export function Cluster({ gap, class: cls, children, ...rest }: BoxProps & { gap?: SpaceValue | undefined }) {
+export function Cluster(props: BoxProps & { gap?: SpaceValue | undefined }) {
+  const rest = restProps(props, ['gap', 'class'])
   return (
     <div
       data-layout="cluster"
-      data-gap={isSpaceToken(gap) ? gap : undefined}
-      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
-      class={cls}
+      data-gap={isSpaceToken(props.gap) ? props.gap : undefined}
+      data-gap-value={props.gap && !isSpaceToken(props.gap) ? props.gap : undefined}
+      class={props.class}
       {...rest}
     >
-      {children}
+      {props.children}
     </div>
   )
 }
 
-export function Grid({ min, gap, class: cls, children, ...rest }: BoxProps & { min?: TrackValue | undefined, gap?: SpaceValue | undefined }) {
+export function Grid(props: BoxProps & { min?: TrackValue | undefined, gap?: SpaceValue | undefined }) {
+  const rest = restProps(props, ['min', 'gap', 'class'])
   return (
     <div
       data-layout="grid"
-      data-min={isTrackToken(min) ? min : undefined}
-      data-min-value={min && !isTrackToken(min) ? min : undefined}
-      data-gap={isSpaceToken(gap) ? gap : undefined}
-      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
-      class={cls}
+      data-min={isTrackToken(props.min) ? props.min : undefined}
+      data-min-value={props.min && !isTrackToken(props.min) ? props.min : undefined}
+      data-gap={isSpaceToken(props.gap) ? props.gap : undefined}
+      data-gap-value={props.gap && !isSpaceToken(props.gap) ? props.gap : undefined}
+      class={props.class}
       {...rest}
     >
-      {children}
+      {props.children}
     </div>
   )
 }
 
-export function Sidebar({ side, gap, class: cls, children, ...rest }: BoxProps & { side?: TrackValue | undefined, gap?: SpaceValue | undefined }) {
+export function Sidebar(props: BoxProps & { side?: TrackValue | undefined, gap?: SpaceValue | undefined }) {
+  const rest = restProps(props, ['side', 'gap', 'class'])
   return (
     <div
       data-layout="sidebar"
-      data-side={isTrackToken(side) ? side : undefined}
-      data-side-value={side && !isTrackToken(side) ? side : undefined}
-      data-gap={isSpaceToken(gap) ? gap : undefined}
-      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
-      class={cls}
+      data-side={isTrackToken(props.side) ? props.side : undefined}
+      data-side-value={props.side && !isTrackToken(props.side) ? props.side : undefined}
+      data-gap={isSpaceToken(props.gap) ? props.gap : undefined}
+      data-gap-value={props.gap && !isSpaceToken(props.gap) ? props.gap : undefined}
+      class={props.class}
       {...rest}
     >
-      {children}
+      {props.children}
     </div>
   )
 }
 
-export function Split({ gap, class: cls, children, ...rest }: BoxProps & { gap?: SpaceValue | undefined }) {
+export function Split(props: BoxProps & { gap?: SpaceValue | undefined }) {
+  const rest = restProps(props, ['gap', 'class'])
   return (
     <div
       data-layout="split"
-      data-gap={isSpaceToken(gap) ? gap : undefined}
-      data-gap-value={gap && !isSpaceToken(gap) ? gap : undefined}
-      class={cls}
+      data-gap={isSpaceToken(props.gap) ? props.gap : undefined}
+      data-gap-value={props.gap && !isSpaceToken(props.gap) ? props.gap : undefined}
+      class={props.class}
       {...rest}
     >
-      {children}
+      {props.children}
     </div>
   )
 }

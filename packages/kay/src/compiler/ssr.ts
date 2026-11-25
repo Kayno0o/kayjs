@@ -223,7 +223,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     return { propEntries, allStaticProps, staticPropsObj, hydrateExpr, staticHydrate }
   }
 
-  function compileChildrenListToStringExpr(children: readonly JSXChild[]): string {
+  function compileChildrenListToStringExpr(children: readonly JSXChild[], slotMarkers = emitMarkers): string {
     const bufVar = `_o${loopCounter++}`
     const stmts: string[] = []
     const parts = new StringParts()
@@ -233,7 +233,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         parts.clear()
       }
     }
-    emitChildrenIntoBuffer(children, bufVar, parts, flush, s => stmts.push(s))
+    emitChildrenIntoBuffer(children, bufVar, parts, flush, s => stmts.push(s), undefined, slotMarkers)
     if (stmts.length === 0)
       return parts.toExpr()
     flush()
@@ -325,6 +325,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     flushParts: () => void,
     pushStmt: (stmt: string) => void,
     rawTextTag?: 'style' | 'script',
+    slotMarkers = emitMarkers,
   ): void {
     const meaningful = filterMeaningfulChildren(children)
     const slots = meaningful.map(c => ({ child: c, slot: classifyJsxChild(c) })).filter(s => s.slot !== undefined)
@@ -365,7 +366,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       }
 
       if (slot.kind === 'component' || slot.kind === 'fragment') {
-        if (emitMarkers && hasSiblings) {
+        if (slotMarkers && hasSiblings) {
           parts.pushStatic('<!--k[-->')
           emitIntoBuffer(slot.node, bufVar, parts, flushParts, pushStmt)
           if (!isLast)
@@ -380,7 +381,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
       if (slot.kind === 'loop') {
         const { match } = slot
-        const needsBracket = emitMarkers && (!isLast || hadVariableRange)
+        const needsBracket = slotMarkers && (!isLast || hadVariableRange)
         if (needsBracket)
           parts.pushStatic('<!--k[-->')
 
@@ -426,7 +427,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       if (slot.kind === 'and-show') {
         const left = compileSubExpression(slot.expr.left)
         const right = compileJsxToStringExpr(slot.right)
-        if (emitMarkers && hasSiblings) {
+        if (slotMarkers && hasSiblings) {
           parts.pushStatic('<!--k[-->')
           parts.pushExpr(`((${left}) ? (${right}) : "")`)
           parts.pushStatic('<!--k]-->')
@@ -442,7 +443,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         const test = compileSubExpression(slot.expr.test)
         const cons = compileExpressionAsString(slot.cons)
         const alt = compileExpressionAsString(slot.alt)
-        if (emitMarkers && hasSiblings) {
+        if (slotMarkers && hasSiblings) {
           parts.pushStatic('<!--k[-->')
           parts.pushExpr(`((${test}) ? (${cons}) : (${alt}))`)
           parts.pushStatic('<!--k]-->')
@@ -458,7 +459,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       const exprCode = compileSubExpression(slot.expr)
       const rendered = `${use('esc')}(${exprCode})`
       if (isNodeCapableExpr(slot.expr)) {
-        if (emitMarkers && hasSiblings) {
+        if (slotMarkers && hasSiblings) {
           parts.pushStatic('<!--k[-->')
           parts.pushExpr(rendered)
           if (!isLast)
@@ -469,7 +470,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         }
         hadVariableRange = true
       }
-      else if (emitMarkers && hasSiblings) {
+      else if (slotMarkers && hasSiblings) {
         parts.pushStatic('<!---->')
         parts.pushExpr(rendered)
         if (!isLast)
@@ -532,7 +533,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     }
 
     const childrenHaveAwait = hasChildren && childNodes.some(c => containsDirectAwait(c))
-    const childExpr = hasChildren ? compileChildrenListToStringExpr(childNodes) : '""'
+    const childExpr = hasChildren ? compileChildrenListToStringExpr(childNodes, false) : '""'
 
     const islandInfo = islands?.get(tag)
     if (islandInfo === undefined && islands !== undefined && hydrateExpr !== undefined)

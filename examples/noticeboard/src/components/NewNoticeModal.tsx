@@ -1,68 +1,34 @@
-import { Dialog, toast } from '@kayjs/ui'
-import { signal } from 'kay'
+import { Button, Cluster, Dialog, Field, Notice, Stack, toast } from '@kayjs/ui'
+import { signal, useAction } from 'kay'
 import { pinNotice } from '../actions/notices'
 
 export function NewNoticeModal() {
   const open = signal(false)
-  const title = signal('')
-  const body = signal('')
-  const error = signal('')
-  const busy = signal(false)
-
-  const submit = async (e: Event) => {
-    e.preventDefault()
-    if (busy.value)
-      return
-    busy.value = true
-    error.value = ''
-    try {
-      const res = await pinNotice({ title: title.value, body: body.value })
-      if (!res.ok) {
-        error.value = res.error
-        return
-      }
-      title.value = ''
-      body.value = ''
+  const form = useAction(pinNotice, {
+    reset: true,
+    onSuccess(notice) {
       open.value = false
-      toast.success('Pinned', `"${res.data.title}" is now live.`)
-    }
-    finally {
-      busy.value = false
-    }
-  }
+      toast.success('Pinned', `"${notice.title}" is now live.`)
+    },
+  })
 
   return (
     <Dialog open={open} title="Pin a notice" triggerLabel="Pin a notice" triggerVariant="solid">
-      <form onSubmit={submit} data-layout="stack" style="--ui-gap:0.9rem">
-        {error.value && <div data-ui="notice" data-tone="danger" role="alert">{error.value}</div>}
-        <div data-ui="field">
-          <label data-part="label" for="notice-title">Title *</label>
-          <input
-            id="notice-title"
-            name="title"
-            maxlength="120"
-            required
-            value={title.value}
-            onInput={(e) => { title.value = e.currentTarget.value }}
-          />
-        </div>
-        <div data-ui="field">
-          <label data-part="label" for="notice-body">Notice *</label>
-          <textarea
-            id="notice-body"
-            name="body"
-            rows="4"
-            maxlength="4000"
-            required
-            value={body.value}
-            onInput={(e) => { body.value = e.currentTarget.value }}
-          />
-        </div>
-        <div data-layout="cluster">
-          <button id="submit-notice" data-ui="button" data-variant="solid" data-tone="accent" type="submit" disabled={busy.value}>
-            {busy.value ? 'Pinning...' : 'Pin it'}
-          </button>
-        </div>
+      <form action={pinNotice} method="post" onSubmit={form.onSubmit}>
+        <Stack gap="0.9rem">
+          {form.error.value && <Notice tone="danger" role="alert">{form.error.value}</Notice>}
+          <Field id="notice-title" label="Title" error={form.fieldErrors.value.title} required>
+            <input id="notice-title" name="title" maxlength="120" required />
+          </Field>
+          <Field id="notice-body" label="Notice" error={form.fieldErrors.value.body} required>
+            <textarea id="notice-body" name="body" rows="4" maxlength="4000" required />
+          </Field>
+          <Cluster>
+            <Button id="submit-notice" type="submit" tone="accent" disabled={form.pending.value}>
+              {form.pending.value ? 'Pinning...' : 'Pin it'}
+            </Button>
+          </Cluster>
+        </Stack>
       </form>
     </Dialog>
   )

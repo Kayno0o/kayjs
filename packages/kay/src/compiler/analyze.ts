@@ -25,6 +25,7 @@ const REACTIVE_IMPORTS = new Set([
   'selector',
   'store',
   'island',
+  'useAction',
 ])
 
 // Primitives whose result is reactive state another module can import and read.
