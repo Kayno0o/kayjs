@@ -88,7 +88,8 @@ export function defineIslandElement(): void {
       const h = this.getAttribute('h')
       if (typeof KAY_DEFERRED === 'undefined' || KAY_DEFERRED) {
         if (h === 'visible') {
-          const target = this.firstElementChild ?? this
+          const first = this.firstElementChild
+          const target = first !== null && first.tagName !== 'SCRIPT' ? first : this
           const io = new IntersectionObserver((entries) => {
             if (entries.some(e => e.isIntersecting))
               void this._l(false, token)
@@ -165,8 +166,17 @@ export function defineIslandElement(): void {
         if (!this.isConnected || token !== this._t || this._d !== undefined)
           return
 
-        const p = this.getAttribute('p')
-        const props: Record<string, unknown> = p ? parseIslandProps(p) : {}
+        let props: Record<string, unknown> = {}
+        const ps = this.lastElementChild
+        if (ps !== null && ps.tagName === 'SCRIPT' && ps.getAttribute('type') === 'application/json') {
+          props = parseIslandProps(ps.textContent || '{}')
+          ps.remove()
+        }
+        else {
+          const p = this.getAttribute('p')
+          if (p)
+            props = parseIslandProps(p)
+        }
         const slot = findOwnSlot(this)
         if (slot !== null)
           props.children = slot

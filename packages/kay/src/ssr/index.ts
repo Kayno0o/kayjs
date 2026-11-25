@@ -293,11 +293,16 @@ export function ssrIslandStatic(
   return `${tag}${inner}</kay-island>`
 }
 
+function safeJsonScript(json: string): string {
+  return json.replace(/</g, '\\u003c')
+}
+
 export function ssrIsland(
   chunk: string,
   render: () => string,
   props: Record<string, unknown>,
   hydrate?: HydrateStrategy,
+  scriptProps = false,
 ): string {
   if (getIslandDepth() > 0)
     return render()
@@ -306,9 +311,15 @@ export function ssrIsland(
   if (ctx !== undefined)
     recordRenderedIsland(chunk, hydrate)
 
-  const propsAttr = Object.keys(props).length > 0
-    ? ` p="${escAttr(serializeIslandProps(props))}"`
-    : ''
+  let propsAttr = ''
+  let propsScript = ''
+  if (Object.keys(props).length > 0) {
+    const json = serializeIslandProps(props)
+    if (scriptProps)
+      propsScript = `<script type="application/json">${safeJsonScript(json)}</script>`
+    else
+      propsAttr = ` p="${escAttr(json)}"`
+  }
   const hydrateAttr = hydrate !== undefined && hydrate !== 'load'
     ? ` h="${escAttr(hydrate)}"`
     : ''
@@ -337,7 +348,7 @@ export function ssrIsland(
     }
   }
 
-  return `<kay-island c="${escAttr(chunk)}"${propsAttr}${hydrateAttr}${idAttr}>${inner}</kay-island>`
+  return `<kay-island c="${escAttr(chunk)}"${propsAttr}${hydrateAttr}${idAttr}>${inner}${propsScript}</kay-island>`
 }
 
 export interface DocumentOptions {

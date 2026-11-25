@@ -44,6 +44,7 @@ export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, Va
 interface LoadedPageModule {
   default?: (props: Record<string, unknown>) => Html | string | Promise<Html | string>
   load?: (ctx: RequestContext) => unknown | Promise<unknown>
+  clientData?: readonly string[] | ((data: unknown) => unknown) | undefined
   csrf?: boolean | undefined
   GET?: (ctx: RequestContext) => Response | Promise<Response>
   POST?: (ctx: RequestContext) => Response | Promise<Response>
@@ -192,6 +193,44 @@ function allowedMethodsHeader(mod: LoadedPageModule): string {
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+function pickObjectKeys(obj: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> | undefined {
+  if (keys.length === 0)
+    return undefined
+  const picked: Record<string, unknown> = {}
+  let count = 0
+  for (const k of keys) {
+    if (Object.hasOwn(obj, k)) {
+      Object.defineProperty(picked, k, { value: obj[k], enumerable: true, writable: true, configurable: true })
+      count++
+    }
+  }
+  return count > 0 ? picked : undefined
+}
+
+function pickPageIslandProps(data: unknown, entry: RouteManifestEntry, mod: LoadedPageModule): Record<string, unknown> {
+  if (data === undefined)
+    return {}
+  if (typeof mod.clientData === 'function') {
+    const subset = mod.clientData(data)
+    return subset === undefined ? {} : { data: subset }
+  }
+  if (Array.isArray(mod.clientData)) {
+    if (!isPlainObject(data))
+      return {}
+    const subset = pickObjectKeys(data, mod.clientData)
+    return subset === undefined ? {} : { data: subset }
+  }
+  if (entry.islandDataKeys !== undefined) {
+    if (entry.islandDataKeys.length === 0)
+      return {}
+    if (isPlainObject(data)) {
+      const subset = pickObjectKeys(data, entry.islandDataKeys)
+      return subset === undefined ? {} : { data: subset }
+    }
+  }
+  return { data }
 }
 
 function pickRootLayoutFile(manifest: BuildManifest): string | undefined {
@@ -725,8 +764,9 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           return wrapLayouts(ssrIsland(
             entry.islandChunk,
             () => ssrChild(mod.default!(pageProps) as Html),
-            data !== undefined ? { data } : {},
+            pickPageIslandProps(data, entry, mod),
             entry.islandHydrate as HydrateStrategy | undefined,
+            true,
           ), request, url, locals, cookieStore, ctx)
         }
         const rendered = mod.default!(pageProps)
@@ -824,8 +864,9 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         inner = ssrIsland(
           entry.islandChunk,
           () => ssrChild(mod.default!(pageProps) as Html),
-          data !== undefined ? { data } : {},
+          pickPageIslandProps(data, entry, mod),
           entry.islandHydrate as HydrateStrategy | undefined,
+          true,
         )
       }
       else {

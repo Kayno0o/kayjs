@@ -23,6 +23,8 @@ export interface RouteManifestEntry {
   isIsland?: boolean | undefined
   islandChunk?: string | undefined
   islandHydrate?: string | undefined
+  /** Top-level keys of `load()` data statically read by a page island (`undefined` when `data` escapes). */
+  islandDataKeys?: string[] | undefined
   islandChunks: string[]
   eagerIslandChunks?: string[] | undefined
   /** Per-route stylesheets (global plugin styles + CSS imported by this route, its layouts, and its islands). */
@@ -199,6 +201,7 @@ export function buildRouteEntries(options: {
       isIsland: analysis?.isInteractive,
       islandChunk: islandChunks.get(`${file}#default`),
       islandHydrate: analysis?.defaultHydrate,
+      islandDataKeys: analysis?.isInteractive && analysis.hasLoadExport ? analysis.defaultDataKeys : undefined,
       islandChunks: [...chunks],
       eagerIslandChunks: [...eagerChunks],
       styles: [...styles],
