@@ -5,7 +5,7 @@
 
 import type { BunPlugin } from 'bun'
 import type { IslandBinding, ModuleAnalysis } from '../compiler/index'
-import type { BuildPluginContext, KayPlugin } from '../plugins/index'
+import type { BuildPluginContext, BuildPluginTarget, FinalizeBuildContext, KayPlugin } from '../plugins/index'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
@@ -13,14 +13,14 @@ import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 import { asyncInteractiveError } from '../compiler/analyze'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
 import { readsPrivateEnv, SERVER_ONLY_FILTER } from '../compiler/server-only'
-import { loadConfig } from '../plugins/index'
+import { createAppContext, loadConfig, runWithAppContext } from '../plugins/index'
 import { actionHash } from '../server/action'
 import { compileExecutable } from './compile'
 import { resolveImportPath } from './resolve'
 
 export interface BuildCache {
   analyses: Map<string, { mtimeMs: number, size: number, code: string, analysis: ModuleAnalysis }>
-  domCompiled: Map<string, { mtimeMs: number, size: number, code: string }>
+  domCompiled: Map<string, { mtimeMs: number, size: number, key?: string | undefined, code: string }>
   ssrCompiled: Map<string, { mtimeMs: number, size: number, key: string, code: string }>
 }
 
@@ -97,6 +97,8 @@ export interface BuildManifest {
   islands: Record<string, string>
   assets: string[]
   publicFiles: string[]
+  /** Serializable build-time metadata persisted by plugins via `ctx.setData()`, read via `api.getBuildData()`. */
+  pluginData?: Record<string, Record<string, unknown>> | undefined
 }
 
 const KAY_SRC_ROOT = resolve(import.meta.dir, '..')
@@ -339,12 +341,32 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const assetPrefix = (options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const minify = options.minify ?? true
 
+  const outPublicDir = join(outDir, 'public')
+  const publicFiles: string[] = []
+  const publicSet = new Set<string>()
+  const registerPublicFile = (relPath: string): string => {
+    const clean = relPath.replace(/^\/+/, '').replace(/\\/g, '/')
+    if (clean !== '' && !publicSet.has(clean)) {
+      publicSet.add(clean)
+      publicFiles.push(clean)
+    }
+    return clean
+  }
+  const appCtx = createAppContext({
+    root,
+    outDir,
+    publicDir: outPublicDir,
+    assetPrefix,
+    dev: isDev,
+    onRegisterPublicFile: registerPublicFile,
+  })
+
   const prevNodeEnv = process.env.NODE_ENV
   if (!isDev)
     process.env.NODE_ENV ??= 'production'
 
   try {
-    return await buildInternal()
+    return await runWithAppContext(appCtx, () => buildInternal())
   }
   finally {
     if (!isDev) {
@@ -364,10 +386,10 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
   async function buildInternal(): Promise<BuildManifest> {
 
-  const pluginBunPlugins = plugins.flatMap((p) => {
+  const getPluginBunPlugins = (target: BuildPluginTarget): BunPlugin[] => plugins.flatMap((p) => {
     const bp = p.bunPlugins
     if (typeof bp === 'function')
-      return bp({ root, assetPrefix, minify })
+      return bp({ root, assetPrefix, minify, target })
     return bp ?? []
   })
   const pluginClientEntries = plugins.map(p => p.clientEntry).filter((e): e is string => Boolean(e))
@@ -375,16 +397,16 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     .flatMap(p => p.css ?? [])
     .map(c => resolve(root, c))
     .filter(c => existsSync(c))
+  const transformPlugins = plugins.filter(p => typeof p.transform === 'function')
+  const hasTransforms = transformPlugins.length > 0
+  const transformKey = transformPlugins.map(p => p.name).join(',')
 
   function applyTransforms(code: string, id: string, target: 'server' | 'client'): string {
     let cur = code
-    for (let i = 0; i < plugins.length; i++) {
-      const fn = plugins[i]!.transform
-      if (fn !== undefined) {
-        const next = fn(cur, id, target)
-        if (typeof next === 'string')
-          cur = next
-      }
+    for (let i = 0; i < transformPlugins.length; i++) {
+      const next = transformPlugins[i]!.transform!(cur, id, target)
+      if (typeof next === 'string')
+        cur = next
     }
     return cur
   }
@@ -746,21 +768,26 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
             return { contents: `${lines.join('\n')}\n`, loader: 'ts' }
           }
 
-          if (!args.path.endsWith('.tsx'))
-            return undefined
+          if (!args.path.endsWith('.tsx')) {
+            if (!hasTransforms || args.path.includes('/node_modules/'))
+              return undefined
+            const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
+            const transformed = applyTransforms(raw, args.path, 'client')
+            return transformed !== raw ? { contents: transformed, loader: 'ts' } : undefined
+          }
 
           let compiled = compiledDomCache.get(args.path)
           if (compiled === undefined) {
             const stamp = getFileStamp(args.path)
             const cachedDom = stamp !== undefined ? cache?.domCompiled.get(args.path) : undefined
-            if (cachedDom !== undefined && cachedDom.mtimeMs === stamp!.mtimeMs && cachedDom.size === stamp!.size) {
+            if (cachedDom !== undefined && cachedDom.mtimeMs === stamp!.mtimeMs && cachedDom.size === stamp!.size && (cachedDom.key ?? '') === transformKey) {
               compiled = cachedDom.code
             }
             else {
               const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
               compiled = applyTransforms(compileDom(args.path, raw, { analysis: analyses.get(args.path) }).code, args.path, 'client')
               if (cache !== undefined && stamp !== undefined)
-                cache.domCompiled.set(args.path, { mtimeMs: stamp.mtimeMs, size: stamp.size, code: compiled })
+                cache.domCompiled.set(args.path, { mtimeMs: stamp.mtimeMs, size: stamp.size, key: transformKey, code: compiled })
             }
             compiledDomCache.set(args.path, compiled)
           }
@@ -786,7 +813,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           'process.env.NODE_ENV': JSON.stringify(isDev ? 'development' : 'production'),
           ...publicEnvDefines,
         },
-        plugins: [clientPlugin, ...pluginBunPlugins],
+        plugins: [clientPlugin, ...getPluginBunPlugins('client')],
       })
     }
     catch (err) {
@@ -962,13 +989,20 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
             return { path: resolved, external: true }
           return undefined
         })
-        b.onLoad({ filter: /\.tsx$/ }, (args) => {
+        b.onLoad({ filter: /\.(?:ts|tsx)$/ }, (args) => {
+          if (!args.path.endsWith('.tsx')) {
+            if (!hasTransforms || args.path.includes('/node_modules/'))
+              return undefined
+            const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
+            const transformed = applyTransforms(raw, args.path, 'server')
+            return transformed !== raw ? { contents: transformed, loader: 'ts' } : undefined
+          }
           const analysis = analyses.get(args.path)
           const rawBindings = pageIslandBindings.get(args.path)
           let islandMap: Map<string, IslandBinding> | undefined
           const isInteractive = analysis?.isInteractive === true
           const emitMarkers = isInteractive || islandReach.has(args.path)
-          let islandKey = `${isInteractive ? '1' : '0'}:${emitMarkers ? '1' : '0'}`
+          let islandKey = `${isInteractive ? '1' : '0'}:${emitMarkers ? '1' : '0'}|t=${transformKey}`
           if (rawBindings !== undefined) {
             islandMap = new Map()
             for (const [localName, target] of rawBindings) {
@@ -1015,7 +1049,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       define: {
         'process.env.NODE_ENV': 'process.env.NODE_ENV',
       },
-      plugins: [serverPlugin, ...pluginBunPlugins],
+      plugins: [serverPlugin, ...getPluginBunPlugins('server')],
     })
 
     if (!serverResult.success) {
@@ -1204,13 +1238,10 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     islandsRecord[k] = v
 
   // Copy public/ static files into dist/public (skipped in `kay dev`, where createServer streams directly from public/)
-  const publicFiles: string[] = []
-  const outPublicDir = join(outDir, 'public')
   const shouldCopyPublic = options.copyPublic !== false
   if (existsSync(publicDir)) {
     for (const abs of walkAllFiles(publicDir).sort()) {
-      const rel = relative(publicDir, abs).replace(/\\/g, '/')
-      publicFiles.push(rel)
+      const rel = registerPublicFile(relative(publicDir, abs))
       if (shouldCopyPublic) {
         const dst = join(outPublicDir, rel)
         mkdirSync(dirname(dst), { recursive: true })
@@ -1219,41 +1250,50 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     }
   }
 
-  // Run plugin build(ctx) hooks so plugins can emit hashed assets, public files, styles, or <head> tags
+  // Run plugin build(ctx) hooks so plugins can emit hashed assets, public files, styles, <head> tags, or services
   const headTags: string[] = []
   const assetSet = new Set(nonEmptyAssets)
-  const publicSet = new Set(publicFiles)
   const styleSet = new Set(styleUrls)
+  const pluginData: Record<string, Record<string, unknown>> = {}
+  const isStatic = options.static === true
 
-  const buildPluginCtx: BuildPluginContext = {
+  const emitAsset = (relPath: string, content: string | Uint8Array): string => {
+    const clean = relPath.replace(/^\/+/, '').replace(/\\/g, '/')
+    const dst = join(clientDir, clean)
+    mkdirSync(dirname(dst), { recursive: true })
+    writeFileSync(dst, content)
+    if (!assetSet.has(clean)) {
+      assetSet.add(clean)
+      nonEmptyAssets.push(clean)
+    }
+    return `${assetPrefix}/${clean}`
+  }
+
+  const emitPublic = (relPath: string, content: string | Uint8Array): string => {
+    const clean = registerPublicFile(relPath)
+    const dst = join(outPublicDir, clean)
+    mkdirSync(dirname(dst), { recursive: true })
+    writeFileSync(dst, content)
+    return `/${clean}`
+  }
+
+  const makeSetData = (pluginName: string) => (data: Record<string, unknown>): void => {
+    pluginData[pluginName] = { ...(pluginData[pluginName] ?? {}), ...data }
+  }
+
+  const baseBuildCtx = {
     root,
     outDir,
     assetPrefix,
     minify,
+    isStatic,
+    dev: isDev,
     routes: routeEntries,
-    emitAsset(relPath, content) {
-      const clean = relPath.replace(/^\/+/, '').replace(/\\/g, '/')
-      const dst = join(clientDir, clean)
-      mkdirSync(dirname(dst), { recursive: true })
-      writeFileSync(dst, content)
-      if (!assetSet.has(clean)) {
-        assetSet.add(clean)
-        nonEmptyAssets.push(clean)
-      }
-      return `${assetPrefix}/${clean}`
-    },
-    emitPublic(relPath, content) {
-      const clean = relPath.replace(/^\/+/, '').replace(/\\/g, '/')
-      const dst = join(outPublicDir, clean)
-      mkdirSync(dirname(dst), { recursive: true })
-      writeFileSync(dst, content)
-      if (!publicSet.has(clean)) {
-        publicSet.add(clean)
-        publicFiles.push(clean)
-      }
-      return `/${clean}`
-    },
-    addStyle(href) {
+    emitAsset,
+    emitPublic,
+    provide: appCtx.provide,
+    inject: appCtx.inject,
+    addStyle(href: string) {
       if (!styleSet.has(href)) {
         styleSet.add(href)
         styleUrls.push(href)
@@ -1267,7 +1307,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           r.styles.push(href)
       }
     },
-    addRouteStyle(routePath, href) {
+    addRouteStyle(routePath: string, href: string) {
       if (!styleSet.has(href)) {
         styleSet.add(href)
         styleUrls.push(href)
@@ -1279,11 +1319,11 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           route.styles.push(href)
       }
     },
-    addHead(html) {
+    addHead(html: string) {
       if (html !== '')
         headTags.push(html)
     },
-    addRouteHead(routePath, html) {
+    addRouteHead(routePath: string, html: string) {
       if (html === '')
         return
       const route = routeEntries.find(r => r.path === routePath)
@@ -1295,15 +1335,25 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   }
 
   for (const plugin of plugins) {
-    if (plugin.build !== undefined)
-      await plugin.build(buildPluginCtx)
+    if (plugin.build !== undefined) {
+      const ctx: BuildPluginContext = { ...baseBuildCtx, setData: makeSetData(plugin.name) }
+      await plugin.build(ctx)
+    }
   }
 
   // Precompress hashed client assets (.br / .gz sidecars) for production server builds (skip in dev & --static, which compresses its own output)
-  if (!isDev && !options.static) {
-    for (const rel of nonEmptyAssets)
-      precompressFile(join(clientDir, rel), 256)
+  const precompressedAssets = new Set<string>()
+  const precompressPendingAssets = (): void => {
+    if (isDev || isStatic)
+      return
+    for (const rel of nonEmptyAssets) {
+      if (!precompressedAssets.has(rel)) {
+        precompressedAssets.add(rel)
+        precompressFile(join(clientDir, rel), 256)
+      }
+    }
   }
+  precompressPendingAssets()
 
   const manifest: BuildManifest = {
     runtimeScript,
@@ -1317,17 +1367,20 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     islands: islandsRecord,
     assets: nonEmptyAssets,
     publicFiles,
+    ...(Object.keys(pluginData).length > 0 ? { pluginData } : {}),
   }
 
   writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
 
   // Step 3: Hybrid Prerendering / Static Export (skipped in `kay dev` where routes render on-demand)
-  const shouldPrerender = options.prerender !== false || options.static === true
+  const shouldPrerender = options.prerender !== false || isStatic
   const prerenderRoutes = shouldPrerender ? routeEntries.filter(r => r.prerender) : []
-  if (prerenderRoutes.length > 0 || options.static) {
+  let prerenderApp: Awaited<ReturnType<typeof import('../server/index').createServer>> | undefined
+  const prerenderDir = isStatic ? staticStageDir! : join(outDir, 'prerendered')
+
+  if (prerenderRoutes.length > 0 || isStatic) {
     const { createServer } = await import('../server/index')
-    const app = await createServer({ root, outDir: relative(root, outDir), assetPrefix, plugins })
-    const prerenderDir = options.static ? staticStageDir! : join(outDir, 'prerendered')
+    prerenderApp = await createServer({ root, outDir: relative(root, outDir), assetPrefix, plugins, dev: isDev })
     mkdirSync(prerenderDir, { recursive: true })
 
     const prerenderStamp = Date.now()
@@ -1340,7 +1393,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       else if (typeof mod.paths === 'function') {
         urls = await mod.paths()
       }
-      else if (options.static) {
+      else if (isStatic) {
         console.warn(`kay build --static: skipping dynamic route "${route.path}" (${route.file}) because it does not export a paths() function.`)
       }
 
@@ -1357,10 +1410,10 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       for (let i = 0; i < urls.length; i += CONCURRENCY) {
         const batch = urls.slice(i, i + CONCURRENCY)
         await Promise.all(batch.map(async (u) => {
-          const res = await app.handle(new Request(`http://localhost${u}`))
+          const res = await prerenderApp!.handle(new Request(`http://localhost${u}`))
           const isExplicit404 = u === '/404' && res.status === 404
           if (res.status !== 200 && !isExplicit404) {
-            if (options.static)
+            if (isStatic)
               throw new Error(`kay build --static: route "${u}" returned HTTP ${res.status} (expected 200).`)
             return
           }
@@ -1369,72 +1422,95 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           const absHtml = join(prerenderDir, relHtml)
           mkdirSync(dirname(absHtml), { recursive: true })
           writeFileSync(absHtml, html)
-          map[u] = relative(options.static ? prerenderDir : outDir, absHtml).replace(/\\/g, '/')
+          map[u] = relative(isStatic ? prerenderDir : outDir, absHtml).replace(/\\/g, '/')
         }))
       }
       route.prerendered = map
     }
+  }
 
-    if (options.static) {
-      if (hasNotFoundFile) {
-        const notFoundRes = await app.handle(new Request('http://localhost/__kay_404__'))
-        if (notFoundRes.status >= 500)
-          throw new Error(`kay build --static: _404 page returned HTTP ${notFoundRes.status}.`)
-        writeFileSync(join(prerenderDir, '404.html'), await notFoundRes.text())
+  // Step 3b: Post-prerender finalize hooks (run after `route.prerendered` and prerender-emitted public files are known)
+  let ranAfterPrerender = false
+  for (const plugin of plugins) {
+    if (plugin.afterPrerender !== undefined) {
+      ranAfterPrerender = true
+      const finalizeCtx: FinalizeBuildContext = {
+        root,
+        outDir,
+        assetPrefix,
+        minify,
+        isStatic,
+        dev: isDev,
+        routes: routeEntries,
+        publicFiles,
+        emitAsset,
+        emitPublic,
+        provide: appCtx.provide,
+        inject: appCtx.inject,
+        setData: makeSetData(plugin.name),
       }
-      // Copy client assets into <stage>/_kay/... and public/ files into <stage>/...
-      if (nonEmptyAssets.length > 0) {
-        const staticAssetDir = join(prerenderDir, assetPrefix.replace(/^\//, ''))
-        mkdirSync(staticAssetDir, { recursive: true })
-        for (const rel of nonEmptyAssets) {
-          const dst = join(staticAssetDir, rel)
-          mkdirSync(dirname(dst), { recursive: true })
-          writeFileSync(dst, readFileSync(join(clientDir, rel)))
-        }
-      }
-      // Re-scan outPublicDir so any assets emitted during prerender (e.g. OG share cards, optimized MD images) are included in --static
-      if (existsSync(outPublicDir)) {
-        for (const abs of walkAllFiles(outPublicDir)) {
-          const rel = relative(outPublicDir, abs).replace(/\\/g, '/')
-          if (!publicSet.has(rel)) {
-            publicSet.add(rel)
-            publicFiles.push(rel)
-          }
-        }
-      }
-      for (const rel of publicFiles) {
-        const dst = join(prerenderDir, rel)
+      await plugin.afterPrerender(finalizeCtx)
+    }
+  }
+
+  precompressPendingAssets()
+  if (Object.keys(pluginData).length > 0)
+    manifest.pluginData = pluginData
+
+  if (isStatic) {
+    if (hasNotFoundFile && prerenderApp !== undefined) {
+      const notFoundRes = await prerenderApp.handle(new Request('http://localhost/__kay_404__'))
+      if (notFoundRes.status >= 500)
+        throw new Error(`kay build --static: _404 page returned HTTP ${notFoundRes.status}.`)
+      writeFileSync(join(prerenderDir, '404.html'), await notFoundRes.text())
+    }
+    // Copy client assets into <stage>/_kay/... and public/ files into <stage>/...
+    if (nonEmptyAssets.length > 0) {
+      const staticAssetDir = join(prerenderDir, assetPrefix.replace(/^\//, ''))
+      mkdirSync(staticAssetDir, { recursive: true })
+      for (const rel of nonEmptyAssets) {
+        const dst = join(staticAssetDir, rel)
         mkdirSync(dirname(dst), { recursive: true })
-        writeFileSync(dst, readFileSync(join(outDir, 'public', rel)))
+        writeFileSync(dst, readFileSync(join(clientDir, rel)))
       }
-      // Emit precompressed .br and .gz sidecars for compressible static files (>= 128 B)
-      for (const abs of walkAllFiles(prerenderDir))
-        precompressFile(abs, 128)
+    }
+    // Also pick up any files written directly into outPublicDir without calling registerPublicFile
+    if (existsSync(outPublicDir)) {
+      for (const abs of walkAllFiles(outPublicDir))
+        registerPublicFile(relative(outPublicDir, abs))
+    }
+    for (const rel of publicFiles) {
+      const dst = join(prerenderDir, rel)
+      mkdirSync(dirname(dst), { recursive: true })
+      writeFileSync(dst, readFileSync(join(outDir, 'public', rel)))
+    }
+    // Emit precompressed .br and .gz sidecars for compressible static files (>= 128 B)
+    for (const abs of walkAllFiles(prerenderDir))
+      precompressFile(abs, 128)
 
-      // Atomically swap staged static output into finalOutDir only after every page and asset succeeded
-      if (existsSync(finalOutDir)) {
-        const backupDir = join(dirname(finalOutDir), `.${basename(finalOutDir)}.prev-${stageSuffix}`)
-        renameSync(finalOutDir, backupDir)
-        try {
-          renameSync(prerenderDir, finalOutDir)
-        }
-        catch (err) {
-          try {
-            renameSync(backupDir, finalOutDir)
-          }
-          catch {}
-          throw err
-        }
-        rmSync(backupDir, { recursive: true, force: true })
-      }
-      else {
-        mkdirSync(dirname(finalOutDir), { recursive: true })
+    // Atomically swap staged static output into finalOutDir only after every page and asset succeeded
+    if (existsSync(finalOutDir)) {
+      const backupDir = join(dirname(finalOutDir), `.${basename(finalOutDir)}.prev-${stageSuffix}`)
+      renameSync(finalOutDir, backupDir)
+      try {
         renameSync(prerenderDir, finalOutDir)
       }
+      catch (err) {
+        try {
+          renameSync(backupDir, finalOutDir)
+        }
+        catch {}
+        throw err
+      }
+      rmSync(backupDir, { recursive: true, force: true })
     }
     else {
-      writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
+      mkdirSync(dirname(finalOutDir), { recursive: true })
+      renameSync(prerenderDir, finalOutDir)
     }
+  }
+  else if (prerenderRoutes.length > 0 || ranAfterPrerender) {
+    writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
   }
 
   // Step 4: Single-Executable Compile (`kay build --compile [outfile]`)
@@ -1449,7 +1525,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       outfile,
       kaySrcRoot: KAY_SRC_ROOT,
       resolveKaySpecifier,
-      bunPlugins: pluginBunPlugins,
+      bunPlugins: getPluginBunPlugins('compile'),
     })
   }
 

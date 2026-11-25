@@ -13,7 +13,7 @@ import type { CookieStore } from './cookies'
 import type { EmbeddedBody, EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
-import { loadConfig } from '../plugins/index'
+import { createAppContext, getAppContext, loadConfig, runWithAppContext } from '../plugins/index'
 import type { PendingChunk, SettledChunk } from '../ssr/context'
 import { createRenderContext, renderCollectedHead, runWithRenderContext, streamChunkScript } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
@@ -24,8 +24,8 @@ import { Router } from './router'
 import type { TrustProxy } from './security'
 import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, resolveCspPolicy, resolveHstsValue, verifyOrigin, withCspHashes } from './security'
 
-export { defineConfig, definePlugin, loadConfig } from '../plugins/index'
-export type { BuildPluginContext, CheckPluginContext, KayConfig, KayPlugin, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
+export { createAppContext, defineConfig, definePlugin, getAppContext, loadConfig, runWithAppContext } from '../plugins/index'
+export type { AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, CreateAppContextOptions, FinalizeBuildContext, KayConfig, KayPlugin, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
 export { action, getActionError } from './action'
 export type { ActionContext, ActionErrorFlash, ActionOptions, ActionResult, ServerAction } from './action'
 export { CompressionCache, isCompressibleType, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
@@ -77,6 +77,19 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const trustProxy = config.trustProxy ?? false
   const maxRequestBodySize = config.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
   const streamTimeout = config.streamTimeout ?? DEFAULT_STREAM_TIMEOUT
+  const isDev = config.dev ?? (process.env.KAY_DEV === '1')
+  const serverRoot = config.root ?? process.cwd()
+  const serverOutDir = config.outDir ?? join(serverRoot, 'dist')
+  const serverPublicDir = config.publicDir ?? join(serverOutDir, 'public')
+  const parentAppCtx = getAppContext()
+  const serverAppCtx = createAppContext({
+    root: serverRoot,
+    outDir: serverOutDir,
+    publicDir: serverPublicDir,
+    assetPrefix,
+    dev: isDev,
+    onRegisterPublicFile: rel => parentAppCtx?.registerPublicFile(rel),
+  })
   const alwaysLoadRuntime = plugins.some(p => Boolean(p.clientEntry))
   const htmlTransformers = plugins
     .map(p => p.transformHtml)
@@ -128,40 +141,67 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       ? (hasSuspense ? dynHeadersBoth : dynHeadersIslands)
       : (hasSuspense ? dynHeadersSuspense : dynHeadersPlain)
 
-  const compressEnabled = config.compress ?? (process.env.KAY_DEV !== '1')
+  const compressEnabled = config.compress ?? !isDev
   const compressCache = compressEnabled ? new CompressionCache() : undefined
 
   // Collect plugin server hooks (supports both sync and async plugin setup)
   interface PluginRouteDef {
     handler: (ctx: RequestContext) => Response | Promise<Response>
     csrf: boolean
+    trustedOrigins: Set<string> | undefined
+    trustProxy: TrustProxy
   }
   const globalMiddlewares: Middleware[] = []
   const pluginRewrites: ((pathname: string, ctx: RequestContext) => string | undefined)[] = []
   const pluginRouter = new Router<Map<string, PluginRouteDef>>()
   const pluginRouteEntries = new Map<string, Map<string, PluginRouteDef>>()
 
-  const pluginApi: ServerPluginAPI = {
-    use(mw) {
-      globalMiddlewares.push(mw)
-    },
-    route(method, path, handler, options?: PluginRouteOptions) {
-      let byMethod = pluginRouteEntries.get(path)
-      if (byMethod === undefined) {
-        byMethod = new Map()
-        pluginRouteEntries.set(path, byMethod)
-        pluginRouter.add(path, byMethod)
-      }
-      byMethod.set(method.toUpperCase(), { handler, csrf: options?.csrf ?? true })
-    },
-    rewrite(fn) {
-      pluginRewrites.push(fn)
-    },
+  const registerPluginRoute = (
+    method: string,
+    path: string,
+    handler: (ctx: RequestContext) => Response | Promise<Response>,
+    options?: PluginRouteOptions,
+  ): void => {
+    let byMethod = pluginRouteEntries.get(path)
+    if (byMethod === undefined) {
+      byMethod = new Map()
+      pluginRouteEntries.set(path, byMethod)
+      pluginRouter.add(path, byMethod)
+    }
+    let routeTrustedOrigins = trustedOrigins
+    if (options?.trustedOrigins !== undefined && options.trustedOrigins.length > 0) {
+      routeTrustedOrigins = new Set([...(trustedOrigins ?? []), ...options.trustedOrigins])
+    }
+    byMethod.set(method.toUpperCase(), {
+      handler,
+      csrf: options?.csrf ?? true,
+      trustedOrigins: routeTrustedOrigins,
+      trustProxy: options?.trustProxy ?? trustProxy,
+    })
   }
 
   for (const plugin of plugins) {
-    if (plugin.server !== undefined)
-      await plugin.server(pluginApi)
+    if (plugin.server !== undefined) {
+      const pluginApi: ServerPluginAPI = {
+        root: serverRoot,
+        outDir: serverOutDir,
+        assetPrefix,
+        dev: isDev,
+        use(mw) {
+          globalMiddlewares.push(mw)
+        },
+        route: registerPluginRoute,
+        rewrite(fn) {
+          pluginRewrites.push(fn)
+        },
+        provide: serverAppCtx.provide,
+        inject: serverAppCtx.inject,
+        getBuildData<T = Record<string, unknown>>(pluginName?: string): T | undefined {
+          return manifest.pluginData?.[pluginName ?? plugin.name] as T | undefined
+        },
+      }
+      await runWithAppContext(serverAppCtx, () => plugin.server!(pluginApi))
+    }
   }
 
   const hasGlobalMiddleware = globalMiddlewares.length > 0
@@ -264,7 +304,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   }
 
   async function servePublic(request: Request, pathname: string, pub: PublicEntry): Promise<Response> {
-    const cacheControl = process.env.KAY_DEV === '1' ? 'no-cache' : 'public, max-age=3600'
+    const cacheControl = isDev ? 'no-cache' : 'public, max-age=3600'
     const hasVary = pub.compressible && compressCache !== undefined
     const nosniffHeader: Record<string, string> = nosniffEnabled ? { 'x-content-type-options': 'nosniff' } : {}
     if (request.headers.get('if-none-match') === pub.etag) {
@@ -354,7 +394,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
             : undefined
         if (entry !== undefined) {
           prerenderedMap.set(urlPath, entry)
-          if (route.middlewares.length === 0 && !hasGlobalMiddleware && pluginRouter.match(urlPath) === undefined)
+          if (route.middlewares.length === 0 && !hasGlobalMiddleware && !hasPluginRewrites && pluginRouter.match(urlPath) === undefined)
             fastPrerenderedMap.set(urlPath, entry)
         }
       }
@@ -513,7 +553,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         return servePrerendered(ctx.request, rawPath, pre)
       // Prerendered dynamic route: unlisted param returns 404 (never falls back to SSR)
       if (entry.prerender === true && entry.prerendered !== undefined && (entry.path.includes(':') || entry.path.includes('*')))
-        return buildNotFoundResponse(ctx.url)
+        return buildNotFoundResponse(ctx.url, ctx)
     }
 
     // API route (.ts exporting GET/POST/etc.)
@@ -654,17 +694,33 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const rootLayoutMod = rootLayoutFile !== undefined ? modules[rootLayoutFile] as LoadedLayoutModule | undefined : undefined
   const fallbackStyles = manifest.globalStyles ?? manifest.styles
 
-  async function buildErrorResponse(error: unknown, url?: URL): Promise<Response> {
+  async function applyHtmlTransforms(html: string, url: URL, ctx?: RequestContext): Promise<string> {
+    if (htmlTransformers.length === 0)
+      return html
+    const transformCtx = ctx ?? makeRequestContext(new Request(url.toString()), {}, { trustProxy }).ctx
+    let out = html
+    for (let i = 0; i < htmlTransformers.length; i++) {
+      try {
+        out = await htmlTransformers[i]!(out, transformCtx)
+      }
+      catch {}
+    }
+    return out
+  }
+
+  async function buildErrorResponse(error: unknown, url?: URL, ctx?: RequestContext): Promise<Response> {
     if (errorMod !== undefined) {
       try {
+        const effUrl = url ?? new URL('http://localhost/500')
         const rctx = createRenderContext()
         const body = await runWithRenderContext(rctx, async () => {
           let inner = ssrChild(await errorMod.default({ error }) as Html)
           if (rootLayoutMod !== undefined)
-            inner = ssrChild(await rootLayoutMod.default({ children: raw(inner), url: url ?? new URL('http://localhost/500'), params: {}, locals: {} }) as Html)
+            inner = ssrChild(await rootLayoutMod.default({ children: raw(inner), url: effUrl, params: {}, locals: ctx?.locals ?? {} }) as Html)
           return inner
         })
-        const html = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: fallbackStyles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
+        const rawHtml = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: fallbackStyles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
+        const html = await applyHtmlTransforms(rawHtml, effUrl, ctx)
         return new Response(html, { status: 500, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private' } })
       }
       catch {}
@@ -672,23 +728,25 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     return new Response('Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
   }
 
-  async function renderError(error: unknown, cookieStore: CookieStore, url?: URL, request?: Request): Promise<Response> {
-    const base = finalizeResponse(await buildErrorResponse(error, url), cookieStore, securityEntries)
+  async function renderError(error: unknown, cookieStore: CookieStore, url?: URL, request?: Request, ctx?: RequestContext): Promise<Response> {
+    const base = finalizeResponse(await buildErrorResponse(error, url, ctx), cookieStore, securityEntries)
     return request !== undefined ? withHsts(base, request) : base
   }
 
-  async function buildNotFoundResponse(url?: URL): Promise<Response> {
+  async function buildNotFoundResponse(url?: URL, ctx?: RequestContext): Promise<Response> {
     const notFoundFn = notFoundMod?.default
     if (notFoundFn !== undefined) {
       try {
+        const effUrl = url ?? new URL('http://localhost/404')
         const rctx = createRenderContext()
         const body = await runWithRenderContext(rctx, async () => {
           let inner = ssrChild(await notFoundFn({}) as Html)
           if (rootLayoutMod !== undefined)
-            inner = ssrChild(await rootLayoutMod.default({ children: raw(inner), url: url ?? new URL('http://localhost/404'), params: {}, locals: {} }) as Html)
+            inner = ssrChild(await rootLayoutMod.default({ children: raw(inner), url: effUrl, params: {}, locals: ctx?.locals ?? {} }) as Html)
           return inner
         })
-        const html = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: fallbackStyles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
+        const rawHtml = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: fallbackStyles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
+        const html = await applyHtmlTransforms(rawHtml, effUrl, ctx)
         return new Response(html, { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private' } })
       }
       catch {}
@@ -696,8 +754,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     return new Response('Not Found', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } })
   }
 
-  async function renderNotFound(cookieStore: CookieStore, url?: URL, request?: Request): Promise<Response> {
-    const base = finalizeResponse(await buildNotFoundResponse(url), cookieStore, securityEntries)
+  async function renderNotFound(cookieStore: CookieStore, url?: URL, request?: Request, ctx?: RequestContext): Promise<Response> {
+    const base = finalizeResponse(await buildNotFoundResponse(url, ctx), cookieStore, securityEntries)
     return request !== undefined ? withHsts(base, request) : base
   }
 
@@ -722,11 +780,16 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           return serveAsset(request, pathname, asset)
       }
 
-      // 1b. Static public/ files (no-cache in dev so edits/plugins never get stuck in browser cache)
+      // 1b. Static public/ files (explicit plugin routes take precedence over static public/ files)
       if (request.method === 'GET' || request.method === 'HEAD') {
         const pub = publicMap.get(pathname)
-        if (pub !== undefined)
-          return servePublic(request, pathname, pub)
+        if (pub !== undefined) {
+          const matchedPlugin = pluginRouter.match(pathname)
+          const shadowedByPlugin = matchedPlugin !== undefined
+            && (matchedPlugin.data.has(request.method) || matchedPlugin.data.has('ALL'))
+          if (!shadowedByPlugin)
+            return servePublic(request, pathname, pub)
+        }
       }
 
       // Actions are origin-checked before their body is read and before any middleware runs.
@@ -839,7 +902,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         const routeDef = pluginMatch.data.get(req.method.toUpperCase()) ?? pluginMatch.data.get('ALL')
         if (routeDef !== undefined) {
           if (routeDef.csrf) {
-            const originCheck = verifyOrigin(req, trustedOrigins, trustProxy)
+            const originCheck = verifyOrigin(req, routeDef.trustedOrigins, routeDef.trustProxy)
             if (!originCheck.ok)
               return refuseCrossSite(req, originCheck.reason, cookieStore)
           }
@@ -867,14 +930,14 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           }
           catch (error) {
             notifyError(error, req, 'plugin')
-            return renderError(error, cookieStore, ctx.url, req)
+            return renderError(error, cookieStore, ctx.url, req, ctx)
           }
         }
       }
 
       const matched = router.match(effectivePath)
       if (matched === undefined)
-        return renderNotFound(cookieStore, ctx.url, req)
+        return renderNotFound(cookieStore, ctx.url, req, ctx)
 
       ctx.params = matched.params
       const route = matched.data
@@ -907,7 +970,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
       catch (error) {
         notifyError(error, req, 'route')
-        return renderError(error, cookieStore, ctx.url, req)
+        return renderError(error, cookieStore, ctx.url, req, ctx)
       }
     }
     catch (error) {
@@ -923,17 +986,17 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   }
 
   function handle(request: Request, remoteIp?: string): Promise<Response> {
-    return handleInternal(request, remoteIp)
+    return runWithAppContext(serverAppCtx, () => handleInternal(request, remoteIp))
   }
 
   function serve(port = 3000, hostname = '127.0.0.1') {
     let srvRef: ReturnType<typeof Bun.serve> | undefined
-    const fetchReq = (req: Request) => handleInternal(
+    const fetchReq = (req: Request) => runWithAppContext(serverAppCtx, () => handleInternal(
       req,
       srvRef?.requestIP(req)?.address,
       srvRef ? () => srvRef!.timeout(req, 0) : undefined,
       true,
-    )
+    ))
 
     const routes: Record<string, (req: Request) => Response | Promise<Response>> = {}
 
@@ -941,7 +1004,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       routes[path] = req => serveAsset(req, path, asset)
 
     for (const [path, pub] of publicMap) {
-      if (!(path in routes))
+      if (!(path in routes) && pluginRouter.match(path) === undefined)
         routes[path] = req => servePublic(req, path, pub)
     }
 
@@ -956,7 +1019,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     for (const [path, handler] of fastStaticPages) {
       if (!(path in routes)) {
         routes[path] = req => (req.method === 'GET' || req.method === 'HEAD') && !(req.headers.get('cookie') ?? '').includes(`${ACTION_ERROR_COOKIE}=`)
-          ? handler(req, srvRef?.requestIP(req)?.address)
+          ? runWithAppContext(serverAppCtx, () => handler(req, srvRef?.requestIP(req)?.address))
           : fetchReq(req)
       }
     }
@@ -1186,6 +1249,9 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     publicEtags,
     prerendered: {},
     prerenderedFiles,
+    root,
+    outDir,
+    publicDir: join(outDir, 'public'),
     assetPrefix: options.assetPrefix ?? fileConfig.assetPrefix,
     lang: options.lang ?? fileConfig.lang,
     security: securityOpt,
@@ -1194,6 +1260,7 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     maxRequestBodySize,
     streamTimeout: options.streamTimeout ?? fileConfig.streamTimeout,
     compress: options.compress ?? fileConfig.compress,
+    dev: options.dev,
     onError: options.onError ?? fileConfig.onError,
     plugins,
   })

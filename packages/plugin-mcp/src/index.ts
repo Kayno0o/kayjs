@@ -1361,7 +1361,12 @@ export function mcp(options: McpOptions): KayPlugin {
     name: '@kayjs/mcp',
 
     server(api) {
-      if (process.env.NODE_ENV !== 'production') {
+      const envKey = 'NODE_ENV'
+      if (!api.dev && process.env[envKey] !== 'production') {
+        for (const msg of collectBudgetViolations(footprint, options.budget))
+          warnSink(msg)
+      }
+      else if (api.dev) {
         for (const msg of collectBudgetViolations(footprint, options.budget))
           warnSink(msg)
       }
@@ -1405,7 +1410,7 @@ export function mcp(options: McpOptions): KayPlugin {
           return new Response(null, { status: 202 })
         const status = single.error?.code === -32600 ? 400 : 200
         return Response.json(single, { status })
-      })
+      }, { csrf: false })
 
       api.route('GET', endpoint, async (ctx) => {
         const denied = await authorize(ctx.request)
@@ -1419,7 +1424,7 @@ export function mcp(options: McpOptions): KayPlugin {
         if (denied !== undefined)
           return denied
         return new Response(null, { status: 204 })
-      })
+      }, { csrf: false })
     },
 
     check(ctx) {

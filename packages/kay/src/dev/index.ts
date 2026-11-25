@@ -5,7 +5,7 @@ import type { KayApp } from '../server/index'
 import { existsSync, rmSync, statSync, watch } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { build, createBuildCache } from '../build/index'
-import { loadConfig } from '../plugins/index'
+import { createAppContext, loadConfig, runWithAppContext } from '../plugins/index'
 import { DEFAULT_MAX_REQUEST_BODY_SIZE } from '../server/http'
 import { createServer, withCspHashes } from '../server/index'
 
@@ -91,9 +91,10 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
         minify: false,
         prerender: false,
         copyPublic: false,
+        dev: true,
         cache: buildCache,
       })
-      currentApp = await createServer({ root, outDir })
+      currentApp = await createServer({ root, outDir, dev: true })
       lastError = undefined
       if (n > 2)
         rmSync(join(devRoot, `b${n - 2}`), { recursive: true, force: true })
@@ -173,10 +174,12 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
 
   // Watch plugin-declared extra paths (e.g. content/ or messages/ directories)
   try {
+    const watchCtx = createAppContext({ root, outDir: devRoot, publicDir, assetPrefix: '/_kay', dev: true })
     const cfg = await loadConfig(root)
     const watchedExtra = new Set<string>([srcDir, publicDir, configPath])
     for (const plugin of cfg.plugins ?? []) {
-      const paths = typeof plugin.watchPaths === 'function' ? plugin.watchPaths(root) : (plugin.watchPaths ?? [])
+      const paths = runWithAppContext(watchCtx, () =>
+        typeof plugin.watchPaths === 'function' ? plugin.watchPaths(root) : (plugin.watchPaths ?? []))
       for (const p of paths) {
         const abs = resolve(root, p)
         if (watchedExtra.has(abs) || !existsSync(abs))

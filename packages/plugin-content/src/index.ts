@@ -4,10 +4,10 @@
 import type { KayPlugin, StandardSchemaV1 } from 'kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
+import { getAppContext } from 'kay/server'
 import { raw, ssrRaw } from 'kay/ssr'
 
-const KAY_ROOT_KEY = Symbol.for('kay.root')
-const IMAGE_RESOLVERS_KEY = Symbol.for('kay.content.imageResolvers')
+const CONTENT_IMAGE_RESOLVER_SERVICE = 'kay.content.imageResolver'
 const COLLECTION_VERSION_KEY = Symbol.for('kay.content.collectionVersion')
 
 export interface ContentHeading {
@@ -611,25 +611,13 @@ function expandComponents(
 function findDefaultImageResolver(file: string | undefined): MarkdownImageResolver | undefined {
   if (!file)
     return undefined
-  const registry = (globalThis as Record<symbol, unknown>)[IMAGE_RESOLVERS_KEY] as Map<string, MarkdownImageResolver> | undefined
-  if (!registry || registry.size === 0)
-    return undefined
-  const absFile = resolve(file)
-  let bestRoot = ''
-  let bestResolver: MarkdownImageResolver | undefined
-  for (const [root, resolver] of registry) {
-    if ((absFile === root || absFile.startsWith(`${root}/`) || absFile.startsWith(`${root}\\`)) && root.length > bestRoot.length) {
-      bestRoot = root
-      bestResolver = resolver
-    }
-  }
-  return bestResolver
+  return getAppContext()?.inject<MarkdownImageResolver>(CONTENT_IMAGE_RESOLVER_SERVICE)
 }
 
 function resolveCollectionDir(dir: string): string {
   if (isAbsolute(dir))
     return dir
-  const kayRoot = (globalThis as Record<symbol, unknown>)[KAY_ROOT_KEY]
+  const kayRoot = getAppContext()?.root
   if (typeof kayRoot === 'string' && kayRoot !== '') {
     const candidate = resolve(kayRoot, dir)
     if (existsSync(candidate))
@@ -1337,10 +1325,9 @@ export function contentPlugin(options: { feeds?: RssFeedConfig<any>[] | undefine
         const path = feed.path ?? '/rss.xml'
         let memo: { xml: string, etag: string, version: number } | undefined
         api.route('GET', path, (ctx) => {
-          const dev = process.env.KAY_DEV === '1'
           const versionFn = (feed.collection as unknown as Record<symbol, (() => number) | undefined>)[COLLECTION_VERSION_KEY]
           const version = versionFn ? versionFn() : -1
-          if (dev || memo === undefined || memo.version !== version) {
+          if (api.dev || memo === undefined || memo.version !== version) {
             const xml = renderRss(feed)
             const etag = `"${Bun.hash(xml).toString(36)}"`
             memo = { xml, etag, version }

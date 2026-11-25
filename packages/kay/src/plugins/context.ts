@@ -1,0 +1,57 @@
+// Per-build / per-server scoped runtime context (AsyncLocalStorage-backed, zero mutable process globals).
+
+import { AsyncLocalStorage } from 'node:async_hooks'
+
+export interface AppRuntimeContext {
+  readonly root: string
+  readonly outDir: string
+  readonly publicDir: string
+  readonly assetPrefix: string
+  readonly dev: boolean
+  provide<T>(key: string, value: T): void
+  inject<T>(key: string): T | undefined
+  registerPublicFile(relPath: string): void
+}
+
+export interface CreateAppContextOptions {
+  root: string
+  outDir: string
+  publicDir: string
+  assetPrefix: string
+  dev: boolean
+  onRegisterPublicFile?: ((relPath: string) => void) | undefined
+}
+
+const APP_STORAGE_KEY = Symbol.for('kay.app.storage')
+const appStorage: AsyncLocalStorage<AppRuntimeContext> = (
+  (globalThis as Record<symbol, AsyncLocalStorage<AppRuntimeContext> | undefined>)[APP_STORAGE_KEY]
+    ??= new AsyncLocalStorage<AppRuntimeContext>()
+)
+
+export function createAppContext(options: CreateAppContextOptions): AppRuntimeContext {
+  const services = new Map<string, unknown>()
+  return {
+    root: options.root,
+    outDir: options.outDir,
+    publicDir: options.publicDir,
+    assetPrefix: options.assetPrefix,
+    dev: options.dev,
+    provide<T>(key: string, value: T): void {
+      services.set(key, value)
+    },
+    inject<T>(key: string): T | undefined {
+      return services.get(key) as T | undefined
+    },
+    registerPublicFile(relPath: string): void {
+      options.onRegisterPublicFile?.(relPath)
+    },
+  }
+}
+
+export function runWithAppContext<T>(ctx: AppRuntimeContext, fn: () => T): T {
+  return appStorage.run(ctx, fn)
+}
+
+export function getAppContext(): AppRuntimeContext | undefined {
+  return appStorage.getStore()
+}

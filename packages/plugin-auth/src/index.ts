@@ -6,7 +6,7 @@
 import type { KayPlugin, Middleware, RequestContext, TrustProxy } from 'kay/server'
 import type { OAuthProvider } from './oauth'
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
-import { getClientIp, isHttpsRequest, verifyOrigin } from 'kay/server'
+import { getClientIp, isHttpsRequest } from 'kay/server'
 import {
   hashPassword,
   pkceChallenge,
@@ -308,7 +308,10 @@ export function createAuth(options: AuthOptions = {}): Auth {
   const minPasswordLength = options.minPasswordLength ?? 8
   const defaultRole = options.defaultRole ?? 'user'
   const defaultRedirect = options.defaultRedirect ?? '/'
-  const trustedOrigins = options.trustedOrigins ? new Set(options.trustedOrigins) : undefined
+  const authRouteOpts = {
+    ...(options.trustedOrigins !== undefined ? { trustedOrigins: options.trustedOrigins } : {}),
+    trustProxy: options.trustProxy ?? false,
+  }
   const site = options.site !== undefined ? siteOrigin(options.site) : undefined
   const requireEmailVerification = options.requireEmailVerification !== false
   const trustProxy = options.trustProxy ?? false
@@ -598,10 +601,6 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('POST', `${basePath}/signup`, async (ctx) => {
-        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
-        if (!originCheck.ok)
-          return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
-
         const ip = resolveClientIp(ctx, trustProxy)
         if (!rateLimiter.allow(`signup:ip:${ip}`))
           return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
@@ -650,7 +649,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
         if (wantsJson(ctx.request))
           return ctx.json({ ok: true, user }, { status: 201 })
         return ctx.redirect(redirectTarget, 303)
-      })
+      }, authRouteOpts)
 
       api.route('GET', `${basePath}/verify-email`, async (ctx) => {
         const ip = resolveClientIp(ctx, trustProxy)
@@ -663,10 +662,6 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('POST', `${basePath}/verify-email`, async (ctx) => {
-        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
-        if (!originCheck.ok)
-          return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
-
         const ip = resolveClientIp(ctx, trustProxy)
         if (!rateLimiter.allow(`verify-email:ip:${ip}`))
           return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
@@ -682,13 +677,9 @@ export function createAuth(options: AuthOptions = {}): Auth {
         const rawToken = body.token ?? ctx.url.searchParams.get('token') ?? ''
         const redirectTarget = safeRedirect(body.redirect ?? body.next ?? ctx.url.searchParams.get('redirect'), defaultRedirect)
         return handleVerifyEmail(ctx, rawToken, redirectTarget, 303)
-      })
+      }, authRouteOpts)
 
       api.route('POST', `${basePath}/signin`, async (ctx) => {
-        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
-        if (!originCheck.ok)
-          return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
-
         const ip = resolveClientIp(ctx, trustProxy)
         if (!rateLimiter.allow(`signin:ip:${ip}`))
           return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
@@ -723,24 +714,16 @@ export function createAuth(options: AuthOptions = {}): Auth {
         if (wantsJson(ctx.request))
           return ctx.json({ ok: true, user: pub }, { status: 200 })
         return ctx.redirect(redirectTarget, 303)
-      })
+      }, authRouteOpts)
 
       api.route('POST', `${basePath}/signout`, async (ctx) => {
-        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
-        if (!originCheck.ok)
-          return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
-
         await signOut(ctx)
         if (wantsJson(ctx.request))
           return ctx.json({ ok: true })
         return ctx.redirect(safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect), 303)
-      })
+      }, authRouteOpts)
 
       api.route('POST', `${basePath}/magic-link`, async (ctx) => {
-        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
-        if (!originCheck.ok)
-          return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
-
         const ip = resolveClientIp(ctx, trustProxy)
         if (!rateLimiter.allow(`magic:ip:${ip}`))
           return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
@@ -766,7 +749,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
         }
         await sendMagicLink(email, linkOrigin, body.redirect ?? body.next)
         return ctx.json({ ok: true, message: 'If that address can sign in, a link has been sent.' })
-      })
+      }, authRouteOpts)
 
       api.route('GET', `${basePath}/magic-link/verify`, async (ctx) => {
         const ip = resolveClientIp(ctx, trustProxy)

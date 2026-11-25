@@ -22,6 +22,7 @@ export interface ServerOptions {
   /** Milliseconds a streamed `<Suspense>` boundary may take before it renders its error and the response ends (default 30000). */
   streamTimeout?: number | undefined
   compress?: boolean | undefined
+  dev?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
 }
@@ -56,6 +57,9 @@ export interface EmbeddedServerConfig {
   publicEtags?: Record<string, string> | undefined
   prerendered: Record<string, string>
   prerenderedFiles?: Record<string, string> | undefined
+  root?: string | undefined
+  outDir?: string | undefined
+  publicDir?: string | undefined
   assetPrefix?: string | undefined
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
@@ -65,6 +69,7 @@ export interface EmbeddedServerConfig {
   /** Milliseconds a streamed `<Suspense>` boundary may take before it renders its error and the response ends (default 30000). */
   streamTimeout?: number | undefined
   compress?: boolean | undefined
+  dev?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
 }

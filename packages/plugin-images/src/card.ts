@@ -2,8 +2,9 @@
 // Renders a crisp 1200x630 SVG social card and rasterizes to PNG via `magick` when available
 // (cached by content hash in `.kay-cache/images/`), with zero npm binary dependencies.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { getAppContext } from 'kay/server'
 
 export interface ShareCardDefaults {
   /** Base URL prepended to returned card URL (optional, e.g. 'https://log.kaynooo.fr'). */
@@ -32,15 +33,26 @@ export interface ShareCardInput {
   accent?: string | undefined
 }
 
-const CARD_CFG_KEY = Symbol.for('kay.images.cardConfig')
+export const SHARE_CARD_CONFIG_SERVICE = 'kay.images.shareCardConfig'
 const HAS_MAGICK = Bun.which('magick') !== null
+let standaloneCardConfig: ShareCardDefaults | undefined
 
 export function configureShareCard(defaults: ShareCardDefaults): void {
-  ;(globalThis as Record<symbol, ShareCardDefaults | undefined>)[CARD_CFG_KEY] = defaults
+  const appCtx = getAppContext()
+  if (appCtx !== undefined)
+    appCtx.provide(SHARE_CARD_CONFIG_SERVICE, defaults)
+  else
+    standaloneCardConfig = defaults
 }
 
 function getCardConfig(): ShareCardDefaults {
-  return (globalThis as Record<symbol, ShareCardDefaults | undefined>)[CARD_CFG_KEY] ?? {}
+  const appCtx = getAppContext()
+  const scoped = appCtx?.inject<ShareCardDefaults>(SHARE_CARD_CONFIG_SERVICE)
+  if (scoped !== undefined)
+    return scoped
+  if (appCtx !== undefined)
+    return { publicDir: appCtx.publicDir }
+  return standaloneCardConfig ?? {}
 }
 
 function escapeXml(str: string): string {
@@ -127,7 +139,8 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
   const svg = buildCardSvg(input, cfg)
   const hash = Bun.hash(svg).toString(36)
   const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'card'
-  const publicDir = resolve(cfg.publicDir ?? 'dist/public')
+  const appCtx = getAppContext()
+  const publicDir = resolve(cfg.publicDir ?? appCtx?.publicDir ?? 'dist/public')
   const ogDir = join(publicDir, 'og')
   mkdirSync(ogDir, { recursive: true })
 
@@ -136,8 +149,10 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
   if (HAS_MAGICK) {
     const fileName = `${slug}-${hash}.png`
     const outPath = join(ogDir, fileName)
-    if (existsSync(outPath))
+    if (existsSync(outPath)) {
+      appCtx?.registerPublicFile(`og/${fileName}`)
       return `${site}/og/${fileName}`
+    }
 
     const cacheDir = resolve(cfg.cacheDir ?? '.kay-cache/images')
     mkdirSync(cacheDir, { recursive: true })
@@ -145,15 +160,31 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
 
     if (existsSync(cachedPng)) {
       writeFileSync(outPath, readFileSync(cachedPng))
+      appCtx?.registerPublicFile(`og/${fileName}`)
       return `${site}/og/${fileName}`
     }
 
-    const tmpSvg = join(cacheDir, `og-${slug}-${hash}.svg`)
+    const nonce = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`
+    const tmpSvg = join(cacheDir, `og-${slug}-${hash}-${nonce}.svg`)
+    const tmpPng = join(cacheDir, `og-${slug}-${hash}-${nonce}.png`)
     writeFileSync(tmpSvg, svg)
-    const proc = Bun.spawnSync(['magick', tmpSvg, cachedPng], { stdout: 'pipe', stderr: 'pipe' })
-    if (proc.exitCode === 0 && existsSync(cachedPng)) {
-      writeFileSync(outPath, readFileSync(cachedPng))
-      return `${site}/og/${fileName}`
+    const proc = Bun.spawnSync(['magick', tmpSvg, tmpPng], { stdout: 'pipe', stderr: 'pipe' })
+    rmSync(tmpSvg, { force: true })
+    if (proc.exitCode === 0 && existsSync(tmpPng)) {
+      try {
+        renameSync(tmpPng, cachedPng)
+      }
+      catch {
+        rmSync(tmpPng, { force: true })
+      }
+      if (existsSync(cachedPng)) {
+        writeFileSync(outPath, readFileSync(cachedPng))
+        appCtx?.registerPublicFile(`og/${fileName}`)
+        return `${site}/og/${fileName}`
+      }
+    }
+    else {
+      rmSync(tmpPng, { force: true })
     }
   }
 
@@ -161,5 +192,6 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
   const svgOut = join(ogDir, svgFile)
   if (!existsSync(svgOut))
     writeFileSync(svgOut, svg)
+  appCtx?.registerPublicFile(`og/${svgFile}`)
   return `${site}/og/${svgFile}`
 }

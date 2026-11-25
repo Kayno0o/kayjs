@@ -305,40 +305,17 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
         expect(res304.status).toBe(304)
         expect(await res304.text()).toBe('')
 
-        // Also test the plugin server route directly (bypassing static public/rss.xml) to verify memoization + clearCache invalidation
-        let routeHandler: ((ctx: import('../src/server/index').RequestContext) => Response | Promise<Response>) | undefined
-        plugin.server!({
-          route: (_method, _path, handler) => {
-            routeHandler = handler
-          },
-          use: () => {},
-          rewrite: () => {},
-        })
-        expect(routeHandler).toBeDefined()
-        const beforeDirect = mapItemCalls
-        const d1 = await routeHandler!(makeCtx('https://example.com/rss.xml'))
-        expect(d1.status).toBe(200)
-        const dEtag = d1.headers.get('etag')
-        expect(dEtag).toBeTruthy()
-        expect(mapItemCalls).toBe(beforeDirect + 1)
+        // Weak ETag form also returns 304 Not Modified
+        const res304Weak = await app.get('/rss.xml', { 'if-none-match': `W/${etag!}` })
+        expect(res304Weak.status).toBe(304)
 
-        // Second direct hit is memoized (0 additional mapItem calls)
-        const d2 = await routeHandler!(makeCtx('https://example.com/rss.xml'))
-        expect(d2.status).toBe(200)
-        expect(d2.headers.get('etag')).toBe(dEtag)
-        expect(mapItemCalls).toBe(beforeDirect + 1)
-
-        // If-None-Match returns 304 Not Modified (including weak ETag)
-        const d304 = await routeHandler!(makeCtx('https://example.com/rss.xml', {}, { headers: { 'if-none-match': `W/${dEtag}` } }))
-        expect(d304.status).toBe(304)
-
-        // Clearing collection cache invalidates memoized RSS
+        // Clearing collection cache invalidates memoized RSS end-to-end through testApp (plugin route takes precedence over static public/rss.xml)
         writeFileSync(join(postsDir, 'second.md'), '---\ntitle: Second RSS\ndate: 2026-01-02\n---\nBody 2\n')
         col.clearCache()
-        const d3 = await routeHandler!(makeCtx('https://example.com/rss.xml'))
-        expect(d3.status).toBe(200)
-        expect(await d3.text()).toContain('<title>Second RSS</title>')
-        expect(d3.headers.get('etag')).not.toBe(dEtag)
+        const res3 = await app.get('/rss.xml')
+        expect(res3.status).toBe(200)
+        expect(await res3.text()).toContain('<title>Second RSS</title>')
+        expect(res3.headers.get('etag')).not.toBe(etag)
       }
       finally {
         if (prevDev === undefined)

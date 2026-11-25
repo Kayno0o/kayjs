@@ -5,12 +5,12 @@ import type { BunPlugin } from 'bun'
 import type { KayPlugin } from 'kay/server'
 import type { ShareCardDefaults } from './card'
 import type { ImageAsset } from './helpers'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
-import { configureShareCard } from './card'
+import { getAppContext } from 'kay/server'
+import { SHARE_CARD_CONFIG_SERVICE } from './card'
 
-const IMAGE_RESOLVERS_KEY = Symbol.for('kay.content.imageResolvers')
-const KAY_ROOT_KEY = Symbol.for('kay.root')
+export const CONTENT_IMAGE_RESOLVER_SERVICE = 'kay.content.imageResolver'
 
 const ALLOWED_IMAGE_EXTS = new Set([
   '.png',
@@ -73,12 +73,46 @@ function identifyImage(filePath: string): { width: number, height: number } | un
   return { width: w, height: h }
 }
 
+function writeFileAtomic(dstPath: string, data: string | Uint8Array): void {
+  const tmpPath = `${dstPath}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}`
+  writeFileSync(tmpPath, data)
+  try {
+    renameSync(tmpPath, dstPath)
+  }
+  catch {
+    rmSync(tmpPath, { force: true })
+  }
+}
+
 function encodeVariant(srcPath: string, dstPath: string, width: number, quality: number): boolean {
+  const ext = extname(dstPath)
+  const stem = ext !== '' ? dstPath.slice(0, -ext.length) : dstPath
+  const tmpPath = `${stem}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}${ext}`
   const proc = Bun.spawnSync(
-    ['magick', `${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), dstPath],
+    ['magick', `${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), tmpPath],
     { stdout: 'pipe', stderr: 'pipe' },
   )
-  return proc.exitCode === 0 && existsSync(dstPath)
+  if (proc.exitCode === 0 && existsSync(tmpPath)) {
+    try {
+      renameSync(tmpPath, dstPath)
+    }
+    catch {
+      rmSync(tmpPath, { force: true })
+    }
+    return existsSync(dstPath)
+  }
+  rmSync(tmpPath, { force: true })
+  return false
+}
+
+interface PersistedImagesConfig {
+  cacheDirRel: string
+  widths: number[]
+  formats: ('avif' | 'webp')[]
+  quality: number
+  avifQuality: number
+  markdownSizes?: string | undefined
+  card?: ShareCardDefaults | undefined
 }
 
 export function images(options: ImagesPluginOptions = {}): KayPlugin {
@@ -167,7 +201,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
               }
 
               meta = { width: dims.width, height: dims.height, files }
-              writeFileSync(metaPath, JSON.stringify(meta))
+              writeFileAtomic(metaPath, JSON.stringify(meta))
             }
 
             const webpEntries: string[] = []
@@ -208,14 +242,22 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
     build(ctx) {
       const publicDir = join(ctx.outDir, 'public')
       const cacheDir = resolve(ctx.root, cacheDirRel)
-      configureShareCard({
+      const persisted: PersistedImagesConfig = {
+        cacheDirRel,
+        widths,
+        formats,
+        quality,
+        avifQuality,
+        markdownSizes: options.markdownSizes,
+        card: options.card,
+      }
+      ctx.setData(persisted as unknown as Record<string, unknown>)
+      ctx.provide(SHARE_CARD_CONFIG_SERVICE, {
         ...options.card,
         publicDir,
         cacheDir,
-      })
-      const g = globalThis as Record<symbol, Map<string, ReturnType<typeof createMarkdownImageResolver>> | undefined>
-      const registry = g[IMAGE_RESOLVERS_KEY] ??= new Map()
-      registry.set(resolve(ctx.root), createMarkdownImageResolver({
+      } satisfies ShareCardDefaults)
+      ctx.provide(CONTENT_IMAGE_RESOLVER_SERVICE, createMarkdownImageResolver({
         root: resolve(ctx.root),
         outPublicDir: publicDir,
         cacheDir,
@@ -237,6 +279,34 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       }
       emittedAssets.clear()
       activeCacheFiles.clear()
+    },
+    server(api) {
+      const persisted = api.getBuildData<PersistedImagesConfig>()
+      const effCacheRel = persisted?.cacheDirRel ?? cacheDirRel
+      const effWidths = persisted?.widths ?? widths
+      const effFormats = persisted?.formats ?? formats
+      const effQuality = persisted?.quality ?? quality
+      const effAvifQuality = persisted?.avifQuality ?? avifQuality
+      const effMarkdownSizes = persisted?.markdownSizes ?? options.markdownSizes
+      const effCard = persisted?.card ?? options.card
+      const publicDir = join(api.outDir, 'public')
+      const cacheDir = resolve(api.root, effCacheRel)
+
+      api.provide(SHARE_CARD_CONFIG_SERVICE, {
+        ...effCard,
+        publicDir,
+        cacheDir,
+      } satisfies ShareCardDefaults)
+      api.provide(CONTENT_IMAGE_RESOLVER_SERVICE, createMarkdownImageResolver({
+        root: resolve(api.root),
+        outPublicDir: publicDir,
+        cacheDir,
+        widths: effWidths,
+        formats: effFormats,
+        quality: effQuality,
+        avifQuality: effAvifQuality,
+        sizes: effMarkdownSizes,
+      }))
     },
   }
 }
@@ -260,7 +330,8 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
   const formats = options.formats ?? ['webp']
   const quality = options.quality ?? 80
   const avifQuality = options.avifQuality ?? 55
-  const outPublicDir = resolve(options.outPublicDir ?? 'dist/public')
+  const appCtx = getAppContext()
+  const outPublicDir = resolve(options.outPublicDir ?? appCtx?.publicDir ?? 'dist/public')
   const imgOutDir = join(outPublicDir, 'img')
   mkdirSync(imgOutDir, { recursive: true })
 
@@ -271,6 +342,7 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
   if (!hasMagick()) {
     const fileName = `${stem}-${hash}${extname(absPath).toLowerCase()}`
     writeFileSync(join(imgOutDir, fileName), rawBytes)
+    appCtx?.registerPublicFile(`img/${fileName}`)
     return { src: `/img/${fileName}`, width: 0, height: 0 }
   }
 
@@ -295,6 +367,7 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
     if (dims === undefined) {
       const fileName = `${stem}-${hash}${extname(absPath).toLowerCase()}`
       writeFileSync(join(imgOutDir, fileName), rawBytes)
+      appCtx?.registerPublicFile(`img/${fileName}`)
       return { src: `/img/${fileName}`, width: 0, height: 0 }
     }
 
@@ -315,11 +388,12 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
     if (files.length === 0) {
       const fileName = `${stem}-${hash}${extname(absPath).toLowerCase()}`
       writeFileSync(join(imgOutDir, fileName), rawBytes)
+      appCtx?.registerPublicFile(`img/${fileName}`)
       return { src: `/img/${fileName}`, width: dims.width, height: dims.height }
     }
 
     meta = { width: dims.width, height: dims.height, files }
-    writeFileSync(metaPath, JSON.stringify(meta))
+    writeFileAtomic(metaPath, JSON.stringify(meta))
   }
 
   const webpEntries: string[] = []
@@ -330,6 +404,7 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
     const fileName = basename(f.rel)
     const cachedFile = join(cacheRoot, `md-${fileName}`)
     writeFileSync(join(imgOutDir, fileName), readFileSync(cachedFile))
+    appCtx?.registerPublicFile(`img/${fileName}`)
     const url = `/img/${fileName}`
     if (f.format === 'webp') {
       webpEntries.push(`${url} ${f.width}w`)
@@ -369,7 +444,7 @@ export function createMarkdownImageResolver(options: MarkdownImageResolverOption
       boundary = resolve(options.root)
     }
     else {
-      const kayRoot = (globalThis as Record<symbol, unknown>)[KAY_ROOT_KEY]
+      const kayRoot = getAppContext()?.root
       boundary = (typeof kayRoot === 'string' && kayRoot !== '' && isInsideDir(resolve(kayRoot), absFile))
         ? resolve(kayRoot)
         : dirname(absFile)

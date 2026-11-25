@@ -176,8 +176,10 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
           ctx.addStyle(cssUrl)
         }
       }
+    },
 
-      // 5. Sitemap XML
+    afterPrerender(ctx) {
+      // 5. Sitemap XML (runs after Step 3 prerendering so dynamic `paths()` and @kayjs/i18n URLs are included)
       if (site && options.sitemap !== false) {
         const excluded = new Set(options.sitemapExclude ?? [])
         const urls = new Set<string>()
