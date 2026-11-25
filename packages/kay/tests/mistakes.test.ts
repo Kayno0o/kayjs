@@ -59,6 +59,24 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<div innerHTML={html}>\n</div>', 'const html = \'\'')
   })
 
+  test('a ref that is not a function, which fails at hydration far from the cause', () => {
+    refuses('<input ref={{ current: null }} />', /ref=\{\{ \.\.\. \}\} in Page\.tsx: pass a function, ref=\{el => \.\.\.\}/)
+    refuses('<input ref="field" />', /ref="\.\.\." in Page\.tsx: pass a function/)
+    accepts('<input ref={el => el.focus()} />')
+  })
+
+  test('React spellings that set nothing or the wrong thing', () => {
+    refuses('<svg><path strokeWidth={2} /></svg>', /strokeWidth in Page\.tsx: write stroke-width=\{\.\.\.\}, SVG attributes are case-sensitive/)
+    refuses('<svg><path fillRule="evenodd" /></svg>', /write fill-rule=/)
+    refuses('<svg><use xlinkHref="#a" /></svg>', /write xlink:href=/)
+    refuses('<input defaultValue="x" />', /defaultValue in Page\.tsx: write value=\{\.\.\.\}/)
+    refuses('<input type="checkbox" defaultChecked />', /defaultChecked in Page\.tsx: write checked=\{\.\.\.\}/)
+    refuses('<div class="a" className="b" />', /class and className in Page\.tsx: keep one/)
+    refuses('<button disabled="false">x</button>', /disabled="false" in Page\.tsx: write disabled=\{false\}, any string turns it on/)
+    accepts('<svg viewBox="0 0 1 1" preserveAspectRatio="none"><linearGradient gradientUnits="userSpaceOnUse" /></svg>')
+    accepts('<input readOnly tabIndex={0} autoComplete="off" />')
+  })
+
   test('Astro and Solid directives, which become plain attributes or island props', () => {
     refuses('<Counter client:visible />', /client:visible in Page\.tsx: write \$hydrate="visible"/, 'const Counter = () => <p>x</p>')
     refuses('<Counter client:only="solid" />', /write \$hydrate="client"/, 'const Counter = () => <p>x</p>')

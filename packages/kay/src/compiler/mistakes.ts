@@ -65,6 +65,45 @@ function checkHandler(name: string, value: AstNode | null, filename: string, cod
   }
 }
 
+// SVG presentation attributes React spells in camelCase; SVG is case-sensitive, so the camelCase name sets nothing.
+const KEBAB_SVG_ATTRS = new Set([
+  'alignment-baseline', 'baseline-shift', 'clip-path', 'clip-rule', 'color-interpolation', 'color-interpolation-filters',
+  'dominant-baseline', 'enable-background', 'fill-opacity', 'fill-rule', 'flood-color', 'flood-opacity', 'font-family',
+  'font-size', 'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight', 'image-rendering',
+  'letter-spacing', 'lighting-color', 'marker-end', 'marker-mid', 'marker-start', 'paint-order', 'pointer-events',
+  'shape-rendering', 'stop-color', 'stop-opacity', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap',
+  'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity', 'stroke-width', 'text-anchor', 'text-decoration',
+  'text-rendering', 'transform-origin', 'unicode-bidi', 'vector-effect', 'word-spacing', 'writing-mode',
+])
+const CAMEL_HUMP = /[A-Z]/g
+// React's uncontrolled-input props and the attribute each one stands for.
+const REACT_DEFAULTS = new Map([['defaultValue', 'value'], ['defaultChecked', 'checked']])
+const BOOLEAN_ATTRS = new Set([
+  'allowfullscreen', 'async', 'autofocus', 'autoplay', 'checked', 'controls', 'default', 'defer', 'disabled',
+  'formnovalidate', 'hidden', 'inert', 'ismap', 'loop', 'multiple', 'muted', 'nomodule', 'novalidate', 'open',
+  'playsinline', 'readonly', 'required', 'reversed', 'selected',
+])
+
+function checkRef(value: AstNode | null, filename: string): void {
+  if (value?.type === 'Literal')
+    throw mistake('ref="..."', filename, 'pass a function, ref={el => ...}')
+  if (value?.type === 'JSXExpressionContainer' && unwrapParens(value.expression as AstNode).type === 'ObjectExpression')
+    throw mistake('ref={{ ... }}', filename, 'pass a function, ref={el => ...}, kay has no ref objects')
+}
+
+function checkSpelling(name: string, value: AstNode | null, filename: string): void {
+  const kebab = name.replace(CAMEL_HUMP, hump => `-${hump.toLowerCase()}`)
+  if (kebab !== name && KEBAB_SVG_ATTRS.has(kebab))
+    throw mistake(name, filename, `write ${kebab}={...}, SVG attributes are case-sensitive`)
+  if (name === 'xlinkHref')
+    throw mistake(name, filename, 'write xlink:href={...}, or href={...}')
+  const attribute = REACT_DEFAULTS.get(name)
+  if (attribute !== undefined)
+    throw mistake(name, filename, `write ${attribute}={...}`)
+  if (value?.type === 'Literal' && value.value === 'false' && BOOLEAN_ATTRS.has(name.toLowerCase()))
+    throw mistake(`${name}="false"`, filename, `write ${name}={false}, any string turns it on`)
+}
+
 // Astro's client: directives and the $hydrate mode each one means.
 const CLIENT_DIRECTIVES = new Map([['load', 'load'], ['visible', 'visible'], ['idle', 'idle'], ['only', 'client'], ['media', 'media(<query>)']])
 // XML namespaces SVG and MathML really use; every other prefix is a directive from another framework.
@@ -123,6 +162,9 @@ function checkElementAttribute(attr: AstNode, isCustomElement: boolean, filename
     throw mistake(name, filename, `write innerHTML={${reactHtmlSource(attr.value, code) ?? '...'}}`)
   if (name === 'classList')
     throw mistake(name, filename, 'pass one string to class, joining the names yourself')
+  if (name === 'ref')
+    return checkRef(attr.value, filename)
+  checkSpelling(name, attr.value, filename)
   if (LOWERCASE_EVENT.test(name) && EVENT_PROPS.has(name.slice(2)))
     throw mistake(name, filename, `write ${eventProp(name.slice(2))}={...}, kay binds camelCase event props only`)
   if (!EVENT_ATTR.test(name))
@@ -149,7 +191,10 @@ export function checkMistakes(element: AstNode, filename: string, code: string):
   const tag = jsxTagName(element.openingElement.name)
   const isElement = tag !== '' && !isComponentTag(tag)
   const isCustomElement = tag.includes('-')
-  for (const attr of element.openingElement.attributes as AstNode[]) {
+  const attributes = element.openingElement.attributes as AstNode[]
+  if (isElement && attributes.some(a => a.name?.name === 'class') && attributes.some(a => a.name?.name === 'className'))
+    throw mistake('class and className', filename, 'keep one, they set the same attribute')
+  for (const attr of attributes) {
     if (attr.type !== 'JSXAttribute')
       continue
     if (attr.name.type === 'JSXNamespacedName')
