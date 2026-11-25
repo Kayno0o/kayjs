@@ -1,6 +1,6 @@
 // Resolves an import the way kay build follows it: relative files, then packages through Bun's resolver; kay, node:, bun and ~ aliases stay unresolved.
 
-import { existsSync } from 'node:fs'
+import { statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
 export const KAY_SRC_ROOT = resolve(import.meta.dir, '..')
@@ -10,7 +10,7 @@ export function resolveImportPath(fromFile: string, specifier: string): string |
     const base = resolve(dirname(fromFile), specifier)
     const candidates = [base, `${base}.tsx`, `${base}.ts`, join(base, 'index.tsx'), join(base, 'index.ts')]
     for (const c of candidates) {
-      if (existsSync(c))
+      if (statSync(c, { throwIfNoEntry: false })?.isFile())
         return c
     }
     return undefined

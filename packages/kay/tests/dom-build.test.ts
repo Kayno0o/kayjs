@@ -551,3 +551,42 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     }
   })
 })
+
+describe('route reach through a barrel file', () => {
+  test('a component re-exported by an index.ts barrel brings its CSS, its islands and its <Head> to the route', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-barrel-reach-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/components'), { recursive: true })
+      writeFileSync(join(dir, 'src/components/card.css'), '.card { color: rebeccapurple }\n')
+      writeFileSync(join(dir, 'src/components/Counter.tsx'), `
+        import { signal } from 'kay'
+        export function Counter() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{n.value}</button> }
+      `)
+      writeFileSync(join(dir, 'src/components/Card.tsx'), `
+        import { Head } from 'kay'
+        import './card.css'
+        import { Counter } from './Counter'
+        export function Card() { return <div class="card"><Head><title>Barrel card</title></Head><Counter /></div> }
+      `)
+      writeFileSync(join(dir, 'src/components/index.ts'), `export { Card } from './Card'\n`)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { Card } from '../components'
+        export default function Page() { return <main><Card /></main> }
+      `)
+
+      const manifest = await build({ root: dir, minify: false })
+      const route = manifest.routes.find(r => r.path === '/')!
+      expect(route.islandChunks).toEqual([manifest.islands[join(dir, 'src/components/Counter.tsx#Counter')]!])
+      expect(route.styles?.length).toBe(1)
+      expect(route.usesRenderContext).toBe(true)
+
+      const app = await createServer({ root: dir })
+      const html = await (await app.handle(new Request('http://localhost/'))).text()
+      expect(html).toContain('<title>Barrel card</title>')
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})

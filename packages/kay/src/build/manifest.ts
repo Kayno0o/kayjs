@@ -3,7 +3,6 @@
 import type { ModuleGraph } from './graph'
 import type { IslandPlan } from './islands'
 import { join, relative } from 'node:path'
-import { isTsFile } from './files'
 import { islandKey } from './islands'
 import { ancestorFiles, fileToRoutePath, MIDDLEWARE_NAMES } from './routes'
 
@@ -90,11 +89,8 @@ function createReachWalker(graph: ModuleGraph, islands: IslandPlan, islandChunks
       if (!isDeferred)
         reach.eager.add(chunk)
     }
-    for (const imp of analysis.imports) {
-      const target = graph.resolve(file, imp.source)
-      if (target !== undefined && target.endsWith('.tsx'))
-        walkIslands(target, seen, reach)
-    }
+    for (const dep of graph.localDeps(file))
+      walkIslands(dep, seen, reach)
   }
 
   function walkStyles(file: string, seen: Set<string>, out: Set<string>): void {
@@ -116,18 +112,12 @@ function createReachWalker(graph: ModuleGraph, islands: IslandPlan, islandChunks
       walkStyles(target.file, seen, out)
     }
     for (const imp of analysis.imports) {
-      const target = graph.resolve(file, imp.source)
-      if (target === undefined)
-        continue
-      if (target.endsWith('.css')) {
-        const cssUrl = srcCssToUrl.get(target)
-        if (cssUrl !== undefined)
-          out.add(cssUrl)
-      }
-      else if (isTsFile(target)) {
-        walkStyles(target, seen, out)
-      }
+      const cssUrl = srcCssToUrl.get(graph.resolve(file, imp.source) ?? '')
+      if (cssUrl !== undefined)
+        out.add(cssUrl)
     }
+    for (const dep of graph.localDeps(file))
+      walkStyles(dep, seen, out)
   }
 
   function walkRenderContext(file: string, seen: Set<string>): boolean {
@@ -137,14 +127,7 @@ function createReachWalker(graph: ModuleGraph, islands: IslandPlan, islandChunks
     const analysis = analyses.get(file)
     if (analysis === undefined)
       return false
-    if (analysis.usesRenderContext)
-      return true
-    for (const imp of analysis.imports) {
-      const target = graph.resolve(file, imp.source)
-      if (target !== undefined && target.endsWith('.tsx') && walkRenderContext(target, seen))
-        return true
-    }
-    return false
+    return analysis.usesRenderContext || graph.localDeps(file).some(dep => walkRenderContext(dep, seen))
   }
 
   // Layouts are shared by many routes, so each file is walked once.
