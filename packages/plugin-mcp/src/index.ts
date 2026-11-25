@@ -6,7 +6,7 @@ import type { ActionContext, InferOutput, KayPlugin, RequestContext, ServerActio
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import type { CompactSchemaOptions, JsonSchemaObject } from './schema'
-import { definePlugin } from 'kay/server'
+import { definePlugin, nodeEnv } from 'kay/server'
 import { isPlainRecord, isStandardSchema, normalizeObjectSchema, schemaToJsonSchema } from './schema'
 
 export { compactSchema, schemaToJsonSchema } from './schema'
@@ -965,12 +965,7 @@ export function mcp(options: McpOptions): KayPlugin {
     name: '@kayjs/mcp',
 
     server(api) {
-      const envKey = 'NODE_ENV'
-      if (!api.dev && process.env[envKey] !== 'production') {
-        for (const msg of collectBudgetViolations(footprint, options.budget))
-          warnSink(msg)
-      }
-      else if (api.dev) {
+      if (api.dev || nodeEnv() !== 'production') {
         for (const msg of collectBudgetViolations(footprint, options.budget))
           warnSink(msg)
       }

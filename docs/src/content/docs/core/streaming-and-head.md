@@ -73,6 +73,8 @@ export const env = defineEnv(z.object({
 }))
 ```
 
+`nodeEnv()` from `kay/server` reads `NODE_ENV` at runtime, so a compiled binary sees the value it is started with rather than the one it was built with. Plugins use it to tell production from development.
+
 ## Cookies & Security Headers
 
 - Read/write cookies via `ctx.cookies.get('name')`, `ctx.cookies.set('name', value, { httpOnly: true, secure: true, sameSite: 'lax' })`, and `ctx.cookies.delete('name')`.

@@ -5,6 +5,7 @@ import type { KayPlugin, ServerErrorInfo } from '../plugins/index'
 import type { Cookies } from './cookies'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
 import { CookieStore } from './cookies'
+import { nodeEnv } from './env'
 import { getClientIp, isHttpsRequest } from './security'
 
 export const DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 1024
@@ -242,7 +243,7 @@ export function applyHstsHeader(
   hstsValue: string | undefined,
   trustProxy: TrustProxy,
 ): Response {
-  if (hstsValue === undefined || process.env.NODE_ENV !== 'production' || !isHttpsRequest(request, trustProxy))
+  if (hstsValue === undefined || nodeEnv() !== 'production' || !isHttpsRequest(request, trustProxy))
     return res
   if (res.headers.has('strict-transport-security'))
     return res

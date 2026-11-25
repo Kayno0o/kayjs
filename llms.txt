@@ -17,7 +17,7 @@
   - Prerendering: `export const prerender = true` (+ optional `export function paths() { return ['/posts/a'] }`). Skipped in `kay dev` for fast on-demand reloads.
 - **Streaming & Head**: `<Head><title>...</title></Head>` (innermost `<title>` wins); `<Suspense fallback={<p>Loading</p>}><AsyncComp /></Suspense>` streams resolved HTML with 0 KB external JS.
 - **Actions (`kay/server`)**: `export const fn = action(standardSchema, async (input, ctx) => ...)`. Works as zero-JS `<form action={fn} method="post">` and `await fn(data)` from islands (server code auto-stripped; CSRF `Origin` checked automatically, honoring `X-Forwarded-Proto` / `X-Forwarded-Host`).
-- **Env (`kay/server`)**: `export const env = defineEnv(standardSchema)`.
+- **Env (`kay/server`)**: `export const env = defineEnv(standardSchema)`; `nodeEnv()` reads `NODE_ENV` at runtime, never folded at build.
 - **Static files & CSS**: Files in `public/` are served at `/` with ETag/`304` (and `Cache-Control: no-cache` + zero-copy direct streaming in `kay dev`; embedded in `--static` and `--compile`). Import `.css` or `*.module.css` directly from any component or layout.
 - **CLI**: `kay new <dir> [--template minimal|fullstack|blog|app]`, `kay check`, `kay dev`, `kay build [--static] [--compile [out]]`, `kay start`, `kay ui-eject <grammar> [dest]`.
 - **Testing (`kay/test`)**: `const app = await testApp({ root })` — in-process `app.get()`, `app.post()`, `app.submit()` with persistent cookie jar.

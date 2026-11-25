@@ -2,6 +2,13 @@
 
 import type { InferOutput, StandardSchemaV1 } from './standard-schema'
 
+const NODE_ENV_KEY = 'NODE_ENV'
+
+/** Reads NODE_ENV at runtime: the dynamic key keeps Bun.build from constant-folding it in compiled binaries. */
+export function nodeEnv(): string | undefined {
+  return process.env[NODE_ENV_KEY]
+}
+
 export function defineEnv<S extends StandardSchemaV1>(
   schema: S,
   source: Record<string, string | undefined> = process.env,

@@ -33,7 +33,7 @@ export type { ActionContext, ActionErrorFlash, ActionOptions, ActionResult, Serv
 export { CompressionCache, isCompressibleType, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
 export type { CompressionEncoding, PrecompressedEncoding } from './compress'
 export type { CookieOptions, Cookies } from './cookies'
-export { defineEnv } from './env'
+export { defineEnv, nodeEnv } from './env'
 export { DEFAULT_MAX_REQUEST_BODY_SIZE } from './http'
 export type { EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
 export { DEFAULT_CSP, DEFAULT_HSTS, getClientIp, isHttpsRequest, isTrustedOrigin, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, verifyOrigin, withCspHashes } from './security'

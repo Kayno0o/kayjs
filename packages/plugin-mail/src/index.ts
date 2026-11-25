@@ -2,7 +2,7 @@
 // Built strictly on the public KayPlugin API (server(api).route).
 
 import type { KayPlugin } from 'kay/server'
-import { DEFAULT_CSP, withCspHashes } from 'kay/server'
+import { DEFAULT_CSP, nodeEnv, withCspHashes } from 'kay/server'
 import { esc, escAttr } from 'kay/ssr'
 
 export type MailAddress = string | { name: string, address: string }
@@ -94,9 +94,6 @@ export interface Mailer {
   send(message: MailMessage): Promise<SentMail>
 }
 
-// Read NODE_ENV dynamically so Bun.build does not constant-fold it to "development" in compiled binaries.
-const NODE_ENV_KEY = 'NODE_ENV'
-const runtimeNodeEnv = (): string | undefined => process.env[NODE_ENV_KEY]
 
 export function mailer(options: MailerOptions = {}): Mailer {
   const outboxKey = Symbol.for(`kay.mail.outbox.${options.id ?? 'default'}`)
@@ -136,12 +133,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
       if (transport !== undefined) {
         await transport.send(record)
       }
-      else if (runtimeNodeEnv() === 'production' && !options.optional) {
+      else if (nodeEnv() === 'production' && !options.optional) {
         throw new MailNotConfiguredError()
       }
 
       // Production keeps no copy: the outbox holds sign-in links in plain text, and no preview reads it there.
-      if (runtimeNodeEnv() !== 'production') {
+      if (nodeEnv() !== 'production') {
         outbox.unshift(record)
         if (outbox.length > 100)
           outbox.length = 100
@@ -168,7 +165,7 @@ export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): K
   return {
     name: '@kayjs/mail',
     server(api) {
-      const env = runtimeNodeEnv()
+      const env = nodeEnv()
       const enablePreview = options.preview !== false && env !== 'production' && (api.dev || env === 'development' || env === 'test')
       if (!enablePreview)
         return

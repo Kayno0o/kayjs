@@ -7,7 +7,7 @@ import type { KayPlugin, Middleware, RequestContext, TrustProxy } from 'kay/serv
 import type { OAuthProvider } from './oauth'
 import type { RateLimitOptions } from './ratelimit'
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
-import { isHttpsRequest } from 'kay/server'
+import { isHttpsRequest, nodeEnv } from 'kay/server'
 import {
   hashPassword,
 
@@ -32,8 +32,7 @@ export type { OAuthPresetConfig, OAuthProfile, OAuthProvider } from './oauth'
 export { memoryAuthStore, normalizeEmail, toPublicUser } from './store'
 export type { AuthSession, AuthStore, AuthUser, OAuthAccount, PublicUser, TokenKind, UserExport, VerificationToken } from './store'
 
-const NODE_ENV_KEY = 'NODE_ENV'
-const runtimeNodeEnv = (): string | undefined => process.env[NODE_ENV_KEY]
+
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 const DEFAULT_PRUNE_INTERVAL_MS = 15 * 60 * 1000
 
@@ -154,7 +153,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
 
   const envSecret = process.env.AUTH_SECRET
   const configuredSecret = options.secret ?? (envSecret && envSecret.trim().length > 0 ? envSecret : undefined)
-  if (runtimeNodeEnv() === 'production') {
+  if (nodeEnv() === 'production') {
     if (configuredSecret === undefined)
       throw new Error('[kay/auth] `secret` (or `AUTH_SECRET` env) is required in production and must be at least 32 bytes')
     if (Buffer.byteLength(configuredSecret, 'utf8') < MIN_PROD_SECRET_BYTES)
@@ -209,7 +208,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
   const isSecureCookie = (ctx: RequestContext): boolean =>
     ctx.url.protocol === 'https:'
     || isHttpsRequest(ctx.request, trustProxy)
-    || runtimeNodeEnv() === 'production'
+    || nodeEnv() === 'production'
 
   const setSessionCookie = (ctx: RequestContext, rawToken: string): void => {
     ctx.cookies.set(cookieName, rawToken, {
