@@ -4,6 +4,7 @@
 import type { AstNode, ModuleAnalysis } from './analyze'
 import { analyzeModule, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
+import { mistake } from './mistakes'
 import { cleanJsxText, containsJsx, escapeStaticAttr, escapeStaticText, isComponentTag, isJsxNode, isStringBoolAttr, isUnsafeUrlAttr, jsxTagName, staticLiteral, unwrapParens, VOID_ELEMENTS } from './shared'
 
 const RAW_TEXT_ELEMENTS = new Set(['style', 'script'])
@@ -483,6 +484,8 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     const childExpr = hasChildren ? compileJsxToStringExpr({ type: 'JSXFragment', children: childNodes }) : '""'
 
     const islandInfo = islands?.get(tag)
+    if (islandInfo === undefined && islands !== undefined && hydrateExpr !== undefined)
+      throw mistake(`$hydrate on <${tag}>`, filename, `${tag} is not an island, so it never hydrates; drop $hydrate, or give ${tag} state or handlers`)
     if (islandInfo !== undefined) {
       const propsCode = `{ ${propEntries.join(', ')} }`
       const callPropsCode = hasChildren

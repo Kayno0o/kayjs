@@ -2,7 +2,7 @@
 
 import { parseSync } from 'oxc-parser'
 
-import { checkMistakes } from './mistakes'
+import { checkHydrateMode, checkMistakes, mistake } from './mistakes'
 import { isComponentTag, isJsxNode, jsxTagName } from './shared'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -239,8 +239,10 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
         const opts = decl.arguments?.[1]
         if (opts?.type === 'ObjectExpression') {
           for (const prop of opts.properties as AstNode[]) {
-            if (prop.type === 'Property' && prop.key?.name === 'hydrate' && prop.value?.type === 'Literal' && typeof prop.value.value === 'string')
+            if (prop.type === 'Property' && prop.key?.name === 'hydrate' && prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
+              checkHydrateMode(prop.value.value, `island() hydrate: "${prop.value.value}"`, filename)
               defaultHydrate = prop.value.value
+            }
           }
         }
       }
@@ -294,8 +296,12 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
               hasPaths = true
             if (name === 'prerender' && d.init?.type === 'Literal' && d.init.value === true)
               hasPrerender = true
-            if (name === 'hydrate' && d.init?.type === 'Literal' && typeof d.init.value === 'string')
+            if (name === 'hydrate' && d.init?.type === 'Literal' && typeof d.init.value === 'string') {
+              checkHydrateMode(d.init.value, `hydrate = "${d.init.value}"`, filename)
               defaultHydrate = d.init.value
+            }
+            if (d.init?.type === 'CallExpression' && d.init.callee?.name === 'island' && d.init.arguments?.length > 1)
+              throw mistake(`island() options on export ${name}`, filename, 'only the default export\'s island() options apply; export the island as default, or set $hydrate where it renders')
             if (d.init?.type === 'CallExpression' && d.init.callee?.type === 'Identifier' && d.init.callee.name === actionLocalName)
               exportedActions.push(name)
           }
@@ -320,6 +326,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
         const attrName = attr.name.name as string
         if (isComponent && attrName === '$hydrate') {
           const mode = hydrateMode(attr.value)
+          checkHydrateMode(mode, `$hydrate="${mode}"`, filename)
           hydrateModes.add(mode)
           if (mode !== 'load')
             deferredIslandTags.add(tag)

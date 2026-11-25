@@ -84,6 +84,22 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<input readOnly tabIndex={0} autoComplete="off" />')
   })
 
+  test('a hydrate mode kay does not have, which hydrates on load instead', () => {
+    const counter = 'import { Counter } from \'./Counter\''
+    refuses('<Counter $hydrate="visble" />', /\$hydrate="visble" in Page\.tsx: use load, visible, idle, interaction, client or media\(<query>\)/, counter)
+    accepts('<Counter $hydrate="media(max-width: 600px)" />', counter)
+    accepts('<Counter $hydrate={mode} />', `${counter}\nconst mode = 'idle'`)
+    expect(() => compileSsr('Counter.tsx', 'export const hydrate = \'idle \'\nexport default function C() { return <p>x</p> }')).toThrow(/hydrate = "idle " in Counter\.tsx: use load, visible/)
+    expect(() => compileSsr('Counter.tsx', 'import { island } from \'kay\'\nconst C = () => <p>x</p>\nexport const Counter = island(C, { hydrate: \'idle\' })')).toThrow(/island\(\) options on export Counter in Counter\.tsx: only the default export's island\(\) options apply/)
+  })
+
+  test('$hydrate on a component that is not an island, which kay ignores', () => {
+    const page = 'import { Card } from \'./Card\'\nimport { Counter } from \'./Counter\'\nexport default function Page() { return <div><Counter $hydrate="idle" /><Card $hydrate="idle" /></div> }'
+    const islands = new Map([['Counter', { id: 'c', chunk: 'c.js' }]])
+    expect(() => compileSsr('Page.tsx', page, { islands })).toThrow(/\$hydrate on <Card> in Page\.tsx: Card is not an island, so it never hydrates/)
+    expect(() => compileSsr('Page.tsx', page.replace('<Card $hydrate="idle" />', '<Card />'), { islands })).not.toThrow()
+  })
+
   test('Astro and Solid directives, which become plain attributes or island props', () => {
     refuses('<Counter client:visible />', /client:visible in Page\.tsx: write \$hydrate="visible"/, 'const Counter = () => <p>x</p>')
     refuses('<Counter client:only="solid" />', /write \$hydrate="client"/, 'const Counter = () => <p>x</p>')

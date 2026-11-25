@@ -47,8 +47,17 @@ function eventProp(event: string): string {
   return EVENT_PROPS.get(event) ?? `on${event.charAt(0).toUpperCase()}${event.slice(1)}`
 }
 
-function mistake(what: string, filename: string, fix: string): Error {
+export function mistake(what: string, filename: string, fix: string): Error {
   return new Error(`kay compiler: ${what} in ${filename}: ${fix}.`)
+}
+
+const HYDRATE_MODES = new Set(['load', 'visible', 'idle', 'interaction', 'client'])
+const MEDIA_MODE = /^media\(.+\)$/
+
+/** Throws on a hydrate mode the browser runtime would silently treat as `load`; `*` stands for a mode picked at runtime. */
+export function checkHydrateMode(mode: string, what: string, filename: string): void {
+  if (mode !== '*' && !HYDRATE_MODES.has(mode) && !MEDIA_MODE.test(mode))
+    throw mistake(what, filename, 'use load, visible, idle, interaction, client or media(<query>)')
 }
 
 function checkHandler(name: string, value: AstNode | null, filename: string, code: string): void {
