@@ -70,6 +70,107 @@ interface VariantPipelineConfig {
   cachePrefix: string
 }
 
+const MISSING_MAGICK_MESSAGE = '@kayjs/images: ImageMagick ("magick") was not found on PATH; AVIF/WebP optimization is disabled. Install ImageMagick to enable responsive image optimization.'
+const MAX_ENCODE_CONCURRENCY = 4
+
+/** Pure-JS binary header parser for PNG, GIF, WebP, JPEG, and AVIF/HEIF dimensions (zero external dependencies). */
+export function readImageDimensions(bytes: Uint8Array): { width: number, height: number } | undefined {
+  const len = bytes.byteLength
+  if (len < 10)
+    return undefined
+  const view = new DataView(bytes.buffer, bytes.byteOffset, len)
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A, IHDR width@16, height@20 (uint32BE)
+  if (len >= 24 && view.getUint32(0) === 0x89504E47 && view.getUint32(4) === 0x0D0A1A0A) {
+    const width = view.getUint32(16)
+    const height = view.getUint32(20)
+    return width > 0 && height > 0 ? { width, height } : undefined
+  }
+
+  // GIF87a / GIF89a: width@6, height@8 (uint16LE)
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38 && (bytes[4] === 0x37 || bytes[4] === 0x39) && bytes[5] === 0x61) {
+    const width = view.getUint16(6, true)
+    const height = view.getUint16(8, true)
+    return width > 0 && height > 0 ? { width, height } : undefined
+  }
+
+  // WebP: RIFF....WEBP
+  if (len >= 30 && view.getUint32(0) === 0x52494646 && view.getUint32(8) === 0x57454250) {
+    const chunk = view.getUint32(12)
+    // VP8X extended
+    if (chunk === 0x56503858 && len >= 30) {
+      const width = 1 + (bytes[24]! | (bytes[25]! << 8) | (bytes[26]! << 16))
+      const height = 1 + (bytes[27]! | (bytes[28]! << 8) | (bytes[29]! << 16))
+      return width > 0 && height > 0 ? { width, height } : undefined
+    }
+    // VP8L lossless
+    if (chunk === 0x5650384C && len >= 25 && bytes[20] === 0x2F) {
+      const bits = view.getUint32(21, true)
+      const width = (bits & 0x3FFF) + 1
+      const height = ((bits >> 14) & 0x3FFF) + 1
+      return width > 0 && height > 0 ? { width, height } : undefined
+    }
+    // VP8 lossy
+    if (chunk === 0x56503820 && len >= 30 && bytes[23] === 0x9D && bytes[24] === 0x01 && bytes[25] === 0x2A) {
+      const width = view.getUint16(26, true) & 0x3FFF
+      const height = view.getUint16(28, true) & 0x3FFF
+      return width > 0 && height > 0 ? { width, height } : undefined
+    }
+  }
+
+  // JPEG: FF D8 followed by markers; SOF0..SOF15 (except C4, C8, CC) carry height@+5, width@+7
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8) {
+    let offset = 2
+    while (offset + 4 <= len) {
+      if (bytes[offset] !== 0xFF)
+        break
+      while (offset < len && bytes[offset] === 0xFF) offset++
+      if (offset >= len)
+        break
+      const marker = bytes[offset++]!
+      if (marker === 0xD9 || marker === 0xDA)
+        break
+      if (marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7))
+        continue
+      if (offset + 2 > len)
+        break
+      const segLen = view.getUint16(offset)
+      if (segLen < 2 || offset + segLen > len)
+        break
+      if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC && segLen >= 7) {
+        const height = view.getUint16(offset + 3)
+        const width = view.getUint16(offset + 5)
+        return width > 0 && height > 0 ? { width, height } : undefined
+      }
+      offset += segLen
+    }
+  }
+
+  // AVIF / HEIF (ISOBMFF): ftyp box followed by meta -> iprp -> ipco -> ispe box (width@+12, height@+16 from box start)
+  if (len >= 24 && view.getUint32(4) === 0x66747970) {
+    for (let i = 12; i + 16 <= len; i++) {
+      if (bytes[i] === 0x69 && bytes[i + 1] === 0x73 && bytes[i + 2] === 0x70 && bytes[i + 3] === 0x65) {
+        // 'ispe' full box: 4 bytes version+flags, then uint32BE width, uint32BE height
+        const width = view.getUint32(i + 8)
+        const height = view.getUint32(i + 12)
+        if (width > 0 && height > 0 && width <= 65535 && height <= 65535)
+          return { width, height }
+      }
+    }
+  }
+
+  return undefined
+}
+
+function parseMagickDimensions(stdout: string): { width: number, height: number } | undefined {
+  const parts = stdout.trim().split(/\s+/)
+  const w = Number(parts[0])
+  const h = Number(parts[1])
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
+    return undefined
+  return { width: w, height: h }
+}
+
 function identifyImage(filePath: string): { width: number, height: number } | undefined {
   const proc = Bun.spawnSync(['magick', 'identify', '-ping', '-format', '%w %h', `${filePath}[0]`], {
     stdout: 'pipe',
@@ -77,12 +178,31 @@ function identifyImage(filePath: string): { width: number, height: number } | un
   })
   if (proc.exitCode !== 0)
     return undefined
-  const parts = proc.stdout.toString().trim().split(/\s+/)
-  const w = Number(parts[0])
-  const h = Number(parts[1])
-  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
+  return parseMagickDimensions(proc.stdout.toString())
+}
+
+async function identifyImageAsync(filePath: string): Promise<{ width: number, height: number } | undefined> {
+  const proc = Bun.spawn(['magick', 'identify', '-ping', '-format', '%w %h', `${filePath}[0]`], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
+  const [exitCode, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()])
+  if (exitCode !== 0)
     return undefined
-  return { width: w, height: h }
+  return parseMagickDimensions(stdout)
+}
+
+async function mapConcurrent<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const idx = next++
+      results[idx] = await fn(items[idx]!)
+    }
+  })
+  await Promise.all(workers)
+  return results
 }
 
 function writeFileAtomic(dstPath: string, data: string | Uint8Array): void {
@@ -231,19 +351,33 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
   const avifQuality = options.avifQuality ?? 55
   const cacheDirRel = options.cacheDir ?? '.kay-cache/images'
   const pruneCache = options.pruneCache ?? true
-  const magickAvailable = hasMagick()
 
   const emittedAssets = new Map<string, Uint8Array>()
   const activeCacheFiles = new Set<string>()
   let lastCacheRoot: string | undefined
+  let warnedMissingMagick = false
+
+  function warnMissingMagickOnce(): void {
+    if (!warnedMissingMagick) {
+      warnedMissingMagick = true
+      console.warn(MISSING_MAGICK_MESSAGE)
+    }
+  }
 
   return {
     name: '@kayjs/images',
+    check(ctx) {
+      if (!hasMagick())
+        ctx.error(MISSING_MAGICK_MESSAGE)
+    },
     bunPlugins: ({ root, assetPrefix }): BunPlugin[] => {
       const cacheRoot = resolve(root, cacheDirRel)
       lastCacheRoot = cacheRoot
       const prefix = assetPrefix.replace(/\/$/, '')
       const pipelineCfg: VariantPipelineConfig = { widths, formats, quality, avifQuality, cachePrefix: '' }
+      const magickAvailable = hasMagick()
+      if (!magickAvailable)
+        warnMissingMagickOnce()
 
       return [{
         name: 'kayjs-images',
@@ -261,8 +395,12 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
               return { contents: `export default ${JSON.stringify(asset)};\n`, loader: 'js' as const }
             }
 
-            if (!magickAvailable)
-              return emitRaw(0, 0)
+            if (!magickAvailable) {
+              const dims = readImageDimensions(rawBytes)
+              if (dims === undefined)
+                throw new Error(`@kayjs/images: could not determine dimensions for "${args.path}" (ImageMagick is unavailable and binary header could not be parsed)`)
+              return emitRaw(dims.width, dims.height)
+            }
 
             mkdirSync(cacheRoot, { recursive: true })
             const metaName = `${stem}-${hash}.json`
@@ -271,15 +409,15 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
             let meta = readCachedMeta(metaPath, cacheRoot, '')
 
             if (meta === undefined) {
-              const dims = identifyImage(args.path)
+              const dims = await identifyImageAsync(args.path) ?? readImageDimensions(rawBytes)
               if (dims === undefined)
-                return emitRaw(0, 0)
+                throw new Error(`@kayjs/images: could not determine dimensions for "${args.path}"`)
 
               const jobs = planVariantJobs(dims, stem, hash, cacheRoot, pipelineCfg)
-              const encoded = await Promise.all(jobs.map(async (job) => {
+              const encoded = await mapConcurrent(jobs, MAX_ENCODE_CONCURRENCY, async (job) => {
                 const ok = existsSync(job.cachedFile) || await encodeVariantAsync(args.path, job.cachedFile, job.width, job.quality)
                 return ok ? { rel: `img/${job.fileName}`, width: job.width, format: job.format } : undefined
-              }))
+              })
               const files: CachedImageMeta['files'] = encoded.filter((entry): entry is NonNullable<typeof entry> => entry !== undefined)
               if (files.length === 0)
                 return emitRaw(dims.width, dims.height)
@@ -405,8 +543,12 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
     return { src: `/img/${rawFileName}`, width, height }
   }
 
-  if (!hasMagick())
-    return emitRaw(0, 0)
+  if (!hasMagick()) {
+    const dims = readImageDimensions(rawBytes)
+    if (dims === undefined)
+      throw new Error(`@kayjs/images: could not determine dimensions for "${absPath}" (ImageMagick is unavailable and binary header could not be parsed)`)
+    return emitRaw(dims.width, dims.height)
+  }
 
   const cacheRoot = resolve(options.cacheDir ?? '.kay-cache/images')
   mkdirSync(cacheRoot, { recursive: true })
@@ -414,9 +556,9 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
   let meta = readCachedMeta(metaPath, cacheRoot, 'md-')
 
   if (meta === undefined) {
-    const dims = identifyImage(absPath)
+    const dims = identifyImage(absPath) ?? readImageDimensions(rawBytes)
     if (dims === undefined)
-      return emitRaw(0, 0)
+      throw new Error(`@kayjs/images: could not determine dimensions for "${absPath}"`)
 
     const jobs = planVariantJobs(dims, stem, hash, cacheRoot, pipelineCfg)
     const files: CachedImageMeta['files'] = []

@@ -13,6 +13,8 @@ export interface TailwindPluginOptions {
   bunPlugin?: BunPlugin | undefined
 }
 
+const MISSING_PLUGIN_MESSAGE = '@kayjs/tailwind: "bun-plugin-tailwind" could not be resolved; CSS will not be processed by Tailwind. Install it with `bun add -d bun-plugin-tailwind` or pass tailwind({ bunPlugin }).'
+
 function loadDefaultTailwindPlugin(root: string): BunPlugin | undefined {
   for (const base of [join(root, 'package.json'), import.meta.url]) {
     try {
@@ -30,6 +32,8 @@ function loadDefaultTailwindPlugin(root: string): BunPlugin | undefined {
 }
 
 export function tailwind(options: TailwindPluginOptions = {}): KayPlugin {
+  let warnedMissing = false
+
   return {
     name: '@kayjs/tailwind',
     css: [options.css ?? 'src/app.css'],
@@ -37,7 +41,18 @@ export function tailwind(options: TailwindPluginOptions = {}): KayPlugin {
       ? [options.bunPlugin]
       : ({ root }) => {
           const auto = loadDefaultTailwindPlugin(root)
-          return auto !== undefined ? [auto] : []
+          if (auto === undefined) {
+            if (!warnedMissing) {
+              warnedMissing = true
+              console.warn(MISSING_PLUGIN_MESSAGE)
+            }
+            return []
+          }
+          return [auto]
         },
+    check(ctx) {
+      if (options.bunPlugin === undefined && loadDefaultTailwindPlugin(ctx.root) === undefined)
+        ctx.error(MISSING_PLUGIN_MESSAGE)
+    },
   }
 }

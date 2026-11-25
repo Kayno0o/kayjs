@@ -36,15 +36,21 @@ export interface ShareCardInput {
 
 export const SHARE_CARD_CONFIG_SERVICE = 'kay.images.shareCardConfig'
 
-let magickFound: boolean | undefined
-let rsvgFound: boolean | undefined
+let magickCache: { path: string | undefined, available: boolean } | undefined
+let rsvgCache: { path: string | undefined, available: boolean } | undefined
 
 export function hasMagick(): boolean {
-  return magickFound ??= Bun.which('magick') !== null
+  const envPath = process.env.PATH
+  if (magickCache === undefined || magickCache.path !== envPath)
+    magickCache = { path: envPath, available: (envPath ?? '') !== '' && Bun.which('magick', { PATH: envPath! }) !== null }
+  return magickCache.available
 }
 
 export function hasRsvgConvert(): boolean {
-  return rsvgFound ??= Bun.which('rsvg-convert') !== null
+  const envPath = process.env.PATH
+  if (rsvgCache === undefined || rsvgCache.path !== envPath)
+    rsvgCache = { path: envPath, available: (envPath ?? '') !== '' && Bun.which('rsvg-convert', { PATH: envPath! }) !== null }
+  return rsvgCache.available
 }
 
 function rasterizeSvgToPng(tmpSvg: string, tmpPng: string): boolean {

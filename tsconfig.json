@@ -30,7 +30,8 @@
       "@kayjs/mcp": ["./packages/plugin-mcp/src/index.ts"],
       "@kayjs/content": ["./packages/plugin-content/src/index.ts"],
       "@kayjs/ui": ["./packages/ui/src/index.ts"],
-      "@kayjs/ui/plugin": ["./packages/ui/src/plugin.ts"]
+      "@kayjs/ui/plugin": ["./packages/ui/src/plugin.ts"],
+      "@kayjs/tailwind": ["./packages/plugin-tailwind/src/index.ts"]
     }
   },
   "include": ["packages/*/src", "packages/*/tests", "bench-app", "examples/*/src", "examples/*/kay.config.ts"]
