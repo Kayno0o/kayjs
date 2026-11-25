@@ -205,4 +205,39 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
       srv.stop()
     }
   })
+
+  it('re-runs kay.config.ts only when it changes', async () => {
+    const dir = makeTemp('kay-dev-config-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    const configPath = join(dir, 'kay.config.ts')
+    const routePath = join(dir, 'src/routes/index.tsx')
+    const counter = Symbol.for(`kay.test.configRuns.${dir}`)
+    const runs = (): number => (globalThis as Record<symbol, number>)[counter] ?? 0
+    const config = (lang: string) => `
+      const key = Symbol.for(${JSON.stringify(`kay.test.configRuns.${dir}`)})
+      globalThis[key] = (globalThis[key] ?? 0) + 1
+      export default { lang: '${lang}' }
+    `
+    writeFileSync(configPath, config('en'))
+    writeFileSync(routePath, `export default function Home() { return <p>v1</p> }\n`)
+
+    const srv = await devServer({ root: dir, port: 0 })
+    try {
+      const atStart = runs()
+      expect(atStart).toBeGreaterThan(0)
+
+      writeFileSync(routePath, `export default function Home() { return <p>v2</p> }\n`)
+      await srv.rebuild()
+      expect(runs()).toBe(atStart)
+
+      writeFileSync(configPath, config('fr'))
+      await srv.rebuild()
+      expect(runs()).toBeGreaterThan(atStart)
+      expect(await (await fetch(srv.url)).text()).toContain('lang="fr"')
+    }
+    finally {
+      srv.stop()
+    }
+  })
 })

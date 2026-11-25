@@ -6,7 +6,7 @@ import type { BunPlugin } from 'bun'
 import type { RouteManifestEntry } from '../build/index'
 import type { Middleware, RequestContext } from '../server/index'
 import type { SecurityHeadersOptions, TrustProxy } from '../server/security'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { createAppContext, getAppContext, runWithAppContext } from './context'
 
@@ -170,9 +170,12 @@ export async function loadConfig(root: string, options?: { fresh?: boolean }): P
   const configPath = join(absRoot, 'kay.config.ts')
   if (!existsSync(configPath))
     return {}
-  const spec = options?.fresh || process.env.KAY_DEV === '1'
-    ? `${configPath}?v=${++configReloadSeq}-${Date.now()}`
-    : configPath
+  // In dev the query follows the file content: a save elsewhere reuses the loaded config and its plugin instances instead of re-running every factory.
+  const spec = options?.fresh
+    ? `${configPath}?v=fresh-${++configReloadSeq}`
+    : process.env.KAY_DEV === '1'
+      ? `${configPath}?v=${Bun.hash(readFileSync(configPath)).toString(36)}`
+      : configPath
   const active = getAppContext()
   const ctx = active !== undefined && active.root === absRoot
     ? active
