@@ -1,0 +1,72 @@
+// A word this long or more is completed or respelled; shorter ones match too much.
+const SHORTEST_COMPLETED = 3
+const SHORTEST_RESPELLED = 4
+// From this length a word may be two edits off, else one.
+const TWO_EDITS_FROM = 8
+const MOST = 3
+
+// The known words starting with `word`, the most used first, then the shortest.
+export function completions(word: string, vocabulary: Iterable<string>, uses: (word: string) => number): string[] {
+  if (word.length < SHORTEST_COMPLETED)
+    return []
+
+  const found: string[] = []
+
+  for (const candidate of vocabulary) {
+    if (candidate.startsWith(word))
+      found.push(candidate)
+  }
+
+  return found.sort((a, b) => uses(b) - uses(a) || a.length - b.length).slice(0, MOST)
+}
+
+// The known words one edit from `word` (two for a long one), a swap of neighbour letters counting as one, the closest first.
+export function closeWords(word: string, vocabulary: Iterable<string>): string[] {
+  if (word.length < SHORTEST_RESPELLED)
+    return []
+
+  const most = word.length >= TWO_EDITS_FROM ? 2 : 1
+  const found: [string, number][] = []
+
+  for (const candidate of vocabulary) {
+    if (Math.abs(candidate.length - word.length) > most)
+      continue
+
+    const edits = distance(word, candidate, most)
+
+    if (edits <= most)
+      found.push([candidate, edits])
+  }
+
+  return found.sort((a, b) => a[1] - b[1]).slice(0, MOST).map(([candidate]) => candidate)
+}
+
+// Damerau-Levenshtein distance (optimal string alignment), giving up past `most` once a whole row is above it.
+export function distance(a: string, b: string, most = Infinity): number {
+  let before: number[] = []
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j)
+
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i]
+    let lowest = i
+
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      let value = Math.min(previous[j]! + 1, row[j - 1]! + 1, previous[j - 1]! + cost)
+
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1])
+        value = Math.min(value, before[j - 2]! + 1)
+
+      row.push(value)
+      lowest = Math.min(lowest, value)
+    }
+
+    if (lowest > most)
+      return lowest
+
+    before = previous
+    previous = row
+  }
+
+  return previous[b.length]!
+}

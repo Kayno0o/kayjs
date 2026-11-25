@@ -1,0 +1,25 @@
+{
+  "name": "kayjs-icons-build",
+  "type": "module",
+  "private": true,
+  "description": "Builds the word table of @kayjs/icons and benches it, apart from the workspace so its model runtime is installed only to rebuild",
+  "scripts": {
+    "table": "$npm_execpath table.ts",
+    "bench": "$npm_execpath bench.ts"
+  },
+  "devDependencies": {
+    "@huggingface/transformers": "4.3.2",
+    "@iconify-json/carbon": "1.2.30",
+    "@iconify-json/heroicons": "1.2.3",
+    "@iconify-json/iconoir": "1.2.12",
+    "@iconify-json/lucide": "1.2.153",
+    "@iconify-json/material-symbols": "1.2.98",
+    "@iconify-json/mdi": "1.2.3",
+    "@iconify-json/mingcute": "1.2.10",
+    "@iconify-json/ph": "1.2.2",
+    "@iconify-json/ri": "1.2.10",
+    "@iconify-json/tabler": "1.2.44",
+    "@tabler/icons": "3.51.0",
+    "lucide-static": "1.72.0"
+  }
+}

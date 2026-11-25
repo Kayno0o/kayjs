@@ -5,6 +5,7 @@
 import type { BunPlugin } from 'bun'
 import type { KayPlugin } from '@kayjs/kay/server'
 import type { IconData, IconifyIcon, IconSet } from './types'
+import { join } from 'node:path'
 import { definePlugin } from '@kayjs/kay/server'
 
 export { Icon } from './Icon'
@@ -12,6 +13,7 @@ export type { IconComponentProps } from './Icon'
 export type { IconData, IconifyIcon, IconSet } from './types'
 
 const DEFAULT_SIZE = 16
+const FOUND_PER_SET = 10
 const ICON_SPEC_RE = /^~icons\/([^/]+)\/(.+)$/
 
 function resolveIconSetFile(prefix: string, root: string): string {
@@ -117,5 +119,29 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
         })
       },
     }],
+    commands: {
+      // Prints the `~icons/<set>/<name>` specifiers of the installed sets matching the words, so an agent imports icons that exist.
+      'icons-find': async (args, root) => {
+        const query = args.join(' ')
+        if (query.trim() === '') {
+          console.error('Usage: kay icons-find <words>')
+          process.exit(1)
+        }
+
+        const files = [...new Bun.Glob('node_modules/@iconify-json/*/icons.json').scanSync({ cwd: root, followSymlinks: true })].sort()
+        if (files.length === 0) {
+          console.error('No icon set installed. Install one, such as @iconify-json/tabler.')
+          process.exit(1)
+        }
+
+        // Imported here so the word table never reaches a bundle that only draws icons.
+        const { findIcons } = await import('./search')
+        for (const file of files) {
+          const set = await Bun.file(join(root, file)).json() as IconSet
+          for (const name of findIcons(set, query, { limit: FOUND_PER_SET }))
+            console.log(`~icons/${set.prefix}/${name}`)
+        }
+      },
+    },
   })
 }

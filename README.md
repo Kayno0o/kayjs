@@ -95,7 +95,7 @@ Core holds the compiler, runtime, router, SSR and build. Every optional capabili
 | **`@kayjs/mcp`** | Streamable HTTP (`2025-03-26`) MCP server exposing typed `action()` tools with schema compaction, shared schemas, `resources`, output shaping, and `kay mcp-footprint` | Zero external deps |
 | **`@kayjs/mail`** | Resend HTTP transport, custom transports, and dev-only `/_kay/mail` outbox preview | Zero external deps |
 | **`@kayjs/images`** | Build-time responsive AVIF/WebP pipeline + content-hash cache + `<Picture>` + OG `shareCard()` | ImageMagick / librsvg-backed (zero npm deps) |
-| **`@kayjs/icons`** | Virtual `~icons/<set>/<name>` imports + browser-pure `<Icon>` | Iconify JSON sets |
+| **`@kayjs/icons`** | Virtual `~icons/<set>/<name>` imports + browser-pure `<Icon>`, `kay icons-find` search by related word or typo | Iconify JSON sets |
 | **`@kayjs/seo`** | `titleTemplate`, OpenGraph/Twitter meta, JSON-LD, sitemap, redirects, self-hosted fonts | Zero external deps |
 | **`@kayjs/tailwind`** | Tailwind v4 CSS integration (auto-loads `bun-plugin-tailwind`) | Opt-in |
 | **`@kayjs/spa`** | Opt-in SPA navigation with persistent `[data-persist]` islands and `[data-kay-prefetch]` | Opt-in |
