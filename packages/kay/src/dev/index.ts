@@ -172,7 +172,10 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   process.env.KAY_DEV = '1'
   const root = resolve(options.root)
   const devRoot = join(root, '.kay-dev')
-  const initialCfg = await loadConfig(root).catch(() => ({} as Awaited<ReturnType<typeof loadConfig>>))
+  const initialCfg = await loadConfig(root).catch((err) => {
+    console.warn(`[kay dev] failed to load kay.config.ts: ${err instanceof Error ? err.message : String(err)}`)
+    return {} as Awaited<ReturnType<typeof loadConfig>>
+  })
   const assetPrefix = (initialCfg.assetPrefix ?? '/_kay').replace(/\/$/, '')
   let reloadAssets = makeDevReloadAssets(assetPrefix)
   const srcDir = resolve(root, 'src')
@@ -182,6 +185,30 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   const hostname = options.hostname ?? '127.0.0.1'
   const buildCache = createBuildCache()
   const modules = createModuleStore(join(devRoot, 'server'))
+  const watchers: FSWatcher[] = []
+  const watchedDirs = new Set<string>()
+  const pluginWatchers: FSWatcher[] = []
+  let activeAssetPrefix = assetPrefix
+
+  function refreshPluginWatchers(cfg: Awaited<ReturnType<typeof loadConfig>>): void {
+    for (const w of pluginWatchers)
+      w.close()
+    pluginWatchers.length = 0
+    const seen = new Set<string>(watchedDirs)
+    const watchCtx = createAppContext({ root, outDir: devRoot, publicDir, assetPrefix: activeAssetPrefix, dev: true })
+    for (const plugin of cfg.plugins ?? []) {
+      const paths = runWithAppContext(watchCtx, () =>
+        typeof plugin.watchPaths === 'function' ? plugin.watchPaths(root) : (plugin.watchPaths ?? []))
+      for (const p of paths) {
+        const abs = resolve(root, p)
+        if (seen.has(abs) || !existsSync(abs))
+          continue
+        seen.add(abs)
+        const isDir = statSync(abs).isDirectory()
+        pluginWatchers.push(watch(abs, isDir ? { recursive: true } : {}, () => scheduleRebuild('full')))
+      }
+    }
+  }
 
   let buildNum = 0
   let currentApp: KayApp | undefined
@@ -215,20 +242,21 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   async function runSingleBuild(cssOnly: boolean, resetCache: boolean, reloadAll: boolean): Promise<void> {
     if (stopped)
       return
-    if (resetCache) {
-      clearBuildCache(buildCache)
-      const freshCfg = await loadConfig(root, { fresh: true }).catch(() => undefined)
-      if (freshCfg?.assetPrefix !== undefined)
-        reloadAssets = makeDevReloadAssets(freshCfg.assetPrefix)
-    }
-    if (reloadAll)
-      modules.reloadAll()
     const hadError = lastError !== undefined
     const hadApp = currentApp !== undefined
     const n = ++buildNum
     const outDir = `.kay-dev/b${n}`
     const t0 = performance.now()
     try {
+      if (resetCache) {
+        clearBuildCache(buildCache)
+        const freshCfg = await loadConfig(root, { fresh: true })
+        activeAssetPrefix = (freshCfg.assetPrefix ?? '/_kay').replace(/\/$/, '')
+        reloadAssets = makeDevReloadAssets(activeAssetPrefix)
+        refreshPluginWatchers(freshCfg)
+      }
+      if (reloadAll)
+        modules.reloadAll()
       const manifest = await build({
         root,
         routesDir: options.routesDir,
@@ -337,8 +365,6 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
     }, 40)
   }
 
-  const watchers: FSWatcher[] = []
-  const watchedDirs = new Set<string>()
   const addDirWatch = (dir: string, handler: (filename: string) => void) => {
     if (watchedDirs.has(dir) || !existsSync(dir))
       return
@@ -360,22 +386,9 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
       scheduleRebuild('config')
   }))
 
-  // Watch plugin-declared extra paths (e.g. content/ or messages/ directories)
+  // Watch plugin-declared extra paths (e.g. content/ or messages/ directories); refreshed on kay.config.ts edits.
   try {
-    const watchCtx = createAppContext({ root, outDir: devRoot, publicDir, assetPrefix, dev: true })
-    const cfg = await loadConfig(root, { appContext: watchCtx })
-    for (const plugin of cfg.plugins ?? []) {
-      const paths = runWithAppContext(watchCtx, () =>
-        typeof plugin.watchPaths === 'function' ? plugin.watchPaths(root) : (plugin.watchPaths ?? []))
-      for (const p of paths) {
-        const abs = resolve(root, p)
-        if (watchedDirs.has(abs) || !existsSync(abs))
-          continue
-        watchedDirs.add(abs)
-        const isDir = statSync(abs).isDirectory()
-        watchers.push(watch(abs, isDir ? { recursive: true } : {}, () => scheduleRebuild('full')))
-      }
-    }
+    refreshPluginWatchers(initialCfg)
   }
   catch (err) {
     console.warn(`[kay dev] could not attach plugin watchers: ${err instanceof Error ? err.message : String(err)}`)
@@ -384,7 +397,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   const pingChunk = encoder.encode(': ping\n\n')
   const pingInterval = setInterval(() => pushToClients(pingChunk), 15_000)
 
-  const maxRequestBodySize = options.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
+  const maxRequestBodySize = options.maxRequestBodySize ?? initialCfg.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
 
   const server = Bun.serve({
     port,
@@ -463,6 +476,8 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
       clearTimeout(timer)
       clearInterval(pingInterval)
       for (const w of watchers)
+        w.close()
+      for (const w of pluginWatchers)
         w.close()
       server.stop(true)
       void currentApp?.dispose?.()
