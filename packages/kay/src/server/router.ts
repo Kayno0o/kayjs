@@ -1,6 +1,8 @@
 // File-based route matcher: static > [param] > [...catchall] priority sorting + param extraction.
 
-export interface RoutePattern<T> {
+const ENCODED_SLASH_RE = /%2f/i
+
+interface RoutePattern<T> {
   path: string
   segments: string[]
   isStatic: boolean
@@ -14,7 +16,7 @@ export interface RouteMatch<T> {
   params: Record<string, string>
 }
 
-export function compileRoutePattern<T>(path: string, data: T): RoutePattern<T> {
+function compileRoutePattern<T>(path: string, data: T): RoutePattern<T> {
   const clean = path === '/' ? '' : path.replace(/^\/|\/$/g, '')
   const segments = clean === '' ? [] : clean.split('/')
   let isStatic = true
@@ -85,7 +87,7 @@ export class Router<T> {
         }
         else if (seg.startsWith(':')) {
           const rawSeg = parts[j]!
-          if (/%2f/i.test(rawSeg)) {
+          if (ENCODED_SLASH_RE.test(rawSeg)) {
             matched = false
             break
           }

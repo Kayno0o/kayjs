@@ -17,7 +17,7 @@ export interface Cookies {
   all(): Record<string, string>
 }
 
-export function parseCookieHeader(header: string | null): Map<string, string> {
+function parseCookieHeader(header: string | null): Map<string, string> {
   const map = new Map<string, string>()
   if (!header)
     return map

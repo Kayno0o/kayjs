@@ -5,7 +5,7 @@ import type { KayPlugin, ServerErrorInfo } from '../plugins/index'
 import type { Cookies } from './cookies'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
 import { CookieStore } from './cookies'
-import { buildSecurityHeaderEntries, getClientIp, isHttpsRequest } from './security'
+import { getClientIp, isHttpsRequest } from './security'
 
 export const DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 1024
 
@@ -121,46 +121,57 @@ export function extractRenderedIslands(html: string): { hasIslands: boolean, eag
 export interface RequestContextOptions {
   trustProxy?: TrustProxy | undefined
   remoteIp?: string | undefined
+  /** The parsed `request.url`, when the caller already has it. */
+  url?: URL | undefined
 }
+
+// None of these read the request, so every context shares them.
+const json: RequestContext['json'] = (data, init) => {
+  const payload = JSON.stringify(data)
+  const headers = new Headers(init?.headers)
+  if (!headers.has('content-type'))
+    headers.set('content-type', 'application/json; charset=utf-8')
+  if (!headers.has('content-length'))
+    headers.set('content-length', String(Buffer.byteLength(payload, 'utf8')))
+  return new Response(payload, { ...init, headers })
+}
+const text: RequestContext['text'] = (body, init) => {
+  const headers = new Headers(init?.headers)
+  if (!headers.has('content-type'))
+    headers.set('content-type', 'text/plain; charset=utf-8')
+  if (!headers.has('content-length'))
+    headers.set('content-length', String(Buffer.byteLength(body, 'utf8')))
+  return new Response(body, { ...init, headers })
+}
+const redirect: RequestContext['redirect'] = (location, status = 302) => new Response(null, { status, headers: { location } })
+const deny: RequestContext['deny'] = (status, message, fieldErrors) => Response.json({ ok: false, status, error: message, fieldErrors }, { status })
 
 export function makeRequestContext(
   request: Request,
   params: Record<string, string>,
   opts?: RequestContextOptions,
 ): { ctx: RequestContext, cookieStore: CookieStore } {
-  const url = new URL(request.url)
   const trustProxy = opts?.trustProxy ?? false
-  const isHttps = isHttpsRequest(request, trustProxy)
-  const cookieStore = new CookieStore(request.headers.get('cookie'), isHttps)
-  const ip = getClientIp(request, trustProxy, opts?.remoteIp)
+  const cookieStore = new CookieStore(request.headers.get('cookie'), isHttpsRequest(request, trustProxy))
   const ctx: RequestContext = {
     request,
-    url,
+    url: opts?.url ?? new URL(request.url),
     params,
     cookies: cookieStore,
     locals: {},
-    ip,
-    json: (data, init) => {
-      const payload = JSON.stringify(data)
-      const headers = new Headers(init?.headers)
-      if (!headers.has('content-type'))
-        headers.set('content-type', 'application/json; charset=utf-8')
-      if (!headers.has('content-length'))
-        headers.set('content-length', String(Buffer.byteLength(payload, 'utf8')))
-      return new Response(payload, { ...init, headers })
-    },
-    text: (body, init) => {
-      const headers = new Headers(init?.headers)
-      if (!headers.has('content-type'))
-        headers.set('content-type', 'text/plain; charset=utf-8')
-      if (!headers.has('content-length'))
-        headers.set('content-length', String(Buffer.byteLength(body, 'utf8')))
-      return new Response(body, { ...init, headers })
-    },
-    redirect: (location, status = 302) => new Response(null, { status, headers: { location } }),
-    deny: (status, message, fieldErrors) => Response.json({ ok: false, status, error: message, fieldErrors }, { status }),
+    ip: getClientIp(request, trustProxy, opts?.remoteIp),
+    json,
+    text,
+    redirect,
+    deny,
   }
   return { ctx, cookieStore }
+}
+
+/** True when the client sent or asked for JSON: such requests get JSON errors, not pages. */
+export function wantsJson(request: Request): boolean {
+  return (request.headers.get('accept') ?? '').includes('application/json')
+    || (request.headers.get('content-type') ?? '').includes('application/json')
 }
 
 /** Enforces `maxBytes` on incoming request bodies (both Content-Length and streaming body reads). */
@@ -194,7 +205,10 @@ export async function enforceRequestBodyLimit(
         break
       total += value.byteLength
       if (total > maxBytes) {
-        await reader.cancel().catch(() => {})
+        try {
+          await reader.cancel()
+        }
+        catch {}
         return { ok: false }
       }
       chunks.push(value)
@@ -243,40 +257,32 @@ export function applyHstsHeader(
   }
 }
 
+/** Adds the pending cookies (when any) and the security headers the response does not set itself. */
 export function finalizeResponse(
   res: Response,
-  cookieStore: CookieStore,
-  securityEntries: readonly [string, string][] | SecurityHeadersOptions | false | undefined,
+  cookieStore: CookieStore | undefined,
+  entries: readonly [string, string][],
 ): Response {
-  const entries: readonly [string, string][] = Array.isArray(securityEntries)
-    ? securityEntries
-    : buildSecurityHeaderEntries(securityEntries as SecurityHeadersOptions | false | undefined)
-
-  if (!cookieStore.hasChanges && entries.length === 0)
+  const hasCookies = cookieStore?.hasChanges === true
+  if (!hasCookies && entries.length === 0)
     return res
 
-  // Fast path: mutate Response.headers in place (zero Response/Headers copy in Bun!)
-  try {
-    const h = res.headers
-    if (cookieStore.hasChanges)
-      cookieStore.applyTo(h)
-    for (let i = 0; i < entries.length; i++) {
-      const [k, v] = entries[i]!
+  const apply = (h: Headers): void => {
+    if (hasCookies)
+      cookieStore!.applyTo(h)
+    for (const [k, v] of entries) {
       if (!h.has(k))
         h.set(k, v)
     }
+  }
+  // Mutate in place (no copy in Bun); a response with immutable headers (e.g. a proxied upstream fetch) is rebuilt.
+  try {
+    apply(res.headers)
     return res
   }
   catch {
-    // Fallback for immutable headers (e.g. proxied upstream fetch Response)
     const headers = new Headers(res.headers)
-    if (cookieStore.hasChanges)
-      cookieStore.applyTo(headers)
-    for (let i = 0; i < entries.length; i++) {
-      const [k, v] = entries[i]!
-      if (!headers.has(k))
-        headers.set(k, v)
-    }
+    apply(headers)
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
   }
 }

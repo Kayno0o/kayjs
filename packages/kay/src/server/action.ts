@@ -3,6 +3,7 @@
 import type { Cookies } from './cookies'
 import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult } from './standard-schema'
 import type { TrustProxy } from './security'
+import { wantsJson } from './http'
 import { isTrustedOrigin } from './security'
 import { validateSchema } from './standard-schema'
 
@@ -126,6 +127,21 @@ function isJsonBody(request: Request): boolean {
   return (request.headers.get('content-type') ?? '').includes('application/json')
 }
 
+// The page a form came from, when its origin is one this server trusts: where a no-JS submit goes back to.
+function trustedReferer(request: Request, trustedOrigins: ReadonlySet<string> | undefined, trustProxy: TrustProxy): URL | undefined {
+  const referer = request.headers.get('referer')
+  if (!referer)
+    return undefined
+  let refUrl: URL
+  try {
+    refUrl = new URL(referer)
+  }
+  catch {
+    return undefined
+  }
+  return isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy) ? refUrl : undefined
+}
+
 function topLevelKey(issue: StandardSchemaIssue): string | undefined {
   const seg = issue.path?.length === 1 ? issue.path[0] : undefined
   const key = typeof seg === 'object' && seg !== null ? seg.key : seg
@@ -226,8 +242,7 @@ export async function executeAction(
   trustedOrigins?: ReadonlySet<string>,
   trustProxy: TrustProxy = false,
 ): Promise<Response> {
-  const wantsJson = (request.headers.get('accept') ?? '').includes('application/json')
-    || (request.headers.get('content-type') ?? '').includes('application/json')
+  const json = wantsJson(request)
 
   let input: unknown
   if (act.schema !== undefined) {
@@ -244,26 +259,14 @@ export async function executeAction(
       checked = await retryWithFormArrays(act.schema, rawBody as Record<string, unknown>, checked)
     if (!checked.ok) {
       // Zero-JS progressive HTML <form> submit: flash fieldErrors + safe submitted values (<4KB) and redirect 303 back to trusted Referer
-      if (!wantsJson) {
-        const referer = request.headers.get('referer')
-        if (referer) {
-          let refUrl: URL | undefined
-          try {
-            refUrl = new URL(referer)
-          }
-          catch {
-            refUrl = undefined
-          }
-          if (refUrl !== undefined && isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy)) {
-            const serializedFlash = buildActionErrorFlash(act.url, checked.fieldErrors, rawBody, act.flashFields)
-            ctx.cookies.set(ACTION_ERROR_COOKIE, serializedFlash, {
-              httpOnly: true,
-              sameSite: 'lax',
-              maxAge: 60,
-            })
-            return Response.redirect(refUrl.href, 303)
-          }
-        }
+      const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy)
+      if (back !== undefined) {
+        ctx.cookies.set(ACTION_ERROR_COOKIE, buildActionErrorFlash(act.url, checked.fieldErrors, rawBody, act.flashFields), {
+          httpOnly: true,
+          sameSite: 'lax',
+          maxAge: 60,
+        })
+        return Response.redirect(back.href, 303)
       }
       return Response.json(
         { ok: false, status: 400, error: 'Validation failed', fieldErrors: checked.fieldErrors, issues: checked.issues },
@@ -277,20 +280,9 @@ export async function executeAction(
   if (result instanceof Response)
     return result
 
-  if (!wantsJson) {
-    const referer = request.headers.get('referer')
-    if (referer) {
-      let refUrl: URL | undefined
-      try {
-        refUrl = new URL(referer)
-      }
-      catch {
-        refUrl = undefined
-      }
-      if (refUrl !== undefined && isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy))
-        return Response.redirect(refUrl.href, 303)
-    }
-  }
+  const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy)
+  if (back !== undefined)
+    return Response.redirect(back.href, 303)
 
   return Response.json({ ok: true, data: result }, { status: 200 })
 }

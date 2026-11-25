@@ -4,7 +4,7 @@
 export type CompressionEncoding = 'zstd' | 'gzip'
 export type PrecompressedEncoding = 'br' | 'gzip'
 
-export const MIN_COMPRESS_BYTES = 256
+const MIN_COMPRESS_BYTES = 256
 const DEFAULT_MAX_CACHE_BYTES = 2 * 1024 * 1024
 const encoder = new TextEncoder()
 
@@ -32,98 +32,52 @@ export function isCompressibleType(contentType: string | null | undefined): bool
   return mime.endsWith('+json') || mime.endsWith('+xml')
 }
 
-export function pickEncoding(acceptEncoding: string | null): CompressionEncoding | undefined {
-  if (!acceptEncoding)
-    return undefined
+const Q_VALUE_RE = /;\s*q\s*=\s*([0-9.]+)/i
 
-  // Fast path: standard browser headers without q-values (e.g. "gzip, deflate, br, zstd")
+// The `first` token wins ties; a token the header omits or gives q=0 never wins. Headers without q-values (the usual browser ones) take the allocation-free path.
+function pickToken<A extends string, B extends string>(acceptEncoding: string, first: A | undefined, second: B | undefined): A | B | undefined {
   if (!acceptEncoding.includes(';')) {
     const lower = acceptEncoding.toLowerCase()
-    if (hasToken(lower, 'zstd'))
-      return 'zstd'
-    if (hasToken(lower, 'gzip'))
-      return 'gzip'
-    return undefined
+    if (first !== undefined && hasToken(lower, first))
+      return first
+    return second !== undefined && hasToken(lower, second) ? second : undefined
   }
 
-  let zstdQ = -1
-  let gzipQ = -1
-  const parts = acceptEncoding.split(',')
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i]!.trim()
-    if (!part)
-      continue
+  let firstQ = -1
+  let secondQ = -1
+  for (const rawPart of acceptEncoding.split(',')) {
+    const part = rawPart.trim()
     const semi = part.indexOf(';')
     const name = (semi === -1 ? part : part.slice(0, semi)).trim().toLowerCase()
-    if (name !== 'zstd' && name !== 'gzip')
+    if (name !== first && name !== second)
       continue
     let q = 1
     if (semi !== -1) {
-      const m = /;\s*q\s*=\s*([0-9.]+)/i.exec(part.slice(semi))
-      if (m !== null) {
-        const parsed = Number(m[1])
-        if (!Number.isNaN(parsed))
-          q = parsed
-      }
+      const parsed = Number(Q_VALUE_RE.exec(part.slice(semi))?.[1])
+      if (!Number.isNaN(parsed))
+        q = parsed
     }
-    if (name === 'zstd')
-      zstdQ = q
+    if (name === first)
+      firstQ = q
     else
-      gzipQ = q
+      secondQ = q
   }
-
-  if (zstdQ <= 0 && gzipQ <= 0)
+  if (firstQ <= 0 && secondQ <= 0)
     return undefined
-  return zstdQ >= gzipQ ? 'zstd' : 'gzip'
+  return firstQ >= secondQ ? first : second
+}
+
+export function pickEncoding(acceptEncoding: string | null): CompressionEncoding | undefined {
+  return acceptEncoding ? pickToken(acceptEncoding, 'zstd', 'gzip') : undefined
 }
 
 export function pickPrecompressedEncoding(
   acceptEncoding: string | null,
   available: { br?: boolean, gz?: boolean },
 ): PrecompressedEncoding | undefined {
-  if (!acceptEncoding || (!available.br && !available.gz))
+  if (!acceptEncoding)
     return undefined
-
-  if (!acceptEncoding.includes(';')) {
-    const lower = acceptEncoding.toLowerCase()
-    if (available.br && hasToken(lower, 'br'))
-      return 'br'
-    if (available.gz && hasToken(lower, 'gzip'))
-      return 'gzip'
-    return undefined
-  }
-
-  let brQ = -1
-  let gzipQ = -1
-  const parts = acceptEncoding.split(',')
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i]!.trim()
-    if (!part)
-      continue
-    const semi = part.indexOf(';')
-    const name = (semi === -1 ? part : part.slice(0, semi)).trim().toLowerCase()
-    if (name !== 'br' && name !== 'gzip')
-      continue
-    let q = 1
-    if (semi !== -1) {
-      const m = /;\s*q\s*=\s*([0-9.]+)/i.exec(part.slice(semi))
-      if (m !== null) {
-        const parsed = Number(m[1])
-        if (!Number.isNaN(parsed))
-          q = parsed
-      }
-    }
-    if (name === 'br')
-      brQ = q
-    else
-      gzipQ = q
-  }
-
-  const effBr = available.br ? brQ : -1
-  const effGz = available.gz ? gzipQ : -1
-  if (effBr <= 0 && effGz <= 0)
-    return undefined
-  return effBr >= effGz ? 'br' : 'gzip'
+  return pickToken(acceptEncoding, available.br ? 'br' : undefined, available.gz ? 'gzip' : undefined)
 }
 
 export function toWeakEtag(etag: string): string {
@@ -159,10 +113,18 @@ function hasToken(haystack: string, token: string): boolean {
   return false
 }
 
-export function compressBuffer(bytes: Uint8Array<ArrayBuffer>, encoding: CompressionEncoding): Uint8Array<ArrayBuffer> {
+function compressBuffer(bytes: Uint8Array<ArrayBuffer>, encoding: CompressionEncoding): Uint8Array<ArrayBuffer> {
   if (encoding === 'zstd')
     return Bun.zstdCompressSync(bytes, { level: 3 }) as Uint8Array<ArrayBuffer>
   return Bun.gzipSync(bytes, { level: 6 }) as Uint8Array<ArrayBuffer>
+}
+
+// `undefined` when the input is too small to be worth compressing or does not shrink.
+function shrink(bytes: Uint8Array<ArrayBuffer>, encoding: CompressionEncoding): Uint8Array<ArrayBuffer> | undefined {
+  if (bytes.byteLength < MIN_COMPRESS_BYTES)
+    return undefined
+  const compressed = compressBuffer(bytes, encoding)
+  return compressed.byteLength < bytes.byteLength ? compressed : undefined
 }
 
 export class CompressionCache {
@@ -212,16 +174,12 @@ export class CompressionCache {
 
   /** Compresses `bytes`, kept in the LRU under `staticKey` when given; without one nothing is stored. */
   compress(bytes: Uint8Array<ArrayBuffer>, encoding: CompressionEncoding, staticKey?: string): Uint8Array<ArrayBuffer> | undefined {
-    if (bytes.byteLength < MIN_COMPRESS_BYTES)
-      return undefined
     const cacheKey = staticKey !== undefined ? `${encoding}:${staticKey}` : undefined
     const cached = cacheKey !== undefined ? this.get(cacheKey) : undefined
     if (cached !== undefined)
       return cached
-    const compressed = compressBuffer(bytes, encoding)
-    if (compressed.byteLength >= bytes.byteLength)
-      return undefined
-    if (cacheKey !== undefined)
+    const compressed = shrink(bytes, encoding)
+    if (compressed !== undefined && cacheKey !== undefined)
       this.set(cacheKey, compressed)
     return compressed
   }
@@ -232,16 +190,14 @@ export class CompressionCache {
     let variant = this.#files.get(variantKey)
     if (variant === undefined) {
       const bytes = await read()
-      variant = bytes.byteLength < MIN_COMPRESS_BYTES ? null : compressBuffer(bytes, encoding)
-      if (variant !== null && variant.byteLength >= bytes.byteLength)
-        variant = null
+      variant = shrink(bytes, encoding) ?? null
       this.#files.set(variantKey, variant)
     }
     return variant ?? undefined
   }
 }
 
-export function appendVaryAcceptEncoding(headers: Headers): void {
+function appendVaryAcceptEncoding(headers: Headers): void {
   const existing = headers.get('vary')
   if (!existing) {
     headers.set('vary', 'Accept-Encoding')

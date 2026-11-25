@@ -93,32 +93,23 @@ function forwardedValue(request: Request, header: string, trustProxy: TrustProxy
   return entries[Math.max(0, entries.length - hops)]
 }
 
-function requestOrigins(request: Request, trustProxy: TrustProxy = false): { expectedOrigin: string, forwardedOrigin: string | undefined } {
-  const expectedOrigin = new URL(request.url).origin
-  let forwardedOrigin: string | undefined
-  if (proxyHops(trustProxy) > 0) {
-    const fwdProto = forwardedValue(request, 'x-forwarded-proto', trustProxy)
-    const fwdHost = forwardedValue(request, 'x-forwarded-host', trustProxy) || request.headers.get('host')?.trim()
-    if (fwdProto && fwdHost) {
-      try {
-        forwardedOrigin = new URL(`${fwdProto}://${fwdHost}`).origin
-      }
-      catch {
-        forwardedOrigin = `${fwdProto}://${fwdHost}`
-      }
-    }
+function forwardedOrigin(request: Request, trustProxy: TrustProxy): string | undefined {
+  const proto = forwardedValue(request, 'x-forwarded-proto', trustProxy)
+  const host = forwardedValue(request, 'x-forwarded-host', trustProxy) || request.headers.get('host')?.trim()
+  if (!proto || !host)
+    return undefined
+  try {
+    return new URL(`${proto}://${host}`).origin
   }
-  return { expectedOrigin, forwardedOrigin }
+  catch {
+    return `${proto}://${host}`
+  }
 }
 
 /** Returns true when the request arrived over HTTPS (directly, or via X-Forwarded-Proto when `trustProxy` is true). */
 export function isHttpsRequest(request: Request, trustProxy: TrustProxy = false): boolean {
-  try {
-    if (new URL(request.url).protocol === 'https:')
-      return true
-  }
-  catch {}
-  return forwardedValue(request, 'x-forwarded-proto', trustProxy)?.toLowerCase() === 'https'
+  return request.url.startsWith('https:')
+    || forwardedValue(request, 'x-forwarded-proto', trustProxy)?.toLowerCase() === 'https'
 }
 
 /** Extracts the client IP from the trusted proxies' headers, or falls back to the direct socket IP. */
@@ -141,9 +132,8 @@ export function isTrustedOrigin(
   trustedOrigins?: ReadonlySet<string>,
   trustProxy: TrustProxy = false,
 ): boolean {
-  const { expectedOrigin, forwardedOrigin } = requestOrigins(request, trustProxy)
-  return origin === expectedOrigin
-    || (forwardedOrigin !== undefined && origin === forwardedOrigin)
+  return origin === new URL(request.url).origin
+    || origin === forwardedOrigin(request, trustProxy)
     || trustedOrigins?.has(origin) === true
 }
 
@@ -156,13 +146,11 @@ export function verifyOrigin(
   if (!UNSAFE_METHODS.has(request.method.toUpperCase()))
     return { ok: true }
 
-  const { expectedOrigin, forwardedOrigin } = requestOrigins(request, trustProxy)
   const origin = request.headers.get('origin')
-
   if (origin !== null) {
-    if (origin === expectedOrigin || (forwardedOrigin !== undefined && origin === forwardedOrigin) || trustedOrigins?.has(origin))
+    if (isTrustedOrigin(origin, request, trustedOrigins, trustProxy))
       return { ok: true }
-    return { ok: false, reason: `Cross-site request blocked: origin ${origin} does not match ${forwardedOrigin ?? expectedOrigin}` }
+    return { ok: false, reason: `Cross-site request blocked: origin ${origin} does not match ${forwardedOrigin(request, trustProxy) ?? new URL(request.url).origin}` }
   }
 
   const fetchSite = request.headers.get('sec-fetch-site')
@@ -202,18 +190,4 @@ export function buildSecurityHeaderEntries(options: SecurityHeadersOptions | fal
   if (opts.csp !== false)
     entries.push(['content-security-policy', opts.csp ?? DEFAULT_CSP])
   return entries
-}
-
-export function applySecurityHeaders(headers: Headers, options: SecurityHeadersOptions = {}): void {
-  if ((options.contentTypeOptions ?? true) && !headers.has('x-content-type-options'))
-    headers.set('x-content-type-options', 'nosniff')
-
-  if (options.frameOptions !== false && !headers.has('x-frame-options'))
-    headers.set('x-frame-options', options.frameOptions ?? 'SAMEORIGIN')
-
-  if (options.referrerPolicy !== false && !headers.has('referrer-policy'))
-    headers.set('referrer-policy', options.referrerPolicy ?? 'strict-origin-when-cross-origin')
-
-  if (options.csp !== false && !headers.has('content-security-policy'))
-    headers.set('content-security-policy', options.csp ?? DEFAULT_CSP)
 }
