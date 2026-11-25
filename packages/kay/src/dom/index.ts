@@ -28,6 +28,14 @@ export function claimLoop(parent: Node, fn: () => void, skip = 0): boolean {
   return true
 }
 
+// The siblings from `from` up to, not including, `to`; undefined when there are none.
+function between(from: Node | null, to: Node | null): Node[] | undefined {
+  const nodes: Node[] = []
+  for (let n = from; n !== null && n !== to; n = n.nextSibling)
+    nodes.push(n)
+  return nodes.length > 0 ? nodes : undefined
+}
+
 // `nodes` is the SSR range the render claimed through template() (a fragment hydrates to null, so the caller learns its nodes here).
 export function claimInsert<T>(
   parent: Node,
@@ -38,25 +46,14 @@ export function claimInsert<T>(
   if (!hydrating)
     return { result: fn(), marker, claimed: null, nodes: undefined }
 
+  let claimed: Node | null
   if (startMarker !== undefined) {
     const first = startMarker === null ? parent.firstChild : startMarker.nextSibling
-    const claimed = first === marker ? null : first
-    const prevNode = hydrateNode
-    hydrateNode = claimed
-    let result: T
-    try {
-      result = fn()
-    }
-    finally {
-      hydrateNode = prevNode
-    }
-    const nodes: Node[] = []
-    for (let n: Node | null = claimed; n !== null && n !== marker; n = n.nextSibling)
-      nodes.push(n)
-    return { result, marker, claimed, nodes: nodes.length > 0 ? nodes : undefined }
+    claimed = first === marker ? null : first
   }
-
-  const claimed: Node | null = marker === null ? parent.lastChild : marker.nodeType === 8 ? null : marker
+  else {
+    claimed = marker === null ? parent.lastChild : marker.nodeType === 8 ? null : marker
+  }
   const prevNode = hydrateNode
   hydrateNode = claimed
   let result: T
@@ -68,15 +65,10 @@ export function claimInsert<T>(
   finally {
     hydrateNode = prevNode
   }
-  if (marker === null) {
-    let nodes: Node[] | undefined
-    if (claimed !== null && end !== claimed) {
-      nodes = []
-      for (let n: Node | null = claimed; n !== null && n !== end; n = n.nextSibling)
-        nodes.push(n)
-    }
-    return { result, marker: null, claimed, nodes }
-  }
+  if (startMarker !== undefined)
+    return { result, marker, claimed, nodes: between(claimed, marker) }
+  if (marker === null)
+    return { result, marker: null, claimed, nodes: between(claimed, end) }
   if (claimed === null)
     return { result, marker, claimed, nodes: undefined }
 
@@ -85,13 +77,7 @@ export function claimInsert<T>(
   const anchor = document.createComment('')
   ;(anchor as unknown as { __kayAnchor?: boolean }).__kayAnchor = true
   parent.insertBefore(anchor, consumed ? end : claimed.nextSibling)
-  let nodes: Node[] | undefined
-  if (consumed) {
-    nodes = []
-    for (let n: Node | null = claimed; n !== null && n !== anchor; n = n.nextSibling)
-      nodes.push(n)
-  }
-  return { result, marker: anchor, claimed, nodes }
+  return { result, marker: anchor, claimed, nodes: consumed ? between(claimed, anchor) : undefined }
 }
 
 export function hydrate(container: Element, render: () => Node | DocumentFragment | null): () => void {
