@@ -5,7 +5,7 @@ import type { IslandBinding } from '../compiler/index'
 import type { BuildPluginTarget, KayPlugin } from '../plugins/index'
 import type { BuildCache, ModuleGraph } from './graph'
 import type { ActionsByFile, IslandPlan } from './islands'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import { compileDom, compileSsr } from '../compiler/index'
 import { readsPrivateEnv, SERVER_ONLY_FILTER } from '../compiler/server-only'
@@ -100,7 +100,7 @@ function publicEnvDefines(): Record<string, string> {
 }
 
 export async function buildClient(env: BundleEnv, standaloneCss: string[]): Promise<ClientBuild> {
-  const { root, outDir, clientDir, assetPrefix, graph, cache, actionsByFile, islands } = env
+  const { root, clientDir, assetPrefix, graph, cache, actionsByFile, islands } = env
   const result: ClientBuild = {
     islandChunks: new Map(),
     srcCssToUrl: new Map(),
@@ -115,8 +115,13 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     return result
 
   const transforms = pluginTransforms(env.plugins)
-  const entriesDir = join(outDir, '.entries')
+  // Bun hashes an entry's path into its chunk name, so the entries sit at one path per app: a dev rebuild or a static stage then keeps every unchanged chunk name.
+  const entriesDir = join(root, 'node_modules/.cache/kay/entries')
   mkdirSync(entriesDir, { recursive: true })
+  const writeEntry = (path: string, contents: string): void => {
+    if (!existsSync(path) || readFileSync(path, 'utf8') !== contents)
+      writeFileSync(path, contents)
+  }
   const entryPoints: string[] = []
   const islandEntryToKey = new Map<string, string>()
 
@@ -142,7 +147,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     for (const pe of pluginClientEntries)
       runtimeLines.push(`import ${JSON.stringify(pe)};`)
     const runtimeEntryPath = join(entriesDir, 'runtime.ts')
-    writeFileSync(runtimeEntryPath, `${runtimeLines.join('\n')}\n`)
+    writeEntry(runtimeEntryPath, `${runtimeLines.join('\n')}\n`)
     entryPoints.push(runtimeEntryPath)
   }
 
@@ -153,7 +158,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     const exportStmt = target.exportName === 'default'
       ? `export { default } from ${JSON.stringify(target.file)};\n`
       : `export { ${target.exportName} as default } from ${JSON.stringify(target.file)};\n`
-    writeFileSync(entryPath, exportStmt)
+    writeEntry(entryPath, exportStmt)
     entryPoints.push(entryPath)
     islandEntryToKey.set(entryPath, key)
   }
@@ -227,9 +232,6 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     if (clientLeaks.size > 0)
       throw clientLeakError(clientLeaks)
     throw err
-  }
-  finally {
-    rmSync(entriesDir, { recursive: true, force: true })
   }
 
   if (clientLeaks.size > 0)

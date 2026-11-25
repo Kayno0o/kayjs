@@ -2,8 +2,8 @@
 
 import type { FSWatcher } from 'node:fs'
 import type { KayApp } from '../server/index'
-import { existsSync, rmSync, statSync, watch } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
 import { clearBuildCache } from '../build/graph'
 import { build, createBuildCache } from '../build/index'
 import { createAppContext, loadConfig, runWithAppContext } from '../plugins/index'
@@ -32,6 +32,36 @@ function renderErrorOverlay(errText: string): string {
 
 type ChangeKind = 'css' | 'full' | 'config'
 
+// Bun never unloads a module, so every rebuild importing a fresh copy of the server bundle grew RSS by about 1.6 MB a save.
+// Each build's server files are copied into one store instead: a chunk name is a content hash, and an entry is imported under the hash of its bytes, so only what changed is imported again.
+function createModuleStore(storeDir: string) {
+  const hashes = new Map<string, string>()
+  return {
+    sync(serverDir: string): void {
+      for (const entry of readdirSync(serverDir, { recursive: true, withFileTypes: true })) {
+        if (!entry.isFile())
+          continue
+        const from = join(entry.parentPath, entry.name)
+        const rel = relative(serverDir, from)
+        const bytes = readFileSync(from)
+        const hash = Bun.hash(bytes).toString(36)
+        if (hashes.get(rel) === hash)
+          continue
+        const to = join(storeDir, rel)
+        mkdirSync(dirname(to), { recursive: true })
+        writeFileSync(to, bytes)
+        hashes.set(rel, hash)
+      }
+    },
+    importFrom(serverDir: string) {
+      return (path: string): Promise<Record<string, unknown>> => {
+        const rel = relative(serverDir, path)
+        return import(`${join(storeDir, rel)}?v=${hashes.get(rel)}`)
+      }
+    },
+  }
+}
+
 export async function devServer(options: DevServerOptions): Promise<{ url: string, stop: () => void, rebuild: () => Promise<void> }> {
   const prevKayDev = process.env.KAY_DEV
   process.env.KAY_DEV = '1'
@@ -43,6 +73,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   const port = options.port ?? 3000
   const hostname = options.hostname ?? '127.0.0.1'
   const buildCache = createBuildCache()
+  const modules = createModuleStore(join(devRoot, 'server'))
 
   let buildNum = 0
   let currentApp: KayApp | undefined
@@ -94,7 +125,9 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
         dev: true,
         cache: buildCache,
       })
-      currentApp = await createServer({ root, outDir, dev: true })
+      const serverDir = join(root, outDir, 'server')
+      modules.sync(serverDir)
+      currentApp = await createServer({ root, outDir, dev: true, importModule: modules.importFrom(serverDir) })
       lastError = undefined
       if (n > 2)
         rmSync(join(devRoot, `b${n - 2}`), { recursive: true, force: true })

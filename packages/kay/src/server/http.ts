@@ -26,6 +26,8 @@ export interface ServerOptions {
   dev?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
+  /** @internal Imports a built server module by absolute path; `kay dev` passes one that keeps unchanged modules loaded. */
+  importModule?: ((path: string) => Promise<Record<string, unknown>>) | undefined
 }
 
 export interface RequestContext {

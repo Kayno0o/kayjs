@@ -172,4 +172,37 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
       srv.stop()
     }
   })
+
+  it('keeps unchanged server modules loaded across rebuilds and reloads the edited ones', async () => {
+    const dir = makeTemp('kay-dev-modules-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    const statePath = join(dir, 'src/state.ts')
+    const otherPath = join(dir, 'src/routes/other.tsx')
+    writeFileSync(statePath, `export const bootId = 'boot-' + Math.random().toString(36).slice(2)\n`)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { bootId } from '../state'
+      export default function Home() { return <p>{bootId}</p> }
+    `)
+    writeFileSync(otherPath, `export default function Other() { return <p>other v1</p> }\n`)
+
+    const srv = await devServer({ root: dir, port: 0 })
+    const page = async (path: string) => (await (await fetch(`${srv.url}${path}`)).text()).match(/<p>([^<]+)<\/p>/)![1]
+    try {
+      const boot = await page('/')
+      expect(boot).toStartWith('boot-')
+
+      writeFileSync(otherPath, `export default function Other() { return <p>other v2</p> }\n`)
+      await srv.rebuild()
+      expect(await page('/other')).toBe('other v2')
+      expect(await page('/')).toBe(boot)
+
+      writeFileSync(statePath, `export const bootId = 'edited-' + Math.random().toString(36).slice(2)\n`)
+      await srv.rebuild()
+      expect(await page('/')).toStartWith('edited-')
+    }
+    finally {
+      srv.stop()
+    }
+  })
 })

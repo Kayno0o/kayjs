@@ -1052,9 +1052,10 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
   }
 
   const loadStamp = Date.now()
+  const importModule = options.importModule ?? ((path: string) => import(`${path}?v=${loadStamp}`))
   const loadMod = async (rel: string) => {
     if (!(rel in modules))
-      modules[rel] = await import(`${join(outDir, rel)}?v=${loadStamp}`)
+      modules[rel] = await importModule(join(outDir, rel))
   }
 
   for (const r of manifest.routes) {

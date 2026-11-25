@@ -590,3 +590,25 @@ describe('route reach through a barrel file', () => {
     }
   })
 })
+
+describe('chunk names', () => {
+  test('island chunks keep their names when an unchanged app builds into another outDir', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-stable-chunks-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { signal } from 'kay'
+        function Counter() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{n.value}</button> }
+        export default function Page() { return <main><Counter /></main> }
+      `)
+      const first = await build({ root: dir, outDir: 'out-a', minify: false })
+      const second = await build({ root: dir, outDir: 'out-b', minify: false })
+      expect(Object.values(first.islands).length).toBeGreaterThan(0)
+      expect(second.islands).toEqual(first.islands)
+      expect(second.runtimeScript).toBe(first.runtimeScript)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
