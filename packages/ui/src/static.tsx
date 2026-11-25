@@ -3,6 +3,7 @@
 // Emit only semantic `data-ui`, `data-part`, `data-variant`, `data-tone`, `data-layout` attributes.
 
 import type { Html, KayChild } from 'kay'
+import { escAttr } from 'kay/ssr'
 
 export type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger'
 export type ButtonVariant = 'solid' | 'outline' | 'ghost'
@@ -97,13 +98,6 @@ interface FieldControlWiring {
   required: boolean
 }
 
-function escapeAttrValue(str: string): string {
-  return str
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-}
 
 function mergeTokenAttr(existing: string | null | undefined, addition: string): string {
   const tokens = (existing ?? '').split(/\s+/).filter(Boolean)
@@ -126,14 +120,14 @@ function wireFieldHtml(html: string, wiring: FieldControlWiring): string {
 
     let attrs = rawAttrs
     if (!/\bid\s*=/i.test(attrs))
-      attrs += ` id="${escapeAttrValue(wiring.id)}"`
+      attrs += ` id="${escAttr(wiring.id)}"`
 
     if (wiring.describedBy) {
       const descRe = /(\baria-describedby\s*=\s*")([^"]*)(")/i
       if (descRe.test(attrs))
-        attrs = attrs.replace(descRe, (_, p1: string, cur: string, p3: string) => `${p1}${escapeAttrValue(mergeTokenAttr(cur, wiring.describedBy!))}${p3}`)
+        attrs = attrs.replace(descRe, (_, p1: string, cur: string, p3: string) => `${p1}${escAttr(mergeTokenAttr(cur, wiring.describedBy!))}${p3}`)
       else
-        attrs += ` aria-describedby="${escapeAttrValue(wiring.describedBy)}"`
+        attrs += ` aria-describedby="${escAttr(wiring.describedBy)}"`
     }
 
     if (wiring.invalid && !/\baria-invalid\s*=/i.test(attrs))

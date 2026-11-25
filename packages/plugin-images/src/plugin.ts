@@ -8,7 +8,7 @@ import type { ImageAsset } from './helpers'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { getAppContext } from 'kay/server'
-import { SHARE_CARD_CONFIG_SERVICE } from './card'
+import { hasMagick, SHARE_CARD_CONFIG_SERVICE } from './card'
 
 export const CONTENT_IMAGE_RESOLVER_SERVICE = 'kay.content.imageResolver'
 
@@ -26,7 +26,7 @@ const ALLOWED_IMAGE_EXTS = new Set([
   '.tif',
 ])
 
-function isInsideDir(dir: string, target: string): boolean {
+function isStrictlyInside(dir: string, target: string): boolean {
   const rel = relative(dir, target)
   return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
 }
@@ -54,9 +54,6 @@ interface CachedImageMeta {
   files: { rel: string, width: number, format: string }[]
 }
 
-function hasMagick(): boolean {
-  return Bun.which('magick') !== null
-}
 
 function identifyImage(filePath: string): { width: number, height: number } | undefined {
   const proc = Bun.spawnSync(['magick', 'identify', '-ping', '-format', '%w %h', `${filePath}[0]`], {
@@ -445,13 +442,13 @@ export function createMarkdownImageResolver(options: MarkdownImageResolverOption
     }
     else {
       const kayRoot = getAppContext()?.root
-      boundary = (typeof kayRoot === 'string' && kayRoot !== '' && isInsideDir(resolve(kayRoot), absFile))
+      boundary = (typeof kayRoot === 'string' && kayRoot !== '' && isStrictlyInside(resolve(kayRoot), absFile))
         ? resolve(kayRoot)
         : dirname(absFile)
     }
 
     const abs = resolve(dirname(absFile), src)
-    if (!isInsideDir(boundary, abs))
+    if (!isStrictlyInside(boundary, abs))
       return undefined
     if (!ALLOWED_IMAGE_EXTS.has(extname(abs).toLowerCase()))
       return undefined
@@ -467,7 +464,7 @@ export function createMarkdownImageResolver(options: MarkdownImageResolverOption
     catch {
       return undefined
     }
-    if (!isInsideDir(realBoundary, realTarget))
+    if (!isStrictlyInside(realBoundary, realTarget))
       return undefined
     if (!ALLOWED_IMAGE_EXTS.has(extname(realTarget).toLowerCase()))
       return undefined

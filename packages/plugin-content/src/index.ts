@@ -6,10 +6,10 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { getAppContext } from 'kay/server'
 
-import { expandComponents } from './components'
-import { sanitizeMarkdownHtml } from './sanitize'
+import { escAttr } from 'kay/ssr'
+import { renderMarkdown } from './markdown'
 
-const CONTENT_IMAGE_RESOLVER_SERVICE = 'kay.content.imageResolver'
+export { renderMarkdown }
 const COLLECTION_VERSION_KEY = Symbol.for('kay.content.collectionVersion')
 
 export interface ContentHeading {
@@ -140,34 +140,6 @@ export function parseFrontmatter(source: string): { data: Record<string, unknown
   return { data, body }
 }
 
-function slugifyHeading(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036F]/g, '')
-    .replace(/<[^>]+>/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'section'
-}
-
-function stripTags(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, '')
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&#39;', '\'')
-    .replaceAll('&amp;', '&')
-    .trim()
-}
-
-
-function findDefaultImageResolver(file: string | undefined): MarkdownImageResolver | undefined {
-  if (!file)
-    return undefined
-  return getAppContext()?.inject<MarkdownImageResolver>(CONTENT_IMAGE_RESOLVER_SERVICE)
-}
-
 function resolveCollectionDir(dir: string): string {
   if (isAbsolute(dir))
     return dir
@@ -181,120 +153,7 @@ function resolveCollectionDir(dir: string): string {
 }
 
 
-const FENCE_RE = /^([`~]{3,})([^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm
-let slotBatchId = 0
-
-/** Renders Markdown via Bun's native Zig `Bun.markdown.html()`, with optional Shiki `highlight`, embedded TSX `components`, heading IDs, TOC, and reading time. */
-export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}): {
-  html: string
-  headings: ContentHeading[]
-  wordCount: number
-  readingMinutes: number
-} {
-  const slots: string[] = []
-  const slotPrefix = `b${++slotBatchId}-`
-  let processed = body
-
-  // 1. Extract fenced code blocks before component expansion so `<Tag>` inside ```code``` is never treated as a component
-  if (options.highlight !== undefined || options.components !== undefined) {
-    processed = processed.replace(FENCE_RE, (full, _fence: string, info: string, code: string) => {
-      if (options.highlight !== undefined) {
-        const lang = info.trim().split(/\s+/)[0] || undefined
-        const idx = slots.length
-        slots.push(options.highlight(code.replace(/\n$/, ''), lang))
-        return `\n\n<div data-kay-md-slot="${slotPrefix}${idx}"></div>\n\n`
-      }
-      // Protect code fences from component expansion when only components are configured
-      const idx = slots.length
-      slots.push(Bun.markdown.html(full, { tables: true, strikethrough: true, tasklists: true, autolinks: true }))
-      return `\n\n<div data-kay-md-slot="${slotPrefix}${idx}"></div>\n\n`
-    })
-  }
-
-  // 2. Expand embedded TSX components
-  if (options.components !== undefined)
-    processed = expandComponents(processed, options.components, options, slots, slotPrefix)
-
-  // 3. Render remaining Markdown via native Zig Bun.markdown.html
-  let html = Bun.markdown.html(processed, {
-    tables: true,
-    strikethrough: true,
-    tasklists: true,
-    autolinks: true,
-  })
-
-  // 3b. Sanitize rendered Markdown HTML by default unless `trusted: true` is opted into.
-  // Runs before splicing developer-supplied highlight/component slots so custom components remain intact.
-  if (options.trusted !== true)
-    html = sanitizeMarkdownHtml(html)
-
-  // 4. Add unique heading IDs & collect TOC
-  const headings: ContentHeading[] = []
-  const usedIds = new Map<string, number>()
-
-  html = html.replace(/<h([1-6])>([\s\S]*?)<\/h\1>/g, (_match, levelStr: string, inner: string) => {
-    const level = Number(levelStr)
-    const text = stripTags(inner)
-    const base = slugifyHeading(text)
-    const count = usedIds.get(base) ?? 0
-    usedIds.set(base, count + 1)
-    const id = count === 0 ? base : `${base}-${count}`
-    headings.push({ level, id, text })
-    if (options.headingLinks && level >= 2)
-      return `<h${level} id="${id}"><a href="#${id}">${inner}</a></h${level}>`
-    return `<h${level} id="${id}">${inner}</h${level}>`
-  })
-
-  // 4b. Image rewriting (explicit resolveImage or auto-wired @kayjs/images; `false` disables)
-  const resolveImageFn = options.resolveImage === false
-    ? undefined
-    : (options.resolveImage ?? findDefaultImageResolver(options.file))
-  if (resolveImageFn !== undefined) {
-    html = html.replace(/<img\b([^>]*?)>/gi, (full, attrs: string) => {
-      const srcMatch = /\bsrc="([^"]+)"/i.exec(attrs)
-      if (!srcMatch)
-        return full
-      const resolved = resolveImageFn(srcMatch[1]!, options.file)
-      if (!resolved)
-        return full
-      const info: MarkdownImageResult = typeof resolved === 'string' ? { src: resolved } : resolved
-      const altMatch = /\balt="([^"]*)"/i.exec(attrs)
-      const alt = altMatch ? altMatch[1]! : ''
-      const parts = [`src="${escapeXml(info.src)}"`, `alt="${alt}"`]
-      if (info.srcset)
-        parts.push(`srcset="${escapeXml(info.srcset)}"`)
-      if (info.sizes)
-        parts.push(`sizes="${escapeXml(info.sizes)}"`)
-      if (info.width !== undefined && info.width > 0)
-        parts.push(`width="${info.width}"`)
-      if (info.height !== undefined && info.height > 0)
-        parts.push(`height="${info.height}"`)
-      parts.push(`loading="${info.loading ?? 'lazy'}"`, 'decoding="async"')
-      const imgTag = `<img ${parts.join(' ')}>`
-      if (info.avifSrcset) {
-        const sizesAttr = info.sizes ? ` sizes="${escapeXml(info.sizes)}"` : ''
-        return `<picture><source type="image/avif" srcset="${escapeXml(info.avifSrcset)}"${sizesAttr}>${imgTag}</picture>`
-      }
-      return imgTag
-    })
-  }
-
-  // 5. Splice this batch's highlighted code blocks & embedded TSX components back in (loop handles components wrapping code fences)
-  if (slots.length > 0) {
-    const slotRe = new RegExp(`<div data-kay-md-slot="${slotPrefix}(\\d+)"><\\/div>`, 'g')
-    let prev = ''
-    while (prev !== html) {
-      prev = html
-      html = html.replace(slotRe, (_m, idxStr: string) => slots[Number(idxStr)] ?? '')
-    }
-  }
-
-  const words = body.trim().split(/\s+/).filter(Boolean).length
-  const readingMinutes = Math.max(1, Math.ceil(words / 220))
-  return { html, headings, wordCount: words, readingMinutes }
-}
-
-function isInside(dir: string, target: string): boolean {
+function isInsideOrSame(dir: string, target: string): boolean {
   const rel = relative(dir, target)
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
@@ -460,7 +319,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     if (targetLocale === undefined)
       return absDir
     const scanDir = resolve(absDir, targetLocale)
-    return isInside(absDir, scanDir) && scanDir !== absDir ? scanDir : undefined
+    return isInsideOrSame(absDir, scanDir) && scanDir !== absDir ? scanDir : undefined
   }
 
   function all(locale?: string): ContentEntry<TData>[] {
@@ -503,7 +362,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       const clean = slug.replace(/^\/+|\/+$/g, '')
       const targetLocale = localized ? (locale ?? defaultLocale) : undefined
       const scanDir = localeDir(absDir, targetLocale)
-      if (scanDir === undefined || !isInside(scanDir, resolve(scanDir, clean)))
+      if (scanDir === undefined || !isInsideOrSame(scanDir, resolve(scanDir, clean)))
         return undefined
       const dev = isDevMode()
       if (!dev) {
@@ -573,14 +432,6 @@ export interface RssFeedConfig<TData = Record<string, unknown>> {
   }) | undefined
 }
 
-function escapeXml(str: string): string {
-  return str
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('\'', '&apos;')
-}
 
 export function renderRss<TData>(feed: RssFeedConfig<TData>): string {
   const site = feed.site.replace(/\/$/, '')
@@ -597,15 +448,15 @@ export function renderRss<TData>(feed: RssFeedConfig<TData>): string {
         }
     const link = mapped.link ?? `${site}${prefix}/${entry.slug}`
     const pubDate = mapped.date ? `<pubDate>${new Date(mapped.date).toUTCString()}</pubDate>` : ''
-    const desc = mapped.description ? `<description>${escapeXml(mapped.description)}</description>` : ''
-    return `<item><title>${escapeXml(mapped.title)}</title><link>${escapeXml(link)}</link><guid>${escapeXml(link)}</guid>${pubDate}${desc}</item>`
+    const desc = mapped.description ? `<description>${escAttr(mapped.description)}</description>` : ''
+    return `<item><title>${escAttr(mapped.title)}</title><link>${escAttr(link)}</link><guid>${escAttr(link)}</guid>${pubDate}${desc}</item>`
   }).join('')
 
   return `<?xml version="1.0" encoding="UTF-8"?>`
     + `<rss version="2.0"><channel>`
-    + `<title>${escapeXml(feed.title)}</title>`
-    + `<link>${escapeXml(site)}</link>`
-    + `<description>${escapeXml(feed.description)}</description>`
+    + `<title>${escAttr(feed.title)}</title>`
+    + `<link>${escAttr(site)}</link>`
+    + `<description>${escAttr(feed.description)}</description>`
     + items
     + `</channel></rss>`
 }

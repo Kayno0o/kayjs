@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { getAppContext } from 'kay/server'
+import { escAttr } from 'kay/ssr'
 
 export interface ShareCardDefaults {
   /** Base URL prepended to returned card URL (optional, e.g. 'https://log.kaynooo.fr'). */
@@ -34,7 +35,11 @@ export interface ShareCardInput {
 }
 
 export const SHARE_CARD_CONFIG_SERVICE = 'kay.images.shareCardConfig'
-const HAS_MAGICK = Bun.which('magick') !== null
+
+export function hasMagick(): boolean {
+  return Bun.which('magick') !== null
+}
+
 let standaloneCardConfig: ShareCardDefaults | undefined
 
 export function configureShareCard(defaults: ShareCardDefaults): void {
@@ -55,13 +60,6 @@ function getCardConfig(): ShareCardDefaults {
   return standaloneCardConfig ?? {}
 }
 
-function escapeXml(str: string): string {
-  return str
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-}
 
 function wrapLines(text: string, maxChars: number, maxLines: number): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean)
@@ -99,16 +97,16 @@ function buildCardSvg(input: ShareCardInput, cfg: ShareCardDefaults): string {
 
   const titleStartY = input.badge ? 235 : 210
   const titleSvg = titleLines
-    .map((line, i) => `<text x="80" y="${titleStartY + i * 76}" fill="${fg}" font-family="${escapeXml(font)}" font-size="62" font-weight="700">${escapeXml(line)}</text>`)
+    .map((line, i) => `<text x="80" y="${titleStartY + i * 76}" fill="${fg}" font-family="${escAttr(font)}" font-size="62" font-weight="700">${escAttr(line)}</text>`)
     .join('')
 
   const subStartY = titleStartY + titleLines.length * 76 + 26
   const subSvg = subLines
-    .map((line, i) => `<text x="80" y="${subStartY + i * 38}" fill="${muted}" font-family="${escapeXml(font)}" font-size="28" font-weight="400">${escapeXml(line)}</text>`)
+    .map((line, i) => `<text x="80" y="${subStartY + i * 38}" fill="${muted}" font-family="${escAttr(font)}" font-size="28" font-weight="400">${escAttr(line)}</text>`)
     .join('')
 
   const badgeSvg = input.badge
-    ? `<text x="80" y="135" fill="${accent}" font-family="${escapeXml(font)}" font-size="24" font-weight="600" letter-spacing="3">${escapeXml(input.badge.toUpperCase())}</text>`
+    ? `<text x="80" y="135" fill="${accent}" font-family="${escAttr(font)}" font-size="24" font-weight="600" letter-spacing="3">${escAttr(input.badge.toUpperCase())}</text>`
     : ''
 
   let graphicSvg = ''
@@ -146,7 +144,7 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
 
   const site = cfg.site ? cfg.site.replace(/\/$/, '') : ''
 
-  if (HAS_MAGICK) {
+  if (hasMagick()) {
     const fileName = `${slug}-${hash}.png`
     const outPath = join(ogDir, fileName)
     if (existsSync(outPath)) {
