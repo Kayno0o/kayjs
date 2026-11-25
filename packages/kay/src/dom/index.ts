@@ -2,6 +2,7 @@
 
 import { batch, createOwner, disposeOwner, runWithOwner } from '../reactivity/index'
 import { styleText } from '../style'
+import { assertRenderable } from '../unrenderable'
 
 export { effect } from '../reactivity/index'
 
@@ -206,12 +207,16 @@ export function skipRange(marker: Node): Node | null {
 }
 
 export function setText(node: Text, value: unknown): void {
+  if (process.env.NODE_ENV !== 'production')
+    assertRenderable(value, 'text')
   const str = value == null || typeof value === 'boolean' ? '' : String(value)
   if (node.data !== str)
     node.data = str
 }
 
 export function setClass(el: Element, value: unknown): void {
+  if (process.env.NODE_ENV !== 'production')
+    assertRenderable(value, 'class')
   const str = value == null || value === false ? '' : String(value)
   if (typeof el.className === 'string') {
     if (el.className !== str) {
@@ -255,6 +260,8 @@ function isUnsafeUrlAttr(name: string, value: unknown): boolean {
 export function setAttr(el: Element, name: string, value: unknown): void {
   if (isBlockedAttr(name))
     return
+  if (process.env.NODE_ENV !== 'production')
+    assertRenderable(value, name)
   if (value == null) {
     el.removeAttribute(name)
   }

@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { compileDom, compileSsr } from '../src/compiler/index'
 import { spread } from '../src/dom/extras'
-import { ssrSpread } from '../src/ssr/index'
+import { setAttr, setClass, setText } from '../src/dom/index'
+import { signal } from '../src/reactivity/index'
+import { esc, ssrAttr, ssrChild, ssrSpread } from '../src/ssr/index'
 
 // Each mistake must fail both compile targets with the same message naming the fix.
 function refuses(jsx: string, message: RegExp, setup = ''): void {
@@ -91,5 +93,37 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     refuses('<input prop:value={fn} />', /prop:value in Page\.tsx: write value=\{\.\.\.\}/)
     refuses('<div classList={{ on: true }} />', /classList in Page\.tsx: pass one string to class/)
     accepts('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a" /></svg>')
+  })
+})
+
+describe('kay refuses values it cannot render, instead of printing them', () => {
+  const cases: [string, unknown, RegExp][] = [
+    ['a Promise', Promise.resolve('x'), /cannot render a Promise as text; await it in an async component, or make that component the only child of <Suspense>/],
+    ['a function', () => 'x', /cannot render a function as text; call it/],
+    ['a signal', signal(1), /cannot render a signal as text; read its \.value/],
+    ['a plain object', { a: 1 }, /cannot render a plain object as text; render one of its fields/],
+  ]
+  for (const [label, value, message] of cases) {
+    test(`${label} as a child, on both targets`, () => {
+      expect(() => esc(value)).toThrow(message)
+      expect(() => ssrChild(value as never)).toThrow(message)
+      expect(() => setText({ data: '' } as Text, value)).toThrow(message)
+    })
+  }
+
+  test('an object as an attribute or class', () => {
+    expect(() => ssrAttr('class', { on: true })).toThrow(/cannot render a plain object as the class attribute/)
+    expect(() => ssrAttr('title', signal('x'))).toThrow(/cannot render a signal as the title attribute; read its \.value/)
+    expect(() => setClass({ className: '' } as Element, ['a'])).toThrow(/cannot render an array as the class attribute; join the names into one string/)
+    expect(() => setAttr({ setAttribute() {} } as unknown as Element, 'title', { a: 1 })).toThrow(/as the title attribute/)
+  })
+
+  test('values that do render stay accepted', () => {
+    expect(ssrChild(new Date(0) as never)).toContain('1970')
+    expect(esc(new URL('https://kay.dev/'))).toBe('https://kay.dev/')
+    expect(ssrAttr('class', 'a b')).toBe(' class="a b"')
+    expect(ssrChild(['a', 1, null])).toBe('a1')
+    expect(ssrAttr('action', Object.assign(() => {}, { toString: () => '/_kay/action/x' }))).toBe(' action="/_kay/action/x"')
+    expect(esc({ toString: () => 'custom' })).toBe('custom')
   })
 })

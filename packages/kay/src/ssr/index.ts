@@ -2,6 +2,7 @@
 
 import type { Html, HydrateStrategy, KayChild } from '../jsx-runtime'
 import { styleText } from '../style'
+import { assertRenderable } from '../unrenderable'
 import { currentRenderContext, KAY_STREAM_SCRIPT } from './context'
 
 export const KAY_ISLAND_STYLE = 'kay-island,kay-slot{display:contents}'
@@ -40,6 +41,7 @@ export function esc(value: unknown): string {
       out += esc(value[i])
     return out
   }
+  assertRenderable(value, 'text')
   return escText(String(value))
 }
 
@@ -127,6 +129,7 @@ export function ssrAttr(name: string, value: unknown): string {
   }
   if (isUnsafeUrlAttr(name, value))
     return ''
+  assertRenderable(value, name)
   return ` ${name}="${escAttr(value)}"`
 }
 
@@ -186,6 +189,7 @@ export function ssrChild(value: KayChild): string {
       out += ssrChild(value[i])
     return out
   }
+  assertRenderable(value, 'text')
   return esc(String(value))
 }
 

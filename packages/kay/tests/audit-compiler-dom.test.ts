@@ -40,8 +40,8 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
     expect(ssrRt.ssrRawText('style', trusted)).toBe('<b>safe</b>')
 
     // Untrusted plain { __html } object MUST NOT be treated as raw HTML
-    expect(ssrRt.esc(untrusted)).not.toContain('<img')
-    expect(ssrRt.ssrChild(untrusted)).not.toContain('<img')
+    expect(() => ssrRt.esc(untrusted)).toThrow(/cannot render a \{ __html \} object as text/)
+    expect(() => ssrRt.ssrChild(untrusted)).toThrow(/cannot render a \{ __html \} object as text/)
     expect(() => ssrRt.ssrRaw(untrusted)).toThrow(/innerHTML takes the HTML string/)
     expect(ssrRt.ssrRawText('script', untrusted)).not.toContain('<img')
 
