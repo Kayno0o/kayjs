@@ -414,6 +414,97 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     }
   })
 
+  // The deferred loader waits on an IntersectionObserver; the client-only one mounts instead of hydrating.
+  test.each([
+    ['a string', `$hydrate="visible"`, { deferred: true, clientOnly: false }],
+    ['a string in braces', `$hydrate={'client'}`, { deferred: false, clientOnly: true }],
+    ['a template', `$hydrate={\`idle\`}`, { deferred: true, clientOnly: false }],
+    ['a ternary', `$hydrate={wide ? 'visible' : 'idle'}`, { deferred: true, clientOnly: true }],
+    ['a variable', `$hydrate={mode}`, { deferred: true, clientOnly: true }],
+  ])('a $hydrate written as %s keeps the loaders its mode can need in the runtime', async (_, attr, loaders) => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-hydrate-ast-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/components'), { recursive: true })
+      writeFileSync(join(dir, 'src/components/Counter.tsx'), `
+        import { signal } from 'kay'
+        export function Counter() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{n.value}</button> }
+      `)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { Counter } from '../components/Counter'
+        const wide = true
+        const mode = 'visible'
+        export default function Page() { return <main><Counter ${attr} /></main> }
+      `)
+      const manifest = await build({ root: dir, minify: false })
+      const runtime = readFileSync(join(dir, 'dist/client', manifest.runtimeScript!.replace('/_kay/', '')), 'utf8')
+      expect({ deferred: runtime.includes('IntersectionObserver'), clientOnly: runtime.includes('clientOnly ?') }).toEqual(loaders)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test.each([
+    ['layout', 'src/routes/_layout.tsx', `export default function Layout({ children }) { const open = signal(false); return <div><button type="button" onClick={() => open.value = !open.value}>menu</button>{children}</div> }`],
+    ['error page', 'src/routes/_error.tsx', `export default function Oops() { const n = signal(0); return <button type="button" onClick={() => n.value++}>retry</button> }`],
+  ])('an interactive %s fails the build naming the file and the fix', async (_, file, code) => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-interactive-layout-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      writeFileSync(join(dir, file), `import { signal } from 'kay'\n${code}`)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `export default function Page() { return <p>home</p> }`)
+      await expect(build({ root: dir })).rejects.toThrow(`kay build: ${file} uses browser interactivity (imports signal from 'kay'), but it renders on the server only. Move the interactive part into a component and render that component from ${file}.`)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('an island importing a non-action export of an action file fails the build naming both', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-action-export-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/actions'), { recursive: true })
+      writeFileSync(join(dir, 'src/actions/notes.ts'), `
+        import { action } from 'kay/server'
+        export const MAX_LENGTH = 140
+        export const addNote = action(() => 'ok')
+      `)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { signal } from 'kay'
+        import { addNote, MAX_LENGTH } from '../actions/notes'
+        export default function Page() { const n = signal(''); return <button type="button" onClick={() => addNote(undefined)}>{MAX_LENGTH - n.value.length}</button> }
+      `)
+      await expect(build({ root: dir })).rejects.toThrow('kay build: src/routes/index.tsx runs in the browser and imports MAX_LENGTH from src/actions/notes.ts, a file of server actions: the browser only gets its actions. Move MAX_LENGTH into a module without actions.')
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('an island importing an action file as a namespace builds', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-action-namespace-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/actions'), { recursive: true })
+      writeFileSync(join(dir, 'src/actions/notes.ts'), `
+        import { action } from 'kay/server'
+        export const addNote = action(() => 'ok')
+      `)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { signal } from 'kay'
+        import * as notes from '../actions/notes'
+        export default function Page() { const n = signal(0); return <button type="button" onClick={() => notes.addNote(undefined)}>{n.value}</button> }
+      `)
+      const manifest = await build({ root: dir })
+      expect(Object.keys(manifest.islands).map(k => k.slice(dir.length))).toEqual(['/src/routes/index.tsx#default'])
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   test('a plain component rendered inside an island hydrates with the island', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-static-in-island-'))
     tempDirs.push(dir)

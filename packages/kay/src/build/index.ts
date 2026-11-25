@@ -606,6 +606,15 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   for (const [, target] of islandTargets)
     collectIslandCss(target.file)
 
+  // A layout, error or 404 page renders on the server only, so interactivity written in it would never run.
+  for (const file of specialFiles) {
+    const analysis = analyses.get(file)
+    if (analysis?.isInteractive === true) {
+      const rel = relative(root, file).replace(/\\/g, '/')
+      throw new Error(`kay build: ${rel} uses browser interactivity (${analysis.interactiveReason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`)
+    }
+  }
+
   // The client compiles every module an island imports to hydrate against SSR markers, so their SSR must emit them too.
   const islandReach = new Set<string>()
   const reachSeen = new Set<string>()
@@ -622,6 +631,13 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       const target = resolveImportPath(file, imp.source)
       if (target !== undefined && (target.endsWith('.tsx') || target.endsWith('.ts')))
         reachStack.push(target)
+      // The client build swaps an action file for stubs of its actions, so any other export it has is missing there.
+      const actions = target !== undefined && !analyses.get(target)?.isInteractive ? actionsByFile.get(target) : undefined
+      const missing = actions !== undefined ? imp.specifiers.find(s => s.imported !== '*' && !actions.some(a => a.exportName === s.imported)) : undefined
+      if (missing !== undefined) {
+        const rel = (f: string) => relative(root, f).replace(/\\/g, '/')
+        throw new Error(`kay build: ${rel(file)} runs in the browser and imports ${missing.imported} from ${rel(target!)}, a file of server actions: the browser only gets its actions. Move ${missing.imported} into a module without actions.`)
+      }
     }
     for (const re of analysis?.reexports ?? []) {
       const target = resolveImportPath(file, re.source)
@@ -664,17 +680,14 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     let hasDeferredHydrate = false
     let hasClientOnlyHydrate = false
 
+    // A mode computed at runtime may be any of them, so it keeps both loaders.
     for (const [, analysis] of analyses) {
-      if (analysis.defaultHydrate === 'client')
-        hasClientOnlyHydrate = true
-      else if (analysis.defaultHydrate !== undefined && analysis.defaultHydrate !== 'load')
-        hasDeferredHydrate = true
-    }
-    for (const [, raw] of sources) {
-      if (/\$hydrate\s*=\s*["'](?:visible|idle|interaction|media\()/.test(raw))
-        hasDeferredHydrate = true
-      if (/\$hydrate\s*=\s*["']client["']/.test(raw))
-        hasClientOnlyHydrate = true
+      for (const mode of [analysis.defaultHydrate, ...analysis.hydrateModes]) {
+        if (mode === 'client' || mode === '*')
+          hasClientOnlyHydrate = true
+        if (mode !== undefined && mode !== 'load' && mode !== 'client')
+          hasDeferredHydrate = true
+      }
     }
 
     const runtimeEntryPath = join(entriesDir, 'runtime.ts')

@@ -48,6 +48,8 @@ export interface ModuleAnalysis {
   usesRenderContext: boolean
   defaultHydrate: string | undefined
   deferredIslandTags: Set<string>
+  /** `$hydrate` modes the module writes; `*` stands for one computed at runtime. */
+  hydrateModes: Set<string>
   /** Component tags the module renders, `NS.Tag` included. */
   jsxTags: Set<string>
   /** Exported names bound to reactive state (`export const count = signal(0)`). */
@@ -129,6 +131,18 @@ function isAsyncFunction(node: AstNode | null | undefined): boolean {
   return (node?.type === 'FunctionDeclaration' || node?.type === 'FunctionExpression' || node?.type === 'ArrowFunctionExpression') && node.async === true
 }
 
+// The mode a `$hydrate` attribute names: its string, or `*` when an expression picks it at runtime.
+function hydrateMode(value: AstNode | null | undefined): string {
+  let node = value?.type === 'JSXExpressionContainer' ? value.expression as AstNode : value
+  while (node?.type === 'ParenthesizedExpression' || node?.type === 'TSAsExpression')
+    node = node.expression as AstNode
+  if (node?.type === 'Literal' && typeof node.value === 'string')
+    return node.value
+  if (node?.type === 'TemplateLiteral' && node.expressions.length === 0)
+    return node.quasis[0].value.cooked as string
+  return '*'
+}
+
 function jsxName(node: AstNode): string {
   if (node.type === 'JSXIdentifier')
     return node.name as string
@@ -149,6 +163,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   let defaultHydrate: string | undefined
   const deferredIslandTags = new Set<string>()
   const jsxTags = new Set<string>()
+  const hydrateModes = new Set<string>()
   const kayNamespaces = new Set<string>()
   const stateCallees = new Set<string>()
   const asyncLocals = new Set<string>()
@@ -306,8 +321,12 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
         if (attr.type !== 'JSXAttribute' || attr.name?.type !== 'JSXIdentifier')
           continue
         const attrName = attr.name.name as string
-        if (isComponent && attrName === '$hydrate' && attr.value?.type === 'Literal' && typeof attr.value.value === 'string' && attr.value.value !== 'load')
-          deferredIslandTags.add(tag)
+        if (isComponent && attrName === '$hydrate') {
+          const mode = hydrateMode(attr.value)
+          hydrateModes.add(mode)
+          if (mode !== 'load')
+            deferredIslandTags.add(tag)
+        }
         // A handler or ref on a component tag is a prop for that component; only a DOM element binds it in the browser.
         if (!isComponent && tag !== '' && (EVENT_ATTR.test(attrName) || attrName === 'ref'))
           markInteractive(`uses ${attrName}`)
@@ -364,6 +383,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     usesRenderContext,
     defaultHydrate,
     deferredIslandTags,
+    hydrateModes,
     jsxTags,
     stateExports,
     exportedActions,
