@@ -1,6 +1,7 @@
 // Kay v2 SSR runtime: flat string concatenation with fast-path escaping and zero-overhead islands.
 
 import type { Html, HydrateStrategy, KayChild } from '../jsx-runtime'
+import { styleText } from '../style'
 import { currentRenderContext, KAY_STREAM_SCRIPT } from './context'
 
 export const KAY_ISLAND_STYLE = 'kay-island,kay-slot{display:contents}'
@@ -136,11 +137,7 @@ export function ssrStyle(value: unknown): string {
   if (typeof value === 'string')
     return ` style="${escAttr(value)}"`
   if (typeof value === 'object') {
-    let out = ''
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (v != null && v !== '')
-        out += `${k}:${v};`
-    }
+    const out = styleText(value as Record<string, unknown>)
     return out === '' ? '' : ` style="${escAttr(out)}"`
   }
   return ''

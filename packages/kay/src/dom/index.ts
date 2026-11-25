@@ -1,6 +1,7 @@
 // Kay v2 minimal DOM & hydration core (loop -> kay/dom-loop, extras -> kay/dom-extras for fine-grained chunk splitting).
 
 import { batch, createOwner, disposeOwner, runWithOwner } from '../reactivity/index'
+import { styleText } from '../style'
 
 export { effect } from '../reactivity/index'
 
@@ -299,8 +300,7 @@ export function setStyle(el: HTMLElement, value: unknown): void {
     el.style.cssText = value
   }
   else if (typeof value === 'object') {
-    for (const [k, v] of Object.entries(value as Record<string, unknown>))
-      el.style.setProperty(k, v == null ? '' : String(v))
+    el.style.cssText = styleText(value as Record<string, unknown>)
   }
 }
 

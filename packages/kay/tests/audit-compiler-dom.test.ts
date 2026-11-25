@@ -158,13 +158,54 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
       expect(el.getAttribute('href')).toBeNull()
       expect(el.innerHTML).toBe('')
       el.click()
-      expect(clicked).toBe(false)
+      expect(clicked).toBe(true)
       dispose()
 
       // Explicit compiled onClick handler still works on DOM!
       const btnSrc = `export function Btn({ onHit }: { onHit: () => void }) { return <button onClick={onHit}>Go</button> }`
       const compiled = compileDom('Btn.tsx', btnSrc)
       expect(compiled.code).toContain('.$$click =')
+    })
+  })
+
+  test('a spread handler is wired, swapped and removed with the props', async () => {
+    await withDom(() => {
+      const calls: string[] = []
+      const props = signal<Record<string, unknown>>({ onClick: () => calls.push('first'), onKeyDown: () => calls.push('key') })
+      const host = document.createElement('div')
+      const dispose = domCore.mount(host, () => {
+        const el = document.createElement('button')
+        domExtras.spread(el, () => props.value)
+        return el
+      })
+      const button = host.firstChild as HTMLButtonElement
+      button.click()
+      button.dispatchEvent(new KeyboardEvent('keydown'))
+      props.value = { onClick: () => calls.push('second') }
+      button.click()
+      button.dispatchEvent(new KeyboardEvent('keydown'))
+      props.value = {}
+      button.click()
+      expect(calls).toEqual(['first', 'key', 'second'])
+      dispose()
+    })
+  })
+
+  test.each([
+    ['a camelCase key', { backgroundColor: 'red' }, 'background-color:red;'],
+    ['a number with a unit', { width: 10, fontSize: 12 }, 'width:10px;font-size:12px;'],
+    ['unitless numbers', { opacity: 0.5, zIndex: 2, lineHeight: 1.5, flexGrow: 1 }, 'opacity:0.5;z-index:2;line-height:1.5;flex-grow:1;'],
+    ['a custom property', { '--Gap': 4, '--tone': 'red' }, '--Gap:4;--tone:red;'],
+    ['vendor prefixes', { WebkitLineClamp: 2, msTransform: 'none' }, '-webkit-line-clamp:2;-ms-transform:none;'],
+    ['a kebab-case key', { 'margin-top': 8 }, 'margin-top:8px;'],
+  ])('a style object with %s renders the same CSS on the server and in the browser', async (_, style, css) => {
+    expect(ssrRt.ssrStyle(style)).toBe(` style="${css}"`)
+    await withDom(() => {
+      const el = document.createElement('div')
+      const expected = document.createElement('div')
+      domCore.setStyle(el, style)
+      expected.style.cssText = css
+      expect(el.style.cssText).toBe(expected.style.cssText)
     })
   })
 
@@ -831,6 +872,18 @@ describe('destructured loop rows and component props in an island', () => {
       mountIsland(`${FIELD}\nexport function Form({ seen }) { return <form><Field seen={seen} /></form> }`, 'Form', { seen }, { onMount }, host).dispose()
       await Promise.resolve()
       expect(seen).toEqual([])
+    })
+  })
+
+  test('a key leaving a reactive style object is removed from the element', async () => {
+    await withDom(() => {
+      const style = signal<Record<string, unknown>>({ color: 'red', width: '10px' })
+      const { host, dispose } = mountIsland(`export function Box({ style }) { return <div style={style.value}>box</div> }`, 'Box', { style })
+      const box = host.firstChild as HTMLElement
+      expect(box.style.width).toBe('10px')
+      style.value = { color: 'blue' }
+      expect([box.style.color, box.style.width]).toEqual(['blue', ''])
+      dispose()
     })
   })
 

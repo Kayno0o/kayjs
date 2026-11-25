@@ -2,7 +2,7 @@
 // so Bun.build({ splitting: true }) keeps them out of minimal islands that don't use them.
 
 import type { Owner } from '../reactivity/index'
-import { createOwner, disposeOwner, effect, getOwner, runWithOwner, untrack } from '../reactivity/index'
+import { batch, createOwner, disposeOwner, effect, getOwner, runWithOwner, untrack } from '../reactivity/index'
 import { claimInsert, setAttr, setClass, setProp, setStyle, skipRange } from './index'
 
 const RAW_HTML = Symbol.for('kay.html')
@@ -23,6 +23,7 @@ export function setInnerHtml(el: Element, value: unknown): void {
 
 const VALID_ATTR_NAME = /^[A-Za-z_:][-\w:.]*$/
 const SPREAD_DOM_PROPS = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
+const EVENT_PROP = /^on([A-Z]\w*)$/
 
 function isBlockedSpreadAttr(name: string): boolean {
   if (!VALID_ATTR_NAME.test(name))
@@ -46,8 +47,16 @@ export function omit(props: Record<string, unknown>, excluded: string[]): Record
 
 export function spread(el: Element, getProps: () => Record<string, unknown> | null | undefined): void {
   let prevKeys: string[] = []
+  // One listener per event type, calling whichever handler the props hold now.
+  const handlers = new Map<string, (e: Event) => void>()
+  const listen = (e: Event): void => {
+    const handler = handlers.get(e.type)
+    if (handler !== undefined)
+      batch(() => handler(e))
+  }
 
   effect(() => {
+    const types = new Set<string>()
     const props = getProps() ?? {}
     const nextKeys = Object.keys(props)
 
@@ -78,6 +87,14 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
           (v as (node: Element) => void)(el)
         continue
       }
+      const event = typeof v === 'function' ? EVENT_PROP.exec(k) : null
+      if (event !== null) {
+        const type = event[1]!.toLowerCase()
+        types.add(type)
+        el.addEventListener(type, listen)
+        handlers.set(type, v as (e: Event) => void)
+        continue
+      }
       const name = k === 'className' ? 'class' : k === 'htmlFor' ? 'for' : k
       if (isBlockedSpreadAttr(name))
         continue
@@ -91,6 +108,12 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
         setAttr(el, name, v)
     }
 
+    for (const type of handlers.keys()) {
+      if (!types.has(type)) {
+        handlers.delete(type)
+        el.removeEventListener(type, listen)
+      }
+    }
     prevKeys = nextKeys
   })
 }
