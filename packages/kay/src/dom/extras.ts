@@ -77,6 +77,8 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
       const k = nextKeys[i]!
       if (k === 'key' || k === '$hydrate' || k === 'children')
         continue
+      if (k === 'dangerouslySetInnerHTML')
+        throw new TypeError('kay: dangerouslySetInnerHTML in a spread: write innerHTML={html} on the element.')
       const v = props[k]
       if (k === 'ref') {
         if (typeof v === 'function')

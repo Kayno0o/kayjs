@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { compileDom, compileSsr } from '../src/compiler/index'
+import { spread } from '../src/dom/extras'
+import { ssrSpread } from '../src/ssr/index'
 
 // Each mistake must fail both compile targets with the same message naming the fix.
 function refuses(jsx: string, message: RegExp, setup = ''): void {
@@ -42,5 +44,23 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<my-widget onSelected={fn} />')
     accepts('<video onTimeUpdate={fn} onLoadedMetadata={fn} />')
     accepts('<form onSubmit={fn} onFormData={fn} />')
+  })
+
+  test('React\'s dangerouslySetInnerHTML, which would print [object Object] as an attribute', () => {
+    refuses('<div dangerouslySetInnerHTML={{ __html: html }} />', /dangerouslySetInnerHTML in Page\.tsx: write innerHTML=\{html\}/, 'const html = \'<p>x</p>\'')
+    const props = { dangerouslySetInnerHTML: { __html: '<p>x</p>' } }
+    expect(() => ssrSpread(props)).toThrow(/dangerouslySetInnerHTML in a spread: write innerHTML=\{html\}/)
+    expect(() => spread({} as Element, () => props)).toThrow(/dangerouslySetInnerHTML in a spread: write innerHTML=\{html\}/)
+  })
+
+  test('Astro and Solid directives, which become plain attributes or island props', () => {
+    refuses('<Counter client:visible />', /client:visible in Page\.tsx: write \$hydrate="visible"/, 'const Counter = () => <p>x</p>')
+    refuses('<Counter client:only="solid" />', /write \$hydrate="client"/, 'const Counter = () => <p>x</p>')
+    refuses('<div class:list={[\'a\']} />', /class:list in Page\.tsx: pass one string to class/)
+    refuses('<div set:html={fn} />', /set:html in Page\.tsx: write innerHTML=\{\.\.\.\}/)
+    refuses('<input use:model={fn} />', /use:model in Page\.tsx: call model in a ref/)
+    refuses('<input prop:value={fn} />', /prop:value in Page\.tsx: write value=\{\.\.\.\}/)
+    refuses('<div classList={{ on: true }} />', /classList in Page\.tsx: pass one string to class/)
+    accepts('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a" /></svg>')
   })
 })

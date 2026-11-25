@@ -142,6 +142,8 @@ export function ssrStyle(value: unknown): string {
   return ''
 }
 
+const SPREAD_DANGEROUS_HTML = 'kay: dangerouslySetInnerHTML in a spread: write innerHTML={html} on the element.'
+
 export function ssrSpread(props: Record<string, unknown> | null | undefined): string {
   if (props == null || typeof props !== 'object')
     return ''
@@ -149,6 +151,8 @@ export function ssrSpread(props: Record<string, unknown> | null | undefined): st
   for (const [rawKey, value] of Object.entries(props)) {
     if (rawKey === 'key' || rawKey === 'ref' || rawKey === '$hydrate' || rawKey === 'children')
       continue
+    if (rawKey === 'dangerouslySetInnerHTML')
+      throw new TypeError(SPREAD_DANGEROUS_HTML)
     const name = rawKey === 'className' ? 'class' : rawKey === 'htmlFor' ? 'for' : rawKey
     if (isBlockedAttr(name))
       continue

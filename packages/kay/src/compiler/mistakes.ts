@@ -65,15 +65,43 @@ function checkHandler(name: string, value: AstNode | null, filename: string, cod
   }
 }
 
-function checkElementAttribute(attr: AstNode, isCustomElement: boolean, filename: string, code: string): void {
-  if (attr.name.type === 'JSXNamespacedName') {
-    const namespace = attr.name.namespace.name as string
-    const name = attr.name.name.name as string
-    if (namespace === 'on')
-      throw mistake(`on:${name}`, filename, `write ${eventProp(name.toLowerCase())}={...}`)
+// Astro's client: directives and the $hydrate mode each one means.
+const CLIENT_DIRECTIVES = new Map([['load', 'load'], ['visible', 'visible'], ['idle', 'idle'], ['only', 'client'], ['media', 'media(<query>)']])
+// XML namespaces SVG and MathML really use; every other prefix is a directive from another framework.
+const XML_NAMESPACES = new Set(['xlink', 'xml', 'xmlns'])
+
+function checkNamespacedAttribute(namespace: string, name: string, filename: string): void {
+  if (XML_NAMESPACES.has(namespace))
     return
-  }
+  const what = `${namespace}:${name}`
+  if (namespace === 'on')
+    throw mistake(what, filename, `write ${eventProp(name.toLowerCase())}={...}`)
+  if (namespace === 'client')
+    throw mistake(what, filename, `write $hydrate="${CLIENT_DIRECTIVES.get(name) ?? 'load'}"`)
+  if (what === 'class:list')
+    throw mistake(what, filename, 'pass one string to class, joining the names yourself')
+  if (what === 'set:html')
+    throw mistake(what, filename, 'write innerHTML={...}')
+  if (what === 'set:text')
+    throw mistake(what, filename, 'write the text as children')
+  if (namespace === 'use')
+    throw mistake(what, filename, `call ${name} in a ref`)
+  if (namespace === 'prop' || namespace === 'attr' || namespace === 'bool')
+    throw mistake(what, filename, `write ${name}={...}`)
+  throw mistake(what, filename, `kay has no ${namespace}: directives`)
+}
+
+function checkElementAttribute(attr: AstNode, isCustomElement: boolean, filename: string, code: string): void {
   const name = attr.name.name as string
+  if (name === 'dangerouslySetInnerHTML') {
+    const expr = attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression as AstNode : undefined
+    const html = expr?.type === 'ObjectExpression'
+      ? (expr.properties as AstNode[]).find(p => p.type === 'Property' && (p.key?.name ?? p.key?.value) === '__html')
+      : undefined
+    throw mistake(name, filename, `write innerHTML={${html === undefined ? '...' : code.slice(html.value.start, html.value.end)}}`)
+  }
+  if (name === 'classList')
+    throw mistake(name, filename, 'pass one string to class, joining the names yourself')
   if (LOWERCASE_EVENT.test(name) && EVENT_PROPS.has(name.slice(2)))
     throw mistake(name, filename, `write ${eventProp(name.slice(2))}={...}, kay binds camelCase event props only`)
   if (!EVENT_ATTR.test(name))
@@ -100,11 +128,14 @@ export function checkMistakes(node: AstNode, filename: string, code: string): vo
   if (node.type !== 'JSXOpeningElement')
     return
   const tag = jsxTagName(node.name)
-  if (tag === '' || isComponentTag(tag))
-    return
+  const isElement = tag !== '' && !isComponentTag(tag)
   const isCustomElement = tag.includes('-')
   for (const attr of node.attributes as AstNode[]) {
-    if (attr.type === 'JSXAttribute')
+    if (attr.type !== 'JSXAttribute')
+      continue
+    if (attr.name.type === 'JSXNamespacedName')
+      checkNamespacedAttribute(attr.name.namespace.name as string, attr.name.name.name as string, filename)
+    else if (isElement)
       checkElementAttribute(attr, isCustomElement, filename, code)
   }
 }
