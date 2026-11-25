@@ -1,7 +1,7 @@
 // Unified server actions: works as both progressive <form action={fn} method="post"> and typed island RPC.
 
 import type { Cookies } from './cookies'
-import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
+import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult } from './standard-schema'
 import type { TrustProxy } from './security'
 import { isTrustedOrigin } from './security'
 import { validateSchema } from './standard-schema'
@@ -110,21 +110,61 @@ async function parseActionBody(boundedReq: Request): Promise<unknown> {
     return boundedReq.json()
 
   if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
-    const fd = await boundedReq.formData()
-    const out: Record<string, unknown> = {}
-    for (const [key, val] of fd.entries()) {
-      if (key in out) {
-        const prev = out[key]
-        out[key] = Array.isArray(prev) ? [...prev, val] : [prev, val]
-      }
-      else {
-        out[key] = val
-      }
+    // A Map then fromEntries makes every name an own property, `constructor` and `__proto__` included.
+    const fields = new Map<string, FormDataEntryValue | FormDataEntryValue[]>()
+    for (const [key, val] of (await boundedReq.formData()).entries()) {
+      const prev = fields.get(key)
+      fields.set(key, prev === undefined ? val : Array.isArray(prev) ? [...prev, val] : [prev, val])
     }
-    return out
+    return Object.fromEntries(fields)
   }
 
   return undefined
+}
+
+function isJsonBody(request: Request): boolean {
+  return (request.headers.get('content-type') ?? '').includes('application/json')
+}
+
+function topLevelKey(issue: StandardSchemaIssue): string | undefined {
+  const seg = issue.path?.length === 1 ? issue.path[0] : undefined
+  const key = typeof seg === 'object' && seg !== null ? seg.key : seg
+  return typeof key === 'string' ? key : undefined
+}
+
+function setField(target: Record<string, unknown>, key: string, value: unknown): void {
+  Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true })
+}
+
+// A form sends one checked box as a single value and none as nothing, so a field the schema wants as an array fails. Each failing top-level field is retried as an array, and the array is kept only where it clears that field's issue.
+async function retryWithFormArrays(schema: StandardSchemaV1, body: Record<string, unknown>, failed: ValidationFailure): Promise<ValidationResult<unknown>> {
+  const retried = { ...body }
+  const wrapped: string[] = []
+  for (const issue of failed.issues) {
+    const key = topLevelKey(issue)
+    if (key === undefined || Array.isArray(retried[key]) || wrapped.includes(key))
+      continue
+    setField(retried, key, Object.hasOwn(body, key) ? [body[key]] : [])
+    wrapped.push(key)
+  }
+  if (wrapped.length === 0)
+    return failed
+  const second = await validateSchema(schema, retried)
+  if (second.ok)
+    return second
+  const stillFailing = new Set(second.issues.map(topLevelKey))
+  const kept = wrapped.filter(key => !stillFailing.has(key))
+  if (kept.length === 0)
+    return failed
+  for (const key of wrapped) {
+    if (kept.includes(key))
+      continue
+    if (Object.hasOwn(body, key))
+      setField(retried, key, body[key])
+    else
+      delete retried[key]
+  }
+  return kept.length === wrapped.length ? second : validateSchema(schema, retried)
 }
 
 function encodedFlashSize(flash: ActionErrorFlash): number {
@@ -199,7 +239,9 @@ export async function executeAction(
       return Response.json({ ok: false, status: 400, error: 'Invalid request body' }, { status: 400 })
     }
 
-    const checked = await validateSchema(act.schema, rawBody)
+    let checked = await validateSchema(act.schema, rawBody)
+    if (!checked.ok && !isJsonBody(request))
+      checked = await retryWithFormArrays(act.schema, rawBody as Record<string, unknown>, checked)
     if (!checked.ok) {
       // Zero-JS progressive HTML <form> submit: flash fieldErrors + safe submitted values (<4KB) and redirect 303 back to trusted Referer
       if (!wantsJson) {

@@ -595,3 +595,69 @@ describe('calling an action from an island', () => {
     }
   })
 })
+
+describe('form posts parsed for an action schema', () => {
+  let app: Awaited<ReturnType<typeof testApp>>
+  let url: string
+  const dir = mkdtempSync(join(tmpdir(), 'kay-form-parse-'))
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  const post = async (fields: [string, string][]) => {
+    const res = await app.fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'accept': 'application/json' },
+      body: new URLSearchParams(fields).toString(),
+    })
+    return res.json() as Promise<{ ok: boolean, data?: Record<string, unknown>, fieldErrors?: Record<string, string> }>
+  }
+
+  test('fields named like Object members parse as ordinary values', async () => {
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/form.ts'), `
+      import { action } from 'kay/server'
+      // Each listed field must be a string, an array ('array') or a string of 3 or more characters ('long'); the parsed body comes back as is.
+      const shape = (fields: Record<string, 'string' | 'array' | 'long'>) => ({ '~standard': { version: 1, vendor: 'test', validate(value: Record<string, unknown>) {
+        const issues = Object.entries(fields).flatMap(([k, t]) => {
+          const v = Object.prototype.hasOwnProperty.call(value, k) ? value[k] : undefined
+          if (t === 'array')
+            return Array.isArray(v) ? [] : [{ message: k + ' must be array', path: [k] }]
+          if (typeof v !== 'string')
+            return [{ message: k + ' must be string', path: [k] }]
+          return t === 'long' && v.length < 3 ? [{ message: k + ' is too short', path: [k] }] : []
+        })
+        return issues.length > 0 ? { issues } : { value: Object.fromEntries(Object.entries(value)) }
+      } } })
+      export const members = action(shape({ constructor: 'string', __proto__: 'string', hasOwnProperty: 'string', toString: 'string' }), input => input)
+      export const choices = action(shape({ title: 'long', tags: 'array', pick: 'array' }), input => input)
+    `)
+    app = await testApp({ root: dir })
+    url = app.manifest!.actions.find(a => a.exportName === 'members')!.url
+    const fields: [string, string][] = [['constructor', 'c'], ['__proto__', 'p'], ['hasOwnProperty', 'h'], ['toString', 't']]
+    expect(await post(fields)).toEqual({ ok: true, data: Object.fromEntries(fields) })
+    expect((await post(fields.slice(1))).fieldErrors).toEqual({ constructor: 'constructor must be string' })
+  })
+
+  test.each([
+    ['no box ticked', [], []],
+    ['one box ticked', [['tags', 'a']], ['a']],
+    ['two boxes ticked', [['tags', 'a'], ['tags', 'b']], ['a', 'b']],
+  ] as [string, [string, string][], string[]][])('a checkbox group with %s parses as an array', async (_, tags, expected) => {
+    url = app.manifest!.actions.find(a => a.exportName === 'choices')!.url
+    expect(await post([['title', 'Tea'], ...tags, ['pick', 'x']])).toEqual({ ok: true, data: { title: 'Tea', tags: expected, pick: ['x'] } })
+  })
+
+  test('a missing string field still fails instead of becoming an array', async () => {
+    url = app.manifest!.actions.find(a => a.exportName === 'choices')!.url
+    expect((await post([['tags', 'a'], ['pick', 'x']])).fieldErrors).toEqual({ title: 'title must be string' })
+  })
+
+  test('a string field failing on its value keeps its own error beside a checkbox the retry fixed', async () => {
+    url = app.manifest!.actions.find(a => a.exportName === 'choices')!.url
+    expect((await post([['title', 'ab'], ['tags', 'a'], ['pick', 'x']])).fieldErrors).toEqual({ title: 'title is too short' })
+  })
+
+  test('a JSON body is taken as sent, a single value staying a single value', async () => {
+    url = app.manifest!.actions.find(a => a.exportName === 'choices')!.url
+    expect((await (await app.post(url, { title: 'Tea', tags: 'a', pick: ['x'] })).json() as { fieldErrors: unknown }).fieldErrors).toEqual({ tags: 'tags must be array' })
+  })
+})

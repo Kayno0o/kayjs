@@ -49,6 +49,8 @@ export default function SettingsPage() {
 
 No client JavaScript is shipped. Form fields are parsed, validated against the schema, and executed on the server.
 
+A field the schema declares as an array always arrives as one. That includes a checkbox group with one box or none ticked, and a multi-select with a single choice.
+
 ## 2. Typed RPC from islands
 
 Import and call the exact same function from an interactive island — Kay strips all server-only code and replaces it with a tiny `actionStub()` RPC call in the client bundle:

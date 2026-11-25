@@ -47,8 +47,8 @@ export async function validateSchema<S extends StandardSchemaV1>(
       const key = issue.path && issue.path.length > 0
         ? issue.path.map(seg => (typeof seg === 'object' && seg !== null && 'key' in seg ? String(seg.key) : String(seg))).join('.')
         : ''
-      if (!(key in fieldErrors))
-        fieldErrors[key] = issue.message
+      if (!Object.hasOwn(fieldErrors, key))
+        Object.defineProperty(fieldErrors, key, { value: issue.message, enumerable: true, writable: true, configurable: true })
     }
     return { ok: false, issues: res.issues, fieldErrors }
   }
