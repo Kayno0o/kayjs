@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/live",
-  "version": "2.0.0-beta.2",
+  "version": "2.0.0-beta.3",
   "description": "Zero-dependency typed SSE rooms and coalesced presence plugin for Kay v2",
   "license": "MIT",
   "type": "module",
@@ -21,6 +21,6 @@
     "directory": "packages/plugin-live"
   },
   "peerDependencies": {
-    "@kayjs/kay": "^2.0.0-beta.2"
+    "@kayjs/kay": "^2.0.0-beta.3"
   }
 }

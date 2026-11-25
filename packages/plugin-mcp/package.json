@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/mcp",
-  "version": "2.0.0-beta.2",
+  "version": "2.0.0-beta.3",
   "description": "Zero-dependency MCP Streamable HTTP (2025-03-26) plugin exposing Kay v2 server actions as AI agent tools",
   "license": "MIT",
   "type": "module",
@@ -20,6 +20,6 @@
     "directory": "packages/plugin-mcp"
   },
   "peerDependencies": {
-    "@kayjs/kay": "^2.0.0-beta.2"
+    "@kayjs/kay": "^2.0.0-beta.3"
   }
 }
