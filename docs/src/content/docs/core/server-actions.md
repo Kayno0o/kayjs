@@ -67,6 +67,8 @@ export function QuickSave() {
 }
 ```
 
+The call always resolves to a result. A network failure gives `{ ok: false, status: 0, error }`. Pass a `FormData` instead of an object to send files. If the action answers with a redirect, the page navigates there and the call never resolves.
+
 <Callout title="Built-in CSRF & reverse-proxy support" tone="info">
 Every action `POST` automatically verifies the `Origin` / `Referer` header against the request host, honoring `X-Forwarded-Proto` and `X-Forwarded-Host` behind HTTPS reverse proxies (nginx, Caddy, Cloudflare) once `trustProxy` is set in `kay.config.ts`: `true` for one proxy, `2` for a CDN in front of it.
 </Callout>

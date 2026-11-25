@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { build } from '../src/build/index'
+import { actionStub } from '../src/dom/action'
 import { defineEnv } from '../src/server/env'
 import { testApp } from '../src/test/index'
 
@@ -524,6 +525,73 @@ export default function Home() {
     finally {
       rmSync(appDir, { recursive: true, force: true })
       rmSync(externalOutDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('calling an action from an island', () => {
+  const withFetch = async (fake: (url: string, init: RequestInit) => Promise<Response>, run: () => Promise<void>) => {
+    const real = globalThis.fetch
+    globalThis.fetch = fake as typeof fetch
+    try {
+      await run()
+    }
+    finally {
+      globalThis.fetch = real
+    }
+  }
+
+  test('a FormData with a file reaches the action and its data comes back', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-action-file-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/upload.ts'), `
+        import { action } from 'kay/server'
+        const form = { '~standard': { version: 1, vendor: 'test', validate: (value: unknown) => ({ value: value as { avatar: File, name: string } }) } }
+        export const upload = action(form, async input => ({ file: input.avatar.name, size: input.avatar.size, name: input.name }))
+      `)
+      const app = await testApp({ root: dir })
+      const url = app.manifest!.actions.find(a => a.exportName === 'upload')!.url
+      const form = new FormData()
+      form.set('name', 'Ada')
+      form.set('avatar', new File(['12345'], 'me.png', { type: 'image/png' }))
+      await withFetch((u, init) => app.fetch(u, init), async () => {
+        expect(await actionStub<FormData, unknown>(url)(form)).toEqual({ ok: true, data: { file: 'me.png', size: 5, name: 'Ada' } })
+      })
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a network failure resolves to an error result', async () => {
+    await withFetch(async () => {
+      throw new TypeError('Failed to fetch')
+    }, async () => {
+      expect(await actionStub('/_kay/action/x')({})).toEqual({ ok: false, status: 0, error: 'Failed to fetch' })
+    })
+  })
+
+  test('a response that is not an action result resolves to an error result', async () => {
+    await withFetch(async () => new Response('<h1>Bad gateway</h1>', { status: 502, statusText: 'Bad Gateway' }), async () => {
+      expect(await actionStub('/_kay/action/x')({})).toEqual({ ok: false, status: 502, error: 'Bad Gateway' })
+    })
+  })
+
+  test('a redirect navigates and never resolves with made-up data', async () => {
+    const assigned: string[] = []
+    const realLocation = (globalThis as { location?: unknown }).location
+    ;(globalThis as { location?: unknown }).location = { assign: (u: string) => assigned.push(u) }
+    try {
+      const redirected = Object.defineProperties(new Response('<p>home</p>'), { redirected: { value: true }, url: { value: 'http://localhost/home' } })
+      await withFetch(async () => redirected, async () => {
+        const settled = await Promise.race([actionStub('/_kay/action/x')({}), Bun.sleep(20).then(() => 'pending')])
+        expect(settled).toBe('pending')
+        expect(assigned).toEqual(['http://localhost/home'])
+      })
+    }
+    finally {
+      ;(globalThis as { location?: unknown }).location = realLocation
     }
   })
 })
