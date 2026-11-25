@@ -1,7 +1,7 @@
 // What must never reach a browser bundle, shared by `kay build` and `kay check`.
 
 import type { AstNode } from './analyze'
-import { walk } from './analyze'
+import { loadDeclarations, walk } from './analyze'
 
 export const SERVER_ONLY_MODULES = new Set([
   'kay/server',
@@ -42,10 +42,9 @@ function isProcessEnv(node: AstNode | null | undefined): boolean {
 /** True when the module reads `process.env` outside its `load()` (stripped from client code) for a key the client build does not inline. */
 export function readsPrivateEnv(program: AstNode, isInlined: (key: string) => boolean = key => CLIENT_ENV_KEY.test(key)): boolean {
   let found = false
+  const loadCode = new Set(loadDeclarations(program))
   walk(program, (node) => {
-    if (found)
-      return false
-    if (node.type === 'ExportNamedDeclaration' && node.declaration?.type === 'FunctionDeclaration' && node.declaration.id?.name === 'load')
+    if (found || loadCode.has(node))
       return false
     if (node.type === 'MemberExpression' && isProcessEnv(node.object)) {
       const key = node.computed ? node.property?.value : node.property?.name

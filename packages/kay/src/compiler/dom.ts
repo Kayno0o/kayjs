@@ -2,7 +2,7 @@
 // delegated events, compiler-safe destructured props, and fine-grained keyed .map() loops.
 
 import type { AstNode, ModuleAnalysis } from './analyze'
-import { analyzeModule, parseTsx, walk } from './analyze'
+import { analyzeModule, loadDeclarations, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
 import { cleanJsxText, escapeStaticText } from './ssr'
 
@@ -346,14 +346,9 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   }
   const freshVar = (prefix = '_e'): string => `${prefix}${varCounter++}`
 
-  // Strip `export async function load(...)` in client builds
-  for (const stmt of program.body as AstNode[]) {
-    if (stmt.type === 'ExportNamedDeclaration') {
-      const decl = stmt.declaration as AstNode | null
-      if (decl?.type === 'FunctionDeclaration' && decl.id?.name === 'load')
-        editor.remove(stmt.start, stmt.end)
-    }
-  }
+  // Client builds keep the `load` binding, so every export form stays valid, and drop its server-only code.
+  for (const node of loadDeclarations(program))
+    editor.replace(node.start, node.end, node.type === 'FunctionDeclaration' ? `const ${node.id.name as string} = undefined` : 'undefined')
 
   function hasJsxDescendant(node: AstNode | null | undefined): boolean {
     if (!node)

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { analyzeModule, compileDom, compileSsr } from '../src/compiler/index'
+import { readsPrivateEnv } from '../src/compiler/server-only'
 import { raw, ssrRawText } from '../src/ssr/index'
 
 describe('TSX compiler', () => {
@@ -26,6 +27,28 @@ describe('TSX compiler', () => {
       }
     `
     expect(analyzeModule('Btn.tsx', handlerCode).isInteractive).toBe(true)
+  })
+
+  test.each([
+    ['export async function load', `export async function load() { return process.env.SECRET_MARKER }`],
+    ['export const arrow', `export const load = async () => process.env.SECRET_MARKER`],
+    ['export const function', `export const load = function () { return process.env.SECRET_MARKER }`],
+    ['export const beside another binding', `export const load = () => process.env.SECRET_MARKER, title = 'Home'`],
+    ['local function exported by name', `async function load() { return process.env.SECRET_MARKER }\nexport { load }`],
+    ['local const exported by name', `const load = () => process.env.SECRET_MARKER\nexport { load }`],
+  ])('client code and the private-env scan drop a load declared as %s', (_, loadCode) => {
+    const page = `
+      import { signal } from 'kay'
+      ${loadCode}
+      export default function Home() {
+        const n = signal(0)
+        return <button onClick={() => n.value++}>{n.value}</button>
+      }
+    `
+    const analysis = analyzeModule('index.tsx', page)
+    expect(analysis.hasLoadExport).toBe(true)
+    expect(compileDom('index.tsx', page, { analysis }).code).not.toContain('SECRET_MARKER')
+    expect(readsPrivateEnv(analysis.program)).toBe(false)
   })
 
   test('rejects browser interactivity directly inside async route component', () => {

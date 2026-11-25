@@ -72,6 +72,38 @@ export function walk(node: unknown, visit: (node: AstNode) => boolean | void): v
   }
 }
 
+// The server-only code behind a module's `load` export: a function declaration or a declarator's initialiser, in any export form.
+export function loadDeclarations(program: AstNode): AstNode[] {
+  const localNames = new Set<string>()
+  const found: AstNode[] = []
+  const collect = (stmt: AstNode, names: Set<string>): void => {
+    if (stmt.type === 'FunctionDeclaration' && names.has(stmt.id?.name))
+      found.push(stmt)
+    else if (stmt.type === 'VariableDeclaration') {
+      for (const d of stmt.declarations as AstNode[]) {
+        if (d.id?.type === 'Identifier' && names.has(d.id.name) && d.init)
+          found.push(d.init)
+      }
+    }
+  }
+  const body = program.body as AstNode[]
+  for (const stmt of body) {
+    if (stmt.type !== 'ExportNamedDeclaration' || stmt.source)
+      continue
+    if (stmt.declaration)
+      collect(stmt.declaration, new Set(['load']))
+    for (const spec of (stmt.specifiers ?? []) as AstNode[]) {
+      if ((spec.exported?.name ?? spec.exported?.value) === 'load')
+        localNames.add(spec.local.name)
+    }
+  }
+  if (localNames.size > 0) {
+    for (const stmt of body)
+      collect(stmt, localNames)
+  }
+  return found
+}
+
 export function parseTsx(filename: string, code: string): AstNode {
   const result = parseSync(filename, code, { lang: filename.endsWith('.ts') ? 'ts' : 'tsx', sourceType: 'module' })
   if (result.errors.length > 0) {
@@ -227,7 +259,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     isInteractive,
     interactiveReason,
     hasAsyncDefault,
-    hasLoadExport,
+    hasLoadExport: hasLoadExport || loadDeclarations(program).length > 0,
     hasJsx,
     hasPrerender,
     hasPaths,
