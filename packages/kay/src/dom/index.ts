@@ -10,6 +10,7 @@ export { effect } from '../reactivity/index'
 
 let hydrating = false
 let hydrateNode: Node | null = null
+let hydrateRoot: Element | null = null
 
 export function claimLoop(parent: Node, fn: () => void, skip = 0, startMarker?: Node | null): boolean {
   if (!hydrating)
@@ -95,8 +96,11 @@ export function hydrate(container: Element, render: () => Node | DocumentFragmen
     owner.id = { p: idPrefix, n: 0 }
   const prevHydrating = hydrating
   const prevNode = hydrateNode
+  const prevRoot = process.env.NODE_ENV !== 'production' ? hydrateRoot : null
   hydrating = true
   hydrateNode = container.firstChild
+  if (process.env.NODE_ENV !== 'production')
+    hydrateRoot = container
 
   try {
     runWithOwner(owner, () => {
@@ -110,6 +114,8 @@ export function hydrate(container: Element, render: () => Node | DocumentFragmen
   finally {
     hydrating = prevHydrating
     hydrateNode = prevNode
+    if (process.env.NODE_ENV !== 'production')
+      hydrateRoot = prevRoot
   }
 
   return () => disposeOwner(owner)
@@ -139,20 +145,46 @@ export function mount(container: Element, render: () => Node | DocumentFragment 
 
 export function template(html: string, isSvg?: boolean): () => Node {
   let cached: Node | undefined
+  const expectedTag = process.env.NODE_ENV !== 'production'
+    ? /^<([A-Za-z][^\s/>]*)/.exec(html)?.[1]?.toLowerCase()
+    : undefined
 
-  return (): Node => {
-    if (hydrating && hydrateNode !== null) {
-      const node = hydrateNode
-      hydrateNode = node.nextSibling
-      return node
-    }
-
+  const clone = (): Node => {
     if (cached === undefined) {
       const t = document.createElement('template')
       t.innerHTML = isSvg ? `<svg>${html}</svg>` : html
       cached = isSvg ? t.content.firstChild!.firstChild! : t.content.firstChild!
     }
     return cached.cloneNode(true)
+  }
+
+  return (): Node => {
+    if (hydrating && hydrateNode !== null) {
+      const node = hydrateNode
+      if (process.env.NODE_ENV !== 'production' && expectedTag !== undefined) {
+        const foundTag = node.nodeType === 1 ? (node as Element).tagName.toLowerCase() : undefined
+        if (foundTag !== expectedTag) {
+          const island = hydrateRoot?.getAttribute('c') ?? hydrateRoot?.tagName.toLowerCase() ?? 'unknown'
+          const foundDesc = foundTag !== undefined
+            ? `<${foundTag}>`
+            : node.nodeType === 3
+              ? `#text(${JSON.stringify((node as Text).data.slice(0, 30))})`
+              : node.nodeType === 8
+                ? `<!--${(node as Comment).data}-->`
+                : `nodeType(${node.nodeType})`
+          console.warn(`kay: hydration mismatch in island "${island}": expected <${expectedTag}>, found ${foundDesc}; falling back to fresh clone.`)
+          hydrating = false
+          hydrateNode = null
+          const fresh = clone()
+          node.parentNode?.replaceChild(fresh, node)
+          return fresh
+        }
+      }
+      hydrateNode = node.nextSibling
+      return node
+    }
+
+    return clone()
   }
 }
 
