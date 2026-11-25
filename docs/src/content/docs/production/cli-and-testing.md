@@ -29,7 +29,6 @@ Test routes, middleware, cookies, auth flows, and server actions in-process with
 ```ts
 import { describe, expect, it } from 'bun:test'
 import { testApp } from 'kay/test'
-import { savePreferences } from '../src/actions/preferences'
 
 describe('app routes', () => {
   it('renders home and submits a server action', async () => {
@@ -39,8 +38,9 @@ describe('app routes', () => {
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('Latest posts')
 
-    // Sends FormData with a same-origin Origin header and persists cookies
-    const submitRes = await app.submit(savePreferences.url, { project: 'orbit', target: 'binary' })
+    // The app's own bundled copy, the one its routes and kay.config.ts use
+    const { savePreferences } = await app.import('src/actions/preferences.ts')
+    const submitRes = await app.submit(savePreferences, { project: 'orbit', target: 'binary' })
     expect(submitRes.status).toBe(200)
   })
 })
@@ -50,7 +50,8 @@ describe('app routes', () => {
 
 - `app.get(path, headers?)`: Sends a `GET` request with the current cookie jar.
 - `app.post(path, body?, headers?)`: Sends JSON (or `FormData`) with `Origin: http://localhost`.
-- `app.submit(actionUrl, fields, headers?)`: Sends `FormData` with `Origin: http://localhost`.
+- `app.import(path)`: The app's bundled copy of a route, layout, middleware, action file or `kay.config.ts`, by path from the root. Read module state and actions from it: a module the test file imports itself is a second copy, and its actions have no URL.
+- `app.submit(action, fields, headers?)`: Sends `FormData` with `Origin: http://localhost` to an action from `app.import()`, or to an action URL.
 - `app.fetch(pathOrRequest, init?)`: Low-level request helper with cookie jar persistence.
 - `app.cookies` / `app.clearCookies()`: Inspect or reset cookies between test cases.
 - Pass `prebuilt: true` to `testApp({ root, prebuilt: true })` to reuse an existing `dist/` build across tests.

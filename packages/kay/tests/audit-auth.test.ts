@@ -440,34 +440,31 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
       })
     }
 
-    test('periodic prune timer automatically purges expired sessions & tokens and dispose() stops it', async () => {
+    test('the prune timer runs per server, so a server sharing the plugin keeps pruning after another one shuts down', async () => {
       const store = sqliteAuthStore(':memory:')
-      const now = Date.now()
-      await store.createUser({
-        id: 'u-prune',
-        email: 'prune@example.com',
-        role: 'user',
-        emailVerified: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      await store.createSession({ id: 'exp-sess', userId: 'u-prune', createdAt: now - 5000, expiresAt: now - 10 })
-      await store.createToken({ tokenHash: 'exp-tok', userId: 'u-prune', email: 'prune@example.com', kind: 'magic-link', expiresAt: now - 10 })
-
       const auth = createAuth({
         store,
         secret: 'audit-box19-timer-secret-32-bytes-min!',
         pruneIntervalMs: 25,
       })
+      const appDir = makeMinimalApp('box19-timer')
+      const first = await testApp({ root: appDir, plugins: [auth.plugin] })
+      const second = await testApp({ root: appDir, prebuilt: true, plugins: [auth.plugin] })
+      await first.app.dispose?.()
+      const count = (table: string): number => store.db.query<{ c: number }, []>(`SELECT COUNT(*) as c FROM ${table}`).get()!.c
       try {
-        await Bun.sleep(80)
-        const sessCount = store.db.query<{ c: number }, []>('SELECT COUNT(*) as c FROM kay_auth_sessions').get()!.c
-        const tokCount = store.db.query<{ c: number }, []>('SELECT COUNT(*) as c FROM kay_auth_tokens').get()!.c
-        expect(sessCount).toBe(0)
-        expect(tokCount).toBe(0)
+        const now = Date.now()
+        await store.createUser({ id: 'u-prune', email: 'prune@example.com', role: 'user', emailVerified: true, createdAt: now, updatedAt: now })
+        await store.createSession({ id: 'exp-sess', userId: 'u-prune', createdAt: now - 5000, expiresAt: now - 10 })
+        await store.createToken({ tokenHash: 'exp-tok', userId: 'u-prune', email: 'prune@example.com', kind: 'magic-link', expiresAt: now - 10 })
+        const deadline = Date.now() + 2000
+        while (count('kay_auth_sessions') + count('kay_auth_tokens') > 0 && Date.now() < deadline)
+          await Bun.sleep(10)
+        expect(count('kay_auth_sessions')).toBe(0)
+        expect(count('kay_auth_tokens')).toBe(0)
       }
       finally {
-        auth.dispose()
+        await second.app.dispose?.()
         store.db.close()
       }
     })

@@ -6,6 +6,7 @@ import type { BuildManifest } from './index'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { formatBunBuildLogs } from './files'
+import { SERVER_ENTRY_FILE } from './server-entry'
 
 export interface CompileExecutableOptions {
   root: string
@@ -14,50 +15,18 @@ export interface CompileExecutableOptions {
   manifest: BuildManifest
   assetPrefix: string
   outfile: string
-  kaySrcRoot: string
   resolveKaySpecifier: (specifier: string) => string | undefined
   bunPlugins?: BunPlugin[] | undefined
 }
 
 export async function compileExecutable(opts: CompileExecutableOptions): Promise<void> {
-  const { root, outDir, clientDir, manifest, assetPrefix, outfile, kaySrcRoot, resolveKaySpecifier, bunPlugins = [] } = opts
+  const { root, outDir, clientDir, manifest, assetPrefix, outfile, resolveKaySpecifier, bunPlugins = [] } = opts
   const entryPath = join(outDir, '__compile_entry.ts')
   const prodEnvPath = join(outDir, '__compile_prod_env.ts')
   // Evaluated first via ESM static import order so `kay.config.ts` and route modules see NODE_ENV=production!
   writeFileSync(prodEnvPath, `const _envKey = 'NODE_ENV';\nprocess.env[_envKey] ??= 'production';\n`)
-  const imports: string[] = [`import ${JSON.stringify(prodEnvPath)};`]
-  const modEntries: string[] = []
-  const seenFiles = new Set<string>()
-  let idx = 0
-
-  const addMod = (rel: string) => {
-    if (seenFiles.has(rel))
-      return
-    seenFiles.add(rel)
-    const v = `_m${idx++}`
-    imports.push(`import * as ${v} from ${JSON.stringify(join(outDir, rel))};`)
-    modEntries.push(`${JSON.stringify(rel)}: ${v}`)
-  }
-
-  for (const r of manifest.routes) {
-    addMod(r.file)
-    for (const l of r.layouts) addMod(l)
-    for (const m of r.middlewares) addMod(m)
-  }
-  if (manifest.rootLayoutFile) addMod(manifest.rootLayoutFile)
-  if (manifest.errorFile) addMod(manifest.errorFile)
-  if (manifest.notFoundFile) addMod(manifest.notFoundFile)
-  for (const a of manifest.actions) {
-    addMod(a.file)
-    for (const m of a.middlewares) addMod(m)
-  }
-
-  const configPath = manifest.configFile !== undefined
-    ? join(outDir, manifest.configFile)
-    : join(root, 'kay.config.ts')
-  const hasConfig = existsSync(configPath)
-  if (hasConfig)
-    imports.push(`import _kayConfig from ${JSON.stringify(configPath)};`)
+  const entryJs = join(outDir, 'server', SERVER_ENTRY_FILE)
+  const imports: string[] = [`import ${JSON.stringify(prodEnvPath)};`, `import { createApp, kayConfig } from ${JSON.stringify(entryJs)};`]
 
   // Embed client assets and public files natively via `with { type: "file" }` (0 base64, 0 startup decode!)
   const embeddedAssets: string[] = []
@@ -100,23 +69,17 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     }
   }
 
-  const cfgExpr = hasConfig
-    ? `resolveServerConfig(_kayConfig, { assetPrefix: ${JSON.stringify(assetPrefix)} })`
-    : `{ assetPrefix: ${JSON.stringify(assetPrefix)} }`
-
   const code = [
     ...imports,
-    `import { createServerFromEmbedded, resolveServerConfig } from ${JSON.stringify(join(kaySrcRoot, 'server/index.ts'))};`,
     `const manifest = ${JSON.stringify(manifest)};`,
-    `const modules = { ${modEntries.join(', ')} };`,
     `const assets = { ${embeddedAssets.join(', ')} };`,
     `const publicAssets = { ${embeddedPublic.join(', ')} };`,
     `const publicEtags = { ${embeddedPublicEtags.join(', ')} };`,
     `const prerenderedFiles = { ${embeddedPrerenderedFiles.join(', ')} };`,
-    `const port = Number(process.env.PORT || ${hasConfig ? '_kayConfig?.port || ' : ''}3000);`,
+    `const port = Number(process.env.PORT || kayConfig.port || 3000);`,
     `const hostname = process.env.HOST || undefined;`,
     `if (Bun.argv.includes('--health')) { const probeHost = !hostname || hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname; const r = await fetch(\`http://\${probeHost}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
-    `const app = await createServerFromEmbedded({ ...${cfgExpr}, manifest, modules, assets, publicAssets, publicEtags, prerenderedFiles });`,
+    `const app = await createApp({ assetPrefix: ${JSON.stringify(assetPrefix)}, manifest, assets, publicAssets, publicEtags, prerenderedFiles });`,
     `const server = app.serve(port, hostname);`,
     `console.log(\`kay server listening on http://\${hostname ?? 'localhost'}:\${server.port}\`);`,
   ].join('\n')

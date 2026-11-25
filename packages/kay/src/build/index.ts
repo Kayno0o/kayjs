@@ -22,6 +22,7 @@ import { buildActionEntries, buildRouteEntries } from './manifest'
 import { createPluginHost, createPublicFiles } from './plugin-host'
 import { prerender } from './prerender'
 import { formatBundleReport } from './report'
+import { SERVER_ENTRY_FILE, serverEntrySource } from './server-entry'
 import { KAY_SRC_ROOT, resolveKaySpecifier } from './resolve'
 import { assertNoRouteConflicts, hasRouteHandlerExport, routeExportProblem, SPECIAL_ROUTE_FILES } from './routes'
 import { exportStatic } from './static'
@@ -167,8 +168,11 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const hasNotFoundFile = existsSync(notFoundSrc)
 
   // Every reachable .ts/.tsx file is analyzed & validated BEFORE wiping outDir, so build errors keep the last working dist/.
+  // kay.config.ts enters the graph too, so an action or component reached only from it is analyzed and gets its URL.
+  const configSrc = join(root, 'kay.config.ts')
+  const hasConfigFile = existsSync(configSrc)
   const graph = new ModuleGraph(options.cache)
-  for (const f of [...specialFiles, ...candidatePageFiles])
+  for (const f of [...specialFiles, ...candidatePageFiles, ...(hasConfigFile ? [configSrc] : [])])
     graph.load(f)
   for (const analysis of graph.analyses.values()) {
     for (const warning of analysis.warnings)
@@ -207,23 +211,34 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     .filter(c => existsSync(c))
   const env = { root, outDir, clientDir, serverDir, assetPrefix, minify: run.minify, isDev, analyze: options.analyze === true, graph, cache: options.cache, plugins, actionsByFile, islands }
 
-  const configSrc = join(root, 'kay.config.ts')
-  const hasConfigFile = existsSync(configSrc)
   const routeEntryFiles = new Set([...specialFiles, ...pageFiles])
   const standaloneActionFiles = [...actionsByFile.keys()].filter(f => !routeEntryFiles.has(f))
+  // `_entry.js` imports all of these; each stays an entrypoint so its code lands in a content-named chunk that `kay dev` keeps loaded while it is unchanged.
   const serverEntries = [...specialFiles, ...pageFiles, ...standaloneActionFiles, ...(hasConfigFile ? [configSrc] : [])]
   const serverRoot = standaloneActionFiles.length > 0 || hasConfigFile ? root : routesDir
+  const toOutRel = (srcFile: string): string =>
+    relPosix(outDir, join(serverDir, relative(serverRoot, srcFile).replace(/\.(tsx|ts)$/, '.js')))
+  const serverEntry = {
+    file: join(serverRoot, SERVER_ENTRY_FILE),
+    source: serverEntrySource({
+      modules: [...specialFiles, ...pageFiles, ...standaloneActionFiles].map(file => ({ file, key: toOutRel(file), source: relPosix(root, file) })),
+      config: hasConfigFile ? { file: configSrc, source: relPosix(root, configSrc) } : undefined,
+      assembler: join(KAY_SRC_ROOT, 'server/app-entry.ts'),
+    }),
+  }
+  if (existsSync(serverEntry.file))
+    throw new Error(`kay build: ${relPosix(root, serverEntry.file)} is the path of kay's server entry; rename that file.`)
 
   // The server compiles against the island chunk URLs, so islands build first; without islands both passes run in parallel.
   const clientPass = () => buildClient(env, standaloneCssFiles(graph, pluginCssFiles, islands.cssFiles))
   let client: Awaited<ReturnType<typeof clientPass>>
   if (islands.targets.size === 0) {
-    const [built] = await Promise.all([clientPass(), buildServer(env, serverEntries, serverRoot, new Map())])
+    const [built] = await Promise.all([clientPass(), buildServer(env, serverEntries, serverRoot, new Map(), serverEntry)])
     client = built
   }
   else {
     client = await clientPass()
-    await buildServer(env, serverEntries, serverRoot, client.islandChunks)
+    await buildServer(env, serverEntries, serverRoot, client.islandChunks, serverEntry)
   }
 
   if (options.cache !== undefined) {
@@ -263,9 +278,6 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
         options.cache.ssrCompiled.delete(f)
     }
   }
-
-  const toOutRel = (srcFile: string): string =>
-    relPosix(outDir, join(serverDir, relative(serverRoot, srcFile).replace(/\.(tsx|ts)$/, '.js')))
 
   const assets: string[] = []
   for (const rel of client.assetFiles) {
@@ -327,7 +339,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     globalStyles,
     ...(host.headTags.length > 0 ? { headTags: host.headTags } : {}),
     routes,
-    ...(hasConfigFile ? { configFile: toOutRel(configSrc) } : {}),
+
     ...(hasRootLayout ? { rootLayoutFile: toOutRel(rootLayoutSrc) } : {}),
     errorFile: hasErrorFile ? toOutRel(errorSrc) : undefined,
     notFoundFile: hasNotFoundFile ? toOutRel(notFoundSrc) : undefined,
@@ -344,7 +356,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const prerenderRoutes = options.prerender !== false || isStatic ? routes.filter(r => r.prerender) : []
   const prerenderDir = isStatic ? run.staticStageDir! : join(outDir, 'prerendered')
   const app = prerenderRoutes.length > 0 || isStatic
-    ? await prerender({ root, outDir, assetPrefix, site: run.site, plugins, isDev, isStatic, prerenderDir, routes: prerenderRoutes })
+    ? await prerender({ root, outDir, assetPrefix, site: run.site, plugins, pluginOverride: options.plugins, isDev, isStatic, prerenderDir, routes: prerenderRoutes })
     : undefined
 
   try {
@@ -383,7 +395,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
       manifest,
       assetPrefix,
       outfile: typeof options.compile === 'string' ? resolve(root, options.compile) : join(outDir, 'server-bin'),
-      kaySrcRoot: KAY_SRC_ROOT,
+
       resolveKaySpecifier,
       bunPlugins: pluginBunPlugins(env, 'compile'),
     })

@@ -1,9 +1,12 @@
 // kay/test: in-process testing for pages, middleware, cookies, and actions — zero port binding.
 
 import type { BuildManifest, BuildOptions } from '../build/index'
-import type { KayApp, ServerRuntimeConfig } from '../server/index'
+import type { KayApp, ServerAction, ServerRuntimeConfig } from '../server/index'
+import { resolve } from 'node:path'
 import { build } from '../build/index'
-import { createServer, resolveServerConfig } from '../server/index'
+import { relPosix } from '../build/files'
+import { resolveServerConfig } from '../server/index'
+import { startBuiltApp } from '../server/loader'
 
 export interface TestAppOptions extends Omit<BuildOptions, 'compile' | 'static'>, Partial<ServerRuntimeConfig> {
   prebuilt?: boolean | undefined
@@ -16,7 +19,10 @@ export interface TestApp {
   fetch(pathOrReq: string | Request, init?: RequestInit): Promise<Response>
   get(path: string, headers?: HeadersInit): Promise<Response>
   post(path: string, body?: unknown, headers?: HeadersInit): Promise<Response>
-  submit(actionUrl: string, fields: Record<string, string>, headers?: HeadersInit): Promise<Response>
+  /** The app's own bundled copy of a route, layout, middleware, action file or `kay.config.ts`, by path from the root. */
+  import(path: string): Promise<Record<string, unknown>>
+  /** Posts `fields` as a form to an action, given as one from `import()` or as its URL. */
+  submit(action: ServerAction<never, unknown> | string, fields: Record<string, string>, headers?: HeadersInit): Promise<Response>
   clearCookies(): void
 }
 
@@ -31,7 +37,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     plugins: options.plugins,
   })
 
-  const app = await createServer({
+  const { app, entry } = await startBuiltApp({
     root: options.root,
     outDir: options.outDir,
     ...resolveServerConfig(undefined, options),
@@ -101,7 +107,17 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
         headers: h,
       })
     },
-    submit(actionUrl, fields, headers) {
+    async import(path) {
+      const source = relPosix(options.root, resolve(options.root, path))
+      const mod = entry?.sources[source]
+      if (mod === undefined)
+        throw new Error(`kay: testApp().import('${path}') found no bundled module. Only routes, layouts, middlewares, action files and kay.config.ts are bundled entries; reach ${source} through one of them.`)
+      return mod
+    },
+    submit(action, fields, headers) {
+      const actionUrl = typeof action === 'string' ? action : action.url
+      if (actionUrl === '')
+        throw new Error('kay: testApp().submit() got an action with no URL. Pass one from `await app.import(path)`, not one the test file imported itself.')
       const fd = new FormData()
       for (const [k, v] of Object.entries(fields))
         fd.append(k, v)

@@ -425,7 +425,8 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   return result
 }
 
-export async function buildServer(env: BundleEnv, entries: string[], serverRoot: string, islandChunks: Map<string, string>): Promise<void> {
+/** `entry` is the generated `_entry.js`, an in-memory file bundled beside `entries` so it shares their chunks. */
+export async function buildServer(env: BundleEnv, entries: string[], serverRoot: string, islandChunks: Map<string, string>, entry: { file: string, source: string }): Promise<void> {
   const { root, outDir, serverDir, graph, cache, islands } = env
   const transforms = pluginTransforms(env.plugins)
   const externalOutDir = isOutsideRoot(root, outDir)
@@ -567,7 +568,8 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
   let serverResult: Awaited<ReturnType<typeof Bun.build>>
   try {
     serverResult = await Bun.build({
-      entrypoints: entries,
+      entrypoints: [...entries, entry.file],
+      files: { [entry.file]: entry.source },
       outdir: serverDir,
       root: serverRoot,
       target: 'bun',

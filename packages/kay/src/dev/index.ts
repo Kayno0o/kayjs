@@ -95,7 +95,8 @@ function injectReloadStream(body: ReadableStream<Uint8Array>, reloadScript: stri
 }
 
 // Bun never unloads a module, so each build's server files are copied into a generation store.
-// If any non-chunk module that other entries may statically import changes (e.g. standalone actions), bump generation so static importers re-resolve cleanly.
+// Only `_entry.js` is imported, with its hash: the code lives in content-named chunks, so an unchanged chunk keeps its loaded instance across saves.
+// A failed import starts a new generation, since Bun keeps a module that failed to evaluate.
 function createModuleStore(storeRoot: string) {
   const hashes = new Map<string, string>()
   let generation = 0
@@ -105,7 +106,7 @@ function createModuleStore(storeRoot: string) {
     reloadAll(): void {
       stale = true
     },
-    sync(serverDir: string, sharedRelFiles: ReadonlySet<string>): void {
+    sync(serverDir: string): void {
       const nextFiles = new Map<string, { bytes: Buffer, hash: string }>()
       for (const entry of readdirSync(serverDir, { recursive: true, withFileTypes: true })) {
         if (!entry.isFile())
@@ -115,17 +116,6 @@ function createModuleStore(storeRoot: string) {
         const bytes = readFileSync(from)
         const hash = Bun.hash(bytes).toString(36)
         nextFiles.set(rel, { bytes, hash })
-      }
-
-      // If an already-loaded standalone action file (statically imported by routes) changed, bump generation so static importers re-resolve cleanly.
-      if (!stale && hashes.size > 0) {
-        for (const [rel, { hash }] of nextFiles) {
-          const prev = hashes.get(rel)
-          if (prev !== undefined && prev !== hash && sharedRelFiles.has(rel)) {
-            stale = true
-            break
-          }
-        }
       }
 
       if (stale) {
@@ -336,16 +326,7 @@ export async function devServer(options: DevServerOptions): Promise<{
         return
       }
       const serverDir = join(root, outDir, 'server')
-      const routeFiles = new Set(manifest.routes.map(r => r.file.replace(/^server\//, '')))
-      const sharedRelFiles = new Set<string>()
-      if (manifest.configFile !== undefined)
-        sharedRelFiles.add(manifest.configFile.replace(/^server\//, ''))
-      for (const a of manifest.actions) {
-        const rel = a.file.replace(/^server\//, '')
-        if (!routeFiles.has(rel))
-          sharedRelFiles.add(rel)
-      }
-      modules.sync(serverDir, sharedRelFiles)
+      modules.sync(serverDir)
       const nextApp = await createServer({
         root,
         outDir,

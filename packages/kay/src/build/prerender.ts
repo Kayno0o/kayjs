@@ -3,7 +3,7 @@
 import type { KayPlugin } from '../plugins/index'
 import type { RouteManifestEntry } from './manifest'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { inlineStyleHashes } from '../server/security'
 import { relPosix } from './files'
 import { assertPathUrls } from './routes'
@@ -11,7 +11,6 @@ import { assertPathUrls } from './routes'
 const CONCURRENCY = 8
 const SLASH_EDGES_RE = /^\/|\/$/g
 
-let prerenderImportSeq = 0
 
 function resolvePrerenderHtmlPath(prerenderDir: string, urlStr: string, isStatic: boolean): string {
   const pathname = new URL(urlStr, 'http://localhost').pathname
@@ -33,6 +32,8 @@ export interface PrerenderOptions {
   assetPrefix: string
   site?: string | undefined
   plugins: KayPlugin[]
+  /** Plugins passed to `build()` itself, which the app runs with in place of its bundled config's. */
+  pluginOverride?: KayPlugin[] | undefined
   isDev: boolean
   isStatic: boolean
   /** Where the HTML lands: the static stage dir, or `<outDir>/prerendered`. */
@@ -43,18 +44,18 @@ export interface PrerenderOptions {
 /** Renders every route to HTML, records `route.prerendered`, and returns the server the pages were rendered with. */
 export async function prerender(options: PrerenderOptions) {
   const { root, outDir, prerenderDir, isStatic } = options
-  const { createServer } = await import('../server/index')
-  const app = await createServer({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, site: options.site, plugins: options.plugins, dev: options.isDev })
+  // Pages render with the runtime's own plugin instances, from the bundled config; `options.plugins` are the build's native ones.
+  const { startBuiltApp } = await import('../server/loader')
+  const { app, entry } = await startBuiltApp({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, site: options.site, plugins: options.pluginOverride, dev: options.isDev })
   mkdirSync(prerenderDir, { recursive: true })
 
-  const stamp = `${Date.now()}-${++prerenderImportSeq}`
   for (const route of options.routes) {
     let urls: string[] = []
     if (!route.path.includes(':') && !route.path.includes('*')) {
       urls = [route.path]
     }
     else {
-      const mod = await import(`${join(outDir, route.file)}?v=${stamp}`) as { paths?: () => Promise<string[]> | string[] }
+      const mod = entry?.modules[route.file] as { paths?: () => Promise<string[]> | string[] } | undefined ?? {}
       if (typeof mod.paths === 'function') {
         const returned: unknown = await mod.paths()
         assertPathUrls(returned, route.file)

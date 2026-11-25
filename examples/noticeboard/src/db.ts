@@ -1,5 +1,4 @@
 // Single zero-config `bun:sqlite` database powering BOTH @kayjs/auth and notices.
-// Shared via Symbol.for so bundled server chunks access the exact same DB handle.
 
 import { Database } from 'bun:sqlite'
 import { sqliteAuthStore } from '@kayjs/auth/sqlite'
@@ -22,40 +21,19 @@ interface NoticeRow {
   posted_at: string
 }
 
-interface NoticeboardDb {
-  db: Database
-  authStore: ReturnType<typeof sqliteAuthStore>
-}
+export const db = new Database(process.env.NOTICEBOARD_DB || ':memory:', { create: true })
+export const authStore = sqliteAuthStore(db)
 
-const DB_KEY = Symbol.for('kay.noticeboard.db')
-
-function initDb(): NoticeboardDb {
-  const existing = (globalThis as Record<symbol, NoticeboardDb | undefined>)[DB_KEY]
-  if (existing !== undefined)
-    return existing
-
-  const dbPath = process.env.NOTICEBOARD_DB || ':memory:'
-  const db = new Database(dbPath, { create: true })
-  const authStore = sqliteAuthStore(db)
-
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS notices (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      author_id TEXT NOT NULL,
-      author_name TEXT NOT NULL,
-      title TEXT NOT NULL,
-      body TEXT NOT NULL,
-      posted_at TEXT NOT NULL
-    );
-  `)
-
-  const instance: NoticeboardDb = { db, authStore }
-  ;(globalThis as Record<symbol, NoticeboardDb>)[DB_KEY] = instance
-  return instance
-}
-
-const { db, authStore } = initDb()
-export { authStore, db }
+db.exec(`
+  CREATE TABLE IF NOT EXISTS notices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    author_id TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    posted_at TEXT NOT NULL
+  );
+`)
 
 function mapRow(row: NoticeRow): PinnedNotice {
   return {

@@ -221,9 +221,12 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     ? undefined
     : (options.pruneIntervalMs ?? DEFAULT_PRUNE_INTERVAL_MS)
 
-  let pruneTimer: ReturnType<typeof setInterval> | undefined
-  if (pruneIntervalMs !== undefined && pruneIntervalMs > 0) {
-    pruneTimer = setInterval(() => {
+  // One timer per server the plugin runs on: `kay dev` starts the next server before it shuts the previous one down.
+  const pruneTimers = new Set<ReturnType<typeof setInterval>>()
+  const startPruneTimer = (): (() => void) | undefined => {
+    if (pruneIntervalMs === undefined || pruneIntervalMs <= 0)
+      return undefined
+    const timer = setInterval(() => {
       try {
         void Promise.resolve(store.pruneExpired?.()).catch(() => {})
         rateLimiter.sweep()
@@ -232,7 +235,12 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         // Ignore prune errors if the underlying store has been closed
       }
     }, pruneIntervalMs)
-    pruneTimer.unref?.()
+    timer.unref?.()
+    pruneTimers.add(timer)
+    return () => {
+      clearInterval(timer)
+      pruneTimers.delete(timer)
+    }
   }
 
   const providers = new Map<string, OAuthProvider>()
@@ -630,10 +638,9 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
   }
 
   const dispose = (): void => {
-    if (pruneTimer !== undefined) {
-      clearInterval(pruneTimer)
-      pruneTimer = undefined
-    }
+    for (const timer of pruneTimers)
+      clearInterval(timer)
+    pruneTimers.clear()
   }
 
   const plugin: KayPlugin = definePlugin({
@@ -645,7 +652,9 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         trustProxy = api.trustProxy
       if (options.site === undefined && api.site !== undefined)
         site = siteOrigin(api.site)
-      api.onShutdown(dispose)
+      const stopPruneTimer = startPruneTimer()
+      if (stopPruneTimer !== undefined)
+        api.onShutdown(stopPruneTimer)
 
       // Resolve session lazily on first read of ctx.locals.user/session; skip asset & internal non-action routes.
       const internalPrefix = `${api.assetPrefix.replace(/\/$/, '')}/`
