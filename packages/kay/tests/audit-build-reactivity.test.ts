@@ -434,6 +434,7 @@ describe('audit #3526 — Box 36: disposed row owners & computeds unlink from pa
   test('computed created inside an owner unlinks from upstream signal deps on owner disposal', () => {
     const source = signal(1)
     let computeRuns = 0
+    let seen = 0
     let derivedRef: ReturnType<typeof computed<number>>
 
     const dispose = root((d) => {
@@ -441,11 +442,13 @@ describe('audit #3526 — Box 36: disposed row owners & computeds unlink from pa
         computeRuns++
         return source.value * 10
       })
-      expect(derivedRef.value).toBe(10)
+      effect(() => {
+        seen = derivedRef.value
+      })
       return d
     })
 
-    expect(computeRuns).toBe(1)
+    expect([seen, computeRuns]).toEqual([10, 1])
     const rawSource = source as unknown as { s: unknown, st: unknown, ls: unknown }
     expect(rawSource.s).toBeDefined()
 

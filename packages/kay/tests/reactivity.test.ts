@@ -1,5 +1,9 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
 import { batch, computed, effect, onCleanup, root, selector, signal, snapshot, store } from '../src/index'
+import { createOwner, runWithOwner } from '../src/reactivity/index'
+
+// A source's subscriber list, read to see whether a computed still holds on to it.
+const subscribed = (source: object): boolean => (source as { s?: unknown }).s !== undefined
 
 describe('reactivity kernel', () => {
   test('signal read, write, and synchronous effect flush', () => {
@@ -219,6 +223,159 @@ describe('reactivity kernel', () => {
     }
     expect(caught).toBeInstanceOf(AggregateError)
     expect((caught as AggregateError).errors.map(e => (e as Error).message)).toEqual(['first', 'second'])
+    dispose()
+  })
+
+  test('a computed read outside any effect leaves its source and stays memoized', () => {
+    const s = signal(1)
+    let runs = 0
+    const double = computed(() => {
+      runs++
+      return s.value * 2
+    })
+    expect(double.value).toBe(2)
+    expect(subscribed(s)).toBe(false)
+    expect(double.value).toBe(2)
+    s.value = 2
+    expect(double.value).toBe(4)
+    expect(runs).toBe(2)
+  })
+
+  test('a computed whose last effect is disposed releases its sources and follows them again when observed', () => {
+    const s = signal(1)
+    const double = computed(() => s.value * 2)
+    const outer = computed(() => double.value + 1)
+    const seen: number[] = []
+    const stop = effect(() => {
+      seen.push(outer.value)
+    })
+    expect(subscribed(s)).toBe(true)
+    stop()
+    expect([subscribed(s), subscribed(double)]).toEqual([false, false])
+    s.value = 2
+    const again = effect(() => {
+      seen.push(outer.value)
+    })
+    s.value = 3
+    expect(seen).toEqual([3, 5, 7])
+    again()
+  })
+
+  test.each([
+    ['drops it on a re-run', (c: { value: number }, use: ReturnType<typeof signal<boolean>>, _: () => void) => { use.value = false; void c.value }],
+    ['is disposed', (_c: { value: number }, _use: ReturnType<typeof signal<boolean>>, dispose: () => void) => dispose()],
+  ])('an effect keeps following a source an unobserved computed %s', (_, release) => {
+    const s = signal(1)
+    const use = signal(true)
+    const seen: number[] = []
+    let c!: { value: number }
+    const dispose = root((d) => {
+      c = computed(() => use.value ? s.value : 0)
+      return d
+    })
+    expect(c.value).toBe(1)
+    const stop = effect(() => {
+      seen.push(s.value)
+    })
+    release(c, use, dispose)
+    s.value = 2
+    expect(seen).toEqual([1, 2])
+    stop()
+  })
+
+  test.each([
+    ['directly', (fn: () => void) => fn()],
+    ['through a component owner', (fn: () => void) => runWithOwner(createOwner(), fn)],
+  ])('a parent effect runs before a child created in it %s, even when the child subscribed first', (_, within) => {
+    const open = signal(true)
+    const user = signal<{ name: string } | null>({ name: 'Ada' })
+    const seen: string[] = []
+    const dispose = root((d) => {
+      effect(() => {
+        if (open.value) {
+          within(() => effect(() => {
+            seen.push(user.value!.name)
+          }))
+        }
+      })
+      return d
+    })
+    batch(() => {
+      user.value = null
+      open.value = false
+    })
+    expect(seen).toEqual(['Ada'])
+    dispose()
+  })
+
+  test('an effect created while a computed runs and an onCleanup with no owner warn in dev', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const c = computed(() => {
+        effect(() => {})
+        return 1
+      })
+      expect(c.value).toBe(1)
+      onCleanup(() => {})
+      effect(() => {})()
+      root(() => {
+        effect(() => {})
+        onCleanup(() => {})
+      })
+      expect(warn.mock.calls.map(call => call[0])).toEqual([
+        'kay: effect() created while a computed runs has no owner and is never disposed. Create it in a component or an effect.',
+        'kay: onCleanup() called outside a component or effect never runs.',
+      ])
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  test('an error thrown in batch survives an effect failing in its flush', () => {
+    const s = signal(0)
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    const stop = effect(() => {
+      if (s.value === 1)
+        throw new Error('effect')
+    })
+    try {
+      expect(() => batch(() => {
+        s.value = 1
+        throw new Error('handler')
+      })).toThrow('handler')
+      expect(error.mock.calls.map(call => (call[0] as Error).message)).toEqual(['effect'])
+    }
+    finally {
+      error.mockRestore()
+      stop()
+    }
+  })
+
+  test('a reactive cycle keeps the errors its flush collected', () => {
+    const a = signal(0)
+    let thrown = false
+    const dispose = root((d) => {
+      effect(() => {
+        if (a.value > 0 && !thrown) {
+          thrown = true
+          throw new Error('boom')
+        }
+      })
+      effect(() => {
+        if (a.value > 0)
+          a.value = a.value + 1
+      })
+      return d
+    })
+    let caught: unknown
+    try {
+      a.value = 1
+    }
+    catch (err) {
+      caught = err
+    }
+    expect((caught as AggregateError).errors.map(e => (e as Error).message)).toEqual(['boom', 'kay: reactive cycle'])
     dispose()
   })
 

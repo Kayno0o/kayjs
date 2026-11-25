@@ -9,6 +9,9 @@ const DISPOSED = 8
 const COMPUTED = 16
 const EFFECT = 32
 const QUEUED = 64
+// A computed nothing subscribes to: it keeps its deps list but stays out of its sources' subscriber lists, checking versions on read.
+const UNOBSERVED = 128
+const DEV = process.env.NODE_ENV !== 'production'
 
 interface Link {
   d: DepNode
@@ -94,15 +97,12 @@ function linkSub(dep: DepNode, sub: SubNode): void {
     e: sub.e,
     pd: undefined,
     nd: undefined,
-    ps: dep.st,
+    ps: undefined,
     ns: undefined,
   }
 
-  if (dep.st !== undefined)
-    dep.st.ns = link
-  else
-    dep.s = link
-  dep.st = link
+  if (!(sub.f & UNOBSERVED))
+    addSub(link)
 
   if (cur !== undefined) {
     const prev = cur.pd
@@ -125,18 +125,30 @@ function linkSub(dep: DepNode, sub: SubNode): void {
   }
 }
 
-function unlink(l: Link): void {
-  const { d, s, pd, nd, ps, ns } = l
+// Puts a link at the end of its source's subscriber list; a computed gaining its first subscriber follows its own sources again.
+function addSub(link: Link): void {
+  const dep = link.d
+  const first = dep.s === undefined
+  link.ps = dep.st
+  link.ns = undefined
+  if (dep.st !== undefined)
+    dep.st.ns = link
+  else
+    dep.s = link
+  dep.st = link
+  if (first && dep.f !== undefined && (dep.f & UNOBSERVED)) {
+    const comp = dep as unknown as SubNode
+    comp.f &= ~UNOBSERVED
+    for (let l = comp.d; l !== undefined; l = l.nd)
+      addSub(l)
+  }
+}
+
+// Takes a link out of its source's subscriber list; a computed losing its last subscriber lets go of its own sources.
+function removeSub(link: Link): void {
+  const { d, s, ps, ns } = link
   if (d.ls === s)
     d.ls = undefined
-  if (pd !== undefined)
-    pd.nd = nd
-  else
-    s.d = nd
-  if (nd !== undefined)
-    nd.pd = pd
-  else
-    s.dt = pd
   if (ps !== undefined)
     ps.ns = ns
   else
@@ -145,6 +157,27 @@ function unlink(l: Link): void {
     ns.ps = ps
   else
     d.st = ps
+  link.ps = link.ns = undefined
+  if (d.s === undefined && d.f !== undefined && (d.f & COMPUTED) && !(d.f & UNOBSERVED)) {
+    const comp = d as unknown as SubNode
+    comp.f |= UNOBSERVED
+    for (let l = comp.d; l !== undefined; l = l.nd)
+      removeSub(l)
+  }
+}
+
+function unlink(l: Link): void {
+  const { s, pd, nd } = l
+  if (pd !== undefined)
+    pd.nd = nd
+  else
+    s.d = nd
+  if (nd !== undefined)
+    nd.pd = pd
+  else
+    s.dt = pd
+  if (!(s.f & UNOBSERVED))
+    removeSub(l)
 }
 
 function unlinkRemaining(sub: SubNode): void {
@@ -162,21 +195,25 @@ function unlinkRemaining(sub: SubNode): void {
 function unlinkAll(sub: SubNode): void {
   let l = sub.d
   sub.d = sub.dt = sub.c = undefined
+  const observed = !(sub.f & UNOBSERVED)
   while (l !== undefined) {
     const next = l.nd
-    const { d, ps, ns } = l
-    if (d.ls === sub)
-      d.ls = undefined
-    if (ps !== undefined)
-      ps.ns = ns
-    else
-      d.s = ns
-    if (ns !== undefined)
-      ns.ps = ps
-    else
-      d.st = ps
+    if (observed)
+      removeSub(l)
     l = next
   }
+}
+
+// A child effect can sit ahead of its parent in the queue; the parent runs first, since its run may dispose the child.
+function runParentFirst(sub: SubNode): void {
+  for (let o = sub.o; o !== undefined; o = o.p) {
+    if ((o as Partial<SubNode>).f! & QUEUED) {
+      runParentFirst(o as unknown as SubNode)
+      break
+    }
+  }
+  if (!(sub.f & DISPOSED) && shouldRun(sub))
+    sub.r()
 }
 
 function enqueue(sub: SubNode): void {
@@ -226,8 +263,10 @@ function flush(): void {
   try {
     let rounds = 0
     while (qHead !== undefined) {
-      if (++rounds > 1000)
-        throw new Error('kay: reactive cycle')
+      if (++rounds > 1000) {
+        errors.push(new Error('kay: reactive cycle'))
+        break
+      }
       let node: SubNode | undefined = qHead
       qHead = qTail = undefined
       while (node !== undefined) {
@@ -235,8 +274,7 @@ function flush(): void {
         node.nq = undefined
         node.f &= ~QUEUED
         try {
-          if (!(node.f & DISPOSED) && shouldRun(node))
-            node.r()
+          runParentFirst(node)
         }
         catch (err) {
           errors.push(err)
@@ -268,7 +306,7 @@ function shouldRun(sub: SubNode): boolean {
     return false
   if (f & DIRTY)
     return true
-  if (!(f & CHECK))
+  if (!(f & (CHECK | UNOBSERVED)))
     return false
   let l = sub.d
   while (l !== undefined) {
@@ -328,7 +366,7 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   st: Link | undefined = undefined
   ls: SubNode | undefined = undefined
   le = -1
-  f = COMPUTED | DIRTY
+  f = COMPUTED | DIRTY | UNOBSERVED
   e = -1
   d: Link | undefined = undefined
   dt: Link | undefined = undefined
@@ -603,6 +641,8 @@ export function computed<T>(fn: () => T): ReadonlySignal<T> {
 }
 
 export function effect(fn: () => void | (() => void)): () => void {
+  if (DEV && currentOwner === undefined && currentSub !== undefined && (currentSub.f & COMPUTED))
+    console.warn('kay: effect() created while a computed runs has no owner and is never disposed. Create it in a component or an effect.')
   const node = new EffectNode(fn, currentOwner)
   node.r()
   return () => {
@@ -611,15 +651,27 @@ export function effect(fn: () => void | (() => void)): () => void {
   }
 }
 
+// An error thrown by fn wins over one thrown by the effects it triggered, which is logged instead.
 export function batch<T>(fn: () => T): T {
   batchDepth++
+  let result: T
   try {
-    return fn()
+    result = fn()
   }
-  finally {
-    if (--batchDepth === 0)
-      flush()
+  catch (err) {
+    if (--batchDepth === 0) {
+      try {
+        flush()
+      }
+      catch (flushErr) {
+        console.error(flushErr)
+      }
+    }
+    throw err
   }
+  if (--batchDepth === 0)
+    flush()
+  return result
 }
 
 export function untrack<T>(fn: () => T): T {
@@ -634,8 +686,11 @@ export function untrack<T>(fn: () => T): T {
 }
 
 export function onCleanup(fn: () => void): void {
-  if (currentOwner === undefined)
+  if (currentOwner === undefined) {
+    if (DEV)
+      console.warn('kay: onCleanup() called outside a component or effect never runs.')
     return
+  }
   if (currentOwner.x) {
     fn()
     return
