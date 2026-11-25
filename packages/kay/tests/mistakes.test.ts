@@ -34,4 +34,13 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     refuses('<button onClick={n.value = 1}>x</button>', /write onClick=\{\(\) => n\.value = 1\}/, 'const n = { value: 0 }')
     accepts('<button onClick={make()}>x</button>', 'const make = () => () => {}')
   })
+
+  test('an event the DOM never fires, which binds a listener that never runs', () => {
+    refuses('<div onDoubleClick={fn} />', /onDoubleClick in Page\.tsx: write onDblClick=\{\.\.\.\}/)
+    refuses('<div onClickCapture={fn} />', /onClickCapture in Page\.tsx: kay has no capture props, call addEventListener\('click', fn, \{ capture: true \}\) in a ref/)
+    refuses('<div onClik={fn} />', /onClik in Page\.tsx: no DOM event is named "clik"/)
+    accepts('<my-widget onSelected={fn} />')
+    accepts('<video onTimeUpdate={fn} onLoadedMetadata={fn} />')
+    accepts('<form onSubmit={fn} onFormData={fn} />')
+  })
 })

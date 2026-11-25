@@ -27,7 +27,18 @@ const EVENT_PROPS = new Map(Object.entries({
   touchmove: 'onTouchMove', touchstart: 'onTouchStart', transitioncancel: 'onTransitionCancel',
   transitionend: 'onTransitionEnd', transitionrun: 'onTransitionRun', transitionstart: 'onTransitionStart',
   volumechange: 'onVolumeChange', waiting: 'onWaiting', wheel: 'onWheel',
+  afterprint: 'onAfterPrint', beforeprint: 'onBeforePrint', beforeunload: 'onBeforeUnload', hashchange: 'onHashChange',
+  message: 'onMessage', offline: 'onOffline', online: 'onOnline', pagehide: 'onPageHide', pageshow: 'onPageShow',
+  popstate: 'onPopState', storage: 'onStorage', unload: 'onUnload', fullscreenchange: 'onFullscreenChange',
+  fullscreenerror: 'onFullscreenError', loadend: 'onLoadEnd', search: 'onSearch', beforematch: 'onBeforeMatch',
+  command: 'onCommand', cuechange: 'onCueChange', encrypted: 'onEncrypted', waitingforkey: 'onWaitingForKey',
+  pointerrawupdate: 'onPointerRawUpdate', contextlost: 'onContextLost', contextrestored: 'onContextRestored',
+  contentvisibilityautostatechange: 'onContentVisibilityAutoStateChange',
 }))
+
+// React names whose DOM event is spelled differently.
+const RENAMED_EVENTS = new Map([['doubleclick', 'dblclick']])
+const CAPTURE_SUFFIX = 'capture'
 
 const LOWERCASE_EVENT = /^on[a-z]/
 const EVENT_ATTR = /^on[A-Z]/
@@ -54,7 +65,7 @@ function checkHandler(name: string, value: AstNode | null, filename: string, cod
   }
 }
 
-function checkElementAttribute(attr: AstNode, filename: string, code: string): void {
+function checkElementAttribute(attr: AstNode, isCustomElement: boolean, filename: string, code: string): void {
   if (attr.name.type === 'JSXNamespacedName') {
     const namespace = attr.name.namespace.name as string
     const name = attr.name.name.name as string
@@ -65,8 +76,23 @@ function checkElementAttribute(attr: AstNode, filename: string, code: string): v
   const name = attr.name.name as string
   if (LOWERCASE_EVENT.test(name) && EVENT_PROPS.has(name.slice(2)))
     throw mistake(name, filename, `write ${eventProp(name.slice(2))}={...}, kay binds camelCase event props only`)
-  if (EVENT_ATTR.test(name))
-    checkHandler(name, attr.value, filename, code)
+  if (!EVENT_ATTR.test(name))
+    return
+  checkHandler(name, attr.value, filename, code)
+  if (!isCustomElement)
+    checkEventName(name, filename)
+}
+
+function checkEventName(name: string, filename: string): void {
+  const event = name.slice(2).toLowerCase()
+  if (EVENT_PROPS.has(event))
+    return
+  const renamed = RENAMED_EVENTS.get(event)
+  if (renamed !== undefined)
+    throw mistake(name, filename, `write ${eventProp(renamed)}={...}`)
+  if (event.endsWith(CAPTURE_SUFFIX) && EVENT_PROPS.has(event.slice(0, -CAPTURE_SUFFIX.length)))
+    throw mistake(name, filename, `kay has no capture props, call addEventListener('${event.slice(0, -CAPTURE_SUFFIX.length)}', fn, { capture: true }) in a ref`)
+  throw mistake(name, filename, `no DOM event is named "${event}"; for a custom event, call addEventListener in a ref`)
 }
 
 /** Throws when a JSX opening element would compile into something other than what its author meant. */
@@ -76,8 +102,9 @@ export function checkMistakes(node: AstNode, filename: string, code: string): vo
   const tag = jsxTagName(node.name)
   if (tag === '' || isComponentTag(tag))
     return
+  const isCustomElement = tag.includes('-')
   for (const attr of node.attributes as AstNode[]) {
     if (attr.type === 'JSXAttribute')
-      checkElementAttribute(attr, filename, code)
+      checkElementAttribute(attr, isCustomElement, filename, code)
   }
 }
