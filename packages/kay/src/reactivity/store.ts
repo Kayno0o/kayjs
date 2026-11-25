@@ -28,6 +28,11 @@ function isPlain(value: unknown): value is Record<PropertyKey, unknown> {
   return proto === Object.prototype || proto === null
 }
 
+// The target behind a store proxy, or the value itself.
+function unwrap<T>(value: T): T {
+  return typeof value === 'object' && value !== null && RAW in value ? (value as Record<symbol, T>)[RAW]! : value
+}
+
 function getDep(target: object, key: PropertyKey): Signal<number> {
   let map = depsCache.get(target)
   if (map === undefined) {
@@ -57,8 +62,9 @@ function wrap<T extends object>(target: T): T {
     get(obj, key, receiver) {
       if (key === RAW)
         return obj
-      if (Array.isArray(obj) && batchedMutators.has(key))
-        return batchedMutators.get(key)
+      const mutator = Array.isArray(obj) ? batchedMutators.get(key) : undefined
+      if (mutator !== undefined)
+        return mutator
       getDep(obj, key).value
       // A reader of an array's length is walking it (a list loop reads entries untracked), so any entry write reaches it.
       if (key === 'length' && Array.isArray(obj))
@@ -67,9 +73,7 @@ function wrap<T extends object>(target: T): T {
       return isPlain(value) ? wrap(value) : value
     },
     set(obj, key, value, receiver) {
-      const rawValue = typeof value === 'object' && value !== null && RAW in value
-        ? (value as Record<symbol, unknown>)[RAW]
-        : value
+      const rawValue = unwrap(value)
       const had = Object.prototype.hasOwnProperty.call(obj, key)
       const prev = Reflect.get(obj, key, receiver)
       const prevLength = Array.isArray(obj) ? obj.length : 0
@@ -120,9 +124,9 @@ export function snapshot<T>(value: T): T {
 }
 
 function cloneRaw<T>(value: T): T {
-  if (typeof value !== 'object' || value === null)
-    return value
-  const raw = RAW in value ? (value as Record<symbol, unknown>)[RAW] : value
+  const raw = unwrap(value)
+  if (typeof raw !== 'object' || raw === null)
+    return raw
   if (Array.isArray(raw))
     return raw.map(item => cloneRaw(item)) as unknown as T
   if (isPlain(raw)) {

@@ -5,21 +5,24 @@ import { hydrate, mount } from './index'
 declare const KAY_DEFERRED: boolean | undefined
 declare const KAY_CLIENT_ONLY: boolean | undefined
 
+const REVIVERS: Record<string, (v: never) => unknown> = {
+  __proto__: null as never,
+  D: (v: string) => new Date(v),
+  S: (v: unknown[]) => new Set(v),
+  M: (v: [unknown, unknown][]) => new Map(v),
+  U: (v: string) => new URL(v),
+  R: ([src, flags]: [string, string]) => new RegExp(src, flags),
+  B: (v: string) => BigInt(v),
+}
+
 export function parseIslandProps(raw: string): Record<string, unknown> {
   if (!raw.includes('"__k":'))
     return JSON.parse(raw) as Record<string, unknown>
   return JSON.parse(raw, (_k, v: unknown) => {
     if (v !== null && typeof v === 'object' && '__k' in v && 'v' in v) {
-      const tagged = v as { __k: string, v: unknown }
-      if (tagged.__k === 'D') return new Date(tagged.v as string)
-      if (tagged.__k === 'S') return new Set(tagged.v as unknown[])
-      if (tagged.__k === 'M') return new Map(tagged.v as [unknown, unknown][])
-      if (tagged.__k === 'U') return new URL(tagged.v as string)
-      if (tagged.__k === 'R') {
-        const [src, flags] = tagged.v as [string, string]
-        return new RegExp(src, flags)
-      }
-      if (tagged.__k === 'B') return BigInt(tagged.v as string)
+      const revive = REVIVERS[(v as { __k: string }).__k]
+      if (revive !== undefined)
+        return revive((v as { v: never }).v)
     }
     return v
   }) as Record<string, unknown>
@@ -53,10 +56,8 @@ export function defineIslandElement(): void {
         if (h === 'visible') {
           const target = this.firstElementChild ?? this
           const io = new IntersectionObserver((entries) => {
-            if (entries.some(e => e.isIntersecting)) {
-              this._clearStrategy()
+            if (entries.some(e => e.isIntersecting))
               void this._l(false, token)
-            }
           }, { rootMargin: '200px' })
           this._c = () => io.disconnect()
           io.observe(target)
@@ -64,18 +65,13 @@ export function defineIslandElement(): void {
         }
         if (h === 'idle') {
           const g = globalThis as { requestIdleCallback?: (cb: () => void) => number, cancelIdleCallback?: (id: number) => void }
+          const run = () => void this._l(false, token)
           if (g.requestIdleCallback) {
-            const id = g.requestIdleCallback(() => {
-              this._c = undefined
-              void this._l(false, token)
-            })
+            const id = g.requestIdleCallback(run)
             this._c = () => g.cancelIdleCallback?.(id)
           }
           else {
-            const id = setTimeout(() => {
-              this._c = undefined
-              void this._l(false, token)
-            }, 1)
+            const id = setTimeout(run, 1)
             this._c = () => clearTimeout(id)
           }
           return
@@ -85,11 +81,7 @@ export function defineIslandElement(): void {
           const stop = () => {
             for (const e of evs) this.removeEventListener(e, go, true)
           }
-          const go = () => {
-            this._c = undefined
-            stop()
-            void this._l(false, token)
-          }
+          const go = () => void this._l(false, token)
           for (const e of evs) this.addEventListener(e, go, { capture: true, once: true })
           this._c = stop
           return
@@ -101,10 +93,8 @@ export function defineIslandElement(): void {
           }
           else {
             const go = () => {
-              if (mq.matches) {
-                this._clearStrategy()
+              if (mq.matches)
                 void this._l(false, token)
-              }
             }
             mq.addEventListener('change', go)
             this._c = () => mq.removeEventListener('change', go)

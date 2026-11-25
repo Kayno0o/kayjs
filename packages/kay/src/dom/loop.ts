@@ -16,6 +16,16 @@ interface Row<T> {
 const EMPTY: readonly never[] = []
 const EMPTY_NUMS: number[] = []
 
+// A new rows array holding the kept prefix and suffix of the old one, with room for the middle.
+function keepEnds<T>(rows: Row<T>[], start: number, oldEnd: number, newEnd: number, nextLen: number): Row<T>[] {
+  const result = new Array<Row<T>>(nextLen)
+  for (let i = 0; i < start; i++)
+    result[i] = rows[i]!
+  for (let i = newEnd; i < nextLen; i++)
+    result[i] = rows[oldEnd + (i - newEnd)]!
+  return result
+}
+
 export function loop<T>(
   parent: Node,
   marker: Node | null,
@@ -129,10 +139,7 @@ export function loop<T>(
       // Fast path 4: Pure insertion (e.g. append 1,000 rows)
       if (start === oldEnd) {
         const addCount = newEnd - start
-        const result = new Array<Row<T>>(nextLen)
-        for (let i = 0; i < start; i++)
-          result[i] = rows[i]!
-
+        const result = keepEnds(rows, start, oldEnd, newEnd, nextLen)
         const frag = document.createDocumentFragment()
         for (let i = 0; i < addCount; i++) {
           const idx = start + i
@@ -142,9 +149,6 @@ export function loop<T>(
           frag.appendChild(row.node)
         }
         parent.insertBefore(frag, after)
-
-        for (let i = newEnd; i < nextLen; i++)
-          result[i] = rows[oldEnd + (i - newEnd)]!
         rows = result
         return
       }
@@ -156,12 +160,7 @@ export function loop<T>(
           disposeOwner(row.owner)
           parent.removeChild(row.node)
         }
-        const result = new Array<Row<T>>(nextLen)
-        for (let i = 0; i < start; i++)
-          result[i] = rows[i]!
-        for (let i = newEnd; i < nextLen; i++)
-          result[i] = rows[oldEnd + (i - newEnd)]!
-        rows = result
+        rows = keepEnds(rows, start, oldEnd, newEnd, nextLen)
         return
       }
 
@@ -171,11 +170,7 @@ export function loop<T>(
         oldMap.set(rows[i]!.key, i)
 
       const midLen = newEnd - start
-      const result = new Array<Row<T>>(nextLen)
-      for (let i = 0; i < start; i++)
-        result[i] = rows[i]!
-      for (let i = newEnd; i < nextLen; i++)
-        result[i] = rows[oldEnd + (i - newEnd)]!
+      const result = keepEnds(rows, start, oldEnd, newEnd, nextLen)
 
       const used = new Uint8Array(oldEnd - start)
       let reused = 0
