@@ -150,9 +150,10 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
   const islands = options.islands
   const emitMarkers = options.emitMarkers ?? options.isIsland ?? analysis.isInteractive
+  const jsxNodes = analysis.jsxNodes
 
   function compileSubExpression(node: Node): string {
-    if (!containsJsx(node))
+    if (!containsJsx(node, jsxNodes))
       return code.slice(node.start, node.end)
 
     const sub = new SourceEditor(code.slice(node.start, node.end))
@@ -328,7 +329,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     slotMarkers = emitMarkers,
   ): void {
     const meaningful = filterMeaningfulChildren(children)
-    const slots = meaningful.map(c => ({ child: c, slot: classifyJsxChild(c) })).filter(s => s.slot !== undefined)
+    const slots = meaningful.map(c => ({ child: c, slot: classifyJsxChild(c, jsxNodes) })).filter(s => s.slot !== undefined)
     const hasSiblings = slots.length > 1
     let hadVariableRange = false
 
@@ -458,7 +459,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       // Generic expression slot
       const exprCode = compileSubExpression(slot.expr)
       const rendered = `${use('esc')}(${exprCode})`
-      if (isNodeCapableExpr(slot.expr)) {
+      if (isNodeCapableExpr(slot.expr, jsxNodes)) {
         if (slotMarkers && hasSiblings) {
           parts.pushStatic('<!--k[-->')
           parts.pushExpr(rendered)

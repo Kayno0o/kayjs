@@ -242,8 +242,12 @@ export function isJsxNode(node: Node | null | undefined): node is JSXElement | J
   return node?.type === 'JSXElement' || node?.type === 'JSXFragment'
 }
 
-/** Whether JSX appears anywhere inside `node`, itself included. */
-export function containsJsx(node: Node | null | undefined): boolean {
+/** Whether JSX appears anywhere inside `node`, itself included. Uses O(1) lookup when precomputed `jsxNodes` is passed. */
+export function containsJsx(node: Node | null | undefined, jsxNodes?: WeakSet<Node>): boolean {
+  if (node === null || node === undefined)
+    return false
+  if (jsxNodes !== undefined)
+    return jsxNodes.has(node)
   let found = false
   walk(node, (child) => {
     if (found)
@@ -256,7 +260,9 @@ export function containsJsx(node: Node | null | undefined): boolean {
 }
 
 /** Whether a BlockStatement directly returns JSX (ignoring nested functions). */
-export function blockReturnsJsx(block: BlockStatement): boolean {
+export function blockReturnsJsx(block: BlockStatement, jsxNodes?: WeakSet<Node>): boolean {
+  if (jsxNodes !== undefined && !jsxNodes.has(block))
+    return false
   let found = false
   walk(block, (child) => {
     if (found)
@@ -268,7 +274,7 @@ export function blockReturnsJsx(block: BlockStatement): boolean {
     )) {
       return false
     }
-    if (child.type === 'ReturnStatement' && child.argument !== null && containsJsx(child.argument)) {
+    if (child.type === 'ReturnStatement' && child.argument !== null && containsJsx(child.argument, jsxNodes)) {
       found = true
       return false
     }
@@ -300,7 +306,7 @@ export interface MapCallMatch {
 }
 
 /** Recognizes `arr.map((item, idx?) => <jsx> | { ... return <jsx> })` identically in SSR and DOM compilers. */
-export function matchJsxMapCall(expr: Node): MapCallMatch | undefined {
+export function matchJsxMapCall(expr: Node, jsxNodes?: WeakSet<Node>): MapCallMatch | undefined {
   if (
     expr.type !== 'CallExpression'
     || expr.callee.type !== 'MemberExpression'
@@ -322,7 +328,7 @@ export function matchJsxMapCall(expr: Node): MapCallMatch | undefined {
   const body = unwrapParens(arg.body)
   if (isJsxNode(body))
     return { call: expr, target: expr.callee.object, cb: arg, body, isJsxBody: true, params: arg.params }
-  if (body.type === 'BlockStatement' && blockReturnsJsx(body))
+  if (body.type === 'BlockStatement' && blockReturnsJsx(body, jsxNodes))
     return { call: expr, target: expr.callee.object, cb: arg, body, isJsxBody: false, params: arg.params }
   return undefined
 }
@@ -350,7 +356,7 @@ export type ChildSlotKind =
  * Single shared child classifier for SSR & DOM codegen.
  * Both emitters derive exact hydration marker placement (`<!--k[-->...<!--k]-->` vs `<!---->`) from this classification.
  */
-export function classifyJsxChild(child: JSXChild): ChildSlotKind | undefined {
+export function classifyJsxChild(child: JSXChild, jsxNodes?: WeakSet<Node>): ChildSlotKind | undefined {
   if (child.type === 'JSXText') {
     const text = cleanJsxText(child.value)
     return text === '' ? undefined : { kind: 'static-text', text, fromLiteral: false }
@@ -372,7 +378,7 @@ export function classifyJsxChild(child: JSXChild): ChildSlotKind | undefined {
         ? undefined
         : { kind: 'static-text', text: expr.value, fromLiteral: true }
     }
-    const mapMatch = matchJsxMapCall(expr)
+    const mapMatch = matchJsxMapCall(expr, jsxNodes)
     if (mapMatch !== undefined)
       return { kind: 'loop', match: mapMatch }
     if (expr.type === 'LogicalExpression' && expr.operator === '&&') {
@@ -470,10 +476,10 @@ export function mayReturnNode(node: Node): boolean {
 }
 
 /** Shared SSR/DOM check for whether a dynamic expression slot may produce DOM nodes/fragments (requiring balanced `<!--k[-->...<!--k]-->` markers). */
-export function isNodeCapableExpr(expr: Expression): boolean {
+export function isNodeCapableExpr(expr: Expression, jsxNodes?: WeakSet<Node>): boolean {
   const isChildrenExpr = (expr.type === 'Identifier' && expr.name === 'children')
     || (expr.type === 'MemberExpression' && !expr.computed && expr.property.type === 'Identifier' && expr.property.name === 'children')
-  return isChildrenExpr || containsJsx(expr) || mayReturnNode(expr)
+  return isChildrenExpr || containsJsx(expr, jsxNodes) || mayReturnNode(expr)
 }
 
 export type { Program }

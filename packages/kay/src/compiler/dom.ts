@@ -13,6 +13,7 @@ import type {
   Program,
 } from 'oxc-parser'
 import type { ModuleAnalysis } from './analyze'
+import { visitorKeys } from 'oxc-parser'
 import { analyzeModule, loadDeclarations, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
 import {
@@ -116,94 +117,20 @@ function literalArrayConsts(program: Program): Set<string> {
   return literal
 }
 
-/** Collects free identifier references inside a node (ignoring shadowed locals and property keys). */
-function referencesAny(rootNode: Node, names: ReadonlySet<string>): boolean {
-  if (names.size === 0)
-    return false
-  let found = false
-  function visit(node: Node | null | undefined, shadowed: Set<string>): void {
-    if (found || node === null || node === undefined)
-      return
-    switch (node.type) {
-      case 'Identifier':
-        if (!shadowed.has(node.name) && names.has(node.name))
-          found = true
-        return
-      case 'MemberExpression':
-        visit(node.object, shadowed)
-        if (node.computed)
-          visit(node.property, shadowed)
-        return
-      case 'Property':
-        if (node.computed)
-          visit(node.key, shadowed)
-        visit(node.value, shadowed)
-        return
-      case 'ArrowFunctionExpression':
-      case 'FunctionExpression':
-      case 'FunctionDeclaration': {
-        const next = new Set(shadowed)
-        if (node.type !== 'ArrowFunctionExpression' && node.id !== null)
-          next.add(node.id.name)
-        for (const p of node.params)
-          collectPatternNames(p, next)
-        visit(node.body, next)
-        return
-      }
-      case 'BlockStatement': {
-        const next = new Set(shadowed)
-        for (const stmt of node.body) {
-          if (stmt.type === 'VariableDeclaration') {
-            for (const d of stmt.declarations) {
-              visit(d.init, next)
-              collectPatternNames(d.id, next)
-            }
-          }
-          else {
-            visit(stmt, next)
-          }
-        }
-        return
-      }
-      default: {
-        if (node.type.startsWith('TS'))
-          return
-        for (const [k, v] of Object.entries(node)) {
-          if (k === 'start' || k === 'end' || k === 'type')
-            continue
-          if (Array.isArray(v)) {
-            for (const item of v) {
-              if (item !== null && typeof item === 'object' && 'type' in item)
-                visit(item as Node, shadowed)
-            }
-          }
-          else if (v !== null && typeof v === 'object' && 'type' in v) {
-            visit(v as Node, shadowed)
-          }
-        }
-      }
-    }
-  }
-  visit(rootNode, new Set())
-  return found
+interface ScopedWalkCallbacks {
+  shouldStop?: (() => boolean) | undefined
+  onIdentifier?: ((node: Extract<Node, { type: 'Identifier' }>, shadowed: ReadonlySet<string>) => void) | undefined
+  onShorthandProperty?: ((node: Extract<Node, { type: 'Property' }>, shadowed: ReadonlySet<string>) => boolean) | undefined
+  onJsx?: ((node: JSXElement | JSXFragment, shadowed: ReadonlySet<string>) => void) | undefined
+  onFunction?: ((node: ArrowFunctionExpression | OxcFunction, shadowed: ReadonlySet<string>) => boolean) | undefined
 }
 
-/** Rewrites free identifier reads inside an AST node while respecting lexical scopes, class/object keys, labels, and nested JSX/components. */
-function rewriteFreeIdentifiers(
-  source: string,
-  rootNode: Node,
-  replacements: ReadonlyMap<string, string>,
-  onJsx?: (node: JSXElement | JSXFragment, rewrites: ReadonlyMap<string, string>) => string,
-  onFunction?: (fn: ArrowFunctionExpression | OxcFunction, rewrites: ReadonlyMap<string, string>) => string | undefined,
-): string {
-  if (replacements.size === 0 && (onJsx === undefined || !containsJsx(rootNode)))
-    return source.slice(rootNode.start, rootNode.end)
-
-  const offset = rootNode.start
-  const editor = new SourceEditor(source.slice(rootNode.start, rootNode.end))
+/** Single lexical-scope AST visitor shared by `referencesAny` and `rewriteFreeIdentifiers` (respects `for...of`, `catch (e)`, class members, labels, and TS nodes). */
+function walkScoped(rootNode: Node, callbacks: ScopedWalkCallbacks): void {
+  const { shouldStop, onIdentifier, onShorthandProperty, onJsx, onFunction } = callbacks
 
   function visitPatternDefaults(pattern: Node | null | undefined, shadowed: Set<string>): void {
-    if (pattern === null || pattern === undefined)
+    if (pattern === null || pattern === undefined || shouldStop?.())
       return
     switch (pattern.type) {
       case 'AssignmentPattern':
@@ -234,27 +161,19 @@ function rewriteFreeIdentifiers(
     }
   }
 
-  function activeMap(shadowed: Set<string>): ReadonlyMap<string, string> {
-    return shadowed.size === 0 ? replacements : new Map([...replacements].filter(([k]) => !shadowed.has(k)))
-  }
-
   function visit(node: Node | null | undefined, shadowed: Set<string>): void {
-    if (node === null || node === undefined)
+    if (node === null || node === undefined || shouldStop?.())
       return
 
     if (onJsx !== undefined && isJsxNode(node)) {
-      editor.replace(node.start - offset, node.end - offset, onJsx(node, activeMap(shadowed)))
+      onJsx(node, shadowed)
       return
     }
 
     switch (node.type) {
       case 'Identifier': {
-        const name = node.name
-        if (!shadowed.has(name)) {
-          const rep = replacements.get(name)
-          if (rep !== undefined)
-            editor.replace(node.start - offset, node.end - offset, rep)
-        }
+        if (!shadowed.has(node.name))
+          onIdentifier?.(node, shadowed)
         return
       }
       case 'MemberExpression': {
@@ -274,13 +193,8 @@ function rewriteFreeIdentifiers(
       case 'Property': {
         if (node.computed)
           visit(node.key, shadowed)
-        if (node.shorthand && node.value.type === 'Identifier') {
-          const name = node.value.name
-          if (!shadowed.has(name) && replacements.has(name)) {
-            editor.replace(node.start - offset, node.end - offset, `${name}: ${replacements.get(name)}`)
-            return
-          }
-        }
+        if (node.shorthand && node.value.type === 'Identifier' && onShorthandProperty?.(node, shadowed) === true)
+          return
         visit(node.value, shadowed)
         return
       }
@@ -345,13 +259,8 @@ function rewriteFreeIdentifiers(
       case 'ArrowFunctionExpression':
       case 'FunctionExpression':
       case 'FunctionDeclaration': {
-        if (node !== rootNode && onFunction !== undefined) {
-          const compiled = onFunction(node, activeMap(shadowed))
-          if (compiled !== undefined) {
-            editor.replace(node.start - offset, node.end - offset, compiled)
-            return
-          }
-        }
+        if (node !== rootNode && onFunction?.(node, shadowed) === true)
+          return
         const nextShadow = new Set(shadowed)
         if (node.type !== 'ArrowFunctionExpression' && node.id !== null)
           nextShadow.add(node.id.name)
@@ -400,6 +309,24 @@ function rewriteFreeIdentifiers(
       default: {
         if (node.type.startsWith('TS'))
           return
+        const keys = visitorKeys[node.type]
+        if (keys !== undefined) {
+          const rec = node as unknown as Record<string, unknown>
+          for (let i = 0; i < keys.length; i++) {
+            const val = rec[keys[i]!]
+            if (Array.isArray(val)) {
+              for (let j = 0; j < val.length; j++) {
+                const item = val[j]
+                if (item !== null && typeof item === 'object' && 'type' in item)
+                  visit(item as Node, shadowed)
+              }
+            }
+            else if (val !== null && typeof val === 'object' && 'type' in val) {
+              visit(val as Node, shadowed)
+            }
+          }
+          return
+        }
         for (const [key, val] of Object.entries(node)) {
           if (key === 'start' || key === 'end' || key === 'type')
             continue
@@ -419,7 +346,103 @@ function rewriteFreeIdentifiers(
   }
 
   visit(rootNode, new Set())
+}
+
+/** Returns true if `rootNode` contains any free identifier reference to a name in `names`. */
+function referencesAny(rootNode: Node, names: ReadonlySet<string>): boolean {
+  if (names.size === 0)
+    return false
+  let found = false
+  walkScoped(rootNode, {
+    shouldStop: () => found,
+    onIdentifier(node) {
+      if (names.has(node.name))
+        found = true
+    },
+  })
+  return found
+}
+
+/** Rewrites free identifier reads inside an AST node while respecting lexical scopes, class/object keys, labels, and nested JSX/components. */
+function rewriteFreeIdentifiers(
+  source: string,
+  rootNode: Node,
+  replacements: ReadonlyMap<string, string>,
+  jsxNodes: WeakSet<Node>,
+  onJsx?: (node: JSXElement | JSXFragment, rewrites: ReadonlyMap<string, string>) => string,
+  onFunction?: (fn: ArrowFunctionExpression | OxcFunction, rewrites: ReadonlyMap<string, string>) => string | undefined,
+): string {
+  if (replacements.size === 0 && (onJsx === undefined || !containsJsx(rootNode, jsxNodes)))
+    return source.slice(rootNode.start, rootNode.end)
+
+  const offset = rootNode.start
+  const editor = new SourceEditor(source.slice(rootNode.start, rootNode.end))
+  const activeMap = (shadowed: ReadonlySet<string>): ReadonlyMap<string, string> =>
+    shadowed.size === 0 ? replacements : new Map([...replacements].filter(([k]) => !shadowed.has(k)))
+
+  walkScoped(rootNode, {
+    onJsx: onJsx === undefined
+      ? undefined
+      : (node, shadowed) => {
+          editor.replace(node.start - offset, node.end - offset, onJsx(node, activeMap(shadowed)))
+        },
+    onIdentifier(node) {
+      const rep = replacements.get(node.name)
+      if (rep !== undefined)
+        editor.replace(node.start - offset, node.end - offset, rep)
+    },
+    onShorthandProperty(node, shadowed) {
+      if (node.value.type !== 'Identifier')
+        return false
+      const name = node.value.name
+      if (!shadowed.has(name) && replacements.has(name)) {
+        editor.replace(node.start - offset, node.end - offset, `${name}: ${replacements.get(name)}`)
+        return true
+      }
+      return false
+    },
+    onFunction: onFunction === undefined
+      ? undefined
+      : (node, shadowed) => {
+          const compiled = onFunction(node, activeMap(shadowed))
+          if (compiled !== undefined) {
+            editor.replace(node.start - offset, node.end - offset, compiled)
+            return true
+          }
+          return false
+        },
+  })
   return editor.toString()
+}
+
+/** True when a JSX prop expression is statically stable (non-rewritten identifier, literal, function, or constant array/object) and needs no reactive getter. */
+function isStaticPropExpr(rawNode: Node, scopeRewrites: ReadonlyMap<string, string>): boolean {
+  const node = unwrapTsExpr(rawNode)
+  switch (node.type) {
+    case 'Literal':
+    case 'ArrowFunctionExpression':
+    case 'FunctionExpression':
+      return true
+    case 'Identifier':
+      return !scopeRewrites.has(node.name)
+    case 'UnaryExpression':
+      return (node.operator === '-' || node.operator === '+' || node.operator === '!' || node.operator === '~' || node.operator === 'void')
+        && isStaticPropExpr(node.argument, scopeRewrites)
+    case 'TemplateLiteral':
+      return node.expressions.every(e => isStaticPropExpr(e, scopeRewrites))
+    case 'ArrayExpression':
+      return node.elements.every(el => el === null || (el.type !== 'SpreadElement' && isStaticPropExpr(el, scopeRewrites)))
+    case 'ObjectExpression':
+      return node.properties.every((prop) => {
+        if (prop.type !== 'Property' || prop.kind !== 'init')
+          return false
+        if (prop.computed && !isStaticPropExpr(prop.key, scopeRewrites))
+          return false
+        return isStaticPropExpr(prop.value, scopeRewrites)
+      })
+    default:
+      return false
+  }
 }
 
 export function compileDom(filename: string, code: string, options: CompileDomOptions = {}): CompileDomResult {
@@ -431,6 +454,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   const staticArrays = literalArrayConsts(program)
   const loadNodes = new Set<Node>(loadDeclarations(program))
+  const jsxNodes = analysis.jsxNodes
 
   const editor = new SourceEditor(code)
   const used = new Set<string>()
@@ -532,7 +556,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   }
 
   function compileNestedComponent(fn: ArrowFunctionExpression | OxcFunction, outerRewrites: ReadonlyMap<string, string>): string | undefined {
-    if (!containsJsx(fn.body))
+    if (!containsJsx(fn.body, jsxNodes))
       return undefined
     const firstParam = fn.params[0]
     const destructured = extractDestructuredParam(firstParam)
@@ -542,7 +566,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   }
 
   function compileExpression(node: Node, scopeRewrites: ReadonlyMap<string, string>): string {
-    return rewriteFreeIdentifiers(code, node, scopeRewrites, compileRootJsx, compileNestedComponent)
+    return rewriteFreeIdentifiers(code, node, scopeRewrites, jsxNodes, compileRootJsx, compileNestedComponent)
   }
 
   function compileComponentCall(node: JSXElement, scopeRewrites: ReadonlyMap<string, string>): string {
@@ -579,11 +603,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
         const expr = attr.value.expression
         const exprCode = compileExpression(expr, scopeRewrites)
-        // Reactive getter for dynamic expressions; plain property for literals and inline functions.
-        const isStatic = expr.type === 'Literal'
-          || expr.type === 'ArrowFunctionExpression'
-          || expr.type === 'FunctionExpression'
-        if (isStatic)
+        // Reactive getter for dynamic expressions; plain property for identifiers, constant literals/collections, and inline functions.
+        if (isStaticPropExpr(expr, scopeRewrites))
           currentObj.push(`${propKey}: ${exprCode}`)
         else
           currentObj.push(`get ${propKey}() { return ${exprCode} }`)
@@ -751,7 +772,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         return html
 
       const meaningful = filterMeaningfulChildren(el.children)
-      const slots = meaningful.map(c => classifyJsxChild(c)).filter(s => s !== undefined)
+      const slots = meaningful.map(c => classifyJsxChild(c, jsxNodes)).filter(s => s !== undefined)
       const hasSiblings = slots.length > 1
       let domIndex = 0
       let prevWasStaticText = false
@@ -944,7 +965,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
         // Generic expression slot
         const exprCode = compileExpression(slot.expr, scopeRewrites)
-        if (isNodeCapableExpr(slot.expr)) {
+        if (isNodeCapableExpr(slot.expr, jsxNodes)) {
           if (!hasSiblings) {
             ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, null);`)
           }
@@ -1094,7 +1115,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           return `document.createTextNode(${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value)))})`
         if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression') {
           const exprCode = compileExpression(child.expression, scopeRewrites)
-          if (isNodeCapableExpr(child.expression))
+          if (isNodeCapableExpr(child.expression, jsxNodes))
             return `(() => { const _f = document.createDocumentFragment(); ${use('insert')}(_f, () => (${exprCode}), null, null); return _f; })()`
           return `(() => { const _t = document.createTextNode(""); ${use('effect')}(() => ${use('setText')}(_t, (${exprCode}))); return _t; })()`
         }
@@ -1180,7 +1201,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   // Handle top-level component functions with destructured props + JSX compilation
   function processFunction(fn: ArrowFunctionExpression | OxcFunction): void {
-    if (fn.body === null || !containsJsx(fn.body))
+    if (fn.body === null || !containsJsx(fn.body, jsxNodes))
       return
 
     const destructured = extractDestructuredParam(fn.params[0])
@@ -1209,7 +1230,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           if (!shadowed.has(k))
             active.set(k, v)
         }
-        if (active.size > 0 || containsJsx(stmt))
+        if (active.size > 0 || containsJsx(stmt, jsxNodes))
           editor.replace(stmt.start, stmt.end, compileExpression(stmt, active))
         if (stmt.type === 'VariableDeclaration') {
           for (const d of stmt.declarations)

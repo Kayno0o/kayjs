@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseTsx } from '../src/compiler/analyze'
 import { compileDom, compileSsr } from '../src/compiler/index'
+import { resolveImportPath, resolveKaySpecifier } from '../src/build/resolve'
 import * as domExtras from '../src/dom/extras'
 import * as domCore from '../src/dom/index'
 import { defineIslandElement } from '../src/dom/island'
@@ -899,5 +900,94 @@ describe('destructured loop rows and component props in an island', () => {
     const body = out.code.replace(/^import .*?;\n/gm, '').replace(/export function /g, 'function ')
     const run = new Function(...Object.keys(ssrRt).map(n => `__${n}`), `${body}\nreturn List({ rows: ['a', 'b'] }).__html`)
     expect(run(...Object.values(ssrRt))).toBe('<ul><li>a/2</li><li>b/2</li></ul>')
+  })
+
+  test('#3561: identifiers and constant literals pass as plain props, while rewritten props and reactive expressions stay getters', () => {
+    const src = `
+      const TITLE = 'hi'
+      export function Outer({ count }) {
+        const local = 42
+        return (
+          <Child
+            a={TITLE}
+            b={local}
+            items={[1, 2, 'three']}
+            style={{ color: 'red', gap: 8 }}
+            neg={-1}
+            propCount={count}
+            dynStyle={{ color: count }}
+            sigRead={local.value}
+            fn={() => count}
+          />
+        )
+      }
+    `
+    const out = compileDom('Props.tsx', src).code
+    expect(out).toContain('a: TITLE')
+    expect(out).toContain('b: local')
+    expect(out).toContain('items: [1, 2, \'three\']')
+    expect(out).toContain('style: { color: \'red\', gap: 8 }')
+    expect(out).toContain('neg: -1')
+    expect(out).toContain('fn: () => __p.count')
+    expect(out).toContain('get propCount() { return __p.count }')
+    expect(out).toContain('get dynStyle() { return { color: __p.count } }')
+    expect(out).toContain('get sigRead() { return local.value }')
+  })
+
+  test('#3562: delegate() keys listeners per Document so new Happy-DOM documents still receive delegated events', async () => {
+    let clicks = 0
+    for (let i = 0; i < 2; i++) {
+      await withDom(() => {
+        domCore.delegate(['click'])
+        const btn = document.createElement('button')
+        ;(btn as unknown as { $$click: () => void }).$$click = () => {
+          clicks++
+        }
+        document.body.appendChild(btn)
+        btn.click()
+      })
+    }
+    expect(clicks).toBe(2)
+  })
+
+  test('#3562: resolveKaySpecifier derives from package.json exports and bunyan is not skipped as a bun builtin', () => {
+    expect(resolveKaySpecifier('kay')).toMatch(/src\/index\.ts$/)
+    expect(resolveKaySpecifier('@kayjs/kay/server')).toMatch(/src\/server\/index\.ts$/)
+    expect(resolveKaySpecifier('kay/jsx-dev-runtime')).toMatch(/src\/jsx-runtime\.ts$/)
+    expect(resolveKaySpecifier('kay/nonexistent')).toBeUndefined()
+
+    const tmp = mkdtempSync(join(tmpdir(), 'kay-bunyan-'))
+    try {
+      const bunyanDir = join(tmp, 'node_modules/bunyan')
+      writeFileSync(join(tmp, 'entry.ts'), '')
+      const fs = require('node:fs') as typeof import('node:fs')
+      fs.mkdirSync(bunyanDir, { recursive: true })
+      writeFileSync(join(bunyanDir, 'package.json'), JSON.stringify({ name: 'bunyan', main: './index.ts' }))
+      writeFileSync(join(bunyanDir, 'index.ts'), 'export const log = 1\n')
+      expect(resolveImportPath(join(tmp, 'entry.ts'), 'bunyan')).toBe(join(bunyanDir, 'index.ts'))
+      expect(resolveImportPath(join(tmp, 'entry.ts'), 'bun')).toBeUndefined()
+      expect(resolveImportPath(join(tmp, 'entry.ts'), 'bun:sqlite')).toBeUndefined()
+    }
+    finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  test('#3562: merged scope visitor treats for...of, catch (e), and class members as shadowed in referencesAny', () => {
+    // In a block-body .map(), `x` is a block-local `const x = 1`, shadowed by for...of / catch / class; key={item.id} still hoists cleanly.
+    const src = `
+      export function List({ rows }) {
+        return <ul>{rows.map((item) => {
+          const id = item.id
+          for (const id of [1, 2]) { void id }
+          try {} catch (id) { void id }
+          class C { id() { return 1 } }
+          return <li key={item.id}>{id}{C.name}</li>
+        })}</ul>
+      }
+    `
+    const out = compileDom('Scope.tsx', src).code
+    // key={item.id} does NOT reference block-local `id` (it's a non-computed member property), so loop key is hoisted!
+    expect(out).toContain('(item) => item.id')
   })
 })

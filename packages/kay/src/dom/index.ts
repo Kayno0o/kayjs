@@ -341,7 +341,7 @@ export function setStyle(el: HTMLElement, value: unknown): void {
 
 // ---- Delegated events
 
-const delegated = new Set<string>()
+const delegated = new WeakMap<Document, Set<string>>()
 
 function dispatchEvent(event: Event): void {
   const key = `$$${event.type}`
@@ -364,10 +364,15 @@ function dispatchEvent(event: Event): void {
 export function delegate(events: string[]): void {
   if (typeof document === 'undefined')
     return
+  let set = delegated.get(document)
+  if (set === undefined) {
+    set = new Set()
+    delegated.set(document, set)
+  }
   for (let i = 0; i < events.length; i++) {
     const type = events[i]!
-    if (!delegated.has(type)) {
-      delegated.add(type)
+    if (!set.has(type)) {
+      set.add(type)
       document.addEventListener(type, dispatchEvent)
     }
   }

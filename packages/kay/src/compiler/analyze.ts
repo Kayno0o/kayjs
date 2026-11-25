@@ -58,6 +58,8 @@ export interface ModuleAnalysis {
   hasAsyncDefault: boolean
   hasLoadExport: boolean
   hasJsx: boolean
+  /** Precomputed set of AST nodes containing JSX (itself included), for O(1) subtree checks during codegen. */
+  jsxNodes: WeakSet<Node>
   hasPrerender: boolean
   hasPaths: boolean
   usesRenderContext: boolean
@@ -77,6 +79,49 @@ export interface ModuleAnalysis {
   exportedNames: string[]
   /** Code that compiles but usually means something else, worded for build and `kay check` to print. */
   warnings: string[]
+}
+
+export function computeJsxNodes(program: Program): WeakSet<Node> {
+  const jsxNodes = new WeakSet<Node>()
+  const visit = (node: unknown): boolean => {
+    if (node === null || typeof node !== 'object')
+      return false
+    if (Array.isArray(node)) {
+      let any = false
+      for (let i = 0; i < node.length; i++) {
+        if (visit(node[i]))
+          any = true
+      }
+      return any
+    }
+    const ast = node as Node
+    const type = ast.type
+    if (typeof type !== 'string')
+      return false
+    let found = isJsxNode(ast)
+    const keys = visitorKeys[type]
+    if (keys !== undefined) {
+      const rec = ast as unknown as Record<string, unknown>
+      for (let i = 0; i < keys.length; i++) {
+        const val = rec[keys[i]!]
+        if (val !== null && typeof val === 'object' && visit(val))
+          found = true
+      }
+    }
+    else {
+      for (const [key, val] of Object.entries(ast)) {
+        if (key === 'start' || key === 'end' || key === 'type')
+          continue
+        if (val !== null && typeof val === 'object' && visit(val))
+          found = true
+      }
+    }
+    if (found)
+      jsxNodes.add(ast)
+    return found
+  }
+  visit(program)
+  return jsxNodes
 }
 
 export function walk(node: unknown, visit: (node: Node) => boolean | void): void {
@@ -807,6 +852,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
     hasAsyncDefault,
     hasLoadExport: hasLoadExport || loadDeclarations(program).length > 0,
     hasJsx,
+    jsxNodes: hasJsx ? computeJsxNodes(program) : new WeakSet<Node>(),
     hasPrerender,
     hasPaths,
     usesRenderContext,

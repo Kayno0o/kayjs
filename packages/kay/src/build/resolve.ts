@@ -2,6 +2,7 @@
 
 import { statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import pkg from '../../package.json' with { type: 'json' }
 
 export const KAY_SRC_ROOT = resolve(import.meta.dir, '..')
 
@@ -18,9 +19,11 @@ export function resolveImportPath(fromFile: string, specifier: string): string |
   if (
     specifier === 'kay'
     || specifier.startsWith('kay/')
-    || specifier.startsWith('@kayjs/kay')
+    || specifier === '@kayjs/kay'
+    || specifier.startsWith('@kayjs/kay/')
     || specifier.startsWith('node:')
-    || specifier.startsWith('bun')
+    || specifier === 'bun'
+    || specifier.startsWith('bun:')
     || specifier.startsWith('~')
   ) {
     return undefined
@@ -34,22 +37,12 @@ export function resolveImportPath(fromFile: string, specifier: string): string |
   }
 }
 
-const KAY_SPECIFIER_FILES = new Map([
-  ['kay', 'index.ts'],
-  ['kay/dom', 'dom/index.ts'],
-  ['kay/dom-extras', 'dom/extras.ts'],
-  ['kay/dom-loop', 'dom/loop.ts'],
-  ['kay/action', 'dom/action.ts'],
-  ['kay/island', 'dom/island.ts'],
-  ['kay/ssr', 'ssr/index.ts'],
-  ['kay/server', 'server/index.ts'],
-  ['kay/compiler', 'compiler/index.ts'],
-  ['kay/build', 'build/index.ts'],
-  ['kay/dev', 'dev/index.ts'],
-  ['kay/test', 'test/index.ts'],
-  ['kay/jsx-runtime', 'jsx-runtime.ts'],
-  ['kay/jsx-dev-runtime', 'jsx-runtime.ts'],
-])
+const KAY_SPECIFIER_FILES = new Map<string, string>(
+  Object.entries(pkg.exports as Record<string, string>).map(([subpath, target]) => [
+    subpath === '.' ? 'kay' : `kay/${subpath.slice(2)}`,
+    target.replace(/^\.\/src\//, ''),
+  ]),
+)
 
 /** Maps `kay`, `kay/<subpath>` and the `@kayjs/kay` spelling of both to their source file. */
 export function resolveKaySpecifier(specifier: string): string | undefined {
