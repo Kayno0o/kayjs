@@ -205,6 +205,23 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
         body: JSON.stringify({ msg: 'z'.repeat(256) }),
       }))
       expect(actionTooBig.status).toBe(413)
+
+      // Under serve(), Bun.serve enforces the cap itself on streamed bodies, so kay does not buffer them first
+      const srv = app.serve(0)
+      try {
+        for (const path of ['/api/upload', actionUrl]) {
+          const served = await fetch(`http://127.0.0.1:${srv.port}${path}`, {
+            method: 'POST',
+            headers: { 'origin': `http://127.0.0.1:${srv.port}`, 'content-type': 'application/json' },
+            body: new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new Uint8Array(100)); c.enqueue(new Uint8Array(100)); c.close() } }),
+            duplex: 'half',
+          } as RequestInit)
+          expect(served.status).toBe(413)
+        }
+      }
+      finally {
+        srv.stop(true)
+      }
     })
 
     it('uses finite idleTimeout (no idleTimeout: 0) on Bun.serve while allowing streaming Suspense/SSE', async () => {

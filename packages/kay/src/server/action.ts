@@ -2,8 +2,7 @@
 
 import type { Cookies } from './cookies'
 import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
-import { DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit } from './http'
-import { isTrustedOrigin, verifyOrigin } from './security'
+import { isTrustedOrigin } from './security'
 import { validateSchema } from './standard-schema'
 
 export const ACTION_ERROR_COOKIE = '__kay_action_err'
@@ -104,18 +103,7 @@ export function isServerAction(value: unknown): value is ServerAction<unknown, u
   return typeof value === 'function' && (value as { __kayAction?: boolean }).__kayAction === true
 }
 
-class PayloadTooLargeError extends Error {
-  constructor() {
-    super('Payload Too Large')
-  }
-}
-
-async function parseActionBody(request: Request, maxRequestBodySize: number): Promise<unknown> {
-  const checked = await enforceRequestBodyLimit(request, maxRequestBodySize)
-  if (!checked.ok)
-    throw new PayloadTooLargeError()
-  const boundedReq = checked.request
-
+async function parseActionBody(boundedReq: Request): Promise<unknown> {
   const contentType = boundedReq.headers.get('content-type') ?? ''
   if (contentType.includes('application/json'))
     return boundedReq.json()
@@ -196,16 +184,7 @@ export async function executeAction(
   ctx: ActionContext,
   trustedOrigins?: ReadonlySet<string>,
   trustProxy = false,
-  maxRequestBodySize = DEFAULT_MAX_REQUEST_BODY_SIZE,
 ): Promise<Response> {
-  const originCheck = verifyOrigin(request, trustedOrigins, trustProxy)
-  if (!originCheck.ok) {
-    return Response.json(
-      { ok: false, status: 403, error: originCheck.reason },
-      { status: 403 },
-    )
-  }
-
   const wantsJson = (request.headers.get('accept') ?? '').includes('application/json')
     || (request.headers.get('content-type') ?? '').includes('application/json')
 
@@ -213,11 +192,9 @@ export async function executeAction(
   if (act.schema !== undefined) {
     let rawBody: unknown
     try {
-      rawBody = await parseActionBody(request, maxRequestBodySize)
+      rawBody = await parseActionBody(request)
     }
-    catch (err) {
-      if (err instanceof PayloadTooLargeError)
-        return Response.json({ ok: false, status: 413, error: 'Payload Too Large' }, { status: 413 })
+    catch {
       return Response.json({ ok: false, status: 400, error: 'Invalid request body' }, { status: 400 })
     }
 

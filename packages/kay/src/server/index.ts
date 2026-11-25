@@ -692,7 +692,12 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       || (request.headers.get('content-type') ?? '').includes('application/json')
   }
 
-  async function handleInternal(request: Request, remoteIp?: string, disableTimeout?: () => void): Promise<Response> {
+  function refuseCrossSite(req: Request, reason: string, cookieStore: CookieStore): Response {
+    return withHsts(finalizeResponse(Response.json({ ok: false, status: 403, error: reason }, { status: 403 }), cookieStore, securityEntries), req)
+  }
+
+  // `bodyLimited` is set under `serve()`, where Bun.serve already enforces maxRequestBodySize on every body, chunked ones included.
+  async function handleInternal(request: Request, remoteIp?: string, disableTimeout?: () => void, bodyLimited = false): Promise<Response> {
     try {
       const pathname = new URL(request.url).pathname
 
@@ -710,8 +715,16 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           return servePublic(request, pathname, pub)
       }
 
+      // Actions are origin-checked before their body is read and before any middleware runs.
+      const actionHandler = request.method === 'POST' ? actionHandlers.get(pathname) : undefined
+      if (actionHandler !== undefined) {
+        const originCheck = verifyOrigin(request, trustedOrigins, trustProxy)
+        if (!originCheck.ok)
+          return refuseCrossSite(request, originCheck.reason, makeRequestContext(request, {}, { trustProxy, remoteIp }).cookieStore)
+      }
+
       // Enforce request body size cap before actions, plugin routes, and API routes
-      const bounded = await enforceRequestBodyLimit(request, maxRequestBodySize)
+      const bounded = bodyLimited ? { ok: true as const, request } : await enforceRequestBodyLimit(request, maxRequestBodySize)
       if (!bounded.ok) {
         const res413 = requestWantsJson(request)
           ? Response.json({ ok: false, status: 413, error: 'Payload Too Large' }, { status: 413 })
@@ -721,51 +734,48 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       const req = bounded.request
 
       // 2. Server actions (POST /_kay/action/<id>): global plugin middlewares, then the _middleware.ts chain of the action's folder
-      if (req.method === 'POST') {
-        const handler = actionHandlers.get(pathname)
-        if (handler !== undefined) {
-          const { act, middlewares } = handler
-          const { ctx, cookieStore } = makeRequestContext(req, {}, { trustProxy, remoteIp })
-          const runAction = async (): Promise<Response> => {
-            const actionCtx: ActionContext = {
-              request: ctx.request,
-              url: ctx.url,
-              params: ctx.params,
-              cookies: ctx.cookies,
-              locals: ctx.locals,
-              ip: ctx.ip,
-              redirect: ctx.redirect,
-              deny: ctx.deny,
-            }
-            return executeAction(act, req, actionCtx, trustedOrigins, trustProxy, maxRequestBodySize)
+      if (actionHandler !== undefined) {
+        const { act, middlewares } = actionHandler
+        const { ctx, cookieStore } = makeRequestContext(req, {}, { trustProxy, remoteIp })
+        const runAction = async (): Promise<Response> => {
+          const actionCtx: ActionContext = {
+            request: ctx.request,
+            url: ctx.url,
+            params: ctx.params,
+            cookies: ctx.cookies,
+            locals: ctx.locals,
+            ip: ctx.ip,
+            redirect: ctx.redirect,
+            deny: ctx.deny,
           }
-          let index = -1
-          const dispatch = async (i: number): Promise<Response> => {
-            if (i <= index)
-              throw new Error('kay: middleware called next() multiple times')
-            index = i
-            if (i < middlewares.length)
-              return middlewares[i]!(ctx, () => dispatch(i + 1))
-            return runAction()
+          return executeAction(act, req, actionCtx, trustedOrigins, trustProxy)
+        }
+        let index = -1
+        const dispatch = async (i: number): Promise<Response> => {
+          if (i <= index)
+            throw new Error('kay: middleware called next() multiple times')
+          index = i
+          if (i < middlewares.length)
+            return middlewares[i]!(ctx, () => dispatch(i + 1))
+          return runAction()
+        }
+        try {
+          const res = await dispatch(0)
+          return withHsts(finalizeResponse(res, cookieStore, securityEntries), req)
+        }
+        catch (error) {
+          notifyError(error, req, 'action')
+          if (requestWantsJson(req)) {
+            return withHsts(
+              finalizeResponse(
+                Response.json({ ok: false, status: 500, error: 'Internal Server Error' }, { status: 500 }),
+                cookieStore,
+                securityEntries,
+              ),
+              req,
+            )
           }
-          try {
-            const res = await dispatch(0)
-            return withHsts(finalizeResponse(res, cookieStore, securityEntries), req)
-          }
-          catch (error) {
-            notifyError(error, req, 'action')
-            if (requestWantsJson(req)) {
-              return withHsts(
-                finalizeResponse(
-                  Response.json({ ok: false, status: 500, error: 'Internal Server Error' }, { status: 500 }),
-                  cookieStore,
-                  securityEntries,
-                ),
-                req,
-              )
-            }
-            return renderError(error, cookieStore, ctx.url, req)
-          }
+          return renderError(error, cookieStore, ctx.url, req)
         }
       }
 
@@ -816,16 +826,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         if (routeDef !== undefined) {
           if (routeDef.csrf) {
             const originCheck = verifyOrigin(req, trustedOrigins, trustProxy)
-            if (!originCheck.ok) {
-              return withHsts(
-                finalizeResponse(
-                  Response.json({ ok: false, status: 403, error: originCheck.reason }, { status: 403 }),
-                  cookieStore,
-                  securityEntries,
-                ),
-                req,
-              )
-            }
+            if (!originCheck.ok)
+              return refuseCrossSite(req, originCheck.reason, cookieStore)
           }
           ctx.params = pluginMatch.params
           let res: Response
@@ -866,16 +868,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       // CSRF verification for file-based API routes on unsafe methods (opt out via `export const csrf = false`)
       if (typeof route.mod[req.method] === 'function' && route.mod.csrf !== false) {
         const originCheck = verifyOrigin(req, trustedOrigins, trustProxy)
-        if (!originCheck.ok) {
-          return withHsts(
-            finalizeResponse(
-              Response.json({ ok: false, status: 403, error: originCheck.reason }, { status: 403 }),
-              cookieStore,
-              securityEntries,
-            ),
-            req,
-          )
-        }
+        if (!originCheck.ok)
+          return refuseCrossSite(req, originCheck.reason, cookieStore)
       }
 
       const allMiddlewares = globalMiddlewares.length > 0
@@ -924,6 +918,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       req,
       srvRef?.requestIP(req)?.address,
       srvRef ? () => srvRef!.timeout(req, 0) : undefined,
+      true,
     )
 
     const routes: Record<string, (req: Request) => Response | Promise<Response>> = {}

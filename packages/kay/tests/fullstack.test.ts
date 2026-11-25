@@ -384,6 +384,18 @@ describe('Kay v2 Milestone 2 full-stack features', () => {
     expect(noteRes.headers.get('x-root-mw')).toBeNull()
   })
 
+  test('a cross-site action POST is refused before its _middleware.ts chain runs', async () => {
+    const app = await testApp({ root: fixtureDir })
+    const chainUrl = app.manifest!.actions.find(a => a.exportName === 'reportChain')!.url
+    const res = await app.fetch(chainUrl, {
+      method: 'POST',
+      headers: { 'origin': 'https://evil.example', 'content-type': 'application/json' },
+      body: '{}',
+    })
+    expect(res.status).toBe(403)
+    expect(res.headers.get('x-root-mw')).toBeNull()
+  })
+
   test('defineEnv validates and freezes typed environment variables', () => {
     const envSchema = {
       '~standard': {
