@@ -5,19 +5,26 @@
 
 import type { KayPlugin, Middleware, RequestContext, TrustProxy } from 'kay/server'
 import type { OAuthProvider } from './oauth'
+import type { RateLimitOptions } from './ratelimit'
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
-import { getClientIp, isHttpsRequest } from 'kay/server'
+import { isHttpsRequest } from 'kay/server'
 import {
   hashPassword,
-  pkceChallenge,
+
   randomToken,
   safeRedirect,
   sha256Hex,
-  signPayload,
+
   verifyPassword,
-  verifyPayload,
+
 } from './crypto'
+import { fail, formatSessionIp, isValidEmail, parseBody, resolveClientIp, wantsJson } from './http'
+import { registerOAuthRoutes } from './oauth-routes'
+import { createRateLimiter } from './ratelimit'
 import { memoryAuthStore, normalizeEmail, toPublicUser } from './store'
+
+export { createRateLimiter } from './ratelimit'
+export type { RateLimiter, RateLimitOptions } from './ratelimit'
 
 export { safeRedirect } from './crypto'
 export { discord, github, google, oauthProvider } from './oauth'
@@ -29,8 +36,13 @@ const NODE_ENV_KEY = 'NODE_ENV'
 const runtimeNodeEnv = (): string | undefined => process.env[NODE_ENV_KEY]
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 const DEFAULT_PRUNE_INTERVAL_MS = 15 * 60 * 1000
-const DEFAULT_RATE_LIMIT_MAX_KEYS = 10_000
+
 const MIN_PROD_SECRET_BYTES = 32
+const LINK_PATHS = { 'magic-link': 'magic-link/verify', 'verify-email': 'verify-email' } as const
+const LINK_MAILS = {
+  'magic-link': { subject: 'Your sign-in link', text: 'Sign in using this one-time link', html: 'Click to sign in', label: 'Sign in' },
+  'verify-email': { subject: 'Verify your email address', text: 'Confirm your email address using this one-time link', html: 'Click to verify your email address', label: 'Verify email' },
+} as const
 
 // Mailed links and OAuth callbacks start with `site`, so anything but an http(s) origin is a config mistake.
 function siteOrigin(value: string): string {
@@ -47,21 +59,6 @@ export interface AuthMailPayload {
   html?: string | undefined
   url: string
   kind: 'magic-link' | 'verify-email' | 'reset-password'
-}
-
-export interface RateLimitOptions {
-  /** Max attempts per window (default: 15). */
-  max?: number | undefined
-  /** Window duration in ms (default: 60_000). */
-  windowMs?: number | undefined
-  /** Maximum distinct keys kept in memory before evicting oldest entries (default: 10_000). */
-  maxKeys?: number | undefined
-}
-
-export interface RateLimiter {
-  allow(key: string): boolean
-  sweep(now?: number): number
-  size(): number
 }
 
 export interface AuthOptions {
@@ -149,141 +146,7 @@ export interface Auth {
   dispose(): void
 }
 
-interface OAuthStateCookie {
-  provider: string
-  state: string
-  verifier?: string | undefined
-  redirect: string
-  exp: number
-}
 
-function wantsJson(req: Request): boolean {
-  const accept = req.headers.get('accept') ?? ''
-  const ct = req.headers.get('content-type') ?? ''
-  return accept.includes('application/json') || ct.includes('application/json')
-}
-
-async function readBody(req: Request): Promise<Record<string, string>> {
-  const ct = req.headers.get('content-type') ?? ''
-  if (ct.includes('application/json')) {
-    const raw = await req.json() as Record<string, unknown>
-    const out: Record<string, string> = {}
-    for (const [k, v] of Object.entries(raw ?? {})) {
-      if (typeof v === 'string')
-        out[k] = v
-    }
-    return out
-  }
-  if (ct.includes('application/x-www-form-urlencoded') || ct.includes('multipart/form-data')) {
-    const fd = await req.formData()
-    const out: Record<string, string> = {}
-    for (const [k, v] of fd.entries()) {
-      if (typeof v === 'string')
-        out[k] = v
-    }
-    return out
-  }
-  return {}
-}
-
-function isValidEmail(email: string): boolean {
-  const e = email.trim()
-  const at = e.indexOf('@')
-  return at > 0 && at === e.lastIndexOf('@') && e.indexOf('.', at + 2) > at + 1 && !/\s/.test(e)
-}
-
-function resolveClientIp(ctx: RequestContext, trustProxy: TrustProxy): string {
-  return ctx.ip?.trim() || getClientIp(ctx.request, trustProxy) || 'unknown'
-}
-
-function formatSessionIp(ip: string, mode: boolean | 'truncate'): string | undefined {
-  if (mode === false || ip === 'unknown')
-    return undefined
-  if (mode === true)
-    return ip
-  // Truncate mode: IPv4 -> /24, IPv4-mapped IPv6 -> /120, IPv6 -> /48
-  const v4 = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/.exec(ip)
-  if (v4)
-    return `${v4[1]}.0`
-  const v4Mapped = /^(::ffff:\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/i.exec(ip)
-  if (v4Mapped)
-    return `${v4Mapped[1]}.0`
-  if (ip.includes(':')) {
-    const [head = '', tail = ''] = ip.split('::')
-    const headParts = head ? head.split(':').filter(Boolean) : []
-    const tailParts = ip.includes('::') && tail ? tail.split(':').filter(Boolean) : []
-    const full = ip.includes('::')
-      ? [...headParts, ...Array.from({ length: Math.max(0, 8 - headParts.length - tailParts.length) }, () => '0'), ...tailParts]
-      : headParts
-    if (full.length >= 3)
-      return `${full.slice(0, 3).join(':')}::`
-  }
-  return undefined
-}
-
-export function createRateLimiter(opts: RateLimitOptions | false | undefined): RateLimiter {
-  if (opts === false) {
-    return {
-      allow: () => true,
-      sweep: () => 0,
-      size: () => 0,
-    }
-  }
-  const max = opts?.max ?? 15
-  const windowMs = opts?.windowMs ?? 60_000
-  const maxKeys = Math.max(1, opts?.maxKeys ?? DEFAULT_RATE_LIMIT_MAX_KEYS)
-  const hits = new Map<string, number[]>()
-  let lastSweep = Date.now()
-
-  function sweep(now = Date.now()): number {
-    const cutoff = now - windowMs
-    let removed = 0
-    for (const [k, list] of hits) {
-      const fresh = list.filter(t => t > cutoff)
-      if (fresh.length === 0) {
-        hits.delete(k)
-        removed++
-      }
-      else if (fresh.length !== list.length) {
-        hits.set(k, fresh)
-      }
-    }
-    lastSweep = now
-    return removed
-  }
-
-  return {
-    sweep,
-    size: () => hits.size,
-    allow(key: string): boolean {
-      const now = Date.now()
-      const cutoff = now - windowMs
-
-      if (now - lastSweep >= windowMs || hits.size >= maxKeys)
-        sweep(now)
-
-      const existing = hits.get(key)
-      const list = existing ? existing.filter(t => t > cutoff) : []
-      if (list.length >= max) {
-        hits.delete(key)
-        hits.set(key, list)
-        return false
-      }
-      list.push(now)
-      hits.delete(key)
-      hits.set(key, list)
-
-      if (hits.size > maxKeys) {
-        for (const oldest of hits.keys()) {
-          if (hits.size <= maxKeys)
-            break
-          hits.delete(oldest)
-        }
-      }
-      return true
-    },
-  }
-}
 
 export function createAuth(options: AuthOptions = {}): Auth {
   if (options.secret !== undefined && options.secret.trim().length === 0)
@@ -318,6 +181,8 @@ export function createAuth(options: AuthOptions = {}): Auth {
   const storeIp = options.storeIp ?? true
   const storeUserAgent = options.storeUserAgent !== false
   const rateLimiter = createRateLimiter(options.rateLimit)
+  const limitIp = (ctx: RequestContext, scope: string): Response | undefined =>
+    rateLimiter.allow(`${scope}:ip:${resolveClientIp(ctx, trustProxy)}`) ? undefined : fail(ctx, 429, 'Too many requests')
 
   const pruneIntervalMs = options.pruneIntervalMs === false
     ? undefined
@@ -345,6 +210,16 @@ export function createAuth(options: AuthOptions = {}): Auth {
     ctx.url.protocol === 'https:'
     || isHttpsRequest(ctx.request, trustProxy)
     || runtimeNodeEnv() === 'production'
+
+  const setSessionCookie = (ctx: RequestContext, rawToken: string): void => {
+    ctx.cookies.set(cookieName, rawToken, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isSecureCookie(ctx),
+      maxAge: Math.floor(sessionTtlMs / 1000),
+    })
+  }
 
   async function resolveRequestSession(ctx: RequestContext): Promise<{ user: PublicUser, session: AuthSession } | undefined> {
     if (ctx.locals.__kayAuthResolved === true) {
@@ -377,13 +252,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
       const nextExpiry = Date.now() + sessionTtlMs
       await store.updateSessionExpiry(tokenHash, nextExpiry)
       session.expiresAt = nextExpiry
-      ctx.cookies.set(cookieName, rawToken, {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: isSecureCookie(ctx),
-        maxAge: Math.floor(sessionTtlMs / 1000),
-      })
+      setSessionCookie(ctx, rawToken)
     }
 
     const pub = toPublicUser(userRecord)
@@ -406,13 +275,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
       ...(recordedIp !== undefined ? { ip: recordedIp } : {}),
     }
     await store.createSession(session)
-    ctx.cookies.set(cookieName, rawToken, {
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: isSecureCookie(ctx),
-      maxAge: Math.floor(sessionTtlMs / 1000),
-    })
+    setSessionCookie(ctx, rawToken)
     ctx.locals.session = session
     return session
   }
@@ -439,17 +302,13 @@ export function createAuth(options: AuthOptions = {}): Auth {
     if (await store.getUserByEmail(email))
       throw new Error('Email is already registered')
 
-    const now = Date.now()
     const passwordHash = input.password !== undefined ? await hashPassword(input.password) : undefined
-    const created = await store.createUser({
-      id: crypto.randomUUID(),
+    const created = await insertUser({
       email,
       ...(input.name !== undefined ? { name: input.name } : {}),
-      role: input.role ?? defaultRole,
+      ...(input.role !== undefined ? { role: input.role } : {}),
       emailVerified: input.emailVerified ?? false,
       ...(passwordHash !== undefined ? { passwordHash } : {}),
-      createdAt: now,
-      updatedAt: now,
     })
     return toPublicUser(created)
   }
@@ -470,29 +329,31 @@ export function createAuth(options: AuthOptions = {}): Auth {
     return claimed
   }
 
-  async function issueVerificationToken(userId: string | undefined, email: string, origin: string | undefined, redirectTo?: string): Promise<string> {
+  // One-time emailed link: stores the hashed token, builds the URL and mails it when a transport is configured.
+  async function issueLink(kind: 'magic-link' | 'verify-email', userId: string | undefined, email: string, origin: string | undefined, redirectTo: string | undefined): Promise<string> {
     const normalized = normalizeEmail(email)
     const rawToken = randomToken(32)
     await store.createToken({
       tokenHash: sha256Hex(rawToken),
       ...(userId !== undefined ? { userId } : {}),
       email: normalized,
-      kind: 'verify-email',
+      kind,
       expiresAt: Date.now() + tokenTtlMs,
     })
 
     const next = safeRedirect(redirectTo, defaultRedirect)
-    const path = `${basePath}/verify-email?token=${encodeURIComponent(rawToken)}&redirect=${encodeURIComponent(next)}`
+    const path = `${basePath}/${LINK_PATHS[kind]}?token=${encodeURIComponent(rawToken)}&redirect=${encodeURIComponent(next)}`
     const url = origin !== undefined ? `${origin.replace(/\/$/, '')}${path}` : path
 
     if (options.sendMail && origin !== undefined) {
+      const mail = LINK_MAILS[kind]
       await options.sendMail({
         to: normalized,
-        subject: 'Verify your email address',
-        text: `Confirm your email address using this one-time link: ${url}`,
-        html: `<p>Click to verify your email address: <a href="${url}">Verify email</a></p>`,
+        subject: mail.subject,
+        text: `${mail.text}: ${url}`,
+        html: `<p>${mail.html}: <a href="${url}">${mail.label}</a></p>`,
         url,
-        kind: 'verify-email',
+        kind,
       })
     }
     return url
@@ -501,35 +362,27 @@ export function createAuth(options: AuthOptions = {}): Auth {
   async function sendVerificationEmail(email: string, origin: string, redirectTo?: string): Promise<string> {
     const normalized = normalizeEmail(email)
     const existing = await store.getUserByEmail(normalized)
-    return issueVerificationToken(existing?.id, normalized, origin, redirectTo)
+    return issueLink('verify-email', existing?.id, normalized, origin, redirectTo)
   }
 
   async function sendMagicLink(email: string, origin: string, redirectTo?: string): Promise<string> {
     const normalized = normalizeEmail(email)
-    const rawToken = randomToken(32)
     const existing = await store.getUserByEmail(normalized)
-    await store.createToken({
-      tokenHash: sha256Hex(rawToken),
-      ...(existing ? { userId: existing.id } : {}),
-      email: normalized,
-      kind: 'magic-link',
-      expiresAt: Date.now() + tokenTtlMs,
-    })
+    return issueLink('magic-link', existing?.id, normalized, origin, redirectTo)
+  }
 
-    const next = safeRedirect(redirectTo, defaultRedirect)
-    const url = `${origin.replace(/\/$/, '')}${basePath}/magic-link/verify?token=${encodeURIComponent(rawToken)}&redirect=${encodeURIComponent(next)}`
+  // Consumes a one-time token and loads the user it was issued for (by id, else by email).
+  async function consumeLink(kind: 'magic-link' | 'verify-email', rawToken: string): Promise<{ email: string, user: AuthUser | undefined } | undefined> {
+    const consumed = await store.consumeToken(sha256Hex(rawToken), kind)
+    if (!consumed)
+      return undefined
+    const user = consumed.userId ? await store.getUserById(consumed.userId) : await store.getUserByEmail(consumed.email)
+    return { email: consumed.email, user }
+  }
 
-    if (options.sendMail) {
-      await options.sendMail({
-        to: normalized,
-        subject: 'Your sign-in link',
-        text: `Sign in using this one-time link: ${url}`,
-        html: `<p>Click to sign in: <a href="${url}">Sign in</a></p>`,
-        url,
-        kind: 'magic-link',
-      })
-    }
-    return url
+  async function insertUser(fields: Pick<AuthUser, 'email' | 'emailVerified'> & Partial<AuthUser>): Promise<AuthUser> {
+    const now = Date.now()
+    return store.createUser({ id: crypto.randomUUID(), role: defaultRole, createdAt: now, updatedAt: now, ...fields })
   }
 
   function respondAuthError(ctx: RequestContext, status: number, error: string, redirectTo?: string): Response {
@@ -549,29 +402,23 @@ export function createAuth(options: AuthOptions = {}): Auth {
           const sep = guardOpts.redirectTo.includes('?') ? '&' : '?'
           return ctx.redirect(`${guardOpts.redirectTo}${sep}next=${nextParam}`, 302)
         }
-        return ctx.json({ ok: false, error: 'Authentication required' }, { status: 401 })
+        return fail(ctx, 401, 'Authentication required')
       }
       if (roles && !roles.includes(resolved.user.role))
-        return ctx.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+        return fail(ctx, 403, 'Forbidden')
       if (guardOpts.allow && !(await guardOpts.allow(resolved.user, ctx)))
-        return ctx.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+        return fail(ctx, 403, 'Forbidden')
       return next()
     }
   }
 
   async function handleVerifyEmail(ctx: RequestContext, rawToken: string, redirectTarget: string, redirectStatus: 302 | 303): Promise<Response> {
     if (!rawToken)
-      return ctx.json({ ok: false, error: 'Missing token' }, { status: 400 })
+      return fail(ctx, 400, 'Missing token')
 
-    const consumed = await store.consumeToken(sha256Hex(rawToken), 'verify-email')
-    if (!consumed)
-      return ctx.json({ ok: false, error: 'Invalid or expired verification link' }, { status: 400 })
-
-    const userRecord: AuthUser | undefined = consumed.userId
-      ? await store.getUserById(consumed.userId)
-      : await store.getUserByEmail(consumed.email)
+    const userRecord = (await consumeLink('verify-email', rawToken))?.user
     if (!userRecord)
-      return ctx.json({ ok: false, error: 'Invalid or expired verification link' }, { status: 400 })
+      return fail(ctx, 400, 'Invalid or expired verification link')
 
     const verified = (await store.updateUser(userRecord.id, { emailVerified: true })) ?? { ...userRecord, emailVerified: true }
     await createSessionForUser(verified.id, ctx)
@@ -601,21 +448,17 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('POST', `${basePath}/signup`, async (ctx) => {
-        const ip = resolveClientIp(ctx, trustProxy)
-        if (!rateLimiter.allow(`signup:ip:${ip}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+        const limited = limitIp(ctx, 'signup')
+        if (limited)
+          return limited
 
-        let body: Record<string, string>
-        try {
-          body = await readBody(ctx.request)
-        }
-        catch {
-          return ctx.json({ ok: false, error: 'Invalid request body' }, { status: 400 })
-        }
+        const body = await parseBody(ctx)
+        if (body instanceof Response)
+          return body
 
         const email = normalizeEmail(body.email ?? '')
         if (email && !rateLimiter.allow(`signup:email:${email}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+          return fail(ctx, 429, 'Too many requests')
 
         const password = body.password ?? ''
         const name = body.name?.trim() || undefined
@@ -632,10 +475,10 @@ export function createAuth(options: AuthOptions = {}): Auth {
           const linkOrigin = mailedLinkOrigin(ctx.url)
           if (options.sendMail && linkOrigin === undefined) {
             console.error(`[kay/auth] refusing to mail a verification link for host ${ctx.url.host}: set the auth \`site\` option to the public origin`)
-            return ctx.json({ ok: false, error: 'Verification links are not configured' }, { status: 500 })
+            return fail(ctx, 500, 'Verification links are not configured')
           }
           const user = await createUser({ email, password, name, emailVerified: false })
-          await issueVerificationToken(user.id, user.email, linkOrigin, redirectTarget)
+          await issueLink('verify-email', user.id, user.email, linkOrigin, redirectTarget)
 
           if (wantsJson(ctx.request))
             return ctx.json({ ok: true, verificationRequired: true, user }, { status: 202 })
@@ -652,9 +495,9 @@ export function createAuth(options: AuthOptions = {}): Auth {
       }, authRouteOpts)
 
       api.route('GET', `${basePath}/verify-email`, async (ctx) => {
-        const ip = resolveClientIp(ctx, trustProxy)
-        if (!rateLimiter.allow(`verify-email:ip:${ip}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+        const limited = limitIp(ctx, 'verify-email')
+        if (limited)
+          return limited
 
         const rawToken = ctx.url.searchParams.get('token') ?? ''
         const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
@@ -662,17 +505,13 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('POST', `${basePath}/verify-email`, async (ctx) => {
-        const ip = resolveClientIp(ctx, trustProxy)
-        if (!rateLimiter.allow(`verify-email:ip:${ip}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+        const limited = limitIp(ctx, 'verify-email')
+        if (limited)
+          return limited
 
-        let body: Record<string, string>
-        try {
-          body = await readBody(ctx.request)
-        }
-        catch {
-          return ctx.json({ ok: false, error: 'Invalid request body' }, { status: 400 })
-        }
+        const body = await parseBody(ctx)
+        if (body instanceof Response)
+          return body
 
         const rawToken = body.token ?? ctx.url.searchParams.get('token') ?? ''
         const redirectTarget = safeRedirect(body.redirect ?? body.next ?? ctx.url.searchParams.get('redirect'), defaultRedirect)
@@ -680,21 +519,17 @@ export function createAuth(options: AuthOptions = {}): Auth {
       }, authRouteOpts)
 
       api.route('POST', `${basePath}/signin`, async (ctx) => {
-        const ip = resolveClientIp(ctx, trustProxy)
-        if (!rateLimiter.allow(`signin:ip:${ip}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+        const limited = limitIp(ctx, 'signin')
+        if (limited)
+          return limited
 
-        let body: Record<string, string>
-        try {
-          body = await readBody(ctx.request)
-        }
-        catch {
-          return ctx.json({ ok: false, error: 'Invalid request body' }, { status: 400 })
-        }
+        const body = await parseBody(ctx)
+        if (body instanceof Response)
+          return body
 
         const email = normalizeEmail(body.email ?? '')
         if (email && !rateLimiter.allow(`signin:email:${email}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+          return fail(ctx, 429, 'Too many requests')
 
         const password = body.password ?? ''
         const redirectTarget = safeRedirect(body.redirect ?? body.next, defaultRedirect)
@@ -724,203 +559,65 @@ export function createAuth(options: AuthOptions = {}): Auth {
       }, authRouteOpts)
 
       api.route('POST', `${basePath}/magic-link`, async (ctx) => {
-        const ip = resolveClientIp(ctx, trustProxy)
-        if (!rateLimiter.allow(`magic:ip:${ip}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+        const limited = limitIp(ctx, 'magic')
+        if (limited)
+          return limited
 
-        let body: Record<string, string>
-        try {
-          body = await readBody(ctx.request)
-        }
-        catch {
-          return ctx.json({ ok: false, error: 'Invalid request body' }, { status: 400 })
-        }
+        const body = await parseBody(ctx)
+        if (body instanceof Response)
+          return body
 
         const email = normalizeEmail(body.email ?? '')
         if (email && !rateLimiter.allow(`magic:email:${email}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+          return fail(ctx, 429, 'Too many requests')
         if (!isValidEmail(email))
-          return ctx.json({ ok: false, error: 'Please enter a valid email address' }, { status: 400 })
+          return fail(ctx, 400, 'Please enter a valid email address')
 
         const linkOrigin = mailedLinkOrigin(ctx.url)
         if (linkOrigin === undefined) {
           console.error(`[kay/auth] refusing to mail a sign-in link for host ${ctx.url.host}: set the auth \`site\` option to the public origin`)
-          return ctx.json({ ok: false, error: 'Sign-in links are not configured' }, { status: 500 })
+          return fail(ctx, 500, 'Sign-in links are not configured')
         }
         await sendMagicLink(email, linkOrigin, body.redirect ?? body.next)
         return ctx.json({ ok: true, message: 'If that address can sign in, a link has been sent.' })
       }, authRouteOpts)
 
       api.route('GET', `${basePath}/magic-link/verify`, async (ctx) => {
-        const ip = resolveClientIp(ctx, trustProxy)
-        if (!rateLimiter.allow(`magic-verify:ip:${ip}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+        const limited = limitIp(ctx, 'magic-verify')
+        if (limited)
+          return limited
 
         const rawToken = ctx.url.searchParams.get('token') ?? ''
         const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
         if (!rawToken)
-          return ctx.json({ ok: false, error: 'Missing token' }, { status: 400 })
+          return fail(ctx, 400, 'Missing token')
 
-        const consumed = await store.consumeToken(sha256Hex(rawToken), 'magic-link')
+        const consumed = await consumeLink('magic-link', rawToken)
         if (!consumed)
-          return ctx.json({ ok: false, error: 'Invalid or expired sign-in link' }, { status: 400 })
+          return fail(ctx, 400, 'Invalid or expired sign-in link')
 
-        let userRecord: AuthUser | undefined = consumed.userId
-          ? await store.getUserById(consumed.userId)
-          : await store.getUserByEmail(consumed.email)
-
-        if (!userRecord) {
-          const now = Date.now()
-          userRecord = await store.createUser({
-            id: crypto.randomUUID(),
-            email: consumed.email,
-            role: defaultRole,
-            emailVerified: true,
-            createdAt: now,
-            updatedAt: now,
-          })
-        }
-        else if (!userRecord.emailVerified) {
-          userRecord = await claimUnverified(userRecord)
-        }
+        const userRecord = !consumed.user
+          ? await insertUser({ email: consumed.email, emailVerified: true })
+          : consumed.user.emailVerified ? consumed.user : await claimUnverified(consumed.user)
 
         await createSessionForUser(userRecord.id, ctx)
         return ctx.redirect(redirectTarget, 302)
       })
 
-      api.route('GET', `${basePath}/oauth/:provider`, (ctx) => {
-        const ip = resolveClientIp(ctx, trustProxy)
-        if (!rateLimiter.allow(`oauth-start:ip:${ip}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
-
-        const provider = providers.get(ctx.params.provider ?? '')
-        if (!provider)
-          return ctx.json({ ok: false, error: 'Unknown OAuth provider' }, { status: 404 })
-
-        const state = randomToken(24)
-        const verifier = provider.pkce !== false ? randomToken(32) : undefined
-        const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect') ?? ctx.url.searchParams.get('next'), defaultRedirect)
-
-        const cookieVal = signPayload(secret, {
-          provider: provider.id,
-          state,
-          verifier,
-          redirect: redirectTarget,
-          exp: Date.now() + 10 * 60 * 1000,
-        } satisfies OAuthStateCookie)
-
-        ctx.cookies.set(oauthCookieName, cookieVal, {
-          path: '/',
-          httpOnly: true,
-          sameSite: 'lax',
-          secure: isSecureCookie(ctx),
-          maxAge: 600,
-        })
-
-        const callbackUrl = `${site ?? ctx.url.origin}${basePath}/oauth/${encodeURIComponent(provider.id)}/callback`
-        const authUrl = new URL(provider.authorizeUrl)
-        authUrl.searchParams.set('client_id', provider.clientId)
-        authUrl.searchParams.set('redirect_uri', callbackUrl)
-        authUrl.searchParams.set('response_type', 'code')
-        authUrl.searchParams.set('scope', provider.scopes.join(' '))
-        authUrl.searchParams.set('state', state)
-        if (verifier !== undefined) {
-          authUrl.searchParams.set('code_challenge', pkceChallenge(verifier))
-          authUrl.searchParams.set('code_challenge_method', 'S256')
-        }
-        return ctx.redirect(authUrl.toString(), 302)
-      })
-
-      api.route('GET', `${basePath}/oauth/:provider/callback`, async (ctx) => {
-        const ip = resolveClientIp(ctx, trustProxy)
-        if (!rateLimiter.allow(`oauth-cb:ip:${ip}`))
-          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
-
-        const provider = providers.get(ctx.params.provider ?? '')
-        if (!provider)
-          return ctx.json({ ok: false, error: 'Unknown OAuth provider' }, { status: 404 })
-
-        const code = ctx.url.searchParams.get('code')
-        const returnedState = ctx.url.searchParams.get('state')
-        const rawCookie = ctx.cookies.get(oauthCookieName)
-        ctx.cookies.delete(oauthCookieName, { path: '/' })
-
-        if (!code || !returnedState || !rawCookie)
-          return ctx.json({ ok: false, error: 'Invalid OAuth callback parameters' }, { status: 400 })
-
-        const saved = verifyPayload<OAuthStateCookie>(secret, rawCookie)
-        if (!saved || saved.exp <= Date.now() || saved.provider !== provider.id || saved.state !== returnedState)
-          return ctx.json({ ok: false, error: 'Invalid or expired OAuth state' }, { status: 400 })
-
-        const callbackUrl = `${site ?? ctx.url.origin}${basePath}/oauth/${encodeURIComponent(provider.id)}/callback`
-        const tokenBody = new URLSearchParams({
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: callbackUrl,
-          client_id: provider.clientId,
-          client_secret: provider.clientSecret,
-        })
-        if (saved.verifier !== undefined)
-          tokenBody.set('code_verifier', saved.verifier)
-
-        const tokenRes = await fetch(provider.tokenUrl, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/x-www-form-urlencoded',
-            'accept': 'application/json',
-          },
-          body: tokenBody.toString(),
-        })
-        if (!tokenRes.ok)
-          return ctx.json({ ok: false, error: 'OAuth token exchange failed' }, { status: 502 })
-
-        const tokenData = await tokenRes.json() as { access_token?: string }
-        if (!tokenData.access_token)
-          return ctx.json({ ok: false, error: 'OAuth provider did not return an access token' }, { status: 502 })
-
-        const profile = await provider.fetchProfile(tokenData.access_token)
-        const existingLink = await store.getOAuthAccount(provider.id, profile.id)
-        let userRecord: AuthUser | undefined
-
-        if (existingLink) {
-          userRecord = await store.getUserById(existingLink.userId)
-        }
-        else {
-          const byEmail = await store.getUserByEmail(profile.email)
-          if (byEmail && profile.emailVerified) {
-            userRecord = byEmail.emailVerified ? byEmail : await claimUnverified(byEmail)
-          }
-          else if (!byEmail) {
-            const now = Date.now()
-            userRecord = await store.createUser({
-              id: crypto.randomUUID(),
-              email: profile.email,
-              ...(profile.name !== undefined ? { name: profile.name } : {}),
-              ...(profile.avatarUrl !== undefined ? { avatarUrl: profile.avatarUrl } : {}),
-              role: defaultRole,
-              emailVerified: profile.emailVerified,
-              createdAt: now,
-              updatedAt: now,
-            })
-          }
-          else {
-            return ctx.json({ ok: false, error: 'An account with this email already exists; verify email to link' }, { status: 409 })
-          }
-          if (userRecord) {
-            await store.linkOAuthAccount({
-              provider: provider.id,
-              providerAccountId: profile.id,
-              userId: userRecord.id,
-              createdAt: Date.now(),
-            })
-          }
-        }
-
-        if (!userRecord)
-          return ctx.json({ ok: false, error: 'Unable to resolve user account' }, { status: 500 })
-
-        await createSessionForUser(userRecord.id, ctx)
-        return ctx.redirect(safeRedirect(saved.redirect, defaultRedirect), 302)
+      registerOAuthRoutes({
+        route: (method, path, handler) => api.route(method, path, handler),
+        store,
+        providers,
+        secret,
+        site,
+        basePath,
+        stateCookieName: oauthCookieName,
+        defaultRedirect,
+        limitIp,
+        isSecureCookie,
+        claimUnverified,
+        insertUser,
+        createSessionForUser,
       })
     },
   }
