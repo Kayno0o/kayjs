@@ -5,10 +5,10 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
 import { isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
-import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
+import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblemLocation, SPECIAL_ROUTE_FILES } from '../build/routes'
 import { analyzeModule, walk } from '../compiler/analyze'
-import { readsPrivateEnv, SERVER_ONLY_MODULES } from '../compiler/server-only'
-import { jsxTagName } from '../compiler/shared'
+import { findPrivateEnvOffset, SERVER_ONLY_MODULES } from '../compiler/server-only'
+import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, jsxTagName } from '../compiler/shared'
 import { createAppContext, loadConfig, runWithAppContext } from '../plugins/index'
 
 export interface CheckResult {
@@ -28,10 +28,19 @@ function walkTsFiles(dir: string): string[] {
   })
 }
 
-function analysisOf(file: string, analyses: Map<string, ModuleAnalysis>, unparsable: Set<string>): ModuleAnalysis | undefined {
+function sourceOf(file: string, sources: Map<string, string>): string {
+  let code = sources.get(file)
+  if (code === undefined) {
+    code = readFileSync(file, 'utf8')
+    sources.set(file, code)
+  }
+  return code
+}
+
+function analysisOf(file: string, analyses: Map<string, ModuleAnalysis>, sources: Map<string, string>, unparsable: Set<string>): ModuleAnalysis | undefined {
   if (!analyses.has(file) && !unparsable.has(file) && isTsFile(file)) {
     try {
-      analyses.set(file, analyzeModule(file, readFileSync(file, 'utf8')))
+      analyses.set(file, analyzeModule(file, sourceOf(file, sources)))
     }
     catch {
       unparsable.add(file)
@@ -40,8 +49,44 @@ function analysisOf(file: string, analyses: Map<string, ModuleAnalysis>, unparsa
   return analyses.get(file)
 }
 
+function locOf(root: string, file: string, sources: Map<string, string>, offset = 0): string {
+  const rel = relPosix(root, file)
+  const code = sources.get(file)
+  return code !== undefined ? formatLoc(rel, code, offset) : `${rel}:1:1`
+}
+
+function findExportedConstOffset(analysis: ModuleAnalysis, name: string): number {
+  for (const stmt of analysis.program.body) {
+    if (stmt.type === 'ExportNamedDeclaration' && stmt.declaration?.type === 'VariableDeclaration') {
+      for (const d of stmt.declaration.declarations) {
+        if (d.id.type === 'Identifier' && d.id.name === name)
+          return d.start
+      }
+    }
+  }
+  return 0
+}
+
+function normalizeDiagnosticPath(root: string, file: string, message: string): string {
+  const rel = relPosix(root, file)
+  if (DIAGNOSTIC_PREFIX_RE.test(message)) {
+    if (message.startsWith(`${file}:`))
+      return `${rel}${message.slice(file.length)}`
+    return message
+  }
+  return formatDiagnostic(`${rel}:1:1`, message)
+}
+
 // Walks the local imports of an island the way the client build follows them: a module that only declares actions is stubbed there, so its imports stop the walk.
-function checkIslandReach(island: string, root: string, graph: ModuleGraph, unparsable: Set<string>, reported: Set<string>, errors: string[]): void {
+function checkIslandReach(
+  island: string,
+  root: string,
+  graph: ModuleGraph,
+  sources: Map<string, string>,
+  unparsable: Set<string>,
+  reported: Set<string>,
+  errors: string[],
+): void {
   const islandRel = relPosix(root, island)
   const seen = new Set<string>()
   const stack = [island]
@@ -52,30 +97,29 @@ function checkIslandReach(island: string, root: string, graph: ModuleGraph, unpa
     seen.add(file)
     if (NODE_MODULES_RE.test(file))
       continue
-    const analysis = analysisOf(file, graph.analyses, unparsable)
+    const analysis = analysisOf(file, graph.analyses, sources, unparsable)
     if (analysis === undefined || (file !== island && !analysis.isInteractive && analysis.exportedActions.length > 0))
       continue
-    const rel = relPosix(root, file)
-    const report = (key: string, message: string): void => {
+    const report = (key: string, offset: number, message: string): void => {
       if (reported.has(`${file}\0${key}`))
         return
       reported.add(`${file}\0${key}`)
-      errors.push(message)
+      errors.push(formatDiagnostic(locOf(root, file, sources, offset), message))
     }
     for (const imp of analysis.imports) {
       if (SERVER_ONLY_MODULES.has(imp.source)) {
-        report(imp.source, file === island
-          ? `kay check: ${rel}: interactive island imports server-only module "${imp.source}". Move server logic to a server action or async server component.`
-          : `kay check: ${rel}: imports server-only module "${imp.source}" and is reachable from the island in ${islandRel}. Move server logic to a server action or async server component.`)
+        report(imp.source, imp.start, file === island
+          ? `kay check: interactive island imports server-only module "${imp.source}". Move server logic to a server action or async server component.`
+          : `kay check: imports server-only module "${imp.source}" and is reachable from the island in ${islandRel}. Move server logic to a server action or async server component.`)
         continue
       }
       const target = graph.resolve(file, imp.source)
       if (target !== undefined) {
-        const targetAnalysis = analysisOf(target, graph.analyses, unparsable)
+        const targetAnalysis = analysisOf(target, graph.analyses, sources, unparsable)
         if (targetAnalysis !== undefined && !targetAnalysis.isInteractive && targetAnalysis.exportedActions.length > 0) {
           const missing = imp.specifiers.find(s => s.imported !== '*' && !targetAnalysis.exportedActions.includes(s.imported))
           if (missing !== undefined)
-            report(`action-export:${target}:${missing.imported}`, `kay check: ${rel}: imports non-action "${missing.imported}" from server action file ${relPosix(root, target)}. Move ${missing.imported} into a module without actions.`)
+            report(`action-export:${target}:${missing.imported}`, imp.start, `kay check: imports non-action "${missing.imported}" from server action file ${relPosix(root, target)}. Move ${missing.imported} into a module without actions.`)
           continue
         }
         stack.push(target)
@@ -83,15 +127,16 @@ function checkIslandReach(island: string, root: string, graph: ModuleGraph, unpa
     }
     for (const re of analysis.reexports) {
       if (SERVER_ONLY_MODULES.has(re.source)) {
-        report(re.source, `kay check: ${rel}: re-exports from server-only module "${re.source}" and is reachable from the island in ${islandRel}.`)
+        report(re.source, re.start, `kay check: re-exports from server-only module "${re.source}" and is reachable from the island in ${islandRel}.`)
         continue
       }
       const target = graph.resolve(file, re.source)
       if (target !== undefined)
         stack.push(target)
     }
-    if (readsPrivateEnv(analysis.program))
-      report('process.env', `kay check: ${rel}: reads process.env and is reachable from the island in ${islandRel}. Only process.env.PUBLIC_* reaches the browser.`)
+    const envOffset = findPrivateEnvOffset(analysis.program)
+    if (envOffset !== undefined)
+      report('process.env', envOffset, `kay check: reads process.env and is reachable from the island in ${islandRel}. Only process.env.PUBLIC_* reaches the browser.`)
   }
 }
 
@@ -115,12 +160,14 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       assetPrefix = cfg.assetPrefix.replace(/\/$/, '')
   }
   catch (err) {
-    errors.push(`kay.config.ts: ${err instanceof Error ? err.message : String(err)}`)
+    errors.push(formatDiagnostic('kay.config.ts:1:1', err instanceof Error ? err.message : String(err)))
   }
 
   // 2. Validate routesDir exists
-  if (!existsSync(routesDir))
-    errors.push(`missing routes directory: ${relative(root, routesDir) || routesDir}`)
+  if (!existsSync(routesDir)) {
+    const relRoutes = relative(root, routesDir) || routesDir
+    errors.push(formatDiagnostic(`${relRoutes.replace(/\\/g, '/')}:1:1`, `kay check: missing routes directory: ${relRoutes}`))
+  }
 
   // 3. Parse & run Kay static compiler analysis across src/ AND custom routesDir
   const srcDir = resolve(root, 'src')
@@ -136,18 +183,21 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   const files = [...fileSet].sort()
   const graph = new ModuleGraph()
   const { analyses } = graph
+  const sources = new Map<string, string>()
   const unparsable = new Set<string>()
 
   const warnings: string[] = []
   for (const file of files) {
     try {
-      const analysis = analyzeModule(file, readFileSync(file, 'utf8'))
+      const code = sourceOf(file, sources)
+      const analysis = analyzeModule(file, code)
       analyses.set(file, analysis)
       warnings.push(...analysis.warnings)
     }
     catch (err) {
       unparsable.add(file)
-      errors.push(err instanceof Error ? err.message : String(err))
+      const msg = err instanceof Error ? err.message : String(err)
+      errors.push(normalizeDiagnosticPath(root, file, msg))
     }
   }
 
@@ -164,9 +214,9 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
           return false
         try {
           if (spec.imported === '*')
-            return (analysisOf(resolved, analyses, unparsable)?.stateExports.length ?? 0) > 0
+            return (analysisOf(resolved, analyses, sources, unparsable)?.stateExports.length ?? 0) > 0
           const target = graph.exportTarget(resolved, spec.imported)
-          return analysisOf(target.file, analyses, unparsable)?.stateExports.includes(target.exportName) === true
+          return analysisOf(target.file, analyses, sources, unparsable)?.stateExports.includes(target.exportName) === true
         }
         catch {
           return false
@@ -175,9 +225,9 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       if (state !== undefined) {
         const reason = `reads ${state.local} from '${imp.source}'`
         if (analysis.hasAsyncDefault)
-          errors.push(`kay check: async route component in ${relPosix(root, file)} cannot use browser interactivity (${reason}).`)
+          errors.push(formatDiagnostic(locOf(root, file, sources, imp.start), `kay check: async route component cannot use browser interactivity (${reason}).`))
         else
-          analyses.set(file, { ...analysis, isInteractive: true, interactiveReason: reason })
+          analyses.set(file, { ...analysis, isInteractive: true, interactiveReason: reason, interactiveOffset: imp.start })
         break
       }
     }
@@ -196,12 +246,15 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
 
     // Special route files (`_layout.tsx`, `_error.tsx`, `_404.tsx`) cannot be interactive
     if (routeFileSet.has(file) && SPECIAL_ROUTE_FILES.has(basename(file)) && analysis.isInteractive) {
-      errors.push(`kay check: ${rel} uses browser interactivity (${analysis.interactiveReason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`)
+      errors.push(formatDiagnostic(
+        locOf(root, file, sources, analysis.interactiveOffset ?? 0),
+        `kay check: ${rel} uses browser interactivity (${analysis.interactiveReason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`,
+      ))
     }
 
     // Guardrail 1: server-only imports and private env reads in an island or any module it imports
     if (analysis.isInteractive)
-      checkIslandReach(file, root, graph, unparsable, reported, errors)
+      checkIslandReach(file, root, graph, sources, unparsable, reported, errors)
 
     // Guardrail 2: non-serializable props passed from static server code into an island (including barrels & namespaces)
     if (!analysis.isInteractive && file.endsWith('.tsx')) {
@@ -218,7 +271,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
           }
           try {
             const target = graph.exportTarget(resolved, spec.imported)
-            if (analysisOf(target.file, analyses, unparsable)?.isInteractive)
+            if (analysisOf(target.file, analyses, sources, unparsable)?.isInteractive)
               islandTags.add(spec.local)
           }
           catch {}
@@ -234,7 +287,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
           if (nsFile !== undefined && member !== undefined) {
             try {
               const target = graph.exportTarget(nsFile, member)
-              return analysisOf(target.file, analyses, unparsable)?.isInteractive === true
+              return analysisOf(target.file, analyses, sources, unparsable)?.isInteractive === true
             }
             catch {}
           }
@@ -259,14 +312,16 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
               continue
             const expr = attr.value.expression
             if (expr.type === 'ArrowFunctionExpression' || expr.type === 'FunctionExpression') {
-              errors.push(
-                `kay check: ${rel}: cannot pass function prop "${attrName}" from a server component into island <${tag}>. Define the handler inside the island or pass serializable data.`,
-              )
+              errors.push(formatDiagnostic(
+                locOf(root, file, sources, attr.start),
+                `kay check: cannot pass function prop "${attrName}" from a server component into island <${tag}>. Define the handler inside the island or pass serializable data.`,
+              ))
             }
             else if (expr.type === 'NewExpression' && expr.callee.type === 'Identifier' && !SERIALIZABLE_NEW_CTORS.has(expr.callee.name)) {
-              errors.push(
-                `kay check: ${rel}: cannot pass non-serializable \`new ${expr.callee.name}()\` prop "${attrName}" into island <${tag}>.`,
-              )
+              errors.push(formatDiagnostic(
+                locOf(root, file, sources, expr.start),
+                `kay check: cannot pass non-serializable \`new ${expr.callee.name}()\` prop "${attrName}" into island <${tag}>.`,
+              ))
             }
           }
         })
@@ -275,15 +330,15 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
 
     // Route-specific guardrails (only real route files matching `kay build`)
     if (routeFileSet.has(file) && !basename(file).startsWith('_')) {
-      const problem = routeExportProblem(analysis, rel)
+      const problem = routeExportProblemLocation(analysis, rel)
       if (problem !== undefined)
-        errors.push(`kay check: ${problem}`)
+        errors.push(formatDiagnostic(locOf(root, file, sources, problem.offset), `kay check: ${problem.message}`))
 
       if (hasRouteHandlerExport(analysis)) {
         const conflictKey = normalizeRoutePattern(fileToRoutePath(routesDir, file))
         const prev = seenRoutes.get(conflictKey)
         if (prev !== undefined) {
-          errors.push(`kay check: conflicting routes "${prev}" and "${rel}" both match "${conflictKey}".`)
+          errors.push(formatDiagnostic(`${rel}:1:1`, `kay check: conflicting routes "${prev}" and "${rel}" both match "${conflictKey}".`))
         }
         else {
           seenRoutes.set(conflictKey, rel)
@@ -291,7 +346,8 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
 
         // Guardrail 4: dynamic prerender = true route missing paths()
         if (analysis.hasPrerender && (conflictKey.includes(':') || conflictKey.includes('*')) && !analysis.hasPaths) {
-          errors.push(`kay check: ${rel}: dynamic route exports \`prerender = true\` without exporting \`paths()\`.`)
+          const offset = findExportedConstOffset(analysis, 'prerender')
+          errors.push(formatDiagnostic(locOf(root, file, sources, offset), `kay check: dynamic route exports \`prerender = true\` without exporting \`paths()\`.`))
         }
       }
     }
@@ -310,7 +366,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       root,
       routesDir,
       error(message: string) {
-        errors.push(message)
+        errors.push(DIAGNOSTIC_PREFIX_RE.test(message) ? message : formatDiagnostic('kay.config.ts:1:1', message))
       },
     }
     for (const plugin of plugins) {
@@ -319,7 +375,8 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
           await runWithAppContext(appCtx, () => plugin.check!(pluginCtx))
         }
         catch (err) {
-          errors.push(`${plugin.name}: ${err instanceof Error ? err.message : String(err)}`)
+          const msg = `${plugin.name}: ${err instanceof Error ? err.message : String(err)}`
+          errors.push(DIAGNOSTIC_PREFIX_RE.test(msg) ? msg : formatDiagnostic('kay.config.ts:1:1', msg))
         }
       }
     }

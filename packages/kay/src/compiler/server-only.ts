@@ -90,13 +90,13 @@ function isEnvRoot(node: Node, shadowed: ReadonlySet<string>): 'process' | 'bun'
   return undefined
 }
 
-/** True when the module reads `process.env` or `Bun.env` outside its `load()` (stripped from client code) for a key the client build does not inline. */
-export function readsPrivateEnv(program: Program, isInlined: (key: string) => boolean = key => CLIENT_ENV_KEY.test(key)): boolean {
-  let found = false
+/** Byte offset of the first `process.env` or `Bun.env` read outside `load()` for a key the client build does not inline, or `undefined`. */
+export function findPrivateEnvOffset(program: Program, isInlined: (key: string) => boolean = key => CLIENT_ENV_KEY.test(key)): number | undefined {
+  let foundOffset: number | undefined
   const loadCode = new Set<Node>(loadDeclarations(program))
 
   function visit(node: unknown, shadowed: Set<string>): void {
-    if (found || node === null || typeof node !== 'object')
+    if (foundOffset !== undefined || node === null || typeof node !== 'object')
       return
     if (Array.isArray(node)) {
       for (let i = 0; i < node.length; i++)
@@ -112,15 +112,16 @@ export function readsPrivateEnv(program: Program, isInlined: (key: string) => bo
       if (rootKind !== undefined) {
         // Bun.env is never statically inlined in browser bundles.
         if (rootKind === 'bun') {
-          found = true
+          foundOffset = n.start
           return
         }
         const key = propKeyName(n)
-        found = key === undefined || !isInlined(key)
+        if (key === undefined || !isInlined(key))
+          foundOffset = n.start
         return
       }
       if (isEnvRoot(n, shadowed) !== undefined) {
-        found = true
+        foundOffset = n.start
         return
       }
     }
@@ -201,5 +202,10 @@ export function readsPrivateEnv(program: Program, isInlined: (key: string) => bo
   }
 
   visit(program, new Set())
-  return found
+  return foundOffset
+}
+
+/** True when the module reads `process.env` or `Bun.env` outside its `load()` (stripped from client code) for a key the client build does not inline. */
+export function readsPrivateEnv(program: Program, isInlined: (key: string) => boolean = key => CLIENT_ENV_KEY.test(key)): boolean {
+  return findPrivateEnvOffset(program, isInlined) !== undefined
 }

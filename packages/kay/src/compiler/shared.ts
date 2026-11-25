@@ -115,12 +115,10 @@ export function decodeHtmlEntities(str: string): string {
   })
 }
 
-export function formatLoc(filename: string, code: string, offset?: number): string {
-  if (offset === undefined || offset < 0)
-    return filename
+export function offsetToLineCol(code: string, offset: number): { line: number, col: number } {
   let line = 1
   let col = 1
-  const end = Math.min(offset, code.length)
+  const end = Math.min(Math.max(0, offset), code.length)
   for (let i = 0; i < end; i++) {
     if (code.charCodeAt(i) === 10) {
       line++
@@ -130,7 +128,46 @@ export function formatLoc(filename: string, code: string, offset?: number): stri
       col++
     }
   }
+  return { line, col }
+}
+
+export function formatLoc(filename: string, code: string, offset?: number): string {
+  if (offset === undefined || offset < 0)
+    return filename
+  const { line, col } = offsetToLineCol(code, offset)
   return `${filename}:${line}:${col}`
+}
+
+/** Renders a short source code frame around `offset` with 1 context line before/after and a caret underline. */
+export function formatCodeFrame(code: string, offset: number, endOffset?: number): string {
+  if (code.length === 0)
+    return ''
+  const clamped = Math.min(Math.max(0, offset), code.length)
+  const { line, col } = offsetToLineCol(code, clamped)
+  const lines = code.split(/\r?\n/)
+  const lineIdx = Math.min(line - 1, lines.length - 1)
+  const startIdx = Math.max(0, lineIdx - 1)
+  const endIdx = Math.min(lines.length - 1, lineIdx + 1)
+  const gutterWidth = String(endIdx + 1).length
+  const pad = (n: number | '') => String(n).padStart(gutterWidth, ' ')
+  const targetLine = lines[lineIdx] ?? ''
+  const maxSpan = Math.max(1, targetLine.length - (col - 1))
+  const rawSpan = endOffset !== undefined && endOffset > clamped ? endOffset - clamped : 1
+  const caretLen = Math.max(1, Math.min(rawSpan, maxSpan))
+  const out: string[] = []
+  for (let i = startIdx; i <= endIdx; i++) {
+    const text = lines[i] ?? ''
+    out.push(`  ${pad(i + 1)} | ${text}`)
+    if (i === lineIdx)
+      out.push(`  ${pad('')} | ${' '.repeat(Math.max(0, col - 1))}${'^'.repeat(caretLen)}`)
+  }
+  return out.join('\n')
+}
+
+export const DIAGNOSTIC_PREFIX_RE = /^.+:\d+:\d+:\s+(?:error|warning):/
+
+export function formatDiagnostic(loc: string, message: string, severity: 'error' | 'warning' = 'error'): string {
+  return `${loc}: ${severity}: ${message}`
 }
 
 export function cleanJsxText(raw: string): string {

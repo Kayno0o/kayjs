@@ -134,3 +134,41 @@ export function precompressFile(abs: string, minBytes: number): void {
   if (gz.byteLength < raw.byteLength)
     writeFileSync(`${abs}.gz`, gz)
 }
+
+export interface BunBuildLogLike {
+  message?: string | undefined
+  level?: string | undefined
+  position?: {
+    file?: string | undefined
+    line?: number | undefined
+    column?: number | undefined
+    length?: number | undefined
+    lineText?: string | undefined
+  } | null | undefined
+}
+
+/** Formats Bun `BuildMessage` / `ResolveMessage` logs with `file:line:col: error|warning: <message>` and a source line frame. */
+export function formatBunBuildLogs(logs: readonly unknown[], root?: string): string {
+  return logs.map((raw) => {
+    if (raw === null || typeof raw !== 'object')
+      return String(raw)
+    const log = raw as BunBuildLogLike
+    const msg = typeof log.message === 'string' && log.message.length > 0 ? log.message : String(raw)
+    const pos = log.position
+    if (pos && typeof pos.file === 'string' && pos.file.length > 0 && typeof pos.line === 'number') {
+      const file = root !== undefined && isAbsolute(pos.file) ? relPosix(root, pos.file) : pos.file
+      const col = typeof pos.column === 'number' && pos.column > 0 ? pos.column : 1
+      const severity = log.level === 'warning' ? 'warning' : 'error'
+      const header = `${file}:${pos.line}:${col}: ${severity}: ${msg}`
+      if (typeof pos.lineText === 'string') {
+        const lineStr = String(pos.line)
+        const pad = ' '.repeat(lineStr.length)
+        const maxSpan = Math.max(1, pos.lineText.length - (col - 1))
+        const len = typeof pos.length === 'number' && pos.length > 0 ? Math.min(pos.length, maxSpan) : 1
+        return `${header}\n  ${lineStr} | ${pos.lineText}\n  ${pad} | ${' '.repeat(Math.max(0, col - 1))}${'^'.repeat(len)}`
+      }
+      return header
+    }
+    return msg
+  }).join('\n')
+}

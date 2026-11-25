@@ -83,7 +83,7 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
       export default function Home() { const n = signal(0); return <button type="button" onClick={() => { open(); n.value++ }}>{n.value}</button> }
     `)
     const checked = await checkProject(dir, { skipTypecheck: true })
-    expect(checked.errors).toContain('kay check: packages/shared-db/index.ts: imports server-only module "bun:sqlite" and is reachable from the island in src/routes/index.tsx. Move server logic to a server action or async server component.')
+    expect(checked.errors).toContain('packages/shared-db/index.ts:1:1: error: kay check: imports server-only module "bun:sqlite" and is reachable from the island in src/routes/index.tsx. Move server logic to a server action or async server component.')
     await expect(build({ root: dir, outDir: '.pkg' })).rejects.toThrow('packages/shared-db/index.ts imports server-only module "bun:sqlite"')
   })
 
@@ -113,8 +113,8 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
 
     const checked = await checkProject(dir, { skipTypecheck: true })
     expect(checked.errors.filter(e => e.includes('src/lib/db.ts'))).toEqual([
-      'kay check: src/lib/db.ts: imports server-only module "bun:sqlite" and is reachable from the island in src/routes/index.tsx. Move server logic to a server action or async server component.',
-      'kay check: src/lib/db.ts: reads process.env and is reachable from the island in src/routes/index.tsx. Only process.env.PUBLIC_* reaches the browser.',
+      'src/lib/db.ts:2:7: error: kay check: imports server-only module "bun:sqlite" and is reachable from the island in src/routes/index.tsx. Move server logic to a server action or async server component.',
+      'src/lib/db.ts:4:44: error: kay check: reads process.env and is reachable from the island in src/routes/index.tsx. Only process.env.PUBLIC_* reaches the browser.',
     ])
     await expect(build({ root: dir, outDir: '.leak' })).rejects.toThrow('src/lib/db.ts imports server-only module "bun:sqlite"')
 

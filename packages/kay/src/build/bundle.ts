@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { isAbsolute, join, resolve } from 'node:path'
 import { compileDom, compileSsr } from '../compiler/index'
 import { readsPrivateEnv, SERVER_ONLY_FILTER } from '../compiler/server-only'
-import { isOutsideRoot, isTsFile, relPosix } from './files'
+import { formatBunBuildLogs, isOutsideRoot, isTsFile, relPosix } from './files'
 import { islandKey } from './islands'
 import { resolveKaySpecifier } from './resolve'
 
@@ -235,13 +235,15 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   catch (err) {
     if (clientLeaks.size > 0)
       throw clientLeakError(clientLeaks)
+    if (err instanceof AggregateError && err.errors.length > 0)
+      throw new Error(`kay build (client) failed:\n${formatBunBuildLogs(err.errors, env.root)}`)
     throw err
   }
 
   if (clientLeaks.size > 0)
     throw clientLeakError(clientLeaks)
   if (!clientResult.success) {
-    const msgs = clientResult.logs.map(l => l.message).join('\n')
+    const msgs = formatBunBuildLogs(clientResult.logs, env.root)
     throw new Error(`kay build (client) failed:\n${msgs}`)
   }
 
@@ -420,23 +422,31 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
     },
   }
 
-  const serverResult = await Bun.build({
-    entrypoints: entries,
-    outdir: serverDir,
-    root: serverRoot,
-    target: 'bun',
-    format: 'esm',
-    splitting: true,
-    packages: 'external',
-    minify: false,
-    define: {
-      'process.env.NODE_ENV': 'process.env.NODE_ENV',
-    },
-    plugins: [serverPlugin, ...pluginBunPlugins(env, 'server')],
-  })
+  let serverResult: Awaited<ReturnType<typeof Bun.build>>
+  try {
+    serverResult = await Bun.build({
+      entrypoints: entries,
+      outdir: serverDir,
+      root: serverRoot,
+      target: 'bun',
+      format: 'esm',
+      splitting: true,
+      packages: 'external',
+      minify: false,
+      define: {
+        'process.env.NODE_ENV': 'process.env.NODE_ENV',
+      },
+      plugins: [serverPlugin, ...pluginBunPlugins(env, 'server')],
+    })
+  }
+  catch (err) {
+    if (err instanceof AggregateError && err.errors.length > 0)
+      throw new Error(`kay build (server) failed:\n${formatBunBuildLogs(err.errors, env.root)}`)
+    throw err
+  }
 
   if (!serverResult.success) {
-    const msgs = serverResult.logs.map(l => l.message).join('\n')
+    const msgs = formatBunBuildLogs(serverResult.logs, env.root)
     throw new Error(`kay build (server) failed:\n${msgs}`)
   }
 }

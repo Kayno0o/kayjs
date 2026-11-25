@@ -12,7 +12,7 @@ import type {
 } from 'oxc-parser'
 import { parseSync, visitorKeys } from 'oxc-parser'
 import { checkBareSignals, checkHydrateMode, checkMistakes, mistake } from './mistakes'
-import { EVENT_ATTR, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from './shared'
+import { EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from './shared'
 
 export type AstNode = Node
 
@@ -45,6 +45,7 @@ export interface ReexportInfo {
   exported: string
   local: string
   source: string
+  start: number
 }
 
 export interface ModuleAnalysis {
@@ -52,6 +53,7 @@ export interface ModuleAnalysis {
   program: Program
   isInteractive: boolean
   interactiveReason: string | undefined
+  interactiveOffset?: number | undefined
   hasAsyncDefault: boolean
   hasLoadExport: boolean
   hasJsx: boolean
@@ -387,9 +389,12 @@ export function parseTsx(filename: string, code: string): Program {
   const result = parseSync(filename, code, { lang, sourceType: 'module' })
   if (result.errors.length > 0) {
     const first = result.errors[0]!
-    const offset = first.labels?.[0]?.start
+    const label = first.labels?.[0]
+    const offset = label?.start ?? 0
     const loc = formatLoc(filename, code, offset)
-    throw new Error(`kay compiler: syntax error in ${loc}: ${first.message}`)
+    const frame = formatCodeFrame(code, offset, label?.end)
+    const header = formatDiagnostic(loc, `kay compiler: syntax error: ${first.message}`)
+    throw new Error(frame ? `${header}\n${frame}` : header)
   }
   return result.program
 }
@@ -468,6 +473,7 @@ function isIslandCall(node: Node, islandLocalName: string | undefined, kayNamesp
 export function analyzeModule(filename: string, code: string, program: Program = parseTsx(filename, code)): ModuleAnalysis {
   let isInteractive = false
   let interactiveReason: string | undefined
+  let interactiveOffset: number | undefined
   let hasAsyncDefault = false
   let hasLoadExport = false
   let hasJsx = false
@@ -496,10 +502,11 @@ export function analyzeModule(filename: string, code: string, program: Program =
   // The action() calls kay gives a URL to: the initialisers of top-level `export const`s.
   const registeredActions = new Set<Node>()
 
-  const markInteractive = (reason: string) => {
+  const markInteractive = (reason: string, offset?: number) => {
     if (!isInteractive) {
       isInteractive = true
       interactiveReason = reason
+      interactiveOffset = offset
     }
   }
 
@@ -530,7 +537,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
         const local = spec.local.name
         specifiers.push({ local, imported })
         if (KAY_SOURCES.has(source) && REACTIVE_IMPORTS.has(imported))
-          markInteractive(`imports ${imported} from '${source}'`)
+          markInteractive(`imports ${imported} from '${source}'`, spec.start)
         if (KAY_SOURCES.has(source) && imported === 'island')
           islandLocalName = local
         if (KAY_SOURCES.has(source) && STATE_PRIMITIVES.has(imported))
@@ -558,7 +565,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
   }
 
   const readIslandHydrate = (call: CallExpression): void => {
-    markInteractive('island() wrapper')
+    markInteractive('island() wrapper', call.start)
     const opts = call.arguments[1]
     if (opts !== undefined && opts.type === 'ObjectExpression') {
       for (const prop of opts.properties) {
@@ -588,7 +595,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
     }
     else if (stmt.type === 'ExportAllDeclaration') {
       if (stmt.exportKind !== 'type')
-        reexports.push({ exported: '*', local: '*', source: stmt.source.value })
+        reexports.push({ exported: '*', local: '*', source: stmt.source.value, start: stmt.start })
     }
     else if (stmt.type === 'ExportDefaultDeclaration') {
       exportedNames.push('default')
@@ -619,7 +626,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
           const local = exportedName(spec.local)
           if (exported !== undefined && local !== undefined) {
             exportedNames.push(exported)
-            reexports.push({ exported, local, source: src })
+            reexports.push({ exported, local, source: src, start: stmt.start })
             if (exported === 'load')
               hasLoadExport = true
             if (exported === 'paths')
@@ -732,13 +739,13 @@ export function analyzeModule(filename: string, code: string, program: Program =
         }
         // A handler or ref on a component tag is a prop for that component; only a DOM element binds it in the browser.
         if (!isComponent && tag !== '' && (EVENT_ATTR.test(attrName) || attrName === 'ref'))
-          markInteractive(`uses ${attrName}`)
+          markInteractive(`uses ${attrName}`, attr.start)
       }
     }
     if (node.type === 'MemberExpression' && !node.computed && node.object.type === 'Identifier' && kayNamespaces.has(node.object.name) && node.property.type === 'Identifier') {
       const member = node.property.name
       if (REACTIVE_IMPORTS.has(member))
-        markInteractive(`calls ${node.object.name}.${member}`)
+        markInteractive(`calls ${node.object.name}.${member}`, node.start)
       if (STATE_PRIMITIVES.has(member))
         stateCallees.add(`${node.object.name}.${member}`)
       if (member === 'signal' || member === 'computed')
@@ -795,6 +802,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
     warnings,
     isInteractive,
     interactiveReason,
+    interactiveOffset,
     hasAsyncDefault,
     hasLoadExport: hasLoadExport || loadDeclarations(program).length > 0,
     hasJsx,

@@ -5,6 +5,7 @@ import type { BunPlugin } from 'bun'
 import type { BuildManifest } from './index'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { formatBunBuildLogs } from './files'
 
 export interface CompileExecutableOptions {
   root: string
@@ -127,14 +128,22 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
         })
       },
     }
-    const res = await Bun.build({
-      entrypoints: [entryPath],
-      compile: { outfile },
-      minify: true,
-      plugins: [kayResolvePlugin, ...bunPlugins],
-    })
+    let res: Awaited<ReturnType<typeof Bun.build>>
+    try {
+      res = await Bun.build({
+        entrypoints: [entryPath],
+        compile: { outfile },
+        minify: true,
+        plugins: [kayResolvePlugin, ...bunPlugins],
+      })
+    }
+    catch (err) {
+      if (err instanceof AggregateError && err.errors.length > 0)
+        throw new Error(`kay build --compile failed:\n${formatBunBuildLogs(err.errors, root)}`)
+      throw err
+    }
     if (!res.success) {
-      const msgs = res.logs.map(l => l.message).join('\n')
+      const msgs = formatBunBuildLogs(res.logs, root)
       throw new Error(`kay build --compile failed:\n${msgs}`)
     }
   }

@@ -55,12 +55,35 @@ const FOREIGN_ROUTE_EXPORTS = new Map([
   ...['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'all'].map(m => [m, `kay never calls it; export function ${m === 'all' ? 'GET(), POST() or another method' : `${m.toUpperCase()}()`}`] as const),
 ])
 
-/** The first route export kay never reads (Next, Remix and Astro names), `paths` that is not a function, or `prerender` that is not literally `true` or `false`, worded for `kay build` and `kay check` to prefix. */
-export function routeExportProblem(analysis: ModuleAnalysis, file: string): string | undefined {
+function findExportOffset(analysis: ModuleAnalysis, exportName: string): number {
+  for (const stmt of analysis.program.body) {
+    if (stmt.type !== 'ExportNamedDeclaration')
+      continue
+    if (stmt.declaration?.type === 'FunctionDeclaration' && stmt.declaration.id?.name === exportName)
+      return stmt.start
+    if (stmt.declaration?.type === 'ClassDeclaration' && stmt.declaration.id?.name === exportName)
+      return stmt.start
+    if (stmt.declaration?.type === 'VariableDeclaration') {
+      for (const d of stmt.declaration.declarations) {
+        if (d.id.type === 'Identifier' && d.id.name === exportName)
+          return d.start
+      }
+    }
+    for (const spec of stmt.specifiers) {
+      const exp = spec.exported.type === 'Identifier' ? spec.exported.name : spec.exported.value
+      if (exp === exportName)
+        return spec.start
+    }
+  }
+  return 0
+}
+
+/** Returns the first route export problem together with its byte offset in the module source. */
+export function routeExportProblemLocation(analysis: ModuleAnalysis, file: string): { message: string, offset: number } | undefined {
   for (const name of analysis.exportedNames) {
     const fix = FOREIGN_ROUTE_EXPORTS.get(name)
     if (fix !== undefined)
-      return `export ${name} in ${file}: ${fix}.`
+      return { message: `export ${name} in ${file}: ${fix}.`, offset: findExportOffset(analysis, name) }
   }
   for (const stmt of analysis.program.body) {
     if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration')
@@ -69,12 +92,17 @@ export function routeExportProblem(analysis: ModuleAnalysis, file: string): stri
       const name = d.id.type === 'Identifier' ? d.id.name : undefined
       const init = d.init
       if (name === 'paths' && init !== null && init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression')
-        return `export const paths in ${file}: export function paths() returning the URLs, such as () => ['/posts/a'].`
+        return { message: `export const paths in ${file}: export function paths() returning the URLs, such as () => ['/posts/a'].`, offset: d.start }
       if (name === 'prerender' && !(init?.type === 'Literal' && typeof init.value === 'boolean'))
-        return `${init?.type === 'Literal' ? `prerender = ${init.raw ?? String(init.value)}` : 'prerender set at runtime'} in ${file}: write prerender = true or prerender = false.`
+        return { message: `${init?.type === 'Literal' ? `prerender = ${init.raw ?? String(init.value)}` : 'prerender set at runtime'} in ${file}: write prerender = true or prerender = false.`, offset: d.start }
     }
   }
   return undefined
+}
+
+/** The first route export kay never reads (Next, Remix and Astro names), `paths` that is not a function, or `prerender` that is not literally `true` or `false`, worded for `kay build` and `kay check` to prefix. */
+export function routeExportProblem(analysis: ModuleAnalysis, file: string): string | undefined {
+  return routeExportProblemLocation(analysis, file)?.message
 }
 
 /** Throws unless a route's `paths()` gave an array of URL paths starting with `/`. */
