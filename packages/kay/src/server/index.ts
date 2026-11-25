@@ -546,7 +546,6 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         const pageProps: Record<string, unknown> = { params: {}, locals: {}, url, ...(data !== undefined ? { data } : {}) }
         if (entry.isIsland && entry.islandChunk !== undefined) {
           return wrapLayouts(ssrIsland(
-            entry.path,
             entry.islandChunk,
             () => ssrChild(mod.default!(pageProps) as Html),
             data !== undefined ? { data } : {},
@@ -627,7 +626,6 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       let inner: string
       if (entry.isIsland && entry.islandChunk !== undefined) {
         inner = ssrIsland(
-          entry.path,
           entry.islandChunk,
           () => ssrChild(mod.default!(pageProps) as Html),
           data !== undefined ? { data } : {},

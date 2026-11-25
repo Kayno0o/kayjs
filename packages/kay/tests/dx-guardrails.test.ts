@@ -141,7 +141,7 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
 
   it('round-trips Date, Set, Map, URL, RegExp, and BigInt across ssrIsland -> parseIslandProps', () => {
     const date = new Date('2026-11-24T12:34:56.000Z')
-    const html = ssrIsland('demo', '/_kay/demo.js', () => '<div/>', {
+    const html = ssrIsland('/_kay/demo.js', () => '<div/>', {
       at: date,
       tags: new Set(['fast', 'small']),
       counts: new Map([['a', 1], ['b', 2]]),

@@ -600,7 +600,6 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
 
     // 2. Rendered inside an OuterIsland (depth > 0): MUST NOT emit a nested <kay-island>!
     const outerHtml = ssrRt.ssrIsland(
-      'outer',
       '/_kay/outer.js',
       () => Card({ label: 'Hi', InnerIsland }).__html,
       {},
@@ -612,7 +611,7 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
     // 3. Also works inside RenderContext (per-request isolation)
     const ctx = createRenderContext()
     runWithRenderContext(ctx, () => {
-      const wrapped = ssrRt.ssrIsland('outer', '/_kay/outer.js', () => Card({ label: 'Ctx', InnerIsland }).__html, {})
+      const wrapped = ssrRt.ssrIsland('/_kay/outer.js', () => Card({ label: 'Ctx', InnerIsland }).__html, {})
       expect(wrapped.match(/<kay-island/g)?.length).toBe(1)
       // After OuterIsland finishes, depth is back to 0!
       const after = Card({ label: 'After', InnerIsland }).__html

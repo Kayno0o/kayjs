@@ -227,7 +227,6 @@ export function ssrInIsland(render: () => string): string {
 }
 
 export function ssrIsland(
-  _id: string,
   chunk: string,
   render: () => string,
   props: Record<string, unknown>,

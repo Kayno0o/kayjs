@@ -510,7 +510,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       const hydrateArg = hydrateExpr ?? (islandInfo.defaultHydrate !== undefined ? JSON.stringify(islandInfo.defaultHydrate) : 'undefined')
       if (allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
         parts.pushExpr(
-          `${use('ssrIsland')}(${JSON.stringify(islandInfo.id)}, ${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg})`,
+          `${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg})`,
         )
         return
       }
@@ -538,7 +538,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         hArg = hVar
       }
       parts.pushExpr(
-        `((${argNames.join(', ')}) => ${use('ssrIsland')}(${JSON.stringify(islandInfo.id)}, ${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callArg})), ${pVar}, ${hArg}))(${argExprs.join(', ')})`,
+        `((${argNames.join(', ')}) => ${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callArg})), ${pVar}, ${hArg}))(${argExprs.join(', ')})`,
       )
       return
     }
