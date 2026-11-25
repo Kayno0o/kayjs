@@ -20,7 +20,7 @@ docker compose -f docs/compose.yaml up -d --build
 ```
 
 Environment variables (optional):
-- `SITE_URL` — canonical URL embedded in sitemap, OpenGraph tags, and share cards (default: `https://v2.kayjs.kaynooo.fr`).
+- `SITE_URL` — canonical URL embedded in sitemap, OpenGraph tags, and share cards (default: `https://kayjs-v2.kaynooo.fr`).
 - `DOCS_PORT` — loopback host port (default: `3650`, leaving v1's `3649` untouched when running side-by-side).
 
 Point your host reverse proxy (nginx / Caddy) at `http://127.0.0.1:3650`. Caddy serves precompressed `.br` and `.gz` sidecars directly from disk with immutable caching on `/_kay/*` and `/fonts/*`, and renders `/404.html` on missing paths.

@@ -10,7 +10,7 @@ import { defineConfig } from 'kay/server'
 import { docs } from './src/content'
 import { pageWeight } from './src/page-weight'
 
-const SITE = process.env.SITE_URL ?? 'https://kayjs.kaynooo.fr'
+const SITE = process.env.SITE_URL ?? 'https://kayjs-v2.kaynooo.fr'
 const GRAMMARS = ['orbit', 'editorial', 'workshop', 'console', 'soft', 'bare'] as const
 
 const docsAssets = {

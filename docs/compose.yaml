@@ -7,7 +7,7 @@ services:
       context: ..
       dockerfile: docs/Dockerfile
       args:
-        SITE_URL: ${SITE_URL:-https://v2.kayjs.kaynooo.fr}
+        SITE_URL: ${SITE_URL:-https://kayjs-v2.kaynooo.fr}
     restart: unless-stopped
     # Loopback-only: reverse proxy (nginx/Caddy on host) terminates TLS and forwards here.
     ports:

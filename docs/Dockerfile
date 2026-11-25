@@ -1,6 +1,6 @@
 # Multi-stage static build for Kay v2 documentation.
 # Build from the repository root:
-#   docker build -f docs/Dockerfile --build-arg SITE_URL=https://v2.kayjs.kaynooo.fr -t kay-v2-docs .
+#   docker build -f docs/Dockerfile --build-arg SITE_URL=https://kayjs-v2.kaynooo.fr -t kay-v2-docs .
 
 FROM oven/bun:1.4.5-alpine AS builder
 RUN apk add --no-cache imagemagick imagemagick-webp imagemagick-heic imagemagick-svg ttf-freefont
@@ -15,7 +15,7 @@ RUN bun install --frozen-lockfile --silent
 WORKDIR /repo/docs
 RUN bun install --silent
 
-ARG SITE_URL=https://v2.kayjs.kaynooo.fr
+ARG SITE_URL=https://kayjs-v2.kaynooo.fr
 ENV SITE_URL=${SITE_URL}
 RUN bun run build
 
