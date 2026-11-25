@@ -1,7 +1,7 @@
 # Kay v2
 
 **Write standard TypeScript & JSX. Zero `'use client'`, zero `client:load`.**
-Static UI compiles to `0 KB` HTML strings; interactive components automatically become `~2.6 KB` fine-grained signal islands. Built natively on Bun with single-binary production deploys and a strict `KayPlugin` boundary (`~6.9k LOC` core).
+Static UI compiles to `0 KB` HTML strings; interactive components automatically become `~2.6 KB` fine-grained signal islands. Built natively on Bun with single-binary production deploys and a strict `KayPlugin` boundary.
 
 ---
 
@@ -83,7 +83,7 @@ export const createPost = action(
 
 ## Modular Ecosystem (`KayPlugin`)
 
-Core stays tiny (`~6.9k LOC`). Every optional capability plugs in cleanly through `kay.config.ts`:
+Core holds the compiler, runtime, router, SSR and build. Every optional capability plugs in cleanly through `kay.config.ts`:
 
 | Package | Purpose | Notes |
 | :--- | :--- | :--- |

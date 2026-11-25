@@ -14,7 +14,7 @@ Kay v2 is a Bun-native web framework. You write standard TypeScript and JSX. Sta
 - **Flat-string SSR**: Static JSX compiles directly to flat string concatenation (`7,017 renders/s` on the products benchmark).
 - **Unified server actions**: Write one `action(schema, handler)` with any Standard Schema validator (Zod, Valibot, ArkType, TypeBox). It works as a zero-JS `<form action={fn} method="post">` and as a typed RPC call from islands.
 - **Single-pass build & `--compile`**: One `Bun.build()` pass compiles your app in `18.8 ms` clean. `kay build --compile` packs routes, plugins, and `public/` assets into a single executable with a `35.4 ms` cold start.
-- **Small core, modular plugins**: Core stays around `6.9k LOC`. Everything optional (`@kayjs/ui`, `@kayjs/auth`, `@kayjs/content`, `@kayjs/live`, `@kayjs/mcp`, `@kayjs/images`, `@kayjs/seo`, `@kayjs/i18n`, `@kayjs/mail`, `@kayjs/icons`, `@kayjs/tailwind`, `@kayjs/spa`) plugs in through `KayPlugin`.
+- **Small core, modular plugins**: Everything optional (`@kayjs/ui`, `@kayjs/auth`, `@kayjs/content`, `@kayjs/live`, `@kayjs/mcp`, `@kayjs/images`, `@kayjs/seo`, `@kayjs/i18n`, `@kayjs/mail`, `@kayjs/icons`, `@kayjs/tailwind`, `@kayjs/spa`) plugs in through `KayPlugin`.
 
 <Callout title="Coding-agent reference" tone="tip">
 The entire Kay v2 API fits on one dense page at [`/llms.txt`](/llms.txt).

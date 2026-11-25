@@ -1,6 +1,6 @@
 # Kay v2 Reference (for humans & coding agents)
 
-> Kay v2 (`v2.0.0-beta.0`) is a Bun-native TSX web framework with zero-directive automatic islands, `.value` fine-grained signals, flat-string SSR, unified Standard-Schema actions, single-binary `--compile`, and a composable `KayPlugin` API.
+> Kay v2 is a Bun-native TSX web framework with zero-directive automatic islands, `.value` fine-grained signals, flat-string SSR, unified Standard-Schema actions, single-binary `--compile`, and a composable `KayPlugin` API.
 
 ## Core Rules (everything fits on one page)
 
