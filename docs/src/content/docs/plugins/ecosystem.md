@@ -5,7 +5,14 @@ section: plugins
 order: 6
 ---
 
-Every remaining capability is an opt-in package built strictly on `KayPlugin`.
+Every remaining capability is an opt-in package built strictly on `KayPlugin` via `definePlugin(...)`.
+
+## Conventions & ordering
+
+- **Stateless plugins** export a single camelCase factory matching the package name from the package root: `tailwind()`, `icons()`, `images()`, `i18n()`, `content()`, `seo()`, `spa()`, `mcp()`.
+- **Stateful service plugins** (which also export a runtime handle used by routes/actions) expose `.plugin` / `.plugin(opts)` on the instance: `auth.plugin`, `rooms.plugin(opts)`, `mail.plugin(opts)` (with `mailPlugin(mail, opts)` and `contentPlugin(opts)` kept as aliases).
+- **Client-safe UI barrel exception**: `@kayjs/ui` exports only browser-safe JSX components; its build plugin lives at `@kayjs/ui/plugin` (`ui()`).
+- **Declarative ordering**: plugins declare `enforce: 'pre' | 'post'`, `after: ['...']`, `providesLocals`, and `readsLocals`. Core sorts plugins deterministically (`pre` → normal → `post`, respecting `after`) and fails at startup if a plugin declares `readsLocals` before its provider runs.
 
 ## `@kayjs/i18n`
 

@@ -2,6 +2,7 @@
 // Built strictly on Web Streams (text/event-stream) + KayPlugin (`api.route`) — zero core WebSocket coupling.
 
 import type { KayPlugin, RequestContext } from '@kayjs/kay/server'
+import { definePlugin } from '@kayjs/kay/server'
 
 export interface Subscriber<TMember> {
   readonly id: string
@@ -317,7 +318,7 @@ export function createRooms<TMessage, TMember = undefined>(
   }
 
   function plugin(opts: LivePluginOptions<TMember>): KayPlugin {
-    return {
+    return definePlugin({
       name: `@kayjs/live(${opts.path})`,
       server(api) {
         api.route('GET', opts.path, async (ctx) => {
@@ -334,7 +335,7 @@ export function createRooms<TMessage, TMember = undefined>(
           return stream(ctx, { ...opts, room, member })
         })
       },
-    }
+    })
   }
 
   return { join, leave, members, size, publish, coalesce, stream, plugin }

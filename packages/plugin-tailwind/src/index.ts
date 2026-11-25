@@ -5,6 +5,7 @@ import type { BunPlugin } from 'bun'
 import type { KayPlugin } from '@kayjs/kay/server'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import { definePlugin } from '@kayjs/kay/server'
 
 export interface TailwindPluginOptions {
   /** Global stylesheet entry path relative to project root (default: 'src/app.css'). */
@@ -34,7 +35,7 @@ function loadDefaultTailwindPlugin(root: string): BunPlugin | undefined {
 export function tailwind(options: TailwindPluginOptions = {}): KayPlugin {
   let warnedMissing = false
 
-  return {
+  return definePlugin({
     name: '@kayjs/tailwind',
     css: [options.css ?? 'src/app.css'],
     bunPlugins: options.bunPlugin !== undefined
@@ -54,5 +55,5 @@ export function tailwind(options: TailwindPluginOptions = {}): KayPlugin {
       if (options.bunPlugin === undefined && loadDefaultTailwindPlugin(ctx.root) === undefined)
         ctx.error(MISSING_PLUGIN_MESSAGE)
     },
-  }
+  })
 }

@@ -5,6 +5,7 @@
 import type { BunPlugin } from 'bun'
 import type { KayPlugin } from '@kayjs/kay/server'
 import type { IconData, IconifyIcon, IconSet } from './types'
+import { definePlugin } from '@kayjs/kay/server'
 
 export { Icon } from './Icon'
 export type { IconComponentProps } from './Icon'
@@ -84,7 +85,7 @@ export interface IconsPluginOptions {
 export function icons(options: IconsPluginOptions = {}): KayPlugin {
   const cache = new Map<string, IconSet>(Object.entries(options.sets ?? {}))
 
-  return {
+  return definePlugin({
     name: '@kayjs/icons',
     bunPlugins: ({ root }): BunPlugin[] => [{
       name: 'kayjs-icons',
@@ -116,5 +117,5 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
         })
       },
     }],
-  }
+  })
 }

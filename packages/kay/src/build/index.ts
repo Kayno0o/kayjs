@@ -11,7 +11,7 @@ import type { BuildManifest } from './manifest'
 import type { PublicFiles } from './plugin-host'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
-import { createAppContext, loadConfig, runWithAppContext } from '../plugins/index'
+import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { actionHash } from '../server/action'
 import { buildClient, buildServer, pluginBunPlugins, standaloneCssFiles } from './bundle'
 import { compileExecutable } from './compile'
@@ -114,7 +114,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     return await runWithAppContext(appCtx, () => runBuild({
       options,
       root,
-      plugins: options.plugins ?? fileConfig.plugins ?? [],
+      plugins: resolvePlugins(options.plugins ?? fileConfig.plugins),
       routesDir,
       publicDir,
       finalOutDir,

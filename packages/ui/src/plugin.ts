@@ -4,6 +4,7 @@
 import type { KayPlugin } from '@kayjs/kay/server'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { definePlugin } from '@kayjs/kay/server'
 
 export type GrammarName = 'bare' | 'editorial' | 'workshop' | 'console' | 'soft' | 'orbit'
 
@@ -41,7 +42,7 @@ export interface UiPluginOptions {
 
 export function ui(options: UiPluginOptions = {}): KayPlugin {
   const grammar = options.grammar === undefined ? 'editorial' : options.grammar
-  return {
+  return definePlugin({
     name: '@kayjs/ui',
     css: grammar === false ? undefined : [grammarCssPath(grammar)],
     commands: {
@@ -57,5 +58,5 @@ export function ui(options: UiPluginOptions = {}): KayPlugin {
         console.log(`Ejected @kayjs/ui "${name}" grammar to ${outPath}`)
       },
     },
-  }
+  })
 }

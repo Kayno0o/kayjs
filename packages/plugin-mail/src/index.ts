@@ -2,7 +2,7 @@
 // Built strictly on the public KayPlugin API (server(api).route).
 
 import type { KayPlugin } from '@kayjs/kay/server'
-import { DEFAULT_CSP, nodeEnv, withCspHashes } from '@kayjs/kay/server'
+import { DEFAULT_CSP, definePlugin, nodeEnv, withCspHashes } from '@kayjs/kay/server'
 import { esc, escAttr } from '@kayjs/kay/ssr'
 
 export type MailAddress = string | { name: string, address: string }
@@ -92,6 +92,8 @@ export interface Mailer {
   isConfigured(): boolean
   clearOutbox(): void
   send(message: MailMessage): Promise<SentMail>
+  /** Returns the Kay plugin mounting the dev outbox preview route (matching `rooms.plugin()`). */
+  plugin(options?: MailPluginOptions): KayPlugin
 }
 
 export function mailer(options: MailerOptions = {}): Mailer {
@@ -106,7 +108,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     return undefined
   }
 
-  return {
+  const instance: Mailer = {
     outbox,
     isConfigured() {
       return getTransport() !== undefined
@@ -144,7 +146,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
       }
       return record
     },
+    plugin(pluginOpts?: MailPluginOptions) {
+      return mailPlugin(instance, pluginOpts)
+    },
   }
+  return instance
 }
 
 export interface MailPluginOptions {
@@ -161,7 +167,7 @@ const MAIL_OUTBOX_CSP = withCspHashes(DEFAULT_CSP, { styleHashes: [MAIL_OUTBOX_S
 export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): KayPlugin {
   const route = options.previewRoute ?? '/_kay/mail'
 
-  return {
+  return definePlugin({
     name: '@kayjs/mail',
     server(api) {
       const env = nodeEnv()
@@ -189,5 +195,5 @@ export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): K
         })
       })
     },
-  }
+  })
 }

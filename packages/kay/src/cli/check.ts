@@ -9,7 +9,7 @@ import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExp
 import { analyzeModule, walk } from '../compiler/analyze'
 import { findPrivateEnvOffset, SERVER_ONLY_MODULES } from '../compiler/server-only'
 import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, jsxTagName } from '../compiler/shared'
-import { createAppContext, loadConfig, runWithAppContext } from '../plugins/index'
+import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 
 export interface CheckResult {
   ok: boolean
@@ -151,7 +151,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   let plugins: Awaited<ReturnType<typeof loadConfig>>['plugins'] = []
   try {
     const cfg = await loadConfig(root)
-    plugins = cfg.plugins ?? []
+    plugins = resolvePlugins(cfg.plugins)
     if (cfg.routesDir !== undefined)
       routesDir = resolve(root, cfg.routesDir)
     if (cfg.outDir !== undefined)

@@ -3,6 +3,7 @@
 // Implemented 100% through KayPlugin public hooks — zero i18n logic in @kay/core.
 
 import type { KayPlugin } from '@kayjs/kay/server'
+import { definePlugin } from '@kayjs/kay/server'
 
 declare module '@kayjs/kay/server' {
   interface KayLocals {
@@ -106,8 +107,10 @@ export function i18n(options: I18nOptions): KayPlugin {
     }
   }
 
-  return {
+  return definePlugin({
     name: '@kayjs/i18n',
+    enforce: 'pre',
+    providesLocals: ['locale', 't', 'localize', 'alternates'],
 
     server(api) {
       // Rewrite /fr/about -> /about and attach locale + helpers onto ctx.locals
@@ -184,5 +187,5 @@ export function i18n(options: I18nOptions): KayPlugin {
           console.log('[i18n] all locales complete')
       },
     },
-  }
+  })
 }

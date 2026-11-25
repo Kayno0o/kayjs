@@ -7,7 +7,7 @@ import type { ShareCardDefaults } from './card'
 import type { ImageAsset } from './helpers'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
-import { getAppContext } from '@kayjs/kay/server'
+import { definePlugin, getAppContext } from '@kayjs/kay/server'
 import { hasMagick, SHARE_CARD_CONFIG_SERVICE } from './card'
 
 export const CONTENT_IMAGE_RESOLVER_SERVICE = 'kay.content.imageResolver'
@@ -364,7 +364,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
     }
   }
 
-  return {
+  return definePlugin({
     name: '@kayjs/images',
     check(ctx) {
       if (!hasMagick())
@@ -505,7 +505,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
         sizes: effMarkdownSizes,
       }))
     },
-  }
+  })
 }
 
 export interface OptimizeImageFileOptions {

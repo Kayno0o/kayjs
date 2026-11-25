@@ -16,7 +16,7 @@ import type { EmbeddedBody, EmbeddedServerConfig, KayApp, Middleware, RequestCon
 import type { TrustProxy } from './security'
 import { existsSync, statSync } from 'node:fs'
 import { extname, join } from 'node:path'
-import { createAppContext, getAppContext, runWithAppContext } from '../plugins/index'
+import { createAppContext, getAppContext, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { createRenderContext, renderCollectedHead, runWithRenderContext, streamChunkScript } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
 import { ACTION_ERROR_COOKIE, executeAction, invokeActionCore, isServerAction } from './action'
@@ -31,7 +31,7 @@ import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HA
  */
 export interface KayLocals {}
 
-export { createAppContext, defineConfig, definePlugin, getAppContext, loadConfig, pickRuntimeConfig, runWithAppContext } from '../plugins/index'
+export { createAppContext, defineConfig, definePlugin, getAppContext, loadConfig, pickRuntimeConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 export type { AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, CreateAppContextOptions, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
 export { action, getActionError } from './action'
 export type { ActionContext, ActionErrorFlash, ActionOptions, ActionResult, ServerAction } from './action'
@@ -286,7 +286,8 @@ function middlewareAppliesToPath(scope: ScopedMiddleware['scope'], path: string,
 }
 
 export async function createServerFromEmbedded(config: EmbeddedServerConfig): Promise<KayApp> {
-  const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered, prerenderedFiles = {}, lang = 'en', security, plugins = [] } = config
+  const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered, prerenderedFiles = {}, lang = 'en', security } = config
+  const plugins = resolvePlugins(config.plugins)
   const assetPrefix = (config.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const trustedOriginsList = config.trustedOrigins ?? []
   const trustedOrigins = trustedOriginsList.length > 0 ? new Set(trustedOriginsList) : undefined

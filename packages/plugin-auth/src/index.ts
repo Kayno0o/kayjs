@@ -7,7 +7,7 @@ import type { KayLocals, KayPlugin, Middleware, RequestContext, TrustProxy } fro
 import type { OAuthProvider } from './oauth'
 import type { RateLimitOptions } from './ratelimit'
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
-import { isHttpsRequest, nodeEnv } from '@kayjs/kay/server'
+import { definePlugin, isHttpsRequest, nodeEnv } from '@kayjs/kay/server'
 import { hashPassword, randomToken, safeRedirect, sha256Hex, verifyPassword } from './crypto'
 import { fail, formatSessionIp, isValidEmail, parseBody, resolveClientIp, wantsJson } from './http'
 import { registerOAuthRoutes } from './oauth-routes'
@@ -613,8 +613,10 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     }
   }
 
-  const plugin: KayPlugin = {
+  const plugin: KayPlugin = definePlugin({
     name: '@kayjs/auth',
+    enforce: 'pre',
+    providesLocals: ['user', 'session'],
     server(api) {
       if (options.trustProxy === undefined)
         trustProxy = api.trustProxy
@@ -811,7 +813,7 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         createSessionForUser,
       })
     },
-  }
+  })
 
   return {
     plugin,

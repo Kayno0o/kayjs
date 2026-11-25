@@ -4,7 +4,7 @@
 import type { KayPlugin, StandardSchemaV1 } from '@kayjs/kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
-import { formatIssuePath, getAppContext, validateSchemaSync } from '@kayjs/kay/server'
+import { definePlugin, formatIssuePath, getAppContext, validateSchemaSync } from '@kayjs/kay/server'
 
 import { escAttr } from '@kayjs/kay/ssr'
 import { renderMarkdown } from './markdown'
@@ -639,7 +639,7 @@ export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefi
     return [...out]
   }
 
-  return {
+  return definePlugin({
     name: '@kayjs/content',
     watchPaths: (root) => {
       const dirs = new Set<string>()
@@ -695,5 +695,8 @@ export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefi
         })
       }
     },
-  }
+  })
 }
+
+/** Alias of `contentPlugin` matching the standard plugin factory naming (`seo()`, `i18n()`, `images()`, `content()`). */
+export const content = contentPlugin

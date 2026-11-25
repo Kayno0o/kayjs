@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wat
 import { dirname, join, relative, resolve } from 'node:path'
 import { clearBuildCache } from '../build/graph'
 import { build, createBuildCache } from '../build/index'
-import { createAppContext, loadConfig, runWithAppContext } from '../plugins/index'
+import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { DEFAULT_MAX_REQUEST_BODY_SIZE } from '../server/http'
 import { createServer, withCspHashes } from '../server/index'
 
@@ -196,7 +196,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
     pluginWatchers.length = 0
     const seen = new Set<string>(watchedDirs)
     const watchCtx = createAppContext({ root, outDir: devRoot, publicDir, assetPrefix: activeAssetPrefix, dev: true })
-    for (const plugin of cfg.plugins ?? []) {
+    for (const plugin of resolvePlugins(cfg.plugins)) {
       const paths = runWithAppContext(watchCtx, () =>
         typeof plugin.watchPaths === 'function' ? plugin.watchPaths(root) : (plugin.watchPaths ?? []))
       for (const p of paths) {

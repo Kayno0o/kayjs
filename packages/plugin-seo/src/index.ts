@@ -5,6 +5,7 @@ import type { Html } from '@kayjs/kay'
 import type { KayPlugin } from '@kayjs/kay/server'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, extname, resolve } from 'node:path'
+import { definePlugin } from '@kayjs/kay/server'
 import { escAttr, raw } from '@kayjs/kay/ssr'
 
 export interface FontEntry {
@@ -83,8 +84,10 @@ function descriptionTags(description: string): string {
 export function seo(options: SeoPluginOptions = {}): KayPlugin {
   const site = options.site?.replace(/\/$/, '')
 
-  return {
+  return definePlugin({
     name: '@kayjs/seo',
+    after: ['@kayjs/i18n'],
+    readsLocals: ['locale'],
 
     server(api) {
       if (options.redirects !== undefined) {
@@ -250,5 +253,5 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
 
       return head + rest
     },
-  }
+  })
 }

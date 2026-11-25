@@ -2,10 +2,11 @@
 
 import type { KayPlugin } from '@kayjs/kay/server'
 import { resolve } from 'node:path'
+import { definePlugin } from '@kayjs/kay/server'
 
 export function spa(): KayPlugin {
-  return {
+  return definePlugin({
     name: '@kayjs/spa',
     clientEntry: resolve(import.meta.dir, 'client.ts'),
-  }
+  })
 }
