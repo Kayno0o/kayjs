@@ -1,17 +1,17 @@
-import type { RequestContext } from 'kay/server'
-import type { PinnedNotice } from '../../db'
+import type { PageProps, RouteContext } from 'kay/server'
 import { Button, Card, CardBody, CardFooter, CardHeader, Stack } from '@kayjs/ui'
 import { Head } from 'kay'
+import { notFound } from 'kay/server'
 import { findNotice } from '../../db'
 
-export function load(ctx: RequestContext): PinnedNotice | Response {
+export function load(ctx: RouteContext<'/notices/[id]'>) {
   const notice = findNotice(Number(ctx.params.id))
   if (!notice)
-    return new Response('Notice not found', { status: 404 })
+    return notFound()
   return notice
 }
 
-export default function NoticeDetailPage({ data }: { data: PinnedNotice }) {
+export default function NoticeDetailPage({ data }: PageProps<typeof load>) {
   return (
     <Stack gap="1.25rem">
       <Head><title>{data.title} — Noticeboard</title></Head>

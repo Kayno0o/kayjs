@@ -236,7 +236,7 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
 
       // Localized fallback description when <head> didn't emit its own <meta name="description">
       if (options.description && typeof options.description === 'object' && !head.includes('name="description"')) {
-        const loc = typeof ctx.locals.locale === 'string' ? ctx.locals.locale : undefined
+        const loc = 'locale' in ctx.locals && typeof ctx.locals.locale === 'string' ? ctx.locals.locale : undefined
         const desc = (loc && options.description[loc]) ?? Object.values(options.description)[0]
         if (desc)
           head += descriptionTags(desc)

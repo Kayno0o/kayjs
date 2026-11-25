@@ -1,11 +1,18 @@
 // Unified server actions: works as both progressive <form action={fn} method="post"> and typed island RPC.
 
 import type { Cookies } from './cookies'
-import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult } from './standard-schema'
+import type { KayLocals } from './index'
 import type { TrustProxy } from './security'
+import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult } from './standard-schema'
 import { wantsJson } from './http'
 import { isTrustedOrigin } from './security'
 import { validateSchema } from './standard-schema'
+
+declare module './index' {
+  interface KayLocals {
+    actionError?: ActionErrorFlash | undefined
+  }
+}
 
 export const ACTION_ERROR_COOKIE = '__kay_action_err'
 
@@ -25,15 +32,15 @@ export interface ActionErrorFlash {
   values?: Record<string, string> | undefined
 }
 
-export function getActionError(locals?: Record<string, unknown>): ActionErrorFlash | undefined {
-  return locals?.actionError as ActionErrorFlash | undefined
+export function getActionError(locals?: KayLocals): ActionErrorFlash | undefined {
+  return locals?.actionError
 }
 
 export interface ActionContext {
   request: Request
   url: URL
   cookies: Cookies
-  locals: Record<string, unknown>
+  locals: KayLocals
   ip?: string | undefined
   redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => Response
   deny: (status: number, message: string, fieldErrors?: Record<string, string>) => Response

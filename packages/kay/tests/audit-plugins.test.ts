@@ -25,7 +25,7 @@ afterAll(() => {
 })
 
 // Minimal RequestContext helper for unit-testing plugins directly
-function makeCtx(urlStr: string, locals: Record<string, unknown> = {}, init?: RequestInit) {
+function makeCtx(urlStr: string, locals: import('../src/server/index').KayLocals = {}, init?: RequestInit) {
   const url = new URL(urlStr)
   const request = new Request(urlStr, init)
   return {

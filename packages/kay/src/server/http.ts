@@ -1,14 +1,92 @@
 // HTTP helpers, MIME table, RequestContext factory, and island tag scanner for Kay v2 server.
 
 import type { BuildManifest } from '../build/index'
+import type { KayChild } from '../jsx-runtime'
 import type { KayPlugin, ServerErrorInfo } from '../plugins/index'
 import type { Cookies } from './cookies'
+import type { KayLocals } from './index'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
 import { CookieStore } from './cookies'
 import { nodeEnv } from './env'
 import { getClientIp, isHttpsRequest } from './security'
 
 export const DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 1024
+
+const NOT_FOUND_SYMBOL = Symbol.for('kay.notFound')
+declare const NOT_FOUND_BRAND: unique symbol
+
+export interface NotFoundResult {
+  readonly [NOT_FOUND_BRAND]: true
+}
+
+/** Return (or throw) from `load()` to render `_404.tsx` with HTTP status 404. */
+export function notFound(): NotFoundResult {
+  return { [NOT_FOUND_SYMBOL]: true } as unknown as NotFoundResult
+}
+
+export function isNotFound(value: unknown): value is NotFoundResult {
+  return typeof value === 'object' && value !== null && (value as Record<symbol, unknown>)[NOT_FOUND_SYMBOL] === true
+}
+
+type SegmentParam<Seg extends string> =
+  Seg extends `[...${infer Name}]`
+    ? { [K in Name]: string }
+    : Seg extends `[${infer Name}]`
+      ? { [K in Name]: string }
+      : Seg extends `*${infer Name}`
+        ? { [K in Name extends '' ? 'rest' : Name]: string }
+        : Seg extends `:${infer Name}`
+          ? { [K in Name]: string }
+          : unknown
+
+type MergeParams<A, B> = {
+  [K in keyof A | keyof B]: K extends keyof B ? B[K] : K extends keyof A ? A[K] : never
+}
+
+type ExtractRouteParamsRec<Path extends string, Acc = {}> =
+  Path extends `${infer Seg}/${infer Rest}`
+    ? ExtractRouteParamsRec<Rest, Seg extends '' ? Acc : MergeParams<Acc, SegmentParam<Seg>>>
+    : Path extends ''
+      ? Acc
+      : MergeParams<Acc, SegmentParam<Path>>
+
+/** Extracts typed route params from a Kay route path (`'/notices/[id]'` -> `{ id: string }`, `'/docs/[...rest]'` -> `{ rest: string }`). */
+export type ExtractRouteParams<Path extends string> =
+  string extends Path
+    ? Record<string, string>
+    : ExtractRouteParamsRec<Path>
+
+export type LoaderFn = (...args: never[]) => unknown
+
+/** Infers the resolved page `data` type returned by a route's `load()` function, excluding `Response` and `notFound()`. */
+export type LoaderData<T extends LoaderFn> = Exclude<Awaited<ReturnType<T>>, Response | NotFoundResult>
+
+type InferLoaderParams<T extends LoaderFn> =
+  Parameters<T> extends [ctx: { params: infer P }, ...unknown[]]
+    ? P
+    : Record<string, string>
+
+/** Props passed to a Kay route page component. Pass `typeof load` to infer `data` (and `params` when `load` uses `RouteContext<Path>`), or a route path string when there is no `load`. */
+export type PageProps<
+  TLoadOrPath extends LoaderFn | string | undefined = undefined,
+  TPath extends string = string,
+> = {
+  params: TLoadOrPath extends string
+    ? ExtractRouteParams<TLoadOrPath>
+    : string extends TPath
+      ? (TLoadOrPath extends LoaderFn ? InferLoaderParams<TLoadOrPath> : Record<string, string>)
+      : ExtractRouteParams<TPath>
+  locals: KayLocals
+  url: URL
+} & (TLoadOrPath extends LoaderFn ? { data: LoaderData<TLoadOrPath> } : { data?: undefined })
+
+/** Props passed to a Kay `_layout.tsx` component. */
+export interface LayoutProps<Path extends string = string> {
+  children: KayChild
+  params: ExtractRouteParams<Path>
+  locals: KayLocals
+  url: URL
+}
 
 export interface ServerOptions {
   root: string
@@ -30,18 +108,21 @@ export interface ServerOptions {
   importModule?: ((path: string) => Promise<Record<string, unknown>>) | undefined
 }
 
-export interface RequestContext {
+export interface RequestContext<Params = Record<string, string>> {
   request: Request
   url: URL
-  params: Record<string, string>
+  params: Params
   cookies: Cookies
-  locals: Record<string, unknown>
+  locals: KayLocals
   ip?: string | undefined
   json: (data: unknown, init?: ResponseInit) => Response
   text: (body: string, init?: ResponseInit) => Response
   redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => Response
   deny: (status: number, message: string, fieldErrors?: Record<string, string>) => Response
 }
+
+/** `RequestContext` with `params` inferred from a Kay route pattern (e.g. `RouteContext<'/notices/[id]'>`). */
+export type RouteContext<Path extends string = string> = RequestContext<ExtractRouteParams<Path>>
 
 export type Middleware = (ctx: RequestContext, next: () => Promise<Response>) => Response | Promise<Response>
 

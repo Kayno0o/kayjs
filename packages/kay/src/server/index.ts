@@ -21,9 +21,15 @@ import { createRenderContext, renderCollectedHead, runWithRenderContext, streamC
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
 import { ACTION_ERROR_COOKIE, executeAction, invokeActionCore, isServerAction } from './action'
 import { CompressionCache, compressedHtmlResponse, isCompressibleType, maybeCompressResponse, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
-import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, etagMatches, extractRenderedIslands, finalizeResponse, makeRequestContext, MIME, wantsJson } from './http'
+import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, etagMatches, extractRenderedIslands, finalizeResponse, isNotFound, makeRequestContext, MIME, wantsJson } from './http'
 import { Router } from './router'
 import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, resolveCspPolicy, resolveHstsValue, verifyOrigin, withCspHashes } from './security'
+
+/**
+ * Request-scoped locals bag shared across middlewares, plugins, actions, layouts, and pages.
+ * Augment via `declare module '@kayjs/kay/server' { interface KayLocals { ... } }`.
+ */
+export interface KayLocals {}
 
 export { createAppContext, defineConfig, definePlugin, getAppContext, loadConfig, pickRuntimeConfig, runWithAppContext } from '../plugins/index'
 export type { AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, CreateAppContextOptions, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
@@ -33,8 +39,8 @@ export { CompressionCache, isCompressibleType, pickEncoding, pickPrecompressedEn
 export type { CompressionEncoding, PrecompressedEncoding } from './compress'
 export type { CookieOptions, Cookies } from './cookies'
 export { defineEnv, nodeEnv } from './env'
-export { DEFAULT_MAX_REQUEST_BODY_SIZE } from './http'
-export type { EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
+export { DEFAULT_MAX_REQUEST_BODY_SIZE, notFound } from './http'
+export type { EmbeddedServerConfig, ExtractRouteParams, KayApp, LayoutProps, LoaderData, LoaderFn, Middleware, NotFoundResult, PageProps, RequestContext, RouteContext, ServerOptions } from './http'
 export { createServer } from './loader'
 export { DEFAULT_CSP, DEFAULT_HSTS, DEFAULT_PERMISSIONS_POLICY, getClientIp, isHttpsRequest, isTrustedOrigin, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, verifyOrigin, withCspHashes } from './security'
 export type { SecurityHeadersOptions, TrustProxy } from './security'
@@ -57,7 +63,7 @@ interface LoadedPageModule {
 }
 
 interface LoadedLayoutModule {
-  default: (props: { children: Html, url?: URL, params?: Record<string, string>, locals?: Record<string, unknown> }) => Html | string | Promise<Html | string>
+  default: (props: { children: Html, url?: URL, params?: Record<string, string>, locals?: KayLocals }) => Html | string | Promise<Html | string>
 }
 
 interface LoadedMiddlewareModule {
@@ -752,9 +758,9 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         const res = compressedHtmlResponse(docPrefix + body + docSuffix, 200, fastHeaders, request, compressCache, !entry.hasLoad)
         return cookieStore?.hasChanges ? finish(res, request, cookieStore) : withHsts(res, request)
       }
-      const layoutProps = (inner: string, url: URL, locals: Record<string, unknown>) => ({ children: raw(inner), url, params: {}, locals })
+      const layoutProps = (inner: string, url: URL, locals: KayLocals) => ({ children: raw(inner), url, params: {}, locals })
 
-      const wrapLayouts = (inner: string, request: Request, url: URL, locals: Record<string, unknown>, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
+      const wrapLayouts = (inner: string, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
         if (layouts.length === 0)
           return respondHtml(inner, request, cookieStore)
         if (singleLayout !== undefined) {
@@ -776,7 +782,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         })()
       }
 
-      const renderPage = (data: unknown, request: Request, url: URL, locals: Record<string, unknown>, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
+      const renderPage = (data: unknown, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
         const pageProps: Record<string, unknown> = { params: {}, locals, url, ...(data !== undefined ? { data } : {}) }
         if (entry.isIsland && entry.islandChunk !== undefined) {
           return wrapLayouts(ssrIsland(
@@ -799,18 +805,21 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
             return renderPage(undefined, request, url, {})
 
           const { ctx, cookieStore } = makeRequestContext(request, {}, { trustProxy, remoteIp, url })
-          const afterLoad = async (pending: unknown): Promise<Response> => {
+          return (async () => {
             try {
-              const loaded = await pending
+              const loaded = await mod.load!(ctx)
+              if (isNotFound(loaded))
+                return finish(await buildNotFoundResponse(url, request, ctx), request, cookieStore)
               if (loaded instanceof Response)
                 return finish(loaded, request, cookieStore)
               return await renderPage(loaded, request, url, ctx.locals, cookieStore, ctx)
             }
             catch (error) {
+              if (isNotFound(error))
+                return finish(await buildNotFoundResponse(url, request, ctx), request, cookieStore)
               return fail(error, request, cookieStore, ctx)
             }
-          }
-          return afterLoad(mod.load(ctx))
+          })()
         }
         catch (error) {
           return fail(error, request)
@@ -868,7 +877,19 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
     }
 
-    const data = entry.hasLoad && typeof mod.load === 'function' ? await mod.load(ctx) : undefined
+    let data: unknown
+    if (entry.hasLoad && typeof mod.load === 'function') {
+      try {
+        data = await mod.load(ctx)
+      }
+      catch (error) {
+        if (isNotFound(error))
+          return buildNotFoundResponse(ctx.url, ctx.request, ctx)
+        throw error
+      }
+    }
+    if (isNotFound(data))
+      return buildNotFoundResponse(ctx.url, ctx.request, ctx)
     if (data instanceof Response)
       return data
     const pageProps: Record<string, unknown> = {

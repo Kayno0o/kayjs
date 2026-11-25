@@ -3,7 +3,7 @@
 // Supports Argon2id passwords, hashed DB sessions with sliding renewal, email verification,
 // magic links, OAuth 2.0 + PKCE (S256), role/route guards, RGPD helpers, and memory or `bun:sqlite` stores.
 
-import type { KayPlugin, Middleware, RequestContext, TrustProxy } from '@kayjs/kay/server'
+import type { KayLocals, KayPlugin, Middleware, RequestContext, TrustProxy } from '@kayjs/kay/server'
 import type { OAuthProvider } from './oauth'
 import type { RateLimitOptions } from './ratelimit'
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
@@ -13,6 +13,13 @@ import { fail, formatSessionIp, isValidEmail, parseBody, resolveClientIp, wantsJ
 import { registerOAuthRoutes } from './oauth-routes'
 import { createRateLimiter } from './ratelimit'
 import { memoryAuthStore, normalizeEmail, toPublicUser } from './store'
+
+declare module '@kayjs/kay/server' {
+  interface KayLocals {
+    user?: PublicUser | undefined
+    session?: AuthSession | undefined
+  }
+}
 
 export { createRateLimiter } from './ratelimit'
 export type { RateLimiter, RateLimitOptions } from './ratelimit'
@@ -119,8 +126,8 @@ export interface Auth {
   readonly plugin: KayPlugin
   readonly store: AuthStore
   readonly basePath: string
-  getUser(ctx: { locals: Record<string, unknown> }): PublicUser | undefined
-  getSession(ctx: { locals: Record<string, unknown> }): AuthSession | undefined
+  getUser(ctx: { locals: KayLocals }): PublicUser | undefined
+  getSession(ctx: { locals: KayLocals }): AuthSession | undefined
   guard(options?: GuardOptions): Middleware
   createUser(input: { email: string, password?: string | undefined, name?: string | undefined, role?: string | undefined, emailVerified?: boolean | undefined }): Promise<PublicUser>
   createSessionForUser(userId: string, ctx: RequestContext): Promise<AuthSession>
@@ -208,13 +215,15 @@ export function createAuth(options: AuthOptions = {}): Auth {
     })
   }
 
+  const resolvedContexts = new WeakSet<object>()
+
   async function resolveRequestSession(ctx: RequestContext): Promise<{ user: PublicUser, session: AuthSession } | undefined> {
-    if (ctx.locals.__kayAuthResolved === true) {
-      const user = ctx.locals.user as PublicUser | undefined
-      const session = ctx.locals.session as AuthSession | undefined
+    if (resolvedContexts.has(ctx.locals)) {
+      const user = ctx.locals.user
+      const session = ctx.locals.session
       return user && session ? { user, session } : undefined
     }
-    ctx.locals.__kayAuthResolved = true
+    resolvedContexts.add(ctx.locals)
 
     const rawToken = ctx.cookies.get(cookieName)
     if (!rawToken)
@@ -625,10 +634,10 @@ export function createAuth(options: AuthOptions = {}): Auth {
     store,
     basePath,
     getUser(ctx) {
-      return ctx.locals.user as PublicUser | undefined
+      return ctx.locals.user
     },
     getSession(ctx) {
-      return ctx.locals.session as AuthSession | undefined
+      return ctx.locals.session
     },
     guard,
     createUser,

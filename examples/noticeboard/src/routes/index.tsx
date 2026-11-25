@@ -1,12 +1,12 @@
-import type { PublicUser } from '@kayjs/auth'
+import type { PageProps } from 'kay'
 import { Button, Split, Stack } from '@kayjs/ui'
 import { Head } from 'kay'
 import { LiveBoard } from '../components/LiveBoard'
 import { NewNoticeModal } from '../components/NewNoticeModal'
 import { latestNotices } from '../db'
 
-export default async function BoardPage({ locals }: { locals?: { user?: PublicUser } }) {
-  const user = locals?.user
+export default async function BoardPage({ locals }: PageProps) {
+  const user = locals.user
   const notices = latestNotices()
   const me = user ? (user.name || user.email) : null
 

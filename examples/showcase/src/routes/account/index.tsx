@@ -1,6 +1,7 @@
+import type { PageProps } from 'kay'
 import { Badge, Button, Card, CardBody, CardFooter, CardHeader, Stack } from '@kayjs/ui'
 
-export default async function AccountPage({ locals }: { locals: { user?: { id: string, email: string, role: string } } }) {
+export default async function AccountPage({ locals }: PageProps) {
   const user = locals.user!
   return (
     <Card>

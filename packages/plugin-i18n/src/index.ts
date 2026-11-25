@@ -4,6 +4,15 @@
 
 import type { KayPlugin } from '@kayjs/kay/server'
 
+declare module '@kayjs/kay/server' {
+  interface KayLocals {
+    locale?: string | undefined
+    t?: ((key: string) => string) | undefined
+    localize?: ((path: string, targetLocale?: string) => string) | undefined
+    alternates?: (() => Array<{ locale: string, href: string }>) | undefined
+  }
+}
+
 export interface I18nOptions {
   locales: string[]
   defaultLocale: string
@@ -130,7 +139,7 @@ export function i18n(options: I18nOptions): KayPlugin {
     },
 
     transformHtml(html, ctx) {
-      const locale = String(ctx.locals.locale ?? defaultLocale)
+      const locale = ctx.locals.locale ?? defaultLocale
       let out = html.replace(/<html\s+lang="[^"]*"/i, () => `<html lang="${locale}"`)
 
       if (site) {

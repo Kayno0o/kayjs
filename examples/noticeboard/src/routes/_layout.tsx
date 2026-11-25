@@ -1,10 +1,9 @@
-import type { PublicUser } from '@kayjs/auth'
-import type { KayChild } from 'kay'
+import type { LayoutProps } from 'kay'
 import { Button, Cluster, Toaster } from '@kayjs/ui'
 import { Head } from 'kay'
 
-export default function Layout({ children, locals }: { children: KayChild, locals?: { user?: PublicUser } }) {
-  const user = locals?.user
+export default function Layout({ children, locals }: LayoutProps) {
+  const user = locals.user
   return (
     <>
       <Head>

@@ -1,4 +1,4 @@
-import type { RequestContext } from 'kay/server'
+import type { PageProps, RequestContext } from 'kay/server'
 import type { Preferences } from '../actions/preferences'
 import {
   Accordion,
@@ -29,7 +29,7 @@ import {
 import { savePreferences } from '../actions/preferences'
 import { ToastTrigger } from '../components/ToastTrigger'
 
-export function load(ctx: RequestContext): { prefs: Preferences, saved: boolean } {
+export function load(ctx: RequestContext) {
   let prefs: Preferences = { project: 'my-kay-app', strict: true, compile: true, deploy: 'binary' }
   const raw = ctx.cookies.get('showcase_prefs')
   if (raw) {
@@ -50,10 +50,9 @@ const SAMPLE_ROWS = [
   { id: '6', pkg: '@kayjs/seo', loc: 230, role: 'Meta, JSON-LD, sitemap, self-hosted fonts' },
 ]
 
-export default function ShowcasePage({ data, locals, url }: { data?: { prefs: Preferences, saved: boolean }, locals?: { user?: { email: string } }, url?: URL }) {
-  const blockedNext = !locals?.user ? url?.searchParams.get('next') : null
-  const prefs = data?.prefs ?? { project: 'my-kay-app', strict: true, compile: true, deploy: 'binary' }
-  const saved = data?.saved ?? false
+export default function ShowcasePage({ data, locals, url }: PageProps<typeof load>) {
+  const blockedNext = !locals.user ? url.searchParams.get('next') : null
+  const { prefs, saved } = data
   return (
     <Stack gap="2rem">
       {blockedNext && (

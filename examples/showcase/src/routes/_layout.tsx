@@ -1,9 +1,9 @@
-import type { KayChild } from 'kay'
+import type { LayoutProps } from 'kay'
 import { Head } from 'kay'
 import { Toaster } from '@kayjs/ui'
 import { GrammarSwitcher } from '../components/GrammarSwitcher'
 
-export default function Layout({ children, locals }: { children: KayChild, locals?: { user?: { email: string } } }) {
+export default function Layout({ children, locals }: LayoutProps) {
   return (
     <>
       <Head>

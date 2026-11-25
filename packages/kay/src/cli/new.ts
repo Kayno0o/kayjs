@@ -416,14 +416,13 @@ export default defineConfig({
   ],
 })
 `
-    files['src/routes/_layout.tsx'] = `import type { PublicUser } from '@kayjs/auth'
-import type { KayChild } from 'kay'
+    files['src/routes/_layout.tsx'] = `import type { LayoutProps } from 'kay'
 import { Button, Cluster, Toaster } from '@kayjs/ui'
 import { Head } from 'kay'
 import '../styles/app.css'
 
-export default function Layout({ children, locals }: { children: KayChild, locals?: { user?: PublicUser } }) {
-  const user = locals?.user
+export default function Layout({ children, locals }: LayoutProps) {
+  const user = locals.user
   return (
     <>
       <Head>
@@ -505,10 +504,10 @@ export default function LoginPage() {
 
 export default auth.guard({ redirectTo: '/login' })
 `
-    files['src/routes/dashboard/index.tsx'] = `import type { PublicUser } from '@kayjs/auth'
+    files['src/routes/dashboard/index.tsx'] = `import type { PageProps } from 'kay'
 import { Card, CardBody, CardHeader } from '@kayjs/ui'
 
-export default async function DashboardPage({ locals }: { locals: { user?: PublicUser } }) {
+export default async function DashboardPage({ locals }: PageProps) {
   return (
     <Card>
       <CardHeader>Dashboard</CardHeader>
