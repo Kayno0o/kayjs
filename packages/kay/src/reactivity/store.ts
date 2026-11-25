@@ -1,10 +1,20 @@
 // Deep reactive proxy store (tree-shakable: 0 B if unused).
 
 import type { Signal } from './index'
-import { signal, untrack } from './index'
+import { batch, signal, untrack } from './index'
 
 const RAW = Symbol('kay.store.raw')
 const OWN_KEYS = Symbol('kay.store.keys')
+
+// An array method that moves several entries writes each one in turn; batched, its readers see only the finished array.
+const batchedMutators = new Map<PropertyKey, (this: unknown[], ...args: unknown[]) => unknown>(
+  (['copyWithin', 'fill', 'pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'] as const).map((name) => {
+    const method = Array.prototype[name] as (...args: unknown[]) => unknown
+    return [name, function (this: unknown[], ...args: unknown[]) {
+      return batch(() => method.apply(this, args))
+    }]
+  }),
+)
 
 const proxyCache = new WeakMap<object, object>()
 const depsCache = new WeakMap<object, Map<PropertyKey, Signal<number>>>()
@@ -47,7 +57,12 @@ function wrap<T extends object>(target: T): T {
     get(obj, key, receiver) {
       if (key === RAW)
         return obj
+      if (Array.isArray(obj) && batchedMutators.has(key))
+        return batchedMutators.get(key)
       getDep(obj, key).value
+      // A reader of an array's length is walking it (a list loop reads entries untracked), so any entry write reaches it.
+      if (key === 'length' && Array.isArray(obj))
+        getDep(obj, OWN_KEYS).value
       const value = Reflect.get(obj, key, receiver)
       return isPlain(value) ? wrap(value) : value
     },
@@ -79,6 +94,8 @@ function wrap<T extends object>(target: T): T {
       return ok
     },
     has(obj, key) {
+      if (key === RAW)
+        return true
       getDep(obj, key).value
       return Reflect.has(obj, key)
     },

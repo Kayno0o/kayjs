@@ -256,4 +256,31 @@ describe('reactivity kernel', () => {
     expect(lengths).toEqual([2, 3, 2])
     stop()
   })
+
+  test.each([
+    ['splice', (l: number[]) => l.splice(0, 1), '2,3,4'],
+    ['unshift', (l: number[]) => l.unshift(0), '0,1,2,3,4'],
+    ['shift', (l: number[]) => l.shift(), '2,3,4'],
+    ['reverse', (l: number[]) => l.reverse(), '4,3,2,1'],
+    ['sort', (l: number[]) => l.sort((a, b) => b - a), '4,3,2,1'],
+    ['fill', (l: number[]) => l.fill(0, 1), '1,0,0,0'],
+    ['copyWithin', (l: number[]) => l.copyWithin(0, 2), '3,4,3,4'],
+  ])('a store array %s reaches its readers once, never half-done', (_, mutate, after) => {
+    const list = store([1, 2, 3, 4])
+    const seen: string[] = []
+    const stop = effect(() => {
+      seen.push(list.join(','))
+    })
+    mutate(list)
+    expect(seen).toEqual(['1,2,3,4', after])
+    stop()
+  })
+
+  test('a store assigned into another store comes back as the same proxy', () => {
+    const inner = store({ n: 1 })
+    const outer = store({ child: { n: 0 } })
+    outer.child = inner
+    expect(outer.child).toBe(inner)
+    expect(Object.getPrototypeOf(snapshot(outer).child)).toBe(Object.prototype)
+  })
 })

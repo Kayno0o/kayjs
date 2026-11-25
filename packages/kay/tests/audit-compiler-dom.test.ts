@@ -10,6 +10,7 @@ import * as domCore from '../src/dom/index'
 import { defineIslandElement } from '../src/dom/island'
 import { loop } from '../src/dom/loop'
 import { onCleanup, signal } from '../src/reactivity/index'
+import { store } from '../src/reactivity/store'
 import { createRenderContext, runWithRenderContext } from '../src/ssr/context'
 import * as ssrRt from '../src/ssr/index'
 
@@ -737,11 +738,11 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
 })
 
 describe('destructured loop rows and component props in an island', () => {
-  // Mounts compiled island code against the real dom runtime: each `__name` it imports is bound to that runtime export.
-  function mountIsland(src: string, entry: string, props: object): { host: HTMLElement, dispose: () => void } {
+  // Mounts compiled island code against the real dom runtime: each `__name` it imports is bound to that runtime export, and `imports` stands in for its own imports.
+  function mountIsland(src: string, entry: string, props: object, imports: Record<string, unknown> = {}): { host: HTMLElement, dispose: () => void } {
     const code = compileDom('Island.tsx', src).code
-    const runtime = Object.entries({ ...domCore, ...domExtras, loop }).map(([name, value]) => [`__${name}`, value] as const)
-    const body = code.replace(/^import .*?;\n/gm, '').replace(/export function /g, 'function ')
+    const runtime = [...Object.entries({ ...domCore, ...domExtras, loop }).map(([name, value]) => [`__${name}`, value] as const), ...Object.entries(imports)]
+    const body = code.replace(/^import .*\n/gm, '').replace(/export function /g, 'function ')
     const render = new Function(...runtime.map(([n]) => n), 'props', `${body}\nreturn ${entry}(props)`)
     const host = document.createElement('div')
     const dispose = domCore.mount(host, () => render(...runtime.map(([, v]) => v), props) as Node)
@@ -786,6 +787,31 @@ describe('destructured loop rows and component props in an island', () => {
       expect(host.querySelector('p')!.textContent).toBe(nextText)
       dispose()
     })
+  })
+
+  test('a store array mapped in JSX updates on push, splice and index write', async () => {
+    await withDom(() => {
+      const todos = store(['a', 'b'])
+      const { host, dispose } = mountIsland(`import { todos } from './state'\nexport function List() { return <ul>{todos.map(t => <li>{t}</li>)}</ul> }`, 'List', {}, { todos })
+      const text = () => host.querySelector('ul')!.textContent
+      expect(text()).toBe('ab')
+      todos.push('c')
+      expect(text()).toBe('abc')
+      todos.splice(0, 1)
+      expect(text()).toBe('bc')
+      todos[0] = 'B'
+      expect(text()).toBe('Bc')
+      dispose()
+    })
+  })
+
+  test('only a const bound to an array literal takes the render-once loop', () => {
+    const out = (src: string) => compileDom('L.tsx', src).code
+    expect(out(`const NAV = ['a', 'b'] as const\nexport function L() { return <ul>{NAV.map(n => <li>{n}</li>)}</ul> }`)).toContain('__eachStatic(')
+    expect(out(`import { store } from 'kay'\nconst todos = store(['a'])\nexport function L() { return <ul>{todos.map(n => <li>{n}</li>)}</ul> }`)).not.toContain('__eachStatic(')
+    expect(out(`import { todos } from './state'\nexport function L() { return <ul>{todos.map(n => <li>{n}</li>)}</ul> }`)).not.toContain('__eachStatic(')
+    expect(out(`const items = ['a']\nexport function L(p) { const items = p.list; return <ul>{items.map(n => <li>{n}</li>)}</ul> }`)).not.toContain('__eachStatic(')
+    expect(out(`let items = ['a']\nexport function L() { return <ul>{items.map(n => <li>{n}</li>)}</ul> }`)).not.toContain('__eachStatic(')
   })
 
   test('an inline SSR loop reading the array parameter renders it', () => {

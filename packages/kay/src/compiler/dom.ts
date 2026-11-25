@@ -206,6 +206,42 @@ function collectPatternNames(pattern: AstNode, out: Set<string>): void {
   }
 }
 
+// Names whose every binding in the file is a `const` holding an array literal: only those can be looped once without tracking, since a store, an import or a reassigned binding may change.
+function literalArrayConsts(program: AstNode): Set<string> {
+  const literal = new Set<string>()
+  const other = new Set<string>()
+  const bindOther = (pattern: AstNode | null | undefined): void => {
+    if (pattern)
+      collectPatternNames(pattern, other)
+  }
+  walk(program, (node) => {
+    if (node.type === 'VariableDeclaration') {
+      for (const decl of node.declarations as AstNode[]) {
+        let init = decl.init as AstNode | null
+        while (init && (init.type === 'TSAsExpression' || init.type === 'TSSatisfiesExpression' || init.type === 'ParenthesizedExpression'))
+          init = init.expression as AstNode
+        if (node.kind === 'const' && decl.id.type === 'Identifier' && init?.type === 'ArrayExpression')
+          literal.add(decl.id.name as string)
+        else
+          bindOther(decl.id)
+      }
+    }
+    else if (node.type === 'ImportSpecifier' || node.type === 'ImportDefaultSpecifier' || node.type === 'ImportNamespaceSpecifier' || node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') {
+      bindOther(node.type.startsWith('Import') ? node.local : node.id)
+    }
+    if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+      for (const param of node.params as AstNode[])
+        bindOther(param.type === 'TSParameterProperty' ? param.parameter : param)
+    }
+    else if (node.type === 'CatchClause') {
+      bindOther(node.param)
+    }
+  })
+  for (const name of other)
+    literal.delete(name)
+  return literal
+}
+
 /** Rewrites free identifier reads inside an AST node while respecting shadowing and property keys. */
 function rewriteFreeIdentifiers(
   source: string,
@@ -333,6 +369,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   if (!analysis.hasJsx && !analysis.hasLoadExport)
     return { code, analysis }
+
+  const staticArrays = literalArrayConsts(program)
 
   const editor = new SourceEditor(code)
   const used = new Set<string>()
@@ -836,8 +874,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               const idxParam = params[1]?.type === 'Identifier' ? params[1].name as string : undefined
               const skipArg = loopSkip > 0 ? `, ${loopSkip}` : ''
 
-              // Fast path: provably static constant array (e.g. `NAV.map(...)`) -> lightweight `eachStatic` (0 bytes of LIS reconciler!)
-              const isStaticArr = expr.callee.object.type === 'Identifier' && !scopeRewrites.has(expr.callee.object.name as string)
+              // Fast path: a const array literal (e.g. `NAV.map(...)`) renders once through `eachStatic`, without the keyed reconciler.
+              const isStaticArr = expr.callee.object.type === 'Identifier' && staticArrays.has(expr.callee.object.name as string) && !scopeRewrites.has(expr.callee.object.name as string)
               if (isStaticArr) {
                 const rawParams = params.map(p => code.slice(p.start, p.end)).join(', ')
                 const shadowed = new Map(scopeRewrites)
