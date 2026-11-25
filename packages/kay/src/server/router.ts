@@ -2,9 +2,21 @@
 
 const ENCODED_SLASH_RE = /%2f/i
 
+const enum SegmentKind {
+  Static = 0,
+  Param = 1,
+  CatchAll = 2,
+}
+
+interface CompiledSegment {
+  kind: SegmentKind
+  /** Exact literal for Static, parameter name for Param/CatchAll. */
+  value: string
+}
+
 interface RoutePattern<T> {
   path: string
-  segments: string[]
+  segments: CompiledSegment[]
   isStatic: boolean
   hasCatchAll: boolean
   score: number
@@ -23,24 +35,28 @@ function normalizePath(path: string): string {
 function compileRoutePattern<T>(path: string, data: T): RoutePattern<T> {
   const norm = normalizePath(path)
   const clean = norm === '/' ? '' : norm.replace(/^\/|\/$/g, '')
-  const segments = clean === '' ? [] : clean.split('/')
+  const rawSegments = clean === '' ? [] : clean.split('/')
+  const segments: CompiledSegment[] = []
   let isStatic = true
   let hasCatchAll = false
   let score = 0
 
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i]!
+  for (let i = 0; i < rawSegments.length; i++) {
+    const seg = rawSegments[i]!
     if (seg.startsWith('*')) {
       isStatic = false
       hasCatchAll = true
       score += 1
+      segments.push({ kind: SegmentKind.CatchAll, value: seg.slice(1) || 'rest' })
     }
     else if (seg.startsWith(':')) {
       isStatic = false
       score += 10
+      segments.push({ kind: SegmentKind.Param, value: seg.slice(1) })
     }
     else {
       score += 100
+      segments.push({ kind: SegmentKind.Static, value: seg })
     }
   }
 
@@ -50,6 +66,7 @@ function compileRoutePattern<T>(path: string, data: T): RoutePattern<T> {
 export class Router<T> {
   readonly #staticRoutes = new Map<string, T>()
   readonly #dynamicRoutes: RoutePattern<T>[] = []
+  #sorted = true
 
   add(path: string, data: T): void {
     const compiled = compileRoutePattern(path, data)
@@ -62,7 +79,7 @@ export class Router<T> {
         this.#dynamicRoutes[existing] = compiled
       else
         this.#dynamicRoutes.push(compiled)
-      this.#dynamicRoutes.sort((a, b) => b.score - a.score || b.segments.length - a.segments.length)
+      this.#sorted = false
     }
   }
 
@@ -73,12 +90,18 @@ export class Router<T> {
     if (exact !== undefined)
       return { data: exact, params: {} }
 
-    if (this.#dynamicRoutes.length === 0)
+    const dynLen = this.#dynamicRoutes.length
+    if (dynLen === 0)
       return undefined
+
+    if (!this.#sorted) {
+      this.#dynamicRoutes.sort((a, b) => b.score - a.score || b.segments.length - a.segments.length)
+      this.#sorted = true
+    }
 
     const parts = norm === '/' ? [] : norm.slice(1).split('/')
 
-    for (let i = 0; i < this.#dynamicRoutes.length; i++) {
+    for (let i = 0; i < dynLen; i++) {
       const route = this.#dynamicRoutes[i]!
       const segs = route.segments
 
@@ -87,32 +110,38 @@ export class Router<T> {
       if (route.hasCatchAll && parts.length < segs.length - 1)
         continue
 
-      const params: Record<string, string> = {}
       let matched = true
-
       for (let j = 0; j < segs.length; j++) {
         const seg = segs[j]!
-        if (seg.startsWith('*')) {
-          const name = seg.slice(1) || 'rest'
-          params[name] = parts.slice(j).map(decodeSegment).join('/')
+        if (seg.kind === SegmentKind.CatchAll)
           break
-        }
-        else if (seg.startsWith(':')) {
-          const rawSeg = parts[j]!
-          if (ENCODED_SLASH_RE.test(rawSeg)) {
+        if (seg.kind === SegmentKind.Param) {
+          if (ENCODED_SLASH_RE.test(parts[j]!)) {
             matched = false
             break
           }
-          params[seg.slice(1)] = decodeSegment(rawSeg)
         }
-        else if (seg !== parts[j]) {
+        else if (seg.value !== parts[j]) {
           matched = false
           break
         }
       }
 
-      if (matched)
-        return { data: route.data, params }
+      if (!matched)
+        continue
+
+      // Allocate and decode params only for the winning route.
+      const params: Record<string, string> = {}
+      for (let j = 0; j < segs.length; j++) {
+        const seg = segs[j]!
+        if (seg.kind === SegmentKind.CatchAll) {
+          params[seg.value] = parts.slice(j).map(decodeSegment).join('/')
+          break
+        }
+        if (seg.kind === SegmentKind.Param)
+          params[seg.value] = decodeSegment(parts[j]!)
+      }
+      return { data: route.data, params }
     }
 
     return undefined

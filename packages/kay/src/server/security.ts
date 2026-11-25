@@ -137,8 +137,9 @@ export function isTrustedOrigin(
   request: Request,
   trustedOrigins?: ReadonlySet<string>,
   trustProxy: TrustProxy = false,
+  requestUrl?: URL,
 ): boolean {
-  return origin === new URL(request.url).origin
+  return origin === (requestUrl?.origin ?? new URL(request.url).origin)
     || origin === forwardedOrigin(request, trustProxy)
     || trustedOrigins?.has(origin) === true
 }
@@ -148,13 +149,14 @@ export function verifyOrigin(
   request: Request,
   trustedOrigins?: ReadonlySet<string>,
   trustProxy: TrustProxy = false,
+  requestUrl?: URL,
 ): { ok: true } | { ok: false, reason: string } {
   if (!UNSAFE_METHODS.has(request.method.toUpperCase()))
     return { ok: true }
 
   const origin = request.headers.get('origin')
   if (origin !== null) {
-    if (isTrustedOrigin(origin, request, trustedOrigins, trustProxy))
+    if (isTrustedOrigin(origin, request, trustedOrigins, trustProxy, requestUrl))
       return { ok: true }
     return { ok: false, reason: `Cross-site request blocked: untrusted origin ${origin}` }
   }

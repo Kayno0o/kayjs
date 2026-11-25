@@ -142,7 +142,7 @@ function isJsonBody(request: Request): boolean {
 }
 
 // The page a form came from, when its origin is one this server trusts: where a no-JS submit goes back to.
-function trustedReferer(request: Request, trustedOrigins: ReadonlySet<string> | undefined, trustProxy: TrustProxy): URL | undefined {
+function trustedReferer(request: Request, trustedOrigins: ReadonlySet<string> | undefined, trustProxy: TrustProxy, requestUrl?: URL): URL | undefined {
   const referer = request.headers.get('referer')
   if (!referer)
     return undefined
@@ -153,7 +153,7 @@ function trustedReferer(request: Request, trustedOrigins: ReadonlySet<string> | 
   catch {
     return undefined
   }
-  return isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy) ? refUrl : undefined
+  return isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy, requestUrl) ? refUrl : undefined
 }
 
 function topLevelKey(issue: StandardSchemaIssue): string | undefined {
@@ -325,7 +325,7 @@ export async function executeAction(
       checked = await retryWithFormArrays(act.schema, rawBody as Record<string, unknown>, checked)
     if (!checked.ok) {
       // Zero-JS progressive HTML <form> submit: flash fieldErrors + safe submitted values (<4KB) and redirect 303 back to trusted Referer
-      const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy)
+      const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy, ctx.url)
       if (back !== undefined) {
         ctx.cookies.set(ACTION_ERROR_COOKIE, buildActionErrorFlash(act.url, checked.fieldErrors, rawBody, act.flashFields), {
           httpOnly: true,
@@ -346,7 +346,7 @@ export async function executeAction(
   if (result instanceof Response)
     return result
 
-  const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy)
+  const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy, ctx.url)
   if (back !== undefined)
     return new Response(null, { status: 303, headers: { location: back.href } })
 

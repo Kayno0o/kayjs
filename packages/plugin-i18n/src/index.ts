@@ -4,6 +4,7 @@
 
 import type { ActiveI18nConfig, KayPlugin } from '@kayjs/kay/server'
 import { definePlugin, I18N_CONFIG_SERVICE } from '@kayjs/kay/server'
+import { escAttr } from '@kayjs/kay/ssr'
 
 declare module '@kayjs/kay/server' {
   interface KayLocals {
@@ -153,34 +154,34 @@ export function i18n(options: I18nOptions): KayPlugin {
       return [...out]
     },
 
-    transformHtml(html, ctx) {
+    head(head, ctx) {
       const locale = ctx.locals.locale ?? defaultLocale
-      let out = html.replace(/<html\s+lang="[^"]*"/i, () => `<html lang="${locale}"`)
+      head.lang = locale
 
       if (activeSite) {
         const { path } = stripLocalePrefix(ctx.url.pathname, locales)
         const links = alternateLinks(path, { site: activeSite, locales, defaultLocale, prefixDefault })
-        const tags = links.map(l => `<link rel="alternate" hreflang="${l.locale}" href="${l.href}">`).join('')
-        if (tags && out.includes('</head>'))
-          out = out.replace('</head>', () => `${tags}</head>`)
+        for (const l of links)
+          head.add(`<link rel="alternate" hreflang="${escAttr(l.locale)}" href="${escAttr(l.href)}">`)
       }
+    },
 
-      // Prefix internal <a href="/..."> links for non-default locales
-      if (locale !== defaultLocale || prefixDefault) {
-        out = out.replace(INTERNAL_HREF_RE, (match, before: string, href: string, after: string) => {
-          if (before.includes('data-no-localize') || after.includes('data-no-localize'))
-            return match
-          if (href.startsWith('//') || href.startsWith('/_kay/') || href.startsWith('/_i18n/'))
-            return match
-          const seg = href.split('/')[1]
-          if (seg !== undefined && localeSet.has(seg))
-            return match
-          const prefixed = href === '/' ? `/${locale}` : `/${locale}${href}`
-          return `<a${before}href="${prefixed}"${after}>`
-        })
-      }
-
-      return out
+    transformHtml(html, ctx) {
+      const locale = ctx.locals.locale ?? defaultLocale
+      // Prefix internal <a href="/..."> links for non-default locales only
+      if (locale === defaultLocale && !prefixDefault)
+        return html
+      return html.replace(INTERNAL_HREF_RE, (match, before: string, href: string, after: string) => {
+        if (before.includes('data-no-localize') || after.includes('data-no-localize'))
+          return match
+        if (href.startsWith('//') || href.startsWith('/_kay/') || href.startsWith('/_i18n/'))
+          return match
+        const seg = href.split('/')[1]
+        if (seg !== undefined && localeSet.has(seg))
+          return match
+        const prefixed = href === '/' ? `/${locale}` : `/${locale}${href}`
+        return `<a${before}href="${escAttr(prefixed)}"${after}>`
+      })
     },
 
     check(ctx) {

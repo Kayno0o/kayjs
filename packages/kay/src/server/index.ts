@@ -7,8 +7,8 @@
 
 import type { BuildManifest, RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
-import type { KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
-import type { PendingChunk, SettledChunk } from '../ssr/context'
+import type { DocumentHeadContext, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
+import type { PendingChunk, RenderContext, SettledChunk } from '../ssr/context'
 import type { DocumentOptions } from '../ssr/index'
 import type { ActionErrorFlash, ActionResult, ServerAction } from './action'
 import type { CookieStore } from './cookies'
@@ -17,7 +17,7 @@ import type { TrustProxy } from './security'
 import { existsSync, statSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { createAppContext, getAppContext, resolvePlugins, runWithAppContext } from '../plugins/index'
-import { createRenderContext, renderCollectedHead, runWithRenderContext, streamChunkScript } from '../ssr/context'
+import { createRenderContext, runWithRenderContext, streamChunkScript } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
 import { ACTION_ERROR_COOKIE, executeAction, invokeActionCore, isServerAction } from './action'
 import { CompressionCache, compressedHtmlResponse, isCompressibleType, maybeCompressResponse, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
@@ -32,7 +32,7 @@ import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HA
 export interface KayLocals {}
 
 export { CONTENT_IMAGE_RESOLVER_SERVICE, createAppContext, defineConfig, definePlugin, getAppContext, I18N_CONFIG_SERVICE, loadConfig, pickRuntimeConfig, resolvePlugins, resolveServerConfig, runWithAppContext } from '../plugins/index'
-export type { ActiveI18nConfig, AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, ContentImageResolver, ContentImageResult, CreateAppContextOptions, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI, ServerRuntimeConfig } from '../plugins/index'
+export type { ActiveI18nConfig, AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, ContentImageResolver, ContentImageResult, CreateAppContextOptions, DocumentHeadContext, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI, ServerRuntimeConfig } from '../plugins/index'
 export { action, getActionError } from './action'
 export type { ActionContext, ActionErrorFlash, ActionOptions, ActionResult, ServerAction } from './action'
 export { CompressionCache, isCompressibleType, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
@@ -209,9 +209,16 @@ function allowedPluginMethodsHeader(methods: ReadonlyMap<string, PluginRouteDef>
   return [...allowed].join(', ')
 }
 
+async function cancelBodyQuietly(body: ReadableStream<Uint8Array>): Promise<void> {
+  try {
+    await body.cancel()
+  }
+  catch {}
+}
+
 function stripHeadBody(res: Response): Response {
   if (res.body !== null)
-    void res.body.cancel().catch(() => {})
+    void cancelBodyQuietly(res.body)
   return new Response(null, { status: res.status, statusText: res.statusText, headers: res.headers })
 }
 
@@ -282,6 +289,9 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const parentAppCtx = getAppContext()
 
   const alwaysLoadRuntime = plugins.some(p => Boolean(p.clientEntry))
+  const headHooks = plugins
+    .map(p => p.head)
+    .filter((fn): fn is NonNullable<KayPlugin['head']> => typeof fn === 'function')
   const htmlTransformers = plugins
     .map(p => p.transformHtml)
     .filter((fn): fn is NonNullable<KayPlugin['transformHtml']> => typeof fn === 'function')
@@ -426,10 +436,15 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
       catch {}
     }
+    let text = ''
+    try {
+      text = await res.clone().text()
+    }
+    catch {}
     return {
       ok: false,
       status: res.status,
-      error: (await res.clone().text().catch(() => '')) || res.statusText || 'Forbidden',
+      error: text || res.statusText || 'Forbidden',
     }
   }
 
@@ -479,10 +494,20 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     }
   }
 
-  const middlewaresFor = (path: string, isStaticFast = false): Middleware[] =>
-    scopedMiddlewares.filter(m => middlewareAppliesToPath(m.scope, path, isStaticFast)).map(m => m.mw)
-  const allPluginMiddlewares = scopedMiddlewares.map(m => m.mw)
+  const allPluginMiddlewares: readonly Middleware[] = scopedMiddlewares.map(m => m.mw)
+  const staticFastPluginMiddlewares: readonly Middleware[] = scopedMiddlewares
+    .filter(m => m.scope === 'all')
+    .map(m => m.mw)
+  const hasPathScopedMiddlewares = scopedMiddlewares.some(m => m.scope !== 'all' && m.scope !== 'dynamic')
+  const middlewaresFor = (path: string, isStaticFast = false): readonly Middleware[] => {
+    if (scopedMiddlewares.length === 0)
+      return allPluginMiddlewares
+    if (!hasPathScopedMiddlewares)
+      return isStaticFast ? staticFastPluginMiddlewares : allPluginMiddlewares
+    return scopedMiddlewares.filter(m => middlewareAppliesToPath(m.scope, path, isStaticFast)).map(m => m.mw)
+  }
   const hasPluginRewrites = pluginRewrites.length > 0
+  const hasHeadHooks = headHooks.length > 0
   const hasHtmlTransformers = htmlTransformers.length > 0
 
   const errorHooks: ((info: ServerErrorInfo) => void)[] = []
@@ -614,10 +639,88 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     lang,
   }
 
+  const TITLE_INNER_RE = /^<title\b[^>]*>([\s\S]*?)<\/title>$/i
+
+  async function resolveDocumentHead(
+    rctx: RenderContext,
+    baseHeadTags: readonly string[] | undefined,
+    url: URL,
+    req?: Request,
+    ctx?: RequestContext,
+  ): Promise<{ head: string, lang: string, htmlAttrs: Record<string, string> }> {
+    const collectedParts = rctx.headParts.join('')
+    if (!hasHeadHooks) {
+      return {
+        head: (rctx.title ?? '') + collectedParts,
+        lang,
+        htmlAttrs: rctx.htmlAttrs,
+      }
+    }
+
+    const headCtx = ctx ?? makeRequestContext(req ?? new Request(url.toString()), {}, { trustProxy, url }).ctx
+    const htmlAttrs: Record<string, string> = { ...rctx.htmlAttrs }
+    const initialTitleTag = rctx.title
+    const initialTitleInner = initialTitleTag !== undefined ? TITLE_INNER_RE.exec(initialTitleTag)?.[1] : undefined
+    let currentTitle = initialTitleInner
+    let titleDirty = false
+    let currentLang = htmlAttrs.lang ?? lang
+    let headBuf = (initialTitleTag ?? '') + collectedParts
+    if (baseHeadTags !== undefined) {
+      for (let i = 0; i < baseHeadTags.length; i++)
+        headBuf += baseHeadTags[i]
+    }
+    const added: string[] = []
+
+    const docHead: DocumentHeadContext = {
+      get lang() {
+        return currentLang
+      },
+      set lang(v: string) {
+        currentLang = v
+        htmlAttrs.lang = v
+      },
+      htmlAttrs,
+      get title() {
+        return currentTitle
+      },
+      set title(v: string | undefined) {
+        currentTitle = v
+        titleDirty = true
+      },
+      get headHtml() {
+        return headBuf
+      },
+      add(html: string) {
+        if (html !== '') {
+          added.push(html)
+          headBuf += html
+        }
+      },
+    }
+
+    for (const hook of headHooks) {
+      try {
+        await hook(docHead, headCtx)
+      }
+      catch (err) {
+        notifyError(err, req ?? headCtx.request, 'plugin')
+      }
+    }
+
+    const titleHtml = titleDirty
+      ? (currentTitle !== undefined ? `<title>${currentTitle}</title>` : '')
+      : (initialTitleTag ?? '')
+    return {
+      head: titleHtml + collectedParts + (added.length > 0 ? added.join('') : ''),
+      lang: currentLang,
+      htmlAttrs,
+    }
+  }
+
   async function applyHtmlTransforms(html: string, url: URL, req?: Request, ctx?: RequestContext): Promise<string> {
     if (!hasHtmlTransformers)
       return html
-    const transformCtx = ctx ?? makeRequestContext(req ?? new Request(url.toString()), {}, { trustProxy }).ctx
+    const transformCtx = ctx ?? makeRequestContext(req ?? new Request(url.toString()), {}, { trustProxy, url }).ctx
     let out = html
     for (const transform of htmlTransformers) {
       try {
@@ -657,11 +760,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           return inner
         })
         const { hasIslands, eagerChunks } = resolveRenderedIslands(rctx, body)
+        const docHead = await resolveDocumentHead(rctx, manifest.headTags, effUrl, req, ctx)
         const docHtml = renderDocument({
           ...fallbackDoc,
           body,
-          head: renderCollectedHead(rctx),
-          htmlAttrs: rctx.htmlAttrs,
+          head: docHead.head,
+          lang: docHead.lang,
+          htmlAttrs: docHead.htmlAttrs,
           preloadChunks: eagerChunks,
           hasIslands,
         })
@@ -718,6 +823,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     // Zero-overhead path for a static route with no middleware, no <Head>/<Suspense>, and no intercepting plugin hook
     const canFastPath = fastPluginMiddlewares.length === 0
       && !hasPluginRewrites
+      && !hasHeadHooks
       && !hasHtmlTransformers
       && pluginRouter.match(entry.path) === undefined
       && !dynamic
@@ -734,9 +840,9 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       const singleLayout = layouts.length === 1 ? layouts[0]! : undefined
       const fastHeaders = htmlHeaders(hasIslands, false, true)
 
-      const fail = (error: unknown, request: Request, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
+      const fail = (error: unknown, request: Request, url: URL, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
         notifyError(error, request, 'route')
-        return renderError(error, cookieStore, ctx?.url ?? new URL(request.url), request, ctx)
+        return renderError(error, cookieStore, url, request, ctx)
       }
       const respondHtml = (body: string, request: Request, cookieStore?: CookieStore): Response => {
         const res = compressedHtmlResponse(docPrefix + body + docSuffix, 200, fastHeaders, request, compressCache, !entry.hasLoad)
@@ -744,13 +850,22 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
       const layoutProps = (inner: string, url: URL, locals: KayLocals) => ({ children: raw(inner), url, params: {}, locals })
 
+      const finishSingleLayout = async (wrapped: Promise<Html | string>, request: Request, url: URL, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
+        try {
+          return respondHtml(ssrChild(await wrapped as Html), request, cookieStore)
+        }
+        catch (error) {
+          return fail(error, request, url, cookieStore, ctx)
+        }
+      }
+
       const wrapLayouts = (inner: string, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
         if (layouts.length === 0)
           return respondHtml(inner, request, cookieStore)
         if (singleLayout !== undefined) {
           const wrapped = singleLayout.default(layoutProps(inner, url, locals))
           if (wrapped instanceof Promise)
-            return wrapped.then(x => respondHtml(ssrChild(x as Html), request, cookieStore), error => fail(error, request, cookieStore, ctx))
+            return finishSingleLayout(wrapped, request, url, cookieStore, ctx)
           return respondHtml(ssrChild(wrapped as Html), request, cookieStore)
         }
         return (async () => {
@@ -761,9 +876,18 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
             return respondHtml(cur, request, cookieStore)
           }
           catch (error) {
-            return fail(error, request, cookieStore, ctx)
+            return fail(error, request, url, cookieStore, ctx)
           }
         })()
+      }
+
+      const finishAsyncPage = async (rendered: Promise<Html | string>, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
+        try {
+          return await wrapLayouts(ssrChild(await rendered as Html), request, url, locals, cookieStore, ctx)
+        }
+        catch (error) {
+          return fail(error, request, url, cookieStore, ctx)
+        }
       }
 
       const renderPage = (data: unknown, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
@@ -779,7 +903,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         }
         const rendered = mod.default!(pageProps)
         if (rendered instanceof Promise)
-          return rendered.then(r => wrapLayouts(ssrChild(r as Html), request, url, locals, cookieStore, ctx), error => fail(error, request, cookieStore, ctx))
+          return finishAsyncPage(rendered, request, url, locals, cookieStore, ctx)
         return wrapLayouts(ssrChild(rendered as Html), request, url, locals, cookieStore, ctx)
       }
 
@@ -801,12 +925,12 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
             catch (error) {
               if (isNotFound(error))
                 return finish(await buildNotFoundResponse(url, request, ctx), request, cookieStore)
-              return fail(error, request, cookieStore, ctx)
+              return fail(error, request, url, cookieStore, ctx)
             }
           })()
         }
         catch (error) {
-          return fail(error, request)
+          return fail(error, request, url)
         }
       })
     }
@@ -904,7 +1028,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     }
 
     const body = await runWithRenderContext(rctx, renderBody)
-    const collectedHead = renderCollectedHead(rctx)
+    const docHead = await resolveDocumentHead(rctx, doc.headTags as readonly string[] | undefined, ctx.url, ctx.request, ctx)
     const renderedIslands = resolveRenderedIslands(rctx, body)
     const isStreamed = rctx.pending.length > 0
     const hasIslands = renderedIslands.hasIslands || (isStreamed && entry.islandChunks.length > 0)
@@ -915,7 +1039,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       if (ctx.request.method === 'HEAD')
         return new Response(null, { status: 200, headers: htmlHeaders(hasIslands, true, true) })
       disableTimeout?.()
-      let shell = renderDocument({ ...doc, body: body + STREAM_TAIL_MARK, head: collectedHead, htmlAttrs: rctx.htmlAttrs, preloadChunks, hasIslands, hasSuspense: true })
+      let shell = renderDocument({ ...doc, body: body + STREAM_TAIL_MARK, head: docHead.head, lang: docHead.lang, htmlAttrs: docHead.htmlAttrs, preloadChunks, hasIslands, hasSuspense: true })
       // Transforms see the document with its initial body; boundaries resolved later stream as they render.
       for (const transform of htmlTransformers)
         shell = await transform(shell, ctx)
@@ -983,7 +1107,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       return new Response(stream, { status: 200, headers: htmlHeaders(hasIslands, true, true) })
     }
 
-    let html = renderDocument({ ...doc, body, head: collectedHead, htmlAttrs: rctx.htmlAttrs, preloadChunks, hasIslands })
+    let html = renderDocument({ ...doc, body, head: docHead.head, lang: docHead.lang, htmlAttrs: docHead.htmlAttrs, preloadChunks, hasIslands })
     for (const transform of htmlTransformers)
       html = await transform(html, ctx)
 
@@ -1021,7 +1145,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       // Actions are origin-checked before their body is read and before any middleware runs.
       const actionHandler = request.method === 'POST' ? registeredAction : undefined
       if (actionHandler !== undefined) {
-        const originCheck = verifyOrigin(request, trustedOrigins, trustProxy)
+        const originCheck = verifyOrigin(request, trustedOrigins, trustProxy, url)
         if (!originCheck.ok)
           return refuseCrossSite(request, originCheck.reason)
       }
@@ -1079,7 +1203,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       const routeDef = directPluginDef ?? headFallbackPluginDef
       if (pluginMatch !== undefined && routeDef !== undefined) {
         if (routeDef.csrf) {
-          const originCheck = verifyOrigin(req, routeDef.trustedOrigins, routeDef.trustProxy)
+          const originCheck = verifyOrigin(req, routeDef.trustedOrigins, routeDef.trustProxy, url)
           if (!originCheck.ok)
             return refuseCrossSite(req, originCheck.reason, cookieStore)
         }
@@ -1121,7 +1245,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
       // CSRF verification for file-based API routes on unsafe methods (opt out via `export const csrf = false`)
       if (typeof route.mod[method] === 'function' && route.mod.csrf !== false) {
-        const originCheck = verifyOrigin(req, trustedOrigins, trustProxy)
+        const originCheck = verifyOrigin(req, trustedOrigins, trustProxy, url)
         if (!originCheck.ok)
           return refuseCrossSite(req, originCheck.reason, cookieStore)
       }

@@ -74,8 +74,6 @@ function resolveFileOrPkg(root: string, spec: string): string | undefined {
   }
 }
 
-const TITLE_TAG_RE = /<title>([\s\S]*?)<\/title>/i
-
 function descriptionTags(description: string): string {
   const content = escAttr(description)
   return `<meta name="description" content="${content}"><meta property="og:description" content="${content}">`
@@ -281,46 +279,34 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
       }
     },
 
-    transformHtml(html, ctx) {
-      const headEnd = html.indexOf('</head>')
-      if (headEnd === -1)
-        return html
-      let head = html.slice(0, headEnd)
-      const rest = html.slice(headEnd)
-
-      // Title template / default title (strictly inside <head>, never matching inline <svg><title> in <body>)
+    head(head, ctx) {
+      // Title template / default title
       if (options.titleTemplate || options.name) {
-        const m = TITLE_TAG_RE.exec(head)
-        if (m !== null) {
-          const inner = m[1]!
-          if (options.titleTemplate && (!options.name || !inner.includes(options.name))) {
+        if (head.title !== undefined) {
+          if (options.titleTemplate && (!options.name || !head.title.includes(options.name))) {
             const safeTemplate = escAttr(options.titleTemplate)
-            const formatted = safeTemplate.replace('%s', () => inner)
-            head = head.replace(TITLE_TAG_RE, () => `<title>${formatted}</title>`)
+            head.title = safeTemplate.replace('%s', () => head.title!)
           }
         }
         else if (options.name) {
-          const defaultTitle = escAttr(options.name)
-          head += `<title>${defaultTitle}</title>`
+          head.title = escAttr(options.name)
         }
       }
 
       // Localized fallback description when <head> didn't emit its own <meta name="description">
-      if (options.description && typeof options.description === 'object' && !head.includes('name="description"')) {
+      if (options.description && typeof options.description === 'object' && !head.headHtml.includes('name="description"')) {
         const loc = 'locale' in ctx.locals && typeof ctx.locals.locale === 'string' ? ctx.locals.locale : undefined
         const fallbackLoc = activeI18n?.defaultLocale
         const desc = (loc && options.description[loc]) ?? (fallbackLoc && options.description[fallbackLoc]) ?? Object.values(options.description)[0]
         if (desc)
-          head += descriptionTags(desc)
+          head.add(descriptionTags(desc))
       }
 
       // Canonical URL
-      if (activeSite && !head.includes('rel="canonical"')) {
+      if (activeSite && !head.headHtml.includes('rel="canonical"')) {
         const canonical = escAttr(`${activeSite}${ctx.url.pathname}`)
-        head += `<link rel="canonical" href="${canonical}">`
+        head.add(`<link rel="canonical" href="${canonical}">`)
       }
-
-      return head + rest
     },
   })
 }

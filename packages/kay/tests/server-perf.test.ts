@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { build } from '../src/build/index'
 import { CompressionCache, createServer, isCompressibleType, pickEncoding } from '../src/server/index'
+import { Router } from '../src/server/router'
+import { verifyOrigin } from '../src/server/security'
 import { testApp } from '../src/test/index'
 
 const KAY_PKG_DIR = join(import.meta.dir, '..')
@@ -254,9 +256,10 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
       import { seo } from ${JSON.stringify(seoPath)}
       import { i18n } from ${JSON.stringify(i18nPath)}
       export default defineConfig({
+        site: 'https://example.test',
         plugins: [
           i18n({ locales: ['en', 'fr'], defaultLocale: 'en', messages: { en: { hi: 'Hello' }, fr: { hi: 'Bonjour' } } }),
-          seo({ site: 'https://example.test', name: 'Demo', titleTemplate: '%s | Demo', redirects: { '/old': '/' } }),
+          seo({ name: 'Demo', titleTemplate: '%s | Demo', redirects: { '/old': '/' } }),
         ],
       })
     `)
@@ -307,6 +310,8 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     const enHtml = new TextDecoder().decode(Bun.zstdDecompressSync(new Uint8Array(await enRes.arrayBuffer())))
     expect(enHtml).toContain('<title>Home | Demo</title>')
     expect(enHtml).toContain('<html lang="en">')
+    expect(enHtml).toContain('<link rel="canonical" href="https://example.test/">')
+    expect(enHtml).toContain('<link rel="alternate" hreflang="fr" href="https://example.test/fr">')
 
     const frRes = await app.fetch(new Request('http://localhost/fr', { headers: { 'accept-encoding': 'gzip' } }))
     expect(frRes.status).toBe(200)
@@ -314,6 +319,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     const frHtml = new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await frRes.arrayBuffer())))
     expect(frHtml).toContain('<html lang="fr">')
     expect(frHtml).toContain('Bonjour')
+    expect(frHtml).toContain('<link rel="canonical" href="https://example.test/fr">')
 
     expect(Number(await Bun.file(counterFile).text())).toBe(countAfterBuild)
 
@@ -427,6 +433,71 @@ describe('compression work per request', () => {
     }
     finally {
       spy.mockRestore()
+    }
+  })
+})
+
+describe('Server hot-path allocations (#3557)', () => {
+  it('Router sorts lazily on first match and skips param decoding on non-matching dynamic routes', () => {
+    const sortSpy = spyOn(Array.prototype, 'sort')
+    const decodeSpy = spyOn(globalThis, 'decodeURIComponent')
+    try {
+      const router = new Router<string>()
+      router.add('/files/*rest', 'catchall')
+      router.add('/:org/:repo/settings', 'settings')
+      router.add('/:org/:repo/issues/:id', 'issue')
+      router.add('/static/about', 'static')
+
+      // Adding dynamic routes must not re-sort on every add()
+      expect(sortSpy).not.toHaveBeenCalled()
+
+      // First match sorts once; non-matching candidate (:org/:repo/issues/:id) must NOT decode params
+      const m = router.match('/acme/kay%20v2/settings')
+      expect(sortSpy).toHaveBeenCalledTimes(1)
+      expect(m).toEqual({ data: 'settings', params: { org: 'acme', repo: 'kay v2' } })
+      // Only the winning route's two params were decoded (not any rejected candidate's params)
+      expect(decodeSpy).toHaveBeenCalledTimes(2)
+
+      // Subsequent match does not re-sort
+      sortSpy.mockClear()
+      decodeSpy.mockClear()
+      const m2 = router.match('/acme/kay/issues/42')
+      expect(sortSpy).not.toHaveBeenCalled()
+      expect(m2).toEqual({ data: 'issue', params: { org: 'acme', repo: 'kay', id: '42' } })
+      expect(decodeSpy).toHaveBeenCalledTimes(3)
+
+      // Encoded slash rejected without decoding
+      decodeSpy.mockClear()
+      expect(router.match('/acme/bad%2Frepo/settings')).toBeUndefined()
+      expect(decodeSpy).not.toHaveBeenCalled()
+    }
+    finally {
+      sortSpy.mockRestore()
+      decodeSpy.mockRestore()
+    }
+  })
+
+  it('verifyOrigin reuses pre-parsed requestUrl without re-parsing request.url', () => {
+    const req = new Request('https://example.test/api/items', {
+      method: 'POST',
+      headers: { origin: 'https://example.test' },
+    })
+    const url = new URL(req.url)
+    const origURL = globalThis.URL
+    let calls = 0
+    const CountingURL = new Proxy(origURL, {
+      construct(target, args, newTarget) {
+        calls++
+        return Reflect.construct(target, args, newTarget)
+      },
+    })
+    ;(globalThis as unknown as { URL: typeof URL }).URL = CountingURL
+    try {
+      expect(verifyOrigin(req, undefined, false, url)).toEqual({ ok: true })
+      expect(calls).toBe(0)
+    }
+    finally {
+      ;(globalThis as unknown as { URL: typeof URL }).URL = origURL
     }
   })
 })

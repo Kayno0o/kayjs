@@ -126,6 +126,19 @@ export interface ServerErrorInfo {
   source: 'route' | 'action' | 'plugin'
 }
 
+export interface DocumentHeadContext {
+  /** Current document `lang` attribute (mutating sets `<html lang="...">`). */
+  lang: string
+  /** Extra attributes emitted on `<html>`. */
+  readonly htmlAttrs: Record<string, string>
+  /** Inner HTML of the page's `<title>` tag (if rendered via `<Head><title>...</title></Head>`), or `undefined`. */
+  title: string | undefined
+  /** Read-only view of head HTML already collected from `<Head>`, build `addHead`, and earlier plugins. */
+  readonly headHtml: string
+  /** Append raw HTML to `<head>` (emitted once by core when assembling the document). */
+  add(html: string): void
+}
+
 export interface KayPlugin {
   name: string
   /** Execution phase: `'pre'` runs before normal plugins, `'post'` runs after them. */
@@ -152,6 +165,8 @@ export interface KayPlugin {
   bunPlugins?: BunPlugin[] | ((info: { root: string, assetPrefix: string, minify: boolean, target: BuildPluginTarget }) => BunPlugin[]) | undefined
   /** Global CSS files to bundle and inject as <link rel="stylesheet"> in <head>. */
   css?: string[] | undefined
+  /** Mutate `<html lang>`, `htmlAttrs`, `<title>`, or append tags to `<head>` before core renders the document once. */
+  head?: (head: DocumentHeadContext, ctx: RequestContext) => void | Promise<void>
   /** Post-process rendered HTML before sending (applies to pages, `<Suspense>` shells, `_error.tsx`, and `_404.tsx`). */
   transformHtml?: (html: string, ctx: RequestContext) => string | Promise<string>
   /** Expand or filter prerender URLs for a route (e.g. @kayjs/i18n expanding `/posts/a` -> `['/posts/a', '/fr/posts/a']`). */
