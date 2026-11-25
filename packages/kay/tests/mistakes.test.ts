@@ -53,6 +53,12 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     expect(() => spread({} as Element, () => props)).toThrow(/dangerouslySetInnerHTML in a spread: write innerHTML=\{html\}/)
   })
 
+  test('innerHTML with children or on a void element, which drops one of the two', () => {
+    refuses('<div innerHTML={html}><p>x</p></div>', /innerHTML with children in Page\.tsx: keep one, the children or innerHTML/, 'const html = \'\'')
+    refuses('<img innerHTML={html} />', /innerHTML on <img> in Page\.tsx: a void element has no content/, 'const html = \'\'')
+    accepts('<div innerHTML={html}>\n</div>', 'const html = \'\'')
+  })
+
   test('Astro and Solid directives, which become plain attributes or island props', () => {
     refuses('<Counter client:visible />', /client:visible in Page\.tsx: write \$hydrate="visible"/, 'const Counter = () => <p>x</p>')
     refuses('<Counter client:only="solid" />', /write \$hydrate="client"/, 'const Counter = () => <p>x</p>')

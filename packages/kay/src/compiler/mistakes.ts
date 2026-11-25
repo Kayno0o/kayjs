@@ -1,7 +1,7 @@
 // Refuses JSX that compiles but does the wrong thing, mostly habits from React, Solid and Astro, with an error naming the fix.
 
 import type { AstNode } from './analyze'
-import { isComponentTag, jsxTagName } from './shared'
+import { cleanJsxText, isComponentTag, jsxTagName, unwrapParens, VOID_ELEMENTS } from './shared'
 
 // The kay prop for each DOM event, keyed by the event name kay binds (`onKeyDown` binds `keydown`).
 const EVENT_PROPS = new Map(Object.entries({
@@ -91,15 +91,36 @@ function checkNamespacedAttribute(namespace: string, name: string, filename: str
   throw mistake(what, filename, `kay has no ${namespace}: directives`)
 }
 
+// The source of `x` in React's `{{ __html: x }}`, or undefined when the attribute holds something else.
+function reactHtmlSource(value: AstNode | null, code: string): string | undefined {
+  if (value?.type !== 'JSXExpressionContainer')
+    return undefined
+  const expr = unwrapParens(value.expression as AstNode)
+  if (expr.type !== 'ObjectExpression')
+    return undefined
+  const html = (expr.properties as AstNode[]).find(p => p.type === 'Property' && (p.key?.name ?? p.key?.value) === '__html')
+  return html === undefined ? undefined : code.slice(html.value.start, html.value.end)
+}
+
+function hasChildren(element: AstNode): boolean {
+  return (element.children as AstNode[]).some(child =>
+    child.type === 'JSXText' ? cleanJsxText(child.value as string) !== '' : !(child.type === 'JSXExpressionContainer' && child.expression.type === 'JSXEmptyExpression'))
+}
+
+function checkInnerHtml(element: AstNode, tag: string, attr: AstNode, filename: string, code: string): void {
+  const html = reactHtmlSource(attr.value, code)
+  if (html !== undefined)
+    throw mistake('innerHTML={{ __html }}', filename, `write innerHTML={${html}}, kay takes the HTML string itself`)
+  if (VOID_ELEMENTS.has(tag))
+    throw mistake(`innerHTML on <${tag}>`, filename, 'a void element has no content, drop innerHTML')
+  if (hasChildren(element))
+    throw mistake('innerHTML with children', filename, 'keep one, the children or innerHTML')
+}
+
 function checkElementAttribute(attr: AstNode, isCustomElement: boolean, filename: string, code: string): void {
   const name = attr.name.name as string
-  if (name === 'dangerouslySetInnerHTML') {
-    const expr = attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression as AstNode : undefined
-    const html = expr?.type === 'ObjectExpression'
-      ? (expr.properties as AstNode[]).find(p => p.type === 'Property' && (p.key?.name ?? p.key?.value) === '__html')
-      : undefined
-    throw mistake(name, filename, `write innerHTML={${html === undefined ? '...' : code.slice(html.value.start, html.value.end)}}`)
-  }
+  if (name === 'dangerouslySetInnerHTML')
+    throw mistake(name, filename, `write innerHTML={${reactHtmlSource(attr.value, code) ?? '...'}}`)
   if (name === 'classList')
     throw mistake(name, filename, 'pass one string to class, joining the names yourself')
   if (LOWERCASE_EVENT.test(name) && EVENT_PROPS.has(name.slice(2)))
@@ -123,18 +144,18 @@ function checkEventName(name: string, filename: string): void {
   throw mistake(name, filename, `no DOM event is named "${event}"; for a custom event, call addEventListener in a ref`)
 }
 
-/** Throws when a JSX opening element would compile into something other than what its author meant. */
-export function checkMistakes(node: AstNode, filename: string, code: string): void {
-  if (node.type !== 'JSXOpeningElement')
-    return
-  const tag = jsxTagName(node.name)
+/** Throws when a JSX element would compile into something other than what its author meant. */
+export function checkMistakes(element: AstNode, filename: string, code: string): void {
+  const tag = jsxTagName(element.openingElement.name)
   const isElement = tag !== '' && !isComponentTag(tag)
   const isCustomElement = tag.includes('-')
-  for (const attr of node.attributes as AstNode[]) {
+  for (const attr of element.openingElement.attributes as AstNode[]) {
     if (attr.type !== 'JSXAttribute')
       continue
     if (attr.name.type === 'JSXNamespacedName')
       checkNamespacedAttribute(attr.name.namespace.name as string, attr.name.name.name as string, filename)
+    else if (isElement && attr.name.name === 'innerHTML')
+      checkInnerHtml(element, tag, attr, filename, code)
     else if (isElement)
       checkElementAttribute(attr, isCustomElement, filename, code)
   }

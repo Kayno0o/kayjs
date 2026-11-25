@@ -307,8 +307,9 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   walk(program, (node) => {
     if (isJsxNode(node))
       hasJsx = true
-    if (node.type === 'JSXOpeningElement') {
+    if (node.type === 'JSXElement')
       checkMistakes(node, filename, code)
+    if (node.type === 'JSXOpeningElement') {
       const tag = jsxTagName(node.name)
       const isComponent = isComponentTag(tag)
       if (isComponent)
