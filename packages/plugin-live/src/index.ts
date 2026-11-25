@@ -15,7 +15,7 @@ export type LiveAuthorizeHook = (
   room: string,
 ) => boolean | Response | Promise<boolean | Response>
 
-export interface RoomsOptions {
+export interface ConnectionLimits {
   /** Maximum concurrent subscribers per room (default: 1000). */
   maxConnectionsPerRoom?: number | undefined
   /** Maximum concurrent subscribers per client key / IP (default: 10). */
@@ -26,24 +26,22 @@ export interface RoomsOptions {
   clientKey?: ((ctx: RequestContext) => string) | undefined
   /** ReadableStream queue high-water mark before dropping stalled subscribers (default: 64). */
   highWaterMark?: number | undefined
+}
+
+export interface RoomsOptions extends ConnectionLimits {
   /** Optional authorization hook checked before opening an SSE stream. */
   authorize?: LiveAuthorizeHook | undefined
 }
 
-export interface StreamOptions<TMember> {
+export interface StreamOptions<TMember> extends ConnectionLimits {
   room: string
   member: TMember
   pingMs?: number | undefined
   onJoin?: ((room: string, member: TMember) => void) | undefined
   onLeave?: ((room: string, member: TMember) => void) | undefined
-  maxConnectionsPerRoom?: number | undefined
-  maxConnectionsPerClient?: number | undefined
-  maxTotalConnections?: number | undefined
-  clientKey?: ((ctx: RequestContext) => string) | undefined
-  highWaterMark?: number | undefined
 }
 
-export interface LivePluginOptions<TMember> {
+export interface LivePluginOptions<TMember> extends ConnectionLimits {
   path: string
   room?: string | ((ctx: RequestContext) => string) | undefined
   member: (ctx: RequestContext) => TMember | Promise<TMember>
@@ -51,11 +49,6 @@ export interface LivePluginOptions<TMember> {
   onJoin?: ((room: string, member: TMember) => void) | undefined
   onLeave?: ((room: string, member: TMember) => void) | undefined
   authorize?: LiveAuthorizeHook | undefined
-  maxConnectionsPerRoom?: number | undefined
-  maxConnectionsPerClient?: number | undefined
-  maxTotalConnections?: number | undefined
-  clientKey?: ((ctx: RequestContext) => string) | undefined
-  highWaterMark?: number | undefined
 }
 
 export interface Rooms<TMessage, TMember = undefined> {
@@ -284,19 +277,7 @@ export function createRooms<TMessage, TMember = undefined>(
 
         if (pingMs > 0) {
           timer = setInterval(() => {
-            if (!cleaned) {
-              if (controller.desiredSize !== null && controller.desiredSize <= 0) {
-                drop()
-              }
-              else {
-                try {
-                  controller.enqueue(PING_CHUNK)
-                }
-                catch {
-                  drop()
-                }
-              }
-            }
+            sub?.send(PING_CHUNK)
           }, pingMs)
         }
 
@@ -337,18 +318,7 @@ export function createRooms<TMessage, TMember = undefined>(
               return new Response('Forbidden', { status: 403 })
           }
           const member = await opts.member(ctx)
-          return stream(ctx, {
-            room,
-            member,
-            pingMs: opts.pingMs,
-            onJoin: opts.onJoin,
-            onLeave: opts.onLeave,
-            maxConnectionsPerRoom: opts.maxConnectionsPerRoom,
-            maxConnectionsPerClient: opts.maxConnectionsPerClient,
-            maxTotalConnections: opts.maxTotalConnections,
-            clientKey: opts.clientKey,
-            highWaterMark: opts.highWaterMark,
-          })
+          return stream(ctx, { ...opts, room, member })
         })
       },
     }

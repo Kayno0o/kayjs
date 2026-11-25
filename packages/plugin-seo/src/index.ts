@@ -75,6 +75,11 @@ function resolveFileOrPkg(root: string, spec: string): string | undefined {
 
 const TITLE_TAG_RE = /<title>([\s\S]*?)<\/title>/i
 
+function descriptionTags(description: string): string {
+  const content = escAttr(description)
+  return `<meta name="description" content="${content}"><meta property="og:description" content="${content}">`
+}
+
 export function seo(options: SeoPluginOptions = {}): KayPlugin {
   const site = options.site?.replace(/\/$/, '')
 
@@ -94,8 +99,7 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
     build(ctx) {
       // 1. Default meta, OG, Twitter, and JSON-LD tags
       if (typeof options.description === 'string') {
-        ctx.addHead(`<meta name="description" content="${escAttr(options.description)}">`)
-        ctx.addHead(`<meta property="og:description" content="${escAttr(options.description)}">`)
+        ctx.addHead(descriptionTags(options.description))
       }
       if (options.name)
         ctx.addHead(`<meta property="og:site_name" content="${escAttr(options.name)}">`)
@@ -230,11 +234,8 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
         const loc = typeof ctx.locals.locale === 'string' ? ctx.locals.locale : undefined
         const desc = (loc && options.description[loc]) ?? Object.values(options.description)[0]
         if (desc) {
-          const escapedDesc = escAttr(desc)
-          out = out.replace(
-            '</head>',
-            () => `<meta name="description" content="${escapedDesc}"><meta property="og:description" content="${escapedDesc}"></head>`,
-          )
+          const tags = descriptionTags(desc)
+          out = out.replace('</head>', () => `${tags}</head>`)
         }
       }
 

@@ -84,6 +84,19 @@ export function i18n(options: I18nOptions): KayPlugin {
     return messages[locale]?.[key] ?? messages[defaultLocale]?.[key] ?? key
   }
 
+  function* missingKeys(): Generator<{ locale: string, key: string }> {
+    const baseKeys = Object.keys(messages[defaultLocale] ?? {})
+    for (const locale of locales) {
+      if (locale === defaultLocale)
+        continue
+      const dict = messages[locale] ?? {}
+      for (const key of baseKeys) {
+        if (!(key in dict))
+          yield { locale, key }
+      }
+    }
+  }
+
   return {
     name: '@kayjs/i18n',
 
@@ -104,26 +117,16 @@ export function i18n(options: I18nOptions): KayPlugin {
     },
 
     prerenderPaths(paths) {
-      const out: string[] = []
-      const seen = new Set<string>()
+      const out = new Set<string>()
       for (const raw of paths) {
-        const { locale: already } = stripLocalePrefix(raw, locales)
-        if (already !== undefined) {
-          if (!seen.has(raw)) {
-            seen.add(raw)
-            out.push(raw)
-          }
+        if (stripLocalePrefix(raw, locales).locale !== undefined) {
+          out.add(raw)
           continue
         }
-        for (const loc of locales) {
-          const localized = localizePath(raw, loc, defaultLocale, locales, prefixDefault)
-          if (!seen.has(localized)) {
-            seen.add(localized)
-            out.push(localized)
-          }
-        }
+        for (const loc of locales)
+          out.add(localizePath(raw, loc, defaultLocale, locales, prefixDefault))
       }
-      return out
+      return [...out]
     },
 
     transformHtml(html, ctx) {
@@ -157,32 +160,16 @@ export function i18n(options: I18nOptions): KayPlugin {
     },
 
     check(ctx) {
-      const baseKeys = Object.keys(messages[defaultLocale] ?? {})
-      for (const loc of locales) {
-        if (loc === defaultLocale)
-          continue
-        const dict = messages[loc] ?? {}
-        for (const key of baseKeys) {
-          if (!(key in dict))
-            ctx.error(`[i18n] ${loc}: missing translation key "${key}"`)
-        }
-      }
+      for (const { locale, key } of missingKeys())
+        ctx.error(`[i18n] ${locale}: missing translation key "${key}"`)
     },
 
     commands: {
       'i18n-check': () => {
-        const baseKeys = Object.keys(messages[defaultLocale] ?? {})
         let missing = 0
-        for (const loc of locales) {
-          if (loc === defaultLocale)
-            continue
-          const dict = messages[loc] ?? {}
-          for (const key of baseKeys) {
-            if (!(key in dict)) {
-              console.log(`[i18n] ${loc}: missing "${key}"`)
-              missing++
-            }
-          }
+        for (const { locale, key } of missingKeys()) {
+          console.log(`[i18n] ${locale}: missing "${key}"`)
+          missing++
         }
         if (missing === 0)
           console.log('[i18n] all locales complete')

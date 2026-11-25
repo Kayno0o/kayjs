@@ -11,6 +11,18 @@ export type { IconComponentProps } from './Icon'
 export type { IconData, IconifyIcon, IconSet } from './types'
 
 const DEFAULT_SIZE = 16
+const ICON_SPEC_RE = /^~icons\/([^/]+)\/(.+)$/
+
+function resolveIconSetFile(prefix: string, root: string): string {
+  const pkgPath = `@iconify-json/${prefix}/icons.json`
+  for (const from of [root, process.cwd()]) {
+    try {
+      return Bun.resolveSync(pkgPath, from)
+    }
+    catch {}
+  }
+  throw new Error(`@kayjs/icons: could not resolve "${pkgPath}". Install @iconify-json/${prefix}.`)
+}
 
 function resolveIcon(set: IconSet, name: string, depth: number): IconifyIcon | undefined {
   const own = set.icons[name]
@@ -77,12 +89,10 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
     bunPlugins: ({ root }): BunPlugin[] => [{
       name: 'kayjs-icons',
       setup(b) {
-        b.onResolve({ filter: /^~icons\/([^/]+)\/(.+)$/ }, (args) => {
-          return { path: args.path, namespace: 'kay-icon' }
-        })
+        b.onResolve({ filter: ICON_SPEC_RE }, args => ({ path: args.path, namespace: 'kay-icon' }))
 
         b.onLoad({ filter: /.*/, namespace: 'kay-icon' }, async (args) => {
-          const match = /^~icons\/([^/]+)\/(.+)$/.exec(args.path)
+          const match = ICON_SPEC_RE.exec(args.path)
           if (match === null)
             throw new Error(`@kayjs/icons: invalid specifier "${args.path}" (expected ~icons/<prefix>/<name>)`)
 
@@ -91,20 +101,7 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
           let set = cache.get(prefix)
 
           if (set === undefined) {
-            const pkgPath = `@iconify-json/${prefix}/icons.json`
-            let resolved: string
-            try {
-              resolved = Bun.resolveSync(pkgPath, root)
-            }
-            catch {
-              try {
-                resolved = Bun.resolveSync(pkgPath, process.cwd())
-              }
-              catch {
-                throw new Error(`@kayjs/icons: could not resolve "${pkgPath}". Install @iconify-json/${prefix}.`)
-              }
-            }
-            set = await Bun.file(resolved).json() as IconSet
+            set = await Bun.file(resolveIconSetFile(prefix, root)).json() as IconSet
             cache.set(prefix, set)
           }
 
