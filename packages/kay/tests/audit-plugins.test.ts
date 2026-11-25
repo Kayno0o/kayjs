@@ -584,6 +584,7 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
               jitterMs: 5,
             })
           })
+          await Promise.resolve()
 
           expect(instances.length).toBe(1)
           const es1 = instances[0]!

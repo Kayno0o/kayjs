@@ -39,7 +39,8 @@ export function Counter({ step = 1 }: { step?: number }) {
 | `effect(fn)` | Runs whenever tracked dependencies change; return a cleanup function |
 | `batch(fn)` | Coalesces multiple signal writes into a single flush |
 | `untrack(fn)` | Reads signals without subscribing the enclosing computation |
-| `onMount(fn)` / `onCleanup(fn)` | Browser lifecycle & teardown hooks |
+| `onMount(fn)` | Runs in the browser once the component's elements are in the document; return a cleanup function |
+| `onCleanup(fn)` | Runs when the component is disposed |
 | `root(dispose => ...)` | Creates an isolated disposal scope |
 
 ## Compiler-safe prop destructuring

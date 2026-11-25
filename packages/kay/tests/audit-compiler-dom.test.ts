@@ -9,7 +9,7 @@ import * as domExtras from '../src/dom/extras'
 import * as domCore from '../src/dom/index'
 import { defineIslandElement } from '../src/dom/island'
 import { loop } from '../src/dom/loop'
-import { onCleanup, signal } from '../src/reactivity/index'
+import { onCleanup, onMount, signal } from '../src/reactivity/index'
 import { store } from '../src/reactivity/store'
 import { createRenderContext, runWithRenderContext } from '../src/ssr/context'
 import * as ssrRt from '../src/ssr/index'
@@ -739,12 +739,11 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
 
 describe('destructured loop rows and component props in an island', () => {
   // Mounts compiled island code against the real dom runtime: each `__name` it imports is bound to that runtime export, and `imports` stands in for its own imports.
-  function mountIsland(src: string, entry: string, props: object, imports: Record<string, unknown> = {}): { host: HTMLElement, dispose: () => void } {
+  function mountIsland(src: string, entry: string, props: object, imports: Record<string, unknown> = {}, host = document.createElement('div')): { host: HTMLElement, dispose: () => void } {
     const code = compileDom('Island.tsx', src).code
     const runtime = [...Object.entries({ ...domCore, ...domExtras, loop }).map(([name, value]) => [`__${name}`, value] as const), ...Object.entries(imports)]
     const body = code.replace(/^import .*\n/gm, '').replace(/export function /g, 'function ')
     const render = new Function(...runtime.map(([n]) => n), 'props', `${body}\nreturn ${entry}(props)`)
-    const host = document.createElement('div')
     const dispose = domCore.mount(host, () => render(...runtime.map(([, v]) => v), props) as Node)
     return { host, dispose }
   }
@@ -802,6 +801,36 @@ describe('destructured loop rows and component props in an island', () => {
       todos[0] = 'B'
       expect(text()).toBe('Bc')
       dispose()
+    })
+  })
+
+  const FIELD = `export function Field({ seen }) { let el; onMount(() => { seen.push(el.isConnected); return () => seen.push('cleanup') }); return <input ref={e => el = e} /> }`
+
+  test.each([
+    ['on the first render', `${FIELD}\nexport function Form({ seen }) { return <form><Field seen={seen} /></form> }`, false],
+    ['in a branch shown later', `${FIELD}\nexport function Form({ seen, open }) { return <form>{open.value ? <Field seen={seen} /> : null}</form> }`, true],
+  ])('onMount runs %s once the element is in the document', async (_, src, later) => {
+    await withDom(async () => {
+      const seen: unknown[] = []
+      const open = signal(false)
+      const host = document.body.appendChild(document.createElement('div'))
+      const { dispose } = mountIsland(src, 'Form', { seen, open }, { onMount }, host)
+      if (later)
+        open.value = true
+      await Promise.resolve()
+      expect(seen).toEqual([true])
+      dispose()
+      expect(seen).toEqual([true, 'cleanup'])
+    })
+  })
+
+  test('onMount skips a component disposed before it reached the document', async () => {
+    await withDom(async () => {
+      const seen: unknown[] = []
+      const host = document.body.appendChild(document.createElement('div'))
+      mountIsland(`${FIELD}\nexport function Form({ seen }) { return <form><Field seen={seen} /></form> }`, 'Form', { seen }, { onMount }, host).dispose()
+      await Promise.resolve()
+      expect(seen).toEqual([])
     })
   })
 

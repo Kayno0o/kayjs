@@ -643,10 +643,18 @@ export function onCleanup(fn: () => void): void {
   ;(currentOwner.cl ??= []).push(fn)
 }
 
+// A render creates its nodes and inserts them in the same task, so a microtask later they are in the document.
 export function onMount(fn: () => void | (() => void)): void {
   if (typeof document === 'undefined')
     return
-  const cleanup = untrack(fn)
-  if (typeof cleanup === 'function')
-    onCleanup(cleanup)
+  const owner = currentOwner
+  queueMicrotask(() => {
+    if (owner?.x)
+      return
+    runWithOwner(owner, () => {
+      const cleanup = fn()
+      if (typeof cleanup === 'function')
+        onCleanup(cleanup)
+    })
+  })
 }
