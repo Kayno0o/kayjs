@@ -1,19 +1,12 @@
 // kay/test: in-process testing for pages, middleware, cookies, and actions — zero port binding.
 
 import type { BuildManifest, BuildOptions } from '../build/index'
-import type { KayApp, ServerOptions } from '../server/index'
-import type { TrustProxy } from '../server/security'
+import type { KayApp, ServerRuntimeConfig } from '../server/index'
 import { build } from '../build/index'
-import { createServer } from '../server/index'
+import { createServer, resolveServerConfig } from '../server/index'
 
-export interface TestAppOptions extends Omit<BuildOptions, 'compile' | 'static'> {
+export interface TestAppOptions extends Omit<BuildOptions, 'compile' | 'static'>, Partial<ServerRuntimeConfig> {
   prebuilt?: boolean | undefined
-  site?: string | undefined
-  lang?: string | undefined
-  security?: ServerOptions['security']
-  trustedOrigins?: string[] | undefined
-  trustProxy?: TrustProxy | undefined
-  maxRequestBodySize?: number | undefined
 }
 
 export interface TestApp {
@@ -41,14 +34,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
   const app = await createServer({
     root: options.root,
     outDir: options.outDir,
-    assetPrefix: options.assetPrefix,
-    site: options.site,
-    lang: options.lang,
-    security: options.security,
-    trustedOrigins: options.trustedOrigins,
-    trustProxy: options.trustProxy,
-    maxRequestBodySize: options.maxRequestBodySize,
-    plugins: options.plugins,
+    ...resolveServerConfig(undefined, options),
   })
 
   const cookies = new Map<string, string>()

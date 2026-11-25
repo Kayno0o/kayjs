@@ -2,10 +2,10 @@
 
 import type { BuildManifest } from '../build/index'
 import type { KayChild } from '../jsx-runtime'
-import type { KayPlugin, ServerErrorInfo } from '../plugins/index'
+import type { ServerRuntimeConfig } from '../plugins/index'
 import type { Cookies } from './cookies'
 import type { KayLocals } from './index'
-import type { SecurityHeadersOptions, TrustProxy } from './security'
+import type { TrustProxy } from './security'
 import { CookieStore } from './cookies'
 import { nodeEnv } from './env'
 import { getClientIp, isHttpsRequest } from './security'
@@ -88,23 +88,11 @@ export interface LayoutProps<Path extends string = string> {
   url: URL
 }
 
-export interface ServerOptions {
+export interface ServerOptions extends ServerRuntimeConfig {
   root: string
   outDir?: string | undefined
-  assetPrefix?: string | undefined
-  site?: string | undefined
   port?: number | undefined
-  lang?: string | undefined
-  security?: SecurityHeadersOptions | false | undefined
-  trustedOrigins?: string[] | undefined
-  trustProxy?: TrustProxy | undefined
-  maxRequestBodySize?: number | undefined
-  /** Milliseconds a streamed `<Suspense>` boundary may take before it renders its error and the response ends (default 30000). */
-  streamTimeout?: number | undefined
-  compress?: boolean | undefined
   dev?: boolean | undefined
-  onError?: ((info: ServerErrorInfo) => void) | undefined
-  plugins?: KayPlugin[] | undefined
   /** @internal Imports a built server module by absolute path; `kay dev` passes one that keeps unchanged modules loaded. */
   importModule?: ((path: string) => Promise<Record<string, unknown>>) | undefined
 }
@@ -136,30 +124,18 @@ export interface KayApp {
 
 export type EmbeddedBody = Uint8Array<ArrayBuffer> | string
 
-export interface EmbeddedServerConfig {
+export interface EmbeddedServerConfig extends ServerRuntimeConfig {
   manifest: BuildManifest
   modules: Record<string, unknown>
   assets: Record<string, EmbeddedBody>
   publicAssets?: Record<string, EmbeddedBody> | undefined
   publicEtags?: Record<string, string> | undefined
-  prerendered: Record<string, string>
+  prerendered?: Record<string, string> | undefined
   prerenderedFiles?: Record<string, string> | undefined
   root?: string | undefined
   outDir?: string | undefined
   publicDir?: string | undefined
-  assetPrefix?: string | undefined
-  site?: string | undefined
-  lang?: string | undefined
-  security?: SecurityHeadersOptions | false | undefined
-  trustedOrigins?: string[] | undefined
-  trustProxy?: TrustProxy | undefined
-  maxRequestBodySize?: number | undefined
-  /** Milliseconds a streamed `<Suspense>` boundary may take before it renders its error and the response ends (default 30000). */
-  streamTimeout?: number | undefined
-  compress?: boolean | undefined
   dev?: boolean | undefined
-  onError?: ((info: ServerErrorInfo) => void) | undefined
-  plugins?: KayPlugin[] | undefined
 }
 
 export const MIME: Record<string, string> = {

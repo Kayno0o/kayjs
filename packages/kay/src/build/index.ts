@@ -159,8 +159,10 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const allRouteFiles = walkRoutes(routesDir).sort()
   const specialFiles = allRouteFiles.filter(f => SPECIAL_ROUTE_FILES.has(basename(f)))
   const candidatePageFiles = allRouteFiles.filter(f => !basename(f).startsWith('_'))
+  const rootLayoutSrc = join(routesDir, '_layout.tsx')
   const errorSrc = join(routesDir, '_error.tsx')
   const notFoundSrc = join(routesDir, '_404.tsx')
+  const hasRootLayout = existsSync(rootLayoutSrc)
   const hasErrorFile = existsSync(errorSrc)
   const hasNotFoundFile = existsSync(notFoundSrc)
 
@@ -326,6 +328,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     ...(host.headTags.length > 0 ? { headTags: host.headTags } : {}),
     routes,
     ...(hasConfigFile ? { configFile: toOutRel(configSrc) } : {}),
+    ...(hasRootLayout ? { rootLayoutFile: toOutRel(rootLayoutSrc) } : {}),
     errorFile: hasErrorFile ? toOutRel(errorSrc) : undefined,
     notFoundFile: hasNotFoundFile ? toOutRel(notFoundSrc) : undefined,
     actions: buildActionEntries(actionsByFile, routesDir, toOutRel),

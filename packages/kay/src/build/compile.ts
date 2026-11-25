@@ -44,6 +44,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     for (const l of r.layouts) addMod(l)
     for (const m of r.middlewares) addMod(m)
   }
+  if (manifest.rootLayoutFile) addMod(manifest.rootLayoutFile)
   if (manifest.errorFile) addMod(manifest.errorFile)
   if (manifest.notFoundFile) addMod(manifest.notFoundFile)
   for (const a of manifest.actions) {
@@ -99,22 +100,23 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     }
   }
 
-  const cfgSpread = hasConfig ? `...pickRuntimeConfig(_kayConfig), ` : ''
+  const cfgExpr = hasConfig
+    ? `resolveServerConfig(_kayConfig, { assetPrefix: ${JSON.stringify(assetPrefix)} })`
+    : `{ assetPrefix: ${JSON.stringify(assetPrefix)} }`
 
   const code = [
     ...imports,
-    `import { createServerFromEmbedded, pickRuntimeConfig } from ${JSON.stringify(join(kaySrcRoot, 'server/index.ts'))};`,
+    `import { createServerFromEmbedded, resolveServerConfig } from ${JSON.stringify(join(kaySrcRoot, 'server/index.ts'))};`,
     `const manifest = ${JSON.stringify(manifest)};`,
     `const modules = { ${modEntries.join(', ')} };`,
     `const assets = { ${embeddedAssets.join(', ')} };`,
     `const publicAssets = { ${embeddedPublic.join(', ')} };`,
     `const publicEtags = { ${embeddedPublicEtags.join(', ')} };`,
-    `const prerendered = {};`,
     `const prerenderedFiles = { ${embeddedPrerenderedFiles.join(', ')} };`,
     `const port = Number(process.env.PORT || ${hasConfig ? '_kayConfig?.port || ' : ''}3000);`,
     `const hostname = process.env.HOST || undefined;`,
     `if (Bun.argv.includes('--health')) { const probeHost = !hostname || hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname; const r = await fetch(\`http://\${probeHost}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
-    `const app = await createServerFromEmbedded({ ${cfgSpread}manifest, modules, assets, publicAssets, publicEtags, prerendered, prerenderedFiles, assetPrefix: ${JSON.stringify(assetPrefix)} });`,
+    `const app = await createServerFromEmbedded({ ...${cfgExpr}, manifest, modules, assets, publicAssets, publicEtags, prerenderedFiles });`,
     `const server = app.serve(port, hostname);`,
     `console.log(\`kay server listening on http://\${hostname ?? 'localhost'}:\${server.port}\`);`,
   ].join('\n')

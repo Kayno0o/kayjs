@@ -44,6 +44,8 @@ export interface BuildManifest {
   headTags?: string[] | undefined
   routes: RouteManifestEntry[]
   configFile?: string | undefined
+  /** Explicit root `_layout.tsx` compiled module path (never inferred from subdirectory layouts). */
+  rootLayoutFile?: string | undefined
   errorFile?: string | undefined
   notFoundFile?: string | undefined
   actions: ActionManifestEntry[]

@@ -166,14 +166,11 @@ export interface KayPlugin {
   commands?: Record<string, (args: string[], root: string) => void | Promise<void>> | undefined
 }
 
-export interface KayConfig {
+/** Shared runtime server options inherited from `kay.config.ts` and overridable by `createServer`, `testApp`, `devServer`, and `--compile`. */
+export interface ServerRuntimeConfig {
   /** Public origin of the site (e.g. 'https://example.com'), inherited by @kayjs/seo, @kayjs/i18n, @kayjs/content, @kayjs/images, and @kayjs/auth. */
   site?: string | undefined
   lang?: string | undefined
-  port?: number | undefined
-  routesDir?: string | undefined
-  outDir?: string | undefined
-  publicDir?: string | undefined
   assetPrefix?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
@@ -186,16 +183,53 @@ export interface KayConfig {
   plugins?: KayPlugin[] | undefined
 }
 
+export interface KayConfig extends ServerRuntimeConfig {
+  port?: number | undefined
+  routesDir?: string | undefined
+  outDir?: string | undefined
+  publicDir?: string | undefined
+}
+
 export function defineConfig(config: KayConfig): KayConfig {
   return config
 }
 
 /** Forwards every runtime key from `kay.config.ts`, stripping build/CLI-only keys (`routesDir`, `outDir`, `publicDir`, `port`). */
-export function pickRuntimeConfig(config: KayConfig | undefined): Omit<KayConfig, 'routesDir' | 'outDir' | 'publicDir' | 'port'> {
+export function pickRuntimeConfig(config: KayConfig | undefined): ServerRuntimeConfig {
   if (config === undefined)
     return {}
   const { routesDir: _r, outDir: _o, publicDir: _p, port: _pt, ...runtime } = config
   return runtime
+}
+
+const RUNTIME_CONFIG_KEYS: readonly (keyof ServerRuntimeConfig)[] = [
+  'site',
+  'lang',
+  'assetPrefix',
+  'security',
+  'trustedOrigins',
+  'trustProxy',
+  'maxRequestBodySize',
+  'streamTimeout',
+  'compress',
+  'onError',
+  'plugins',
+]
+
+/** Merges runtime options from `kay.config.ts` with explicit caller overrides (ignoring `undefined` override fields). */
+export function resolveServerConfig(
+  fileConfig: KayConfig | undefined,
+  overrides?: Partial<ServerRuntimeConfig> | undefined,
+): ServerRuntimeConfig {
+  const merged: Record<string, unknown> = { ...pickRuntimeConfig(fileConfig) }
+  if (overrides !== undefined) {
+    for (const key of RUNTIME_CONFIG_KEYS) {
+      const value = overrides[key]
+      if (value !== undefined)
+        merged[key] = value
+    }
+  }
+  return merged as ServerRuntimeConfig
 }
 
 export function definePlugin(plugin: KayPlugin): KayPlugin {

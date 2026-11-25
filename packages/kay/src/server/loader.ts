@@ -5,7 +5,7 @@ import type { KayConfig } from '../plugins/index'
 import type { EmbeddedBody, KayApp, ServerOptions } from './http'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { loadConfig, pickRuntimeConfig } from '../plugins/index'
+import { loadConfig, resolveServerConfig } from '../plugins/index'
 import { createServerFromEmbedded } from './index'
 import { createStaticDirServer } from './static-dir'
 
@@ -65,11 +65,8 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     }
   }
 
-  const plugins = options.plugins ?? fileConfig.plugins ?? []
+  const runtimeConfig = resolveServerConfig(fileConfig, options)
   const clientDir = join(outDir, 'client')
-  const securityOpt = options.security ?? fileConfig.security
-  const trustProxy = options.trustProxy ?? fileConfig.trustProxy ?? false
-  const maxRequestBodySize = options.maxRequestBodySize ?? fileConfig.maxRequestBodySize
 
   const modules: Record<string, unknown> = {}
   const assets: Record<string, EmbeddedBody> = {}
@@ -117,6 +114,7 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
       }
     }
   }
+  if (manifest.rootLayoutFile) await loadMod(manifest.rootLayoutFile)
   if (manifest.errorFile) await loadMod(manifest.errorFile)
   if (manifest.notFoundFile) await loadMod(manifest.notFoundFile)
   for (const a of manifest.actions) {
@@ -124,7 +122,6 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     for (const m of a.middlewares) await loadMod(m)
   }
 
-  const runtimeConfig = pickRuntimeConfig(fileConfig)
   return createServerFromEmbedded({
     ...runtimeConfig,
     manifest,
@@ -132,22 +129,10 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     assets,
     publicAssets,
     publicEtags,
-    prerendered: {},
     prerenderedFiles,
     root,
     outDir,
     publicDir: join(outDir, 'public'),
-    assetPrefix: options.assetPrefix ?? fileConfig.assetPrefix,
-    site: options.site ?? fileConfig.site,
-    lang: options.lang ?? fileConfig.lang,
-    security: securityOpt,
-    trustedOrigins: options.trustedOrigins ?? fileConfig.trustedOrigins,
-    trustProxy,
-    maxRequestBodySize,
-    streamTimeout: options.streamTimeout ?? fileConfig.streamTimeout,
-    compress: options.compress ?? fileConfig.compress,
     dev: isDev,
-    onError: options.onError ?? fileConfig.onError,
-    plugins,
   })
 }

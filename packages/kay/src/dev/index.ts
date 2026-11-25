@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync,
 import { dirname, join, relative, resolve } from 'node:path'
 import { clearBuildCache } from '../build/graph'
 import { build, createBuildCache } from '../build/index'
-import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
+import { createAppContext, loadConfig, resolvePlugins, resolveServerConfig, runWithAppContext } from '../plugins/index'
 import { DEFAULT_MAX_REQUEST_BODY_SIZE } from '../server/http'
 import { createServer, withCspHashes } from '../server/index'
 
@@ -476,7 +476,8 @@ export async function devServer(options: DevServerOptions): Promise<{
   const pingChunk = encoder.encode(': ping\n\n')
   const pingInterval = setInterval(() => pushToClients(pingChunk), 15_000)
 
-  const maxRequestBodySize = options.maxRequestBodySize ?? initialCfg.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
+  const runtimeCfg = resolveServerConfig(initialCfg, { maxRequestBodySize: options.maxRequestBodySize })
+  const maxRequestBodySize = runtimeCfg.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
 
   const server = Bun.serve({
     port,

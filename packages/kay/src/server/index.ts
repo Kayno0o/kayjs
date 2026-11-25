@@ -31,8 +31,8 @@ import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HA
  */
 export interface KayLocals {}
 
-export { CONTENT_IMAGE_RESOLVER_SERVICE, createAppContext, defineConfig, definePlugin, getAppContext, I18N_CONFIG_SERVICE, loadConfig, pickRuntimeConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
-export type { ActiveI18nConfig, AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, ContentImageResolver, ContentImageResult, CreateAppContextOptions, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
+export { CONTENT_IMAGE_RESOLVER_SERVICE, createAppContext, defineConfig, definePlugin, getAppContext, I18N_CONFIG_SERVICE, loadConfig, pickRuntimeConfig, resolvePlugins, resolveServerConfig, runWithAppContext } from '../plugins/index'
+export type { ActiveI18nConfig, AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, ContentImageResolver, ContentImageResult, CreateAppContextOptions, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI, ServerRuntimeConfig } from '../plugins/index'
 export { action, getActionError } from './action'
 export type { ActionContext, ActionErrorFlash, ActionOptions, ActionResult, ServerAction } from './action'
 export { CompressionCache, isCompressibleType, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
@@ -257,26 +257,6 @@ function pickPageIslandProps(data: unknown, entry: RouteManifestEntry, mod: Load
   return { data }
 }
 
-function pickRootLayoutFile(manifest: BuildManifest): string | undefined {
-  // Prefer a layout attached to a root route (`/`) or shared at the shallowest directory depth.
-  const rootRoute = manifest.routes.find(r => r.path === '/' && r.layouts.length > 0)
-  if (rootRoute !== undefined)
-    return rootRoute.layouts[0]
-  let best: string | undefined
-  let bestDepth = Number.POSITIVE_INFINITY
-  for (const r of manifest.routes) {
-    const first = r.layouts[0]
-    if (first === undefined)
-      continue
-    const depth = first.split('/').length
-    if (depth < bestDepth) {
-      bestDepth = depth
-      best = first
-    }
-  }
-  return best
-}
-
 function middlewareAppliesToPath(scope: ScopedMiddleware['scope'], path: string, isStaticFast: boolean): boolean {
   if (scope === 'all')
     return true
@@ -286,7 +266,7 @@ function middlewareAppliesToPath(scope: ScopedMiddleware['scope'], path: string,
 }
 
 export async function createServerFromEmbedded(config: EmbeddedServerConfig): Promise<KayApp> {
-  const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered, prerenderedFiles = {}, lang = 'en', security } = config
+  const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered = {}, prerenderedFiles = {}, lang = 'en', security } = config
   const plugins = resolvePlugins(config.plugins)
   const assetPrefix = (config.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const site = config.site?.replace(/\/$/, '') || undefined
@@ -622,8 +602,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const router = new Router<CompiledRoute>()
   const fastStaticPages = new Map<string, FastHandler>()
 
-  // Error and 404 pages sit outside any route, so they render with the global styles and the true root layout.
-  const rootLayoutFile = pickRootLayoutFile(manifest)
+  // Error and 404 pages sit outside any route, so they render with the global styles and the explicit root layout only.
+  const rootLayoutFile = manifest.rootLayoutFile
   const rootLayoutMod = rootLayoutFile !== undefined ? modules[rootLayoutFile] as LoadedLayoutModule | undefined : undefined
   const fallbackDoc: DocumentOptions = {
     body: '',

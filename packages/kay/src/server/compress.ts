@@ -88,17 +88,85 @@ function hasNoTransform(cacheControl: string | null | undefined): boolean {
   return Boolean(cacheControl && /\bno-transform\b/i.test(cacheControl))
 }
 
-// Bun exposes no way to tell a streamed body from a buffered one without reading it, so its inspect output decides. Checked once at load: if the output no longer tells them apart, every body without a length counts as streamed and goes out uncompressed.
-const STREAM_MARK = 'ReadableStream {'
-const inspectSeesStreams = typeof Bun !== 'undefined'
-  && Bun.inspect(new Response(new ReadableStream())).includes(STREAM_MARK)
-  && !Bun.inspect(new Response('')).includes(STREAM_MARK)
+const PENDING: unique symbol = Symbol('pending')
+const MAX_BUFFERED_PROBE_CHUNKS = 32
+const MAX_BUFFERED_PROBE_BYTES = 4 * 1024 * 1024
 
-function isStreamingBody(res: Response): boolean {
+function concatChunks(chunks: readonly Uint8Array[], totalBytes: number): Uint8Array<ArrayBuffer> {
+  if (chunks.length === 1) {
+    const only = chunks[0]!
+    if (only.buffer instanceof ArrayBuffer && only.byteOffset === 0 && only.byteLength === only.buffer.byteLength)
+      return only as Uint8Array<ArrayBuffer>
+  }
+  const out = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return out
+}
+
+// Microtask-only probe: buffered bodies (string, TypedArray, JSON, closed streams) settle all chunks
+// within microtasks and can be compressed; open streams stay pending and pass straight through unbuffered.
+async function readBufferedOrPassThrough(
+  res: Response,
+): Promise<{ buffered: Uint8Array<ArrayBuffer> } | { passthrough: Response }> {
   const te = res.headers.get('transfer-encoding')
-  if (te && te.toLowerCase().includes('chunked'))
-    return true
-  return !inspectSeesStreams || Bun.inspect(res).includes(STREAM_MARK)
+  if (te !== null && te.toLowerCase().includes('chunked'))
+    return { passthrough: res }
+  if (res.body === null)
+    return { buffered: new Uint8Array(0) }
+
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+  let pendingRead: ReturnType<typeof reader.read> | undefined
+
+  while (true) {
+    const readPromise = reader.read()
+    const tick = Promise.resolve().then(() => Promise.resolve()).then((): typeof PENDING => PENDING)
+    const outcome = await Promise.race([readPromise, tick])
+    if (outcome === PENDING) {
+      pendingRead = readPromise
+      break
+    }
+    if (outcome.done) {
+      reader.releaseLock()
+      return { buffered: concatChunks(chunks, totalBytes) }
+    }
+    chunks.push(outcome.value)
+    totalBytes += outcome.value.byteLength
+    if (chunks.length >= MAX_BUFFERED_PROBE_CHUNKS || totalBytes > MAX_BUFFERED_PROBE_BYTES)
+      break
+  }
+
+  let chunkIdx = 0
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (chunkIdx < chunks.length) {
+        controller.enqueue(chunks[chunkIdx++]!)
+        return
+      }
+      const next = pendingRead !== undefined ? pendingRead : reader.read()
+      pendingRead = undefined
+      const { done, value } = await next
+      if (done)
+        controller.close()
+      else
+        controller.enqueue(value)
+    },
+    cancel(reason) {
+      return reader.cancel(reason)
+    },
+  })
+  return {
+    passthrough: new Response(stream, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: res.headers,
+    }),
+  }
 }
 
 function hasToken(haystack: string, token: string): boolean {
@@ -300,10 +368,6 @@ export async function maybeCompressResponse(
     return res
 
   const cl = res.headers.get('content-length')
-  // Never buffer streaming responses that have no Content-Length (e.g. chunked streams, ReadableStream)
-  if (cl === null && isStreamingBody(res))
-    return res
-
   const enc = request.method === 'HEAD' ? undefined : pickEncoding(request.headers.get('accept-encoding'))
   if (enc === undefined) {
     try {
@@ -324,7 +388,16 @@ export async function maybeCompressResponse(
   if (res.body === null)
     return res
 
-  const raw = new Uint8Array(await res.arrayBuffer())
+  let raw: Uint8Array<ArrayBuffer>
+  if (cl !== null) {
+    raw = new Uint8Array(await res.arrayBuffer())
+  }
+  else {
+    const probe = await readBufferedOrPassThrough(res)
+    if ('passthrough' in probe)
+      return probe.passthrough
+    raw = probe.buffered
+  }
   const compressed = cache.compress(raw, enc)
   const headers = new Headers(res.headers)
   appendVaryAcceptEncoding(headers)
