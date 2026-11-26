@@ -1,6 +1,6 @@
 import type { FeatureExtractionPipeline } from '@huggingface/transformers'
 import { pipeline } from '@huggingface/transformers'
-import { nameWords } from '../src/name-words'
+import { byStem, nameWords, stem } from '../src/name-words'
 
 // An icon set's names with the tags its makers wrote for each.
 export type Tagged = Map<string, string[]>
@@ -16,6 +16,8 @@ const WHOLE_WORD = /^[a-z]{3,}$/
 // Keeps a table line to the strongest words, and drops those under 5%.
 const KEPT = 12
 const WEAKEST = 0.05
+// The words icon sets name a drawing style with, which say nothing of what an icon shows.
+const STYLES = new Set(['bold', 'duotone', 'fill', 'filled', 'line', 'outline', 'outlined', 'regular', 'round', 'rounded', 'sharp', 'solid', 'thin', 'twotone'])
 
 export async function tablerTags(): Promise<Tagged> {
   const icons = await Bun.file(`${MODULES}/@tabler/icons/icons.json`).json() as Record<string, { name: string, tags: (string | number)[] }>
@@ -25,6 +27,30 @@ export async function tablerTags(): Promise<Tagged> {
 
 export async function lucideTags(): Promise<Tagged> {
   return new Map(Object.entries(await Bun.file(`${MODULES}/lucide-static/tags.json`).json() as Record<string, string[]>))
+}
+
+// Phosphor's tags, minus its `*new*` and `*updated*` release marks.
+export async function phosphorTags(): Promise<Tagged> {
+  const { icons } = await import(`${MODULES}/@phosphor-icons/core/dist/index.mjs`) as { icons: { name: string, tags: string[] }[] }
+
+  return new Map(icons.map(icon => [icon.name, icon.tags.filter(tag => !tag.startsWith('*'))]))
+}
+
+// The other names each installed iconify set gives an icon, as tags of the icon they point to; `skip` leaves out the sets a bench tests on.
+export async function aliasTags(skip: string[] = []): Promise<Tagged> {
+  const tagged: Tagged = new Map()
+
+  for (const folder of new Bun.Glob('@iconify-json/*/icons.json').scanSync(MODULES)) {
+    if (skip.some(prefix => folder === `@iconify-json/${prefix}/icons.json`))
+      continue
+
+    const set = await Bun.file(`${MODULES}/${folder}`).json() as { aliases?: Record<string, { parent: string }> }
+
+    for (const [alias, { parent }] of Object.entries(set.aliases ?? {}))
+      tagged.set(parent, [...tagged.get(parent) ?? [], alias])
+  }
+
+  return tagged
 }
 
 // The names of every iconify set installed here, as the words their icons are named with.
@@ -54,7 +80,15 @@ function add(related: Related, from: string, to: string, weight: number): void {
   row.set(to, (row.get(to) ?? 0) + weight)
 }
 
+// The words of a tag, plus each two neighbours joined, as `dark mode` also stands for `darkmode`: the word a query of both reads them as.
+function tagWords(tag: string): string[] {
+  const words = nameWords(tag)
+
+  return [...words, ...words.slice(1).map((word, i) => words[i]! + word)]
+}
+
 // Each tag word to the name words of the icons it tags, by how often they meet against how common both are.
+// Words of the icon's own name pair with nothing, so `user-round` does not teach `user` to mean `round`, and style words are left out of both sides.
 export function fromTags(sets: Tagged[]): Related {
   const pairs: Related = new Map()
   const tagUses = new Map<string, number>()
@@ -62,8 +96,8 @@ export function fromTags(sets: Tagged[]): Related {
 
   for (const set of sets) {
     for (const [name, tags] of set) {
-      const names = new Set(nameWords(name))
-      const words = new Set([...tags.flatMap(nameWords), ...names])
+      const names = new Set(nameWords(name).filter(word => !STYLES.has(word)))
+      const words = new Set(tags.flatMap(tagWords).filter(word => !names.has(word) && !STYLES.has(word)))
 
       for (const word of names)
         nameUses.set(word, (nameUses.get(word) ?? 0) + 1)
@@ -71,10 +105,8 @@ export function fromTags(sets: Tagged[]): Related {
       for (const word of words) {
         tagUses.set(word, (tagUses.get(word) ?? 0) + 1)
 
-        for (const target of names) {
-          if (target !== word)
-            add(pairs, word, target, 1)
-        }
+        for (const target of names)
+          add(pairs, word, target, 1)
       }
     }
   }
@@ -171,6 +203,7 @@ async function nearest(keys: string[], candidates: string[], keep: number, floor
 }
 
 // Both sources summed per word pair, meaning weighted by `meaningWeight`, as the `word percent word percent` lines the runtime reads.
+// The forms of a word share one line, under the shortest, as the search reads the others as that one; a line keeps one form of each other stem, the strongest, and none of its own, which the search finds in the names.
 export function merge(tags: Related, meaning: Related, meaningWeight: number): Record<string, string> {
   const merged: Related = new Map()
 
@@ -184,13 +217,26 @@ export function merge(tags: Related, meaning: Related, meaningWeight: number): R
       add(merged, word, target, weight * meaningWeight)
   }
 
+  const forms = byStem(merged.keys())
+  const lines: Related = new Map()
+
+  for (const [word, row] of merged) {
+    const form = forms.get(stem(word))!
+    const line = lines.get(form) ?? new Map<string, number>()
+
+    lines.set(form, line)
+    for (const [target, weight] of row)
+      line.set(target, Math.max(line.get(target) ?? 0, Math.min(1, weight)))
+  }
+
   const table: Record<string, string> = {}
 
-  for (const word of [...merged.keys()].sort()) {
-    const kept = [...merged.get(word)!]
-      .map(([target, weight]) => [target, Math.min(1, weight)] as const)
+  for (const word of [...lines.keys()].sort()) {
+    const stems = new Set([stem(word)])
+    const kept = [...lines.get(word)!]
       .filter(([, weight]) => weight >= WEAKEST)
       .sort((a, b) => b[1] - a[1])
+      .filter(([target]) => !stems.has(stem(target)) && stems.add(stem(target)))
       .slice(0, KEPT)
 
     if (kept.length > 0)

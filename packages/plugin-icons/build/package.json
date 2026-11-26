@@ -19,6 +19,7 @@
     "@iconify-json/ph": "1.2.2",
     "@iconify-json/ri": "1.2.10",
     "@iconify-json/tabler": "1.2.44",
+    "@phosphor-icons/core": "2.1.1",
     "@tabler/icons": "3.51.0",
     "lucide-static": "1.72.0"
   }

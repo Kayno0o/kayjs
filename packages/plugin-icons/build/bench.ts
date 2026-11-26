@@ -1,11 +1,11 @@
-// Scores the search on tables that never saw the set they are tested on: learned from one set's tags, queried with the other set's.
+// Scores the search on tables that never saw the set they are tested on: learned from one set's tags (plus phosphor's and the other sets' aliases), queried with the other set's.
 // A case is a tag naming at most 5 icons that the icon's name does not hold, so the plain substring search scores about 0; each suite reports the share found in the first 10 (what `kay icons-find` prints) and 50 (a picker's first page), and the mean reciprocal rank.
 // The typed queries of queries.ts add multi-word cases and count how often an icon they must not lead with comes first.
 import type { Tagged } from './learn'
 import type { Query } from './queries'
 import { findIcons } from '../src/search'
 import { replaceTable } from '../src/table'
-import { fromMeaning, fromTags, iconifyNameWords, lucideTags, merge, modelWords, setWords, tablerTags } from './learn'
+import { aliasTags, fromMeaning, fromTags, iconifyNameWords, lucideTags, merge, modelWords, phosphorTags, setWords, tablerTags } from './learn'
 import { QUERIES } from './queries'
 import { FLOOR, MEANING_WEIGHT, NEIGHBOURS } from './settings'
 
@@ -107,16 +107,23 @@ function scoreQueries(names: string[], queries: Query[]): string {
 }
 
 const sets = { tabler: await tablerTags(), lucide: await lucideTags() }
+const phosphor = await phosphorTags()
 const candidates = [...await iconifyNameWords()]
 const common = await modelWords()
 
 for (const [train, test] of [['tabler', 'lucide'], ['lucide', 'tabler']] as const) {
   const suites = cases(sets[test])
-  const tags = fromTags([sets[train]])
-  // The words a search may be typed with, minus the test set's tags, which would hand the answers over.
-  const keys = [...new Set([...common, ...setWords([sets[train]]), ...candidates])]
+  // Every source the table learns from, minus the test set's tags and aliases, which would hand the answers over.
+  const learned = [sets[train], phosphor, await aliasTags([test])]
+  const tags = fromTags(learned)
+  const keys = [...new Set([...common, ...setWords(learned), ...candidates])]
   const meaning = await fromMeaning(keys, candidates, NEIGHBOURS, FLOOR)
-  const tables = { 'none': {}, 'tags': merge(tags, new Map(), 0), 'tags + meaning': merge(tags, meaning, MEANING_WEIGHT) }
+  const tables = {
+    'none': {},
+    'set tags': merge(fromTags([sets[train]]), new Map(), 0),
+    'all tags': merge(tags, new Map(), 0),
+    'all tags + meaning': merge(tags, meaning, MEANING_WEIGHT),
+  }
 
   console.log(`\n${train} tags -> ${test} (${Object.entries(suites).map(([kind, list]) => `${list.length} ${kind}`).join(', ')})`)
 
@@ -124,7 +131,7 @@ for (const [train, test] of [['tabler', 'lucide'], ['lucide', 'tabler']] as cons
 
   for (const [label, table] of Object.entries(tables)) {
     replaceTable(table)
-    console.log(`  ${label}`)
+    console.log(`  ${label} (${Object.keys(table).length} words)`)
     for (const [kind, suite] of Object.entries(suites))
       console.log(`    ${kind.padEnd(8)} ${score(names, suite)}`)
     console.log(`    ${'queries'.padEnd(8)} ${scoreQueries(names, QUERIES)}`)
