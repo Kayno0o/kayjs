@@ -11,6 +11,7 @@ import type { DocumentOptions } from '../ssr/index'
 import type { CookieStore } from './cookies'
 import type { EmbeddedServerConfig, KayApp, Middleware, RequestContext } from './http'
 import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } from './page'
+import type { FastHandler } from './routing'
 import { join } from 'node:path'
 import { createAppContext, getAppContext, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { createRenderContext, runWithRenderContext } from '../ssr/context'
@@ -26,6 +27,7 @@ import { allowedMethodsHeader, mergedHeadTags, pickPageIslandProps, stripHeadBod
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
 import { requestedRegion, respondRegion } from './region'
 import { Router } from './router'
+import { actionRoutePrefix, createAncestorMiddlewareLookup, createFastStaticPageHandler, decodeRequestPathname, inferRoutesServerPrefix, methodNotAllowed, toBunRouteKey } from './routing'
 import { buildSecurityHeaderEntries, inlineStyleHashes, resolveHstsValue, verifyOrigin } from './security'
 import { STREAM_TAIL_MARK, streamDocument } from './stream'
 
@@ -54,12 +56,12 @@ export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, Va
 // Matches Bun.serve's 30 s idle timeout, which a streamed page turns off.
 const DEFAULT_STREAM_TIMEOUT = 30_000
 
-type FastHandler = (req: Request, remoteIp?: string, url?: URL) => Response | Promise<Response>
-
 interface CompiledRoute {
   entry: RouteManifestEntry
   mod: LoadedPageModule
   layouts: LoadedLayoutModule[]
+  dirMiddlewares: Middleware[]
+  /** Precomputed plugin + directory middlewares for non-rewritten static paths. */
   middlewares: Middleware[]
   /** Dynamic segments (`:param` / `*rest`), so the path names no single URL. */
   dynamic: boolean
@@ -144,15 +146,25 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     trustedOriginsList,
     trustedOrigins,
   })
-  const { router: pluginRouter, middlewaresFor } = pluginHost
+  const { router: pluginRouter, middlewaresFor, middlewaresForPaths } = pluginHost
   const hasPluginRewrites = pluginHost.rewrites.length > 0
+  const routesPrefix = inferRoutesServerPrefix(manifest)
+  const routePathByFile = new Map(manifest.routes.map(r => [r.file, r.path]))
+  const ancestorMiddlewaresFor = createAncestorMiddlewareLookup(manifest, modules, routesPrefix)
+  const pluginMiddlewaresFor = (effectiveScopedPath: string, rawScopedPath: string): readonly Middleware[] =>
+    effectiveScopedPath === rawScopedPath
+      ? middlewaresFor(effectiveScopedPath)
+      : middlewaresForPaths([effectiveScopedPath, rawScopedPath])
 
   // Server actions and their live URLs
   for (const entry of manifest.actions) {
     const mod = modules[entry.file] as Record<string, unknown> | undefined
     const act = mod?.[entry.exportName]
-    if (isServerAction(act))
-      actions.register(act, entry.exportName, entry.url, entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default), middlewaresFor(entry.url))
+    if (isServerAction(act)) {
+      const routePrefix = actionRoutePrefix(entry, routesPrefix, routePathByFile)
+      const pluginMws = routePrefix !== undefined ? middlewaresForPaths([entry.url, routePrefix]) : middlewaresFor(entry.url)
+      actions.register(act, entry.exportName, entry.url, entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default), pluginMws)
+    }
   }
 
   const { all: prerenderedMap, fast: fastPrerenderedMap } = files.collectPrerendered(manifest.routes, {
@@ -167,9 +179,27 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
   const { buildNotFoundResponse, renderError } = createFallbackPages({ manifest, modules, lang, alwaysLoadRuntime, dev: isDev, document, htmlHeaders, notifyError, finish })
 
-  async function renderNotFound(cookieStore: CookieStore, url: URL, request: Request, ctx: RequestContext): Promise<Response> {
-    const res = await runChain(ctx, middlewaresFor(url.pathname), () => buildNotFoundResponse(url, request, ctx))
-    return finish(res, request, cookieStore)
+  async function renderNotFound(
+    cookieStore: CookieStore,
+    url: URL,
+    request: Request,
+    ctx: RequestContext,
+    effectiveScopedPath: string,
+    rawScopedPath: string,
+  ): Promise<Response> {
+    const pluginMws = pluginMiddlewaresFor(effectiveScopedPath, rawScopedPath)
+    const ancestor = ancestorMiddlewaresFor(effectiveScopedPath)
+    if (ancestor !== undefined)
+      ctx.params = ancestor.params
+    const chain = ancestor === undefined ? pluginMws : [...pluginMws, ...ancestor.middlewares]
+    try {
+      const res = await actions.run(ctx, () => runChain(ctx, chain, () => buildNotFoundResponse(url, request, ctx)))
+      return finish(res, request, cookieStore)
+    }
+    catch (error) {
+      notifyError(error, request, 'route')
+      return renderError(error, cookieStore, url, request, ctx)
+    }
   }
 
   function refuseCrossSite(request: Request, reason: string, cookieStore?: CookieStore): Response {
@@ -181,7 +211,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const layouts = entry.layouts.map(l => modules[l] as LoadedLayoutModule)
     const dirMiddlewares = entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default)
     const routePluginMiddlewares = middlewaresFor(entry.path)
-    const fastPluginMiddlewares = middlewaresFor(entry.path, true)
+    const hasLoad = Boolean(entry.hasLoad && typeof mod.load === 'function')
+    const fastPluginMiddlewares = middlewaresFor(entry.path, !hasLoad)
     const dynamic = entry.path.includes(':') || entry.path.includes('*')
     const hasIslands = entry.islandChunks.length > 0
     const doc: DocumentOptions = {
@@ -206,125 +237,42 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       && mod.GET === undefined
 
     if (canFastPath) {
-      const shell = renderDocument({ ...doc, body: '\0', preloadChunks: entry.eagerIslandChunks ?? entry.islandChunks, hasIslands })
-      const splitAt = shell.indexOf('\0')
-      const docPrefix = shell.slice(0, splitAt)
-      const docSuffix = shell.slice(splitAt + 1)
-      const singleLayout = layouts.length === 1 ? layouts[0]! : undefined
-
-
-      const fail = (error: unknown, request: Request, url: URL, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
-        notifyError(error, request, 'route')
-        return renderError(error, cookieStore, url, request, ctx)
-      }
-      const respondHtml = (body: string, request: Request, cookieStore?: CookieStore): Response => {
-        const html = docPrefix + body + docSuffix
-        const res = compressedHtmlResponse(html, 200, htmlHeaders(hasIslands, false, true, inlineStyleHashes(html)), request, compressCache, !entry.hasLoad)
-        return cookieStore?.hasChanges ? finish(res, request, cookieStore) : withHsts(res, request)
-      }
-      const layoutProps = (inner: string, url: URL, locals: KayLocals) => ({ children: raw(inner), url, params: {}, locals })
-
-      const finishSingleLayout = async (wrapped: Promise<Html | string>, request: Request, url: URL, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
-        try {
-          return respondHtml(ssrChild(await wrapped as Html), request, cookieStore)
-        }
-        catch (error) {
-          return fail(error, request, url, cookieStore, ctx)
-        }
-      }
-
-      const wrapLayouts = (inner: string, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
-        if (layouts.length === 0)
-          return respondHtml(inner, request, cookieStore)
-        if (singleLayout !== undefined) {
-          const wrapped = singleLayout.default(layoutProps(inner, url, locals))
-          if (wrapped instanceof Promise)
-            return finishSingleLayout(wrapped, request, url, cookieStore, ctx)
-          return respondHtml(ssrChild(wrapped as Html), request, cookieStore)
-        }
-        return (async () => {
-          try {
-            let cur = inner
-            for (let i = layouts.length - 1; i >= 0; i--)
-              cur = ssrChild(await layouts[i]!.default(layoutProps(cur, url, locals)) as Html)
-            return respondHtml(cur, request, cookieStore)
-          }
-          catch (error) {
-            return fail(error, request, url, cookieStore, ctx)
-          }
-        })()
-      }
-
-      const finishAsyncPage = async (rendered: Promise<Html | string>, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
-        try {
-          return await wrapLayouts(ssrChild(await rendered as Html), request, url, locals, cookieStore, ctx)
-        }
-        catch (error) {
-          return fail(error, request, url, cookieStore, ctx)
-        }
-      }
-
-      const renderPage = (data: unknown, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
-        const pageProps: Record<string, unknown> = { params: {}, locals, url, ...(data !== undefined ? { data } : {}) }
-        if (entry.isIsland && entry.islandChunk !== undefined) {
-          return wrapLayouts(ssrIsland(
-            entry.islandChunk,
-            () => ssrChild(mod.default!(pageProps) as Html),
-            pickPageIslandProps(data, entry, mod),
-            entry.islandHydrate as HydrateStrategy | undefined,
-            true, mod.default!.name,
-          ), request, url, locals, cookieStore, ctx)
-        }
-        const rendered = mod.default!(pageProps)
-        if (rendered instanceof Promise)
-          return finishAsyncPage(rendered, request, url, locals, cookieStore, ctx)
-        return wrapLayouts(ssrChild(rendered as Html), request, url, locals, cookieStore, ctx)
-      }
-
-      fastStaticPages.set(entry.path, (request, remoteIp, url = new URL(request.url)) => {
-        try {
-          if (!entry.hasLoad || typeof mod.load !== 'function')
-            return renderPage(undefined, request, url, {})
-
-          const { ctx, cookieStore } = makeRequestContext(request, {}, { trustProxy, remoteIp, url })
-          return (async () => {
-            try {
-              const loaded = await actions.run(ctx, () => mod.load!(ctx))
-              if (isNotFound(loaded))
-                return finish(await buildNotFoundResponse(url, request, ctx), request, cookieStore)
-              if (loaded instanceof Response)
-                return finish(loaded, request, cookieStore)
-              return await renderPage(loaded, request, url, ctx.locals, cookieStore, ctx)
-            }
-            catch (error) {
-              if (isNotFound(error))
-                return finish(await buildNotFoundResponse(url, request, ctx), request, cookieStore)
-              return fail(error, request, url, cookieStore, ctx)
-            }
-          })()
-        }
-        catch (error) {
-          return fail(error, request, url)
-        }
-      })
+      fastStaticPages.set(entry.path, createFastStaticPageHandler({
+        entry,
+        mod,
+        layouts,
+        doc,
+        hasIslands,
+        hasLoad,
+        trustProxy,
+        htmlHeaders,
+        compressCache,
+        actions,
+        buildNotFoundResponse,
+        renderError,
+        notifyError,
+        finish,
+        withHsts,
+      }))
     }
 
-    router.add(entry.path, { entry, mod, layouts, middlewares: [...routePluginMiddlewares, ...dirMiddlewares], dynamic, doc })
+    router.add(entry.path, { entry, mod, layouts, dirMiddlewares, middlewares: [...routePluginMiddlewares, ...dirMiddlewares], dynamic, doc })
   }
 
   async function renderCompiledRoute(
     route: CompiledRoute,
     ctx: RequestContext,
     disableTimeout?: () => void,
+    staticPath?: string,
   ): Promise<Response> {
     const { entry, mod, layouts, doc } = route
 
     const isRegion = requestedRegion(ctx.request) !== undefined
     // Serve prerendered HTML after middlewares have passed (skip on full-page GETs with a flash cookie so it hydrates & clears, and on region requests)
     if (isRead(ctx.request)) {
-      const rawPath = ctx.url.pathname
-      const normPath = rawPath.length > 1 && rawPath.endsWith('/') ? rawPath.slice(0, -1) : rawPath
-      const pre = prerenderedMap.get(rawPath) ?? prerenderedMap.get(normPath)
+      const lookupPath = staticPath ?? ctx.url.pathname
+      const normPath = lookupPath.length > 1 && lookupPath.endsWith('/') ? lookupPath.slice(0, -1) : lookupPath
+      const pre = staticPath !== undefined ? (prerenderedMap.get(lookupPath) ?? prerenderedMap.get(normPath)) : undefined
       if (pre !== undefined && !isRegion && (ctx.request.method === 'HEAD' || !hasActionErrorCookie(ctx.request)))
         return serveFile(ctx.request, pre)
       // Prerendered dynamic route: unlisted param returns 404 (never falls back to SSR)
@@ -341,10 +289,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       return stripHeadBody(await mod.GET(ctx))
 
     // Page routes only handle GET/HEAD; unsafe methods (POST/PUT/PATCH/DELETE) without a method export get 405.
-    if (typeof mod.default !== 'function' || !isRead(ctx.request)) {
-      const allow = allowedMethodsHeader(mod)
-      return new Response('Method Not Allowed', allow ? { status: 405, headers: { allow } } : { status: 405 })
-    }
+    if (typeof mod.default !== 'function' || !isRead(ctx.request))
+      return methodNotAllowed(allowedMethodsHeader(mod))
 
     // Hydrate one-shot flash cookie on full page GETs only; defer deletion until a full page renders (not load() redirects or <Region> requests)
     const hasFlash = ctx.request.method === 'GET' && !isRegion && hasActionErrorCookie(ctx.request) && hydrateActionErrorFlash(ctx)
@@ -426,17 +372,21 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   async function handleInternal(request: Request, remoteIp?: string, disableTimeout?: () => void, bodyLimited = false): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const pathname = url.pathname
+      const rawPathname = url.pathname
+      const decoded = decodeRequestPathname(rawPathname)
+      if (!decoded.ok)
+        return finish(new Response('Bad Request', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } }), request)
+      const { staticPath, scopedPath } = decoded
       const read = isRead(request)
 
       // 1. Static client assets, then public/ files (explicit plugin routes take precedence over public/ files)
-      if (read) {
-        const asset = assetMap.get(pathname)
+      if (read && staticPath !== undefined) {
+        const asset = assetMap.get(staticPath)
         if (asset !== undefined)
           return serveAsset(request, asset)
-        const pub = publicMap.get(pathname)
+        const pub = publicMap.get(staticPath)
         if (pub !== undefined) {
-          const matchedPlugin = pluginRouter.match(pathname)
+          const matchedPlugin = pluginRouter.match(rawPathname)
           const reqMethod = request.method.toUpperCase()
           const shadowedByPlugin = matchedPlugin !== undefined
             && (matchedPlugin.data.has(reqMethod) || (reqMethod === 'HEAD' && matchedPlugin.data.has('GET')) || matchedPlugin.data.has('ALL'))
@@ -445,12 +395,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         }
       }
 
-      // Actions only accept POST; other methods get 405 before any middleware runs.
-      const registeredAction = actions.byUrl(pathname)
-      if (registeredAction !== undefined && request.method !== 'POST')
-        return finish(new Response('Method Not Allowed', { status: 405, headers: { allow: 'POST' } }), request)
-
-      // Actions are origin-checked before their body is read and before any middleware runs.
+      // Actions are origin-checked on POST before their body is read and before any middleware runs.
+      const registeredAction = staticPath !== undefined ? actions.byUrl(staticPath) : undefined
       const actionHandler = request.method === 'POST' ? registeredAction : undefined
       if (actionHandler !== undefined) {
         const originCheck = verifyOrigin(request, trustedOrigins, trustProxy, url)
@@ -468,13 +414,17 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
       const req = bounded.request
 
-      // 2. Server actions (POST /_kay/action/<id>): plugin middlewares, then the _middleware.ts chain of the action's folder
-      if (actionHandler !== undefined) {
-        const { act, middlewares } = actionHandler
+      // 2. Server actions (POST /_kay/action/<id>; non-POST runs applicable middlewares before 405)
+      if (registeredAction !== undefined) {
+        const { act, middlewares } = registeredAction
         const { ctx, cookieStore } = makeRequestContext(req, {}, { trustProxy, remoteIp, url })
         try {
-          const res = await actions.run(ctx, () => runChain(ctx, middlewares, () => executeAction(act, req, ctx, trustedOrigins, trustProxy)))
-          return finish(finishActionRedirect(res, req), req, cookieStore)
+          const res = await actions.run(ctx, () => runChain(ctx, middlewares, () =>
+            actionHandler !== undefined
+              ? executeAction(act, req, ctx, trustedOrigins, trustProxy)
+              : methodNotAllowed('POST'),
+          ))
+          return finish(actionHandler !== undefined ? finishActionRedirect(res, req) : res, req, cookieStore)
         }
         catch (error) {
           notifyError(error, req, 'action')
@@ -484,11 +434,11 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
       // 3. Prerendered static HTML, then 4. the zero-overhead static route path
       const plainRead = isPlainRead(req)
-      if (plainRead) {
-        const pre = fastPrerenderedMap.get(pathname)
+      if (plainRead && staticPath !== undefined) {
+        const pre = fastPrerenderedMap.get(staticPath)
         if (pre !== undefined)
           return serveFile(req, pre)
-        const fast = fastStaticPages.get(pathname)
+        const fast = fastStaticPages.get(staticPath)
         if (fast !== undefined)
           return fast(req, remoteIp, url)
       }
@@ -497,14 +447,21 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       const { ctx, cookieStore } = makeRequestContext(req, {}, { trustProxy, remoteIp, url })
 
       // Apply plugin URL rewrites (e.g. @kayjs/i18n stripping /fr prefix and setting ctx.locals.locale)
-      let effectivePath = pathname
+      let effectivePath = rawPathname
       for (const rewrite of pluginHost.rewrites) {
         const nextPath = rewrite(effectivePath, ctx)
         if (nextPath !== undefined)
           effectivePath = nextPath
       }
+      let effectiveScopedPath = scopedPath
+      if (effectivePath !== rawPathname) {
+        const reDecoded = decodeRequestPathname(effectivePath)
+        if (!reDecoded.ok)
+          return finish(new Response('Bad Request', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } }), req, cookieStore)
+        effectiveScopedPath = reDecoded.scopedPath
+      }
 
-      // Custom plugin routes run behind plugin middlewares so ctx.locals (e.g. auth user/session) is available.
+      // Custom plugin routes run behind path-matched plugin middlewares so ctx.locals is available without cross-scope leaks.
       const method = req.method.toUpperCase()
       const pluginMatch = pluginRouter.match(effectivePath)
       const directPluginDef = pluginMatch?.data.get(method) ?? pluginMatch?.data.get('ALL')
@@ -517,8 +474,9 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
             return refuseCrossSite(req, originCheck.reason, cookieStore)
         }
         ctx.params = pluginMatch.params
+        const pluginMws = pluginMiddlewaresFor(effectiveScopedPath, scopedPath)
         try {
-          let res = await actions.run(ctx, () => runChain(ctx, pluginHost.allMiddlewares, () => routeDef.handler(ctx)))
+          let res = await actions.run(ctx, () => runChain(ctx, pluginMws, () => routeDef.handler(ctx)))
           if (headFallbackPluginDef !== undefined)
             res = stripHeadBody(res)
           else if (isEventStream(res))
@@ -534,23 +492,23 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       const matched = router.match(effectivePath)
       if (matched === undefined) {
         if (pluginMatch !== undefined) {
+          ctx.params = pluginMatch.params
           const allow = allowedPluginMethodsHeader(pluginMatch.data)
-          return finish(new Response('Method Not Allowed', allow ? { status: 405, headers: { allow } } : { status: 405 }), req)
+          const pluginMws = pluginMiddlewaresFor(effectiveScopedPath, scopedPath)
+          try {
+            const res = await actions.run(ctx, () => runChain(ctx, pluginMws, () => methodNotAllowed(allow)))
+            return finish(res, req, cookieStore)
+          }
+          catch (error) {
+            notifyError(error, req, 'plugin')
+            return renderError(error, cookieStore, ctx.url, req, ctx)
+          }
         }
-        return renderNotFound(cookieStore, ctx.url, req, ctx)
+        return renderNotFound(cookieStore, ctx.url, req, ctx, effectiveScopedPath, scopedPath)
       }
 
       ctx.params = matched.params
       const route = matched.data
-
-      // Reject unsupported HTTP methods with 405 + Allow BEFORE any middleware or CSRF check runs.
-      const supportsMethod = typeof route.mod[method] === 'function'
-        || (method === 'HEAD' && typeof route.mod.GET === 'function')
-        || (typeof route.mod.default === 'function' && (method === 'GET' || method === 'HEAD'))
-      if (!supportsMethod) {
-        const allow = allowedMethodsHeader(route.mod)
-        return finish(new Response('Method Not Allowed', allow ? { status: 405, headers: { allow } } : { status: 405 }), req)
-      }
 
       // CSRF verification for file-based API routes on unsafe methods (opt out via `export const csrf = false`)
       if (typeof route.mod[method] === 'function' && route.mod.csrf !== false) {
@@ -559,8 +517,12 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           return refuseCrossSite(req, originCheck.reason, cookieStore)
       }
 
+      const routeMiddlewares = pluginHost.hasPathScopedMiddlewares && (route.dynamic || effectiveScopedPath !== scopedPath)
+        ? [...pluginMiddlewaresFor(effectiveScopedPath, scopedPath), ...route.dirMiddlewares]
+        : route.middlewares
+
       try {
-        const res = await actions.run(ctx, () => runChain(ctx, route.middlewares, () => renderCompiledRoute(route, ctx, disableTimeout)))
+        const res = await actions.run(ctx, () => runChain(ctx, routeMiddlewares, () => renderCompiledRoute(route, ctx, disableTimeout, staticPath)))
         if (isEventStream(res))
           disableTimeout?.()
         // Compress uncompressed API/middleware responses after the middleware chain unwinds.
@@ -593,24 +555,25 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     ))
 
     const routes: Record<string, (req: Request) => Response | Promise<Response>> = {}
+    const registerServeRoute = (path: string, handler: (req: Request) => Response | Promise<Response>): void => {
+      const key = toBunRouteKey(path)
+      if (key !== undefined && !(key in routes))
+        routes[key] = handler
+    }
 
     for (const [path, asset] of assetMap)
-      routes[path] = req => isRead(req) ? serveAsset(req, asset) : fetchReq(req)
+      registerServeRoute(path, req => isRead(req) ? serveAsset(req, asset) : fetchReq(req))
 
     for (const [path, pub] of publicMap) {
-      if (!(path in routes) && pluginRouter.match(path) === undefined)
-        routes[path] = req => isRead(req) ? servePublic(req, pub) : fetchReq(req)
+      if (pluginRouter.match(path) === undefined)
+        registerServeRoute(path, req => isRead(req) ? servePublic(req, pub) : fetchReq(req))
     }
 
-    for (const [path, pre] of fastPrerenderedMap) {
-      if (!(path in routes))
-        routes[path] = req => isPlainRead(req) ? serveFile(req, pre) : fetchReq(req)
-    }
+    for (const [path, pre] of fastPrerenderedMap)
+      registerServeRoute(path, req => isPlainRead(req) ? serveFile(req, pre) : fetchReq(req))
 
-    for (const [path, handler] of fastStaticPages) {
-      if (!(path in routes))
-        routes[path] = req => isPlainRead(req) ? runWithAppContext(serverAppCtx, () => handler(req, ipOf(req))) : fetchReq(req)
-    }
+    for (const [path, handler] of fastStaticPages)
+      registerServeRoute(path, req => isPlainRead(req) ? runWithAppContext(serverAppCtx, () => handler(req, ipOf(req))) : fetchReq(req))
 
     srvRef = Bun.serve({
       port,

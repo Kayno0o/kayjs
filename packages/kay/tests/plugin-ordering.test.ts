@@ -90,3 +90,148 @@ describe('Plugin ordering, definePlugin & locals validation (#3550)', () => {
     }
   })
 })
+
+describe('Plugin middleware scoping (#3626)', () => {
+  it('runs scope: "dynamic" on static-path routes with load() while skipping pure static/prerendered fast paths', async () => {
+    const dir = makeTemp('kay-3626-dynamic-scope-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/profile.tsx'), `
+      import type { RequestContext } from '@kayjs/kay/server'
+      export function load(ctx: RequestContext) {
+        return { dyn: (ctx.locals as Record<string, string>).dyn ?? 'missing' }
+      }
+      export default function Profile({ data }: { data: { dyn: string } }) {
+        return <p>profile:{data.dyn}</p>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/about.tsx'), `
+      export default function About() { return <p>static-about</p> }
+    `)
+    writeFileSync(join(dir, 'src/routes/prerendered.tsx'), `
+      export const prerender = true
+      export default function Pre() { return <p>pre-page</p> }
+    `)
+
+    let dynamicCalls = 0
+    const dynPlugin = definePlugin({
+      name: 'dyn-scope',
+      server(api) {
+        api.use(async (ctx, next) => {
+          dynamicCalls++
+          ;(ctx.locals as Record<string, string>).dyn = 'loaded'
+          const res = await next()
+          res.headers.set('x-dyn-mw', '1')
+          return res
+        }, { scope: 'dynamic' })
+      },
+    })
+
+    const app = await testApp({ root: dir, plugins: [dynPlugin] })
+    try {
+      const profile = await app.get('/profile')
+      expect(profile.status).toBe(200)
+      expect(profile.headers.get('x-dyn-mw')).toBe('1')
+      expect(await profile.text()).toContain('profile:loaded')
+      expect(dynamicCalls).toBe(1)
+
+      const about = await app.get('/about')
+      expect(about.status).toBe(200)
+      expect(about.headers.get('x-dyn-mw')).toBeNull()
+
+      const pre = await app.get('/prerendered')
+      expect(pre.status).toBe(200)
+      expect(pre.headers.get('x-dyn-mw')).toBeNull()
+      expect(dynamicCalls).toBe(1)
+    }
+    finally {
+      await app.app.dispose?.()
+    }
+  })
+
+  it('matches path-scoped middleware against actual dynamic pathnames, action route dirs, and plugin routes without leaking', async () => {
+    const dir = makeTemp('kay-3626-path-scope-')
+    mkdirSync(join(dir, 'src/routes/admin'), { recursive: true })
+    mkdirSync(join(dir, 'src/actions'), { recursive: true })
+
+    writeFileSync(join(dir, 'src/routes/[...slug].tsx'), `
+      export default function CatchAll({ params, locals }: { params: Record<string, string>, locals: Record<string, string> }) {
+        return <p>catchall:{params.slug}:admin={locals.admin ?? 'no'}</p>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/admin/actions.ts'), `
+      import { action } from '@kayjs/kay/server'
+      export const adminAct = action(async (ctx) => ({ admin: (ctx.locals as Record<string, string>).admin ?? 'no' }))
+    `)
+    writeFileSync(join(dir, 'src/actions/public.ts'), `
+      import { action } from '@kayjs/kay/server'
+      export const publicAct = action(async (ctx) => ({ admin: (ctx.locals as Record<string, string>).admin ?? 'no' }))
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { adminAct } from './admin/actions'
+      import { publicAct } from '../actions/public'
+      export default function Home() {
+        return (
+          <div>
+            <form action={adminAct} method="post"><button>a</button></form>
+            <form action={publicAct} method="post"><button>p</button></form>
+          </div>
+        )
+      }
+    `)
+
+    const scopedPlugin = definePlugin({
+      name: 'admin-scope',
+      server(api) {
+        api.use(async (ctx, next) => {
+          ;(ctx.locals as Record<string, string>).admin = 'yes'
+          const res = await next()
+          res.headers.set('x-admin-scope', '1')
+          return res
+        }, { scope: '/admin' })
+        api.route('GET', '/admin/stats', ctx => ctx.json({ admin: (ctx.locals as Record<string, string>).admin ?? 'no' }))
+        api.route('GET', '/auth/session', ctx => ctx.json({ admin: (ctx.locals as Record<string, string>).admin ?? 'no' }))
+      },
+    })
+
+    const app = await testApp({ root: dir, plugins: [scopedPlugin] })
+    try {
+      // Dynamic catch-all route matches scope: '/admin' on actual request pathname (including percent-encoded)
+      const adminCatch = await app.get('/admin/users')
+      expect(adminCatch.status).toBe(200)
+      expect(adminCatch.headers.get('x-admin-scope')).toBe('1')
+      expect(await adminCatch.text()).toContain('catchall:admin/users:admin=yes')
+
+      const encodedAdminCatch = await app.get('/%61dmin/users')
+      expect(encodedAdminCatch.status).toBe(200)
+      expect(encodedAdminCatch.headers.get('x-admin-scope')).toBe('1')
+
+      const publicCatch = await app.get('/public/users')
+      expect(publicCatch.status).toBe(200)
+      expect(publicCatch.headers.get('x-admin-scope')).toBeNull()
+      expect(await publicCatch.text()).toContain('catchall:public/users:admin=no')
+
+      // Actions under src/routes/admin/ run scope: '/admin'; actions outside routes/ do not
+      const adminMod = await app.import('src/routes/admin/actions.ts') as { adminAct: unknown }
+      const adminActRes = await app.submit(adminMod.adminAct as never, {})
+      expect(adminActRes.headers.get('x-admin-scope')).toBe('1')
+      expect(await adminActRes.json()).toEqual({ ok: true, data: { admin: 'yes' } })
+
+      const pubMod = await app.import('src/actions/public.ts') as { publicAct: unknown }
+      const pubActRes = await app.submit(pubMod.publicAct as never, {})
+      expect(pubActRes.headers.get('x-admin-scope')).toBeNull()
+      expect(await pubActRes.json()).toEqual({ ok: true, data: { admin: 'no' } })
+
+      // Plugin routes: scope: '/admin' runs on /admin/stats and does NOT leak onto /auth/session
+      const adminPluginRes = await app.get('/admin/stats')
+      expect(adminPluginRes.headers.get('x-admin-scope')).toBe('1')
+      expect(await adminPluginRes.json()).toEqual({ admin: 'yes' })
+
+      const authPluginRes = await app.get('/auth/session')
+      expect(authPluginRes.headers.get('x-admin-scope')).toBeNull()
+      expect(await authPluginRes.json()).toEqual({ admin: 'no' })
+    }
+    finally {
+      await app.app.dispose?.()
+    }
+  })
+})

@@ -1,5 +1,5 @@
-// Regression tests for #3541: HEAD falls back to GET everywhere, unsupported methods return 405 + Allow
-// before any middleware runs, invalid cookies throw, and ActionContext has no dead params field.
+// Regression tests for #3541 and #3626: HEAD falls back to GET everywhere, unsupported methods return 405 + Allow
+// after applicable middlewares run (so CORS OPTIONS preflight works), invalid cookies throw, and ActionContext has no dead params field.
 
 import type { ActionContext } from '../src/server/index'
 import { describe, expect, test } from 'bun:test'
@@ -54,8 +54,8 @@ export function GET() {
     }
   })
 
-  test('unsupported methods answer 405 with Allow header BEFORE any route or plugin middleware runs', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'kay-3541-405-'))
+  test('unsupported methods run applicable middlewares before answering 405 with Allow header, enabling CORS OPTIONS preflight (#3626)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3626-405-'))
     let pluginMwCalls = 0
     try {
       mkdirSync(join(dir, 'src/routes/api'), { recursive: true })
@@ -63,7 +63,9 @@ export function GET() {
       writeFileSync(join(dir, 'src/routes/_middleware.ts'), `
 export default async function mw(_ctx: unknown, next: () => Promise<Response>) {
   ;(globalThis as Record<string, number>).__kay3541DirMw = ((globalThis as Record<string, number>).__kay3541DirMw ?? 0) + 1
-  return next()
+  const res = await next()
+  res.headers.set('x-dir-mw', '1')
+  return res
 }
 `)
       writeFileSync(join(dir, 'src/routes/index.tsx'), `
@@ -81,11 +83,22 @@ export const ping = action(async () => ({ pong: true }))
 `)
 
       const plugin = definePlugin({
-        name: 'mw-spy',
+        name: 'cors-and-spy',
         server(api) {
-          api.use(async (_ctx, next) => {
+          api.use(async (ctx, next) => {
             pluginMwCalls++
-            return next()
+            if (ctx.request.method === 'OPTIONS') {
+              return new Response(null, {
+                status: 204,
+                headers: {
+                  'access-control-allow-origin': 'https://app.example',
+                  'access-control-allow-methods': 'GET, POST, OPTIONS',
+                },
+              })
+            }
+            const res = await next()
+            res.headers.set('x-plugin-mw', '1')
+            return res
           })
           api.route('GET', '/plugin/only-get', () => new Response('ok'))
         },
@@ -95,8 +108,9 @@ export const ping = action(async () => ({ pong: true }))
       g.__kay3541DirMw = 0
       const manifest = await build({ root: dir, plugins: [plugin], prerender: false })
       const app = await createServer({ root: dir, plugins: [plugin] })
+      const actionUrl = manifest.actions[0]!.url
 
-      // Cross-site POST to page without POST -> 405 + Allow, zero middleware runs
+      // Cross-site POST to page without POST -> middleware runs, then 405 + Allow
       const pagePost = await app.handle(new Request('http://localhost/', {
         method: 'POST',
         headers: { origin: 'https://evil.example' },
@@ -104,28 +118,43 @@ export const ping = action(async () => ({ pong: true }))
       expect(pagePost.status).toBe(405)
       expect(pagePost.headers.get('allow')).toContain('GET')
       expect(pagePost.headers.get('allow')).toContain('HEAD')
-      expect(pluginMwCalls).toBe(0)
-      expect(g.__kay3541DirMw).toBe(0)
+      expect(pagePost.headers.get('x-plugin-mw')).toBe('1')
+      expect(pagePost.headers.get('x-dir-mw')).toBe('1')
+      expect(pluginMwCalls).toBe(1)
+      expect(g.__kay3541DirMw).toBe(1)
 
-      // DELETE to GET-only API route -> 405 + Allow, zero middleware runs
+      // DELETE to GET-only API route -> middleware runs, then 405 + Allow
       const apiDel = await app.handle(new Request('http://localhost/api/only-get', { method: 'DELETE' }))
       expect(apiDel.status).toBe(405)
       expect(apiDel.headers.get('allow')).toBe('GET, HEAD')
-      expect(pluginMwCalls).toBe(0)
-      expect(g.__kay3541DirMw).toBe(0)
+      expect(apiDel.headers.get('x-plugin-mw')).toBe('1')
+      expect(apiDel.headers.get('x-dir-mw')).toBe('1')
+      expect(pluginMwCalls).toBe(2)
+      expect(g.__kay3541DirMw).toBe(2)
 
-      // POST to GET-only plugin route -> 405 + Allow, zero middleware runs
+      // POST to GET-only plugin route -> plugin middleware runs, then 405 + Allow
       const pluginPost = await app.handle(new Request('http://localhost/plugin/only-get', { method: 'POST' }))
       expect(pluginPost.status).toBe(405)
       expect(pluginPost.headers.get('allow')).toBe('GET, HEAD')
-      expect(pluginMwCalls).toBe(0)
+      expect(pluginPost.headers.get('x-plugin-mw')).toBe('1')
+      expect(pluginMwCalls).toBe(3)
 
-      // GET to server action URL -> 405 + Allow: POST, zero middleware runs
-      const actionUrl = manifest.actions[0]!.url
+      // GET to server action URL -> plugin middleware runs, then 405 + Allow: POST
       const actionGet = await app.handle(new Request(`http://localhost${actionUrl}`, { method: 'GET' }))
       expect(actionGet.status).toBe(405)
       expect(actionGet.headers.get('allow')).toBe('POST')
-      expect(pluginMwCalls).toBe(0)
+      expect(actionGet.headers.get('x-plugin-mw')).toBe('1')
+      expect(pluginMwCalls).toBe(4)
+
+      // CORS OPTIONS preflight intercepted by middleware on page, API route, plugin route, and action
+      for (const path of ['/', '/api/only-get', '/plugin/only-get', actionUrl]) {
+        const preflight = await app.handle(new Request(`http://localhost${path}`, {
+          method: 'OPTIONS',
+          headers: { origin: 'https://app.example', 'access-control-request-method': 'POST' },
+        }))
+        expect(preflight.status).toBe(204)
+        expect(preflight.headers.get('access-control-allow-origin')).toBe('https://app.example')
+      }
     }
     finally {
       delete (globalThis as unknown as Record<string, number>).__kay3541DirMw

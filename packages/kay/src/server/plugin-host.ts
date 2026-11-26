@@ -40,7 +40,11 @@ function middlewareAppliesToPath(scope: ScopedMiddleware['scope'], path: string,
     return true
   if (scope === 'dynamic')
     return !isStaticFast
-  return path === scope || path.startsWith(scope.endsWith('/') ? scope : `${scope}/`)
+  const normScope = scope.length > 1 && scope.endsWith('/') ? scope.slice(0, -1) : scope
+  const normPath = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
+  if (normScope === '/')
+    return normPath.startsWith('/')
+  return normPath === normScope || normPath.startsWith(`${normScope}/`)
 }
 
 export function allowedPluginMethodsHeader(methods: ReadonlyMap<string, PluginRouteDef>): string {
@@ -143,6 +147,15 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
       return isStaticFast ? staticFastMiddlewares : allMiddlewares
     return scopedMiddlewares.filter(m => middlewareAppliesToPath(m.scope, path, isStaticFast)).map(m => m.mw)
   }
+  const middlewaresForPaths = (paths: readonly string[], isStaticFast = false): readonly Middleware[] => {
+    if (scopedMiddlewares.length === 0)
+      return allMiddlewares
+    if (!hasPathScopedMiddlewares)
+      return isStaticFast ? staticFastMiddlewares : allMiddlewares
+    return scopedMiddlewares
+      .filter(m => paths.some(path => middlewareAppliesToPath(m.scope, path, isStaticFast)))
+      .map(m => m.mw)
+  }
 
   let disposed = false
   async function dispose(): Promise<void> {
@@ -159,7 +172,7 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
     }
   }
 
-  return { router, rewrites, allMiddlewares, middlewaresFor, dispose }
+  return { router, rewrites, allMiddlewares, hasPathScopedMiddlewares, middlewaresFor, middlewaresForPaths, dispose }
 }
 
 export type ServerPluginHost = Awaited<ReturnType<typeof createServerPluginHost>>

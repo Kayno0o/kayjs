@@ -892,3 +892,219 @@ describe('fast static path', () => {
     }
   })
 })
+
+describe('#3626 router catch-all precedence, percent-decoded paths, and 404 ancestor middleware', () => {
+  it('ranks exact static > exact parametric > catch-all regardless of registration order', async () => {
+    const r = new Router<string>()
+    // Register catch-all BEFORE exact parametric routes to prove sort order wins
+    r.add('/*any', 'root-catchall')
+    r.add('/docs/*rest', 'docs-catchall')
+    r.add('/docs/:section/*rest', 'docs-section-catchall')
+    r.add('/docs/api/*rest', 'docs-api-catchall')
+    r.add('/docs/:slug', 'docs-slug')
+    r.add('/docs/:section/:page', 'docs-section-page')
+    r.add('/docs/intro', 'docs-intro-static')
+    r.add('/:slug', 'root-slug')
+
+    expect(r.match('/docs/intro')).toEqual({ data: 'docs-intro-static', params: {} })
+    expect(r.match('/docs/guide')).toEqual({ data: 'docs-slug', params: { slug: 'guide' } })
+    expect(r.match('/docs/guide/getting-started')).toEqual({ data: 'docs-section-page', params: { section: 'guide', page: 'getting-started' } })
+    expect(r.match('/docs/guide/a/b')).toEqual({ data: 'docs-section-catchall', params: { section: 'guide', rest: 'a/b' } })
+    expect(r.match('/docs/api/v1/users')).toEqual({ data: 'docs-api-catchall', params: { rest: 'v1/users' } })
+    expect(r.match('/hello')).toEqual({ data: 'root-slug', params: { slug: 'hello' } })
+    expect(r.match('/a/b/c')).toEqual({ data: 'root-catchall', params: { any: 'a/b/c' } })
+
+    // End-to-end file-based routes: [slug].tsx must not be shadowed by [section]/[...rest].tsx
+    const dir = makeTemp('kay-3626-catchall-')
+    mkdirSync(join(dir, 'src/routes/docs/[section]'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/docs/[slug].tsx'), `
+      export default function DocSlug({ params }: { params: Record<string, string> }) {
+        return <p>slug:{params.slug}</p>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/docs/[section]/[...rest].tsx'), `
+      export default function DocRest({ params }: { params: Record<string, string> }) {
+        return <p>rest:{params.section}:{params.rest}</p>
+      }
+    `)
+    await build({ root: dir })
+    const app = await createServer({ root: dir })
+    try {
+      const slugRes = await app.handle(new Request('http://localhost/docs/intro'))
+      expect(slugRes.status).toBe(200)
+      expect(await slugRes.text()).toContain('slug:intro')
+
+      const restRes = await app.handle(new Request('http://localhost/docs/guide/deep/page'))
+      expect(restRes.status).toBe(200)
+      expect(await restRes.text()).toContain('rest:guide:deep/page')
+    }
+    finally {
+      await app.dispose?.()
+    }
+  })
+
+  it('percent-decodes non-ASCII static routes, prerendered pages, and public/ files safely while rejecting malformed % and %2F traversal', async () => {
+    // Router unit checks
+    const r = new Router<string>()
+    r.add('/café', 'cafe')
+    r.add('/café/:drink', 'cafe-drink')
+    r.add('/a/b', 'ab')
+    expect(r.match('/caf%C3%A9')).toEqual({ data: 'cafe', params: {} })
+    expect(r.match('/caf%c3%a9/')).toEqual({ data: 'cafe', params: {} })
+    expect(r.match('/caf%C3%A9/cr%C3%A8me')).toEqual({ data: 'cafe-drink', params: { drink: 'crème' } })
+    expect(r.match('/a%2Fb')).toBeUndefined()
+    expect(r.match('/a%2fb')).toBeUndefined()
+    expect(r.match('/caf%ZZ')).toBeUndefined()
+
+    // Full server build + handle() + live serve()
+    const dir = makeTemp('kay-3626-unicode-')
+    mkdirSync(join(dir, 'src/routes/café'), { recursive: true })
+    mkdirSync(join(dir, 'public'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/café.tsx'), `export default function Cafe() { return <h1>Café OK</h1> }\n`)
+    writeFileSync(join(dir, 'src/routes/café/[item].tsx'), `export default function Item({ params }: { params: Record<string, string> }) { return <p>item:{params.item}</p> }\n`)
+    writeFileSync(join(dir, 'src/routes/données.tsx'), `export const prerender = true\nexport default function Donnees() { return <h1>Données Prerendered</h1> }\n`)
+    writeFileSync(join(dir, 'public/café.txt'), 'bonjour café')
+    writeFileSync(join(dir, 'public/mon fichier.txt'), 'espace ok')
+
+    await build({ root: dir })
+    const app = await createServer({ root: dir })
+    const srv = app.serve(0)
+    try {
+      for (const base of ['http://localhost', `http://127.0.0.1:${srv.port}`]) {
+        const send = (path: string) => base === 'http://localhost'
+          ? app.handle(new Request(`${base}${path}`))
+          : fetch(`${base}${path}`)
+
+        const cafeRes = await send('/caf%C3%A9')
+        expect(cafeRes.status).toBe(200)
+        expect(await cafeRes.text()).toContain('Café OK')
+
+        const itemRes = await send('/caf%C3%A9/cr%C3%A8me')
+        expect(itemRes.status).toBe(200)
+        expect(await itemRes.text()).toContain('item:crème')
+
+        const preRes = await send('/donn%C3%A9es')
+        expect(preRes.status).toBe(200)
+        expect(await preRes.text()).toContain('Données Prerendered')
+
+        const pubRes = await send('/caf%C3%A9.txt')
+        expect(pubRes.status).toBe(200)
+        expect(await pubRes.text()).toBe('bonjour café')
+
+        const spaceRes = await send('/mon%20fichier.txt')
+        expect(spaceRes.status).toBe(200)
+        expect(await spaceRes.text()).toBe('espace ok')
+      }
+
+      // Malformed % sequences return 400 (never 500)
+      expect((await app.handle(new Request('http://localhost/%ZZ'))).status).toBe(400)
+      expect((await app.handle(new Request('http://localhost/%E0%A4%A'))).status).toBe(400)
+
+      // Encoded slash / backslash / NUL / traversal never escape into public/ or filesystem
+      expect((await app.handle(new Request('http://localhost/..%2Fcaf%C3%A9.txt'))).status).toBe(404)
+      expect((await app.handle(new Request('http://localhost/..%5Ccaf%C3%A9.txt'))).status).toBe(404)
+      expect((await app.handle(new Request('http://localhost/sub/..%2Fcaf%C3%A9.txt'))).status).toBe(404)
+      expect((await app.handle(new Request('http://localhost/%2e%2e/package.json'))).status).toBe(404)
+      expect((await app.handle(new Request('http://localhost/%00'))).status).toBe(404)
+    }
+    finally {
+      srv.stop(true)
+      await app.dispose?.()
+    }
+  })
+
+  it('runs ancestor _middleware.ts chains on 404s and routes throwing 404 middlewares through _error.tsx', async () => {
+    const dir = makeTemp('kay-3626-404-mw-')
+    mkdirSync(join(dir, 'src/routes/admin'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes/orgs/[orgId]'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes/boom'), { recursive: true })
+
+    writeFileSync(join(dir, 'src/routes/_middleware.ts'), `
+      import type { Middleware } from '@kayjs/kay/server'
+      const rootMw: Middleware = async (_ctx, next) => {
+        const res = await next()
+        res.headers.set('x-chain', (res.headers.get('x-chain') ? res.headers.get('x-chain') + ',' : '') + 'root')
+        return res
+      }
+      export default rootMw
+    `)
+    writeFileSync(join(dir, 'src/routes/admin/_middleware.ts'), `
+      import type { Middleware } from '@kayjs/kay/server'
+      const adminGuard: Middleware = async (ctx, next) => {
+        if (ctx.request.headers.get('x-auth') !== 'secret')
+          return ctx.text('Unauthorized', { status: 401 })
+        const res = await next()
+        res.headers.set('x-chain', 'admin')
+        return res
+      }
+      export default adminGuard
+    `)
+    writeFileSync(join(dir, 'src/routes/admin/users.tsx'), `export default function Users() { return <p>Users</p> }\n`)
+    writeFileSync(join(dir, 'src/routes/orgs/[orgId]/_middleware.ts'), `
+      import type { Middleware } from '@kayjs/kay/server'
+      const orgMw: Middleware = async (ctx, next) => {
+        const res = await next()
+        res.headers.set('x-org', ctx.params.orgId ?? 'none')
+        return res
+      }
+      export default orgMw
+    `)
+    writeFileSync(join(dir, 'src/routes/orgs/[orgId]/index.tsx'), `export default function Org() { return <p>Org</p> }\n`)
+    writeFileSync(join(dir, 'src/routes/boom/_middleware.ts'), `
+      import type { Middleware } from '@kayjs/kay/server'
+      const boomMw: Middleware = async () => { throw new Error('boom-on-404') }
+      export default boomMw
+    `)
+    writeFileSync(join(dir, 'src/routes/boom/index.tsx'), `export default function Boom() { return <p>Boom</p> }\n`)
+    writeFileSync(join(dir, 'src/routes/_404.tsx'), `export default function NotFound() { return <h1>Custom 404</h1> }\n`)
+    writeFileSync(join(dir, 'src/routes/_error.tsx'), `export default function Err({ error }: { error: unknown }) { return <h1>Custom Error: {String((error as Error)?.message ?? error)}</h1> }\n`)
+
+    const errors: string[] = []
+    await build({ root: dir })
+    const app = await createServer({
+      root: dir,
+      onError(info) {
+        errors.push(info.error instanceof Error ? info.error.message : String(info.error))
+      },
+    })
+    try {
+      // Unauthenticated 404 under /admin/ must be blocked by admin/_middleware.ts (no route enumeration)
+      const unauthMissing = await app.handle(new Request('http://localhost/admin/does-not-exist'))
+      expect(unauthMissing.status).toBe(401)
+      expect(unauthMissing.headers.get('x-chain')).toBe('root')
+
+      // Percent-encoded /%61dmin/does-not-exist cannot bypass admin/_middleware.ts either
+      const encodedUnauth = await app.handle(new Request('http://localhost/%61dmin/does-not-exist'))
+      expect(encodedUnauth.status).toBe(401)
+
+      // Authenticated 404 under /admin/ runs root -> admin -> _404.tsx
+      const authMissing = await app.handle(new Request('http://localhost/admin/does-not-exist', {
+        headers: { 'x-auth': 'secret' },
+      }))
+      expect(authMissing.status).toBe(404)
+      expect(authMissing.headers.get('x-chain')).toBe('admin,root')
+      expect(await authMissing.text()).toContain('Custom 404')
+
+      // Dynamic ancestor folder middleware runs on 404 with extracted param
+      const orgMissing = await app.handle(new Request('http://localhost/orgs/acme/missing'))
+      expect(orgMissing.status).toBe(404)
+      expect(orgMissing.headers.get('x-org')).toBe('acme')
+
+      // Throwing middleware on 404 renders _error.tsx and reports via onError
+      const boomRes = await app.handle(new Request('http://localhost/boom/missing'))
+      expect(boomRes.status).toBe(500)
+      expect(await boomRes.text()).toContain('Custom Error: boom-on-404')
+
+      // JSON client gets JSON 500
+      const boomJson = await app.handle(new Request('http://localhost/boom/missing', {
+        headers: { accept: 'application/json' },
+      }))
+      expect(boomJson.status).toBe(500)
+      expect(await boomJson.json()).toEqual({ ok: false, status: 500, error: 'Internal Server Error' })
+      expect(errors).toContain('boom-on-404')
+    }
+    finally {
+      await app.dispose?.()
+    }
+  })
+})

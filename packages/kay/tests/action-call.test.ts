@@ -117,4 +117,61 @@ describe('a server action called from server code (#3580)', () => {
       await app.app.dispose?.()
     }
   })
+
+  it('enters request action scope during fastStaticPages render (with and without load) and on 404 pages (#3626)', async () => {
+    const dir = appWith({
+      'src/routes/actions.ts': `
+        import { action } from '@kayjs/kay/server'
+        export const greet = action(async (ctx) => \`hello:\${ctx.url.pathname}\`)
+      `,
+      'src/routes/no-load.tsx': `
+        import { greet } from './actions'
+        export default async function NoLoad() {
+          const res = await greet()
+          return <p>{res.ok ? res.data : res.error}</p>
+        }
+      `,
+      'src/routes/with-load.tsx': `
+        import { greet } from './actions'
+        export async function load() { return { tag: 'after-load' } }
+        export default async function WithLoad({ data }: { data: { tag: string } }) {
+          const res = await greet()
+          return <p>{data.tag}:{res.ok ? res.data : res.error}</p>
+        }
+      `,
+      'src/routes/missing-load.tsx': `
+        import { notFound } from '@kayjs/kay/server'
+        export async function load() { return notFound() }
+        export default function MissingLoad() { return <p>never</p> }
+      `,
+      'src/routes/_404.tsx': `
+        import { greet } from './actions'
+        export default async function NotFound() {
+          const res = await greet()
+          return <p>404:{res.ok ? res.data : res.error}</p>
+        }
+      `,
+    })
+    const app = await testApp({ root: dir })
+    try {
+      const noLoadRes = await app.get('/no-load')
+      expect(noLoadRes.status).toBe(200)
+      expect(await noLoadRes.text()).toContain('<p>hello:/no-load</p>')
+
+      const withLoadRes = await app.get('/with-load')
+      expect(withLoadRes.status).toBe(200)
+      expect(await withLoadRes.text()).toContain('<p>after-load:hello:/with-load</p>')
+
+      const missingLoadRes = await app.get('/missing-load')
+      expect(missingLoadRes.status).toBe(404)
+      expect(await missingLoadRes.text()).toContain('<p>404:hello:/missing-load</p>')
+
+      const notFoundRes = await app.get('/does-not-exist')
+      expect(notFoundRes.status).toBe(404)
+      expect(await notFoundRes.text()).toContain('<p>404:hello:/does-not-exist</p>')
+    }
+    finally {
+      await app.app.dispose?.()
+    }
+  })
 })

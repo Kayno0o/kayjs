@@ -1,6 +1,7 @@
 // File-based route matcher: static > [param] > [...catchall] priority sorting + param extraction.
 
 const ENCODED_SLASH_RE = /%2f/i
+const UNSAFE_ENCODED_RE = /%(?:2f|5c|00)/i
 
 const enum SegmentKind {
   Static = 0,
@@ -19,7 +20,6 @@ interface RoutePattern<T> {
   segments: CompiledSegment[]
   isStatic: boolean
   hasCatchAll: boolean
-  score: number
   data: T
 }
 
@@ -32,6 +32,31 @@ function normalizePath(path: string): string {
   return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
 }
 
+/**
+ * Segment specificity rank: Static (3) > Param (2) > End of exact route (1) > CatchAll (0).
+ * Lexicographic comparison guarantees exact static > exact parametric > catch-all for any shared prefix
+ * (e.g. `/docs/:slug` beats `/docs/:section/*rest`, and `/docs/:a/:b` beats `/docs/*rest`).
+ */
+function segmentRank(seg: CompiledSegment | undefined): number {
+  if (seg === undefined)
+    return 1
+  if (seg.kind === SegmentKind.Static)
+    return 3
+  if (seg.kind === SegmentKind.Param)
+    return 2
+  return 0
+}
+
+function compareRoutes<T>(a: RoutePattern<T>, b: RoutePattern<T>): number {
+  const len = Math.max(a.segments.length, b.segments.length)
+  for (let i = 0; i < len; i++) {
+    const diff = segmentRank(b.segments[i]) - segmentRank(a.segments[i])
+    if (diff !== 0)
+      return diff
+  }
+  return 0
+}
+
 function compileRoutePattern<T>(path: string, data: T): RoutePattern<T> {
   const norm = normalizePath(path)
   const clean = norm === '/' ? '' : norm.replace(/^\/|\/$/g, '')
@@ -39,32 +64,29 @@ function compileRoutePattern<T>(path: string, data: T): RoutePattern<T> {
   const segments: CompiledSegment[] = []
   let isStatic = true
   let hasCatchAll = false
-  let score = 0
 
   for (let i = 0; i < rawSegments.length; i++) {
     const seg = rawSegments[i]!
     if (seg.startsWith('*')) {
       isStatic = false
       hasCatchAll = true
-      score += 1
       segments.push({ kind: SegmentKind.CatchAll, value: seg.slice(1) || 'rest' })
     }
     else if (seg.startsWith(':')) {
       isStatic = false
-      score += 10
       segments.push({ kind: SegmentKind.Param, value: seg.slice(1) })
     }
     else {
-      score += 100
       segments.push({ kind: SegmentKind.Static, value: seg })
     }
   }
 
-  return { path: norm, segments, isStatic, hasCatchAll, score, data }
+  return { path: norm, segments, isStatic, hasCatchAll, data }
 }
 
 export class Router<T> {
   readonly #staticRoutes = new Map<string, T>()
+  readonly #staticSegmentCounts = new Set<number>()
   readonly #dynamicRoutes: RoutePattern<T>[] = []
   #sorted = true
 
@@ -72,6 +94,7 @@ export class Router<T> {
     const compiled = compileRoutePattern(path, data)
     if (compiled.isStatic) {
       this.#staticRoutes.set(compiled.path, data)
+      this.#staticSegmentCounts.add(compiled.segments.length)
     }
     else {
       const existing = this.#dynamicRoutes.findIndex(r => r.path === compiled.path)
@@ -90,16 +113,29 @@ export class Router<T> {
     if (exact !== undefined)
       return { data: exact, params: {} }
 
+    let parts: string[] | undefined
+    if (this.#staticRoutes.size > 0 && norm.includes('%') && !UNSAFE_ENCODED_RE.test(norm)) {
+      parts = norm === '/' ? [] : norm.slice(1).split('/')
+      if (this.#staticSegmentCounts.has(parts.length)) {
+        const decoded = tryDecodeStatic(norm)
+        if (decoded !== undefined) {
+          const decodedExact = this.#staticRoutes.get(decoded)
+          if (decodedExact !== undefined)
+            return { data: decodedExact, params: {} }
+        }
+      }
+    }
+
     const dynLen = this.#dynamicRoutes.length
     if (dynLen === 0)
       return undefined
 
     if (!this.#sorted) {
-      this.#dynamicRoutes.sort((a, b) => b.score - a.score || b.segments.length - a.segments.length)
+      this.#dynamicRoutes.sort(compareRoutes)
       this.#sorted = true
     }
 
-    const parts = norm === '/' ? [] : norm.slice(1).split('/')
+    parts ??= norm === '/' ? [] : norm.slice(1).split('/')
 
     for (let i = 0; i < dynLen; i++) {
       const route = this.#dynamicRoutes[i]!
@@ -122,8 +158,11 @@ export class Router<T> {
           }
         }
         else if (seg.value !== parts[j]) {
-          matched = false
-          break
+          const part = parts[j]!
+          if (!part.includes('%') || UNSAFE_ENCODED_RE.test(part) || tryDecodeStatic(part) !== seg.value) {
+            matched = false
+            break
+          }
         }
       }
 
@@ -144,6 +183,15 @@ export class Router<T> {
       return { data: route.data, params }
     }
 
+    return undefined
+  }
+}
+
+function tryDecodeStatic(str: string): string | undefined {
+  try {
+    return decodeURIComponent(str)
+  }
+  catch {
     return undefined
   }
 }
