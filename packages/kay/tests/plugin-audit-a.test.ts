@@ -1,5 +1,5 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,6 +8,7 @@ import { registeredCollections } from '../../plugin-content/src/collection'
 import { sanitizeMarkdownHtml } from '../../plugin-content/src/sanitize'
 import { i18n } from '../../plugin-i18n/src/index'
 import { images, optimizeImageFile, shareCard } from '../../plugin-images/src/index'
+import { ENCODE_SLOTS } from '../../plugin-images/src/pipeline'
 import { seo } from '../../plugin-seo/src/index'
 import { regions, spa } from '../../plugin-spa/src/index'
 import { tailwind } from '../../plugin-tailwind/src/index'
@@ -723,5 +724,57 @@ describe('Issue #3635 Part 1 — Cross-plugin audit fixes', () => {
       expect(asset.height).toBe(1)
       expect(existsSync(join(standalonePub, asset.src.slice(1)))).toBe(true)
     })
+  })
+})
+
+describe('@kayjs/images encodes under one build-wide budget (#3655)', () => {
+  it('runs at most ENCODE_SLOTS magick at once over 20 images, bounds each one, and reports a failed encode', async () => {
+    const dir = makeTemp('kay-image-slots-')
+    const bin = join(dir, 'bin')
+    const runs = join(dir, 'runs')
+    mkdirSync(bin)
+    mkdirSync(runs)
+    writeFileSync(join(bin, 'magick'), `#!/bin/sh
+mkdir "${runs}/run.$$"
+ls -d "${runs}"/run.* | wc -l >> "${runs}/counts"
+echo "$*" >> "${runs}/args"
+sleep 0.05
+rmdir "${runs}/run.$$"
+case "$*" in *identify*) printf '64 48'; exit 0;; esac
+case "$*" in *bad*) echo "fake magick: bad input" >&2; exit 1;; esac
+for last; do :; done
+printf 'x' > "$last"
+`)
+    chmodSync(join(bin, 'magick'), 0o755)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'src/assets'), { recursive: true })
+    const names = [...Array.from({ length: 19 }, (_, i) => `i${i}`), 'bad']
+    for (const name of names)
+      writeFileSync(join(dir, `src/assets/${name}.png`), makePng(64, 48))
+    writeFileSync(join(dir, 'kay.config.ts'), `import { images } from '${IMAGES_PKG}'\nexport default { plugins: [images()], compliance: { legalNotice: false } }\n`)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), [
+      ...names.map(name => `import ${name} from '../assets/${name}.png'`),
+      `export default function Home() { return <main>{[${names.join(', ')}].map(img => <img src={img.src} alt="" />)}</main> }`,
+    ].join('\n'))
+
+    const prevPath = process.env.PATH
+    process.env.PATH = `${bin}:${prevPath}`
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+    let warned: string[] = []
+    try {
+      await build({ root: dir })
+      warned = warn.mock.calls.map(call => String(call[0]))
+    }
+    finally {
+      process.env.PATH = prevPath
+      warn.mockRestore()
+    }
+
+    const counts = readFileSync(join(runs, 'counts'), 'utf8').trim().split('\n').map(Number)
+    expect(counts.length).toBeGreaterThanOrEqual(40)
+    expect(Math.max(...counts)).toBeLessThanOrEqual(ENCODE_SLOTS)
+    for (const line of readFileSync(join(runs, 'args'), 'utf8').trim().split('\n'))
+      expect(line).toContain('-limit thread 1 -limit memory 512MiB -limit map 1GiB')
+    expect(warned.some(message => message.includes('src/assets/bad.png') && message.includes('fake magick: bad input'))).toBe(true)
   })
 })

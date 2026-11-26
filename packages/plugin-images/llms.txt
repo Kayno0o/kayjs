@@ -10,7 +10,7 @@
 ## Plugin Setup (`images(options?)`)
 
 - `widths`: responsive widths in px (default `[320, 640, 960, 1280, 1920]`).
-- `formats`: `('avif' | 'webp')[]` (default `['avif', 'webp']`; uses ImageMagick `magick` on `PATH`, falls back to original file with parsed dimensions when unavailable).
+- `formats`: `('avif' | 'webp')[]` (default `['avif', 'webp']`; uses ImageMagick `magick` on `PATH`, falls back to original file with parsed dimensions when unavailable). Encodes share one budget for the whole build (half the cores, at most 8 `magick` at once), each limited to one thread and 512 MiB and killed after 2 min; a failed encode warns with the file and `magick`'s error and leaves that variant out (the original ships when none succeeds).
 - `quality` (WebP, default `80`), `avifQuality` (default `55`), `cacheDir` (default `'.kay-cache/images'`), `pruneCache` (default `true`).
 - `card`: `ShareCardDefaults` (`{ site?, publicDir?, cacheDir?, background?, color?, accent?, mutedColor?, fontFamily?, width? (1200), height? (630) }`).
 - `markdownSizes`: default `sizes` attribute for relative images inside `@kayjs/content` Markdown (auto-wired via `CONTENT_IMAGE_RESOLVER_SERVICE`).

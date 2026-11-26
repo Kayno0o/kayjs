@@ -28,6 +28,8 @@ export default defineConfig({
 })
 ```
 
+The variants come from ImageMagick (`magick` on `PATH`). However many images a build has, at most half the cores (and never more than 8) encode at once, each on one thread with 512 MiB of memory and two minutes to finish, so a large site stays within a shared CI host. An encode that fails prints the file and the error `magick` gave, and that variant is left out; an image none of whose variants encode is served as its original.
+
 Render responsive images with `image()` or `<Picture>`:
 
 ```tsx

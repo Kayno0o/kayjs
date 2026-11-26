@@ -2,6 +2,7 @@
 
 import type { ServerPluginAPI } from '@kayjs/kay/config'
 import { serviceKey } from '@kayjs/kay/config'
+import { runMagick } from './pipeline'
 
 export interface RuntimeImagePayload {
   body: Uint8Array<ArrayBuffer> | string
@@ -209,16 +210,15 @@ export function hasRsvgConvert(): boolean {
 /** Non-blocking SVG->PNG rasterization over stdin/stdout pipes (zero temp files, works on read-only FS). */
 export async function rasterizeSvgToPngBytesAsync(svg: string): Promise<Uint8Array<ArrayBuffer> | undefined> {
   if (hasRsvgConvert()) {
-    const proc = Bun.spawn(['rsvg-convert'], { stdin: new Response(svg), stdout: 'pipe', stderr: 'pipe' })
+    const proc = Bun.spawn(['rsvg-convert'], { stdin: new Response(svg), stdout: 'pipe', stderr: 'ignore' })
     const [exitCode, buf] = await Promise.all([proc.exited, new Response(proc.stdout).arrayBuffer()])
     if (exitCode === 0 && buf.byteLength > 8)
       return new Uint8Array(buf)
   }
   if (hasMagick()) {
-    const proc = Bun.spawn(['magick', 'svg:-', 'png:-'], { stdin: new Response(svg), stdout: 'pipe', stderr: 'pipe' })
-    const [exitCode, buf] = await Promise.all([proc.exited, new Response(proc.stdout).arrayBuffer()])
-    if (exitCode === 0 && buf.byteLength > 8)
-      return new Uint8Array(buf)
+    const result = await runMagick(['svg:-', 'png:-'], new Response(svg))
+    if (result.ok && result.stdout.byteLength > 8)
+      return result.stdout
   }
   return undefined
 }
@@ -232,12 +232,8 @@ export async function encodeVariantToBytesAsync(
 ): Promise<Uint8Array<ArrayBuffer> | undefined> {
   if (!hasMagick())
     return undefined
-  const proc = Bun.spawn(
-    ['magick', `${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), `${format}:-`],
-    { stdout: 'pipe', stderr: 'pipe' },
-  )
-  const [exitCode, buf] = await Promise.all([proc.exited, new Response(proc.stdout).arrayBuffer()])
-  if (exitCode === 0 && buf.byteLength > 0)
-    return new Uint8Array(buf)
+  const result = await runMagick([`${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), `${format}:-`])
+  if (result.ok && result.stdout.byteLength > 0)
+    return result.stdout
   return undefined
 }
