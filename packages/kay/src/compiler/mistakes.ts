@@ -68,10 +68,8 @@ export function mistake(what: string, filename: string, fix: string): KayMistake
 
 let collected: KayMistake[] | undefined
 
-/** Runs one check. The build stops at the first mistake; while `collectMistakes` runs, the mistake is recorded at `start` and the caller goes on. */
+/** Runs one check, a mistake it throws placed at `start`. The build stops at the first mistake; while `collectMistakes` runs, the mistake is recorded and the caller goes on. */
 export function guarded(start: number, check: () => void): void {
-  if (collected === undefined)
-    return check()
   try {
     check()
   }
@@ -79,6 +77,8 @@ export function guarded(start: number, check: () => void): void {
     if (!(err instanceof KayMistake))
       throw err
     err.start ??= start
+    if (collected === undefined)
+      throw err
     collected.push(err)
   }
 }

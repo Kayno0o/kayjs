@@ -1,4 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { ModuleGraph } from '../src/build/graph'
 import { assertPathUrls, routeExportProblem } from '../src/build/routes'
 import { analyzeModule, compileDom, compileSsr } from '../src/compiler/index'
 import { insert, spread } from '../src/dom/extras'
@@ -18,6 +22,30 @@ function accepts(jsx: string, setup = ''): void {
   expect(() => compileSsr('Page.tsx', page)).not.toThrow()
   expect(() => compileDom('Page.tsx', page)).not.toThrow()
 }
+
+test('a mistake found while building names file:line:col and shows its line (#3651)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kay-mistake-loc-'))
+  try {
+    mkdirSync(join(dir, 'src'))
+    writeFileSync(join(dir, 'src/P.tsx'), [
+      'export default function P() {',
+      '  const fn = () => {}',
+      '  return <button onclick={fn}>x</button>',
+      '}',
+      '',
+    ].join('\n'))
+    expect(() => new ModuleGraph(dir).load(join(dir, 'src/P.tsx'))).toThrow([
+      'src/P.tsx:3:18: error: kay compiler: onclick in src/P.tsx: write onClick={...}, kay binds camelCase event props only.',
+      '  2 |   const fn = () => {}',
+      '  3 |   return <button onclick={fn}>x</button>',
+      '    |                  ^',
+      '  4 | }',
+    ].join('\n'))
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 describe('kay refuses mistakes carried over from other frameworks', () => {
   test('a lowercase or namespaced event prop, which binds nothing', () => {

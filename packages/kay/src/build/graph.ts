@@ -3,6 +3,8 @@
 import type { ModuleAnalysis } from '../compiler/index'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { analyzeModule } from '../compiler/index'
+import { KayMistake } from '../compiler/mistakes'
+import { formatCodeFrame, formatDiagnostic, formatLoc } from '../compiler/shared'
 import { isTsFile, relPosix } from './files'
 import { resolveImportPath } from './resolve'
 
@@ -186,14 +188,20 @@ export class ModuleGraph {
     return analysis
   }
 
-  /** `analyzeModule`, its errors naming the file from the app's root. */
+  /** `analyzeModule`, its errors naming the file from the app's root, a mistake at its line with a code frame as a syntax error has. */
   private analyze(file: string, code: string): ModuleAnalysis {
     try {
       return analyzeModule(file, code)
     }
     catch (err) {
-      if (err instanceof Error)
-        err.message = err.message.replaceAll(file, relPosix(this.root, file))
+      if (!(err instanceof Error))
+        throw err
+      const rel = relPosix(this.root, file)
+      err.message = err.message.replaceAll(file, rel)
+      if (err instanceof KayMistake && err.start !== undefined) {
+        const frame = formatCodeFrame(code, err.start)
+        err.message = `${formatDiagnostic(formatLoc(rel, code, err.start), err.message)}${frame === '' ? '' : `\n${frame}`}`
+      }
       throw err
     }
   }
