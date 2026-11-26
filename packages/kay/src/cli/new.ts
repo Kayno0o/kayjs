@@ -261,7 +261,7 @@ const postsDir = existsSync(join(import.meta.dir, '../content/posts'))
 
 export const posts = defineCollection<PostMeta>({ dir: postsDir })
 `
-    files['kay.config.ts'] = `import { contentPlugin } from '@kayjs/content'
+    files['kay.config.ts'] = `import { content } from '@kayjs/content'
 import { seo } from '@kayjs/seo'
 import { ui } from '@kayjs/ui/plugin'
 import { defineConfig } from '@kayjs/kay/config'
@@ -272,7 +272,7 @@ export default defineConfig({
   plugins: [
     ui({ grammar: 'editorial' }),
     seo({ site: 'https://example.com', titleTemplate: '%s — ${name}' }),
-    contentPlugin({
+    content({
       feeds: [{
         path: '/rss.xml',
         title: '${name}',
@@ -409,7 +409,7 @@ export default defineConfig({
   lang: 'en',
   plugins: [
     ui({ grammar: 'editorial' }),
-    auth.plugin,
+    auth,
   ],
 })
 `

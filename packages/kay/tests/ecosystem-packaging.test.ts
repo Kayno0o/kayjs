@@ -99,7 +99,7 @@ import { defineConfig } from '@kayjs/kay/config'
 
 const cfg = defineConfig({
   plugins: [
-    createAuth({ secret: '0123456789abcdef0123456789abcdef' }).plugin,
+    createAuth({ secret: '0123456789abcdef0123456789abcdef' }),
     mcp({ token: 'tok', tools: {} }),
     images(),
     seo({ site: 'https://example.com' }),

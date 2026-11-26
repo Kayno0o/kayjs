@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAuth, memoryAuthStore, oauthProvider, safeRedirect } from '../../plugin-auth/src/index'
 import { sqliteAuthStore } from '../../plugin-auth/src/sqlite'
-import { mailer } from '../../plugin-mail/src/index'
+import { createMailer } from '../../plugin-mail/src/index'
 import { testApp } from '../src/test/index'
 
 const TMP = join(tmpdir(), `kay-v2-auth-${Date.now()}`)
@@ -61,7 +61,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     })
 
     const mockOrigin = `http://127.0.0.1:${mockOAuth.port}`
-    const mail = mailer()
+    const mail = createMailer()
     const store = sqliteAuthStore(dbPath)
     const auth = createAuth({
       store,
@@ -144,7 +144,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     try {
       const app = await testApp({
         root: appDir,
-        plugins: [auth.plugin],
+        plugins: [auth],
       })
 
       // 1. Unauthenticated access to protected route redirects HTML and returns 401 for JSON
@@ -380,7 +380,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
         fetchProfile: async () => ({ id: '1', email: 'a@b.c', emailVerified: true }),
       })],
     })
-    const app = await testApp({ root: appDir, plugins: [auth.plugin] })
+    const app = await testApp({ root: appDir, plugins: [auth] })
 
     const res = await app.post('http://evil.example/auth/magic-link', { email: 'user@example.com' }, { 'origin': 'http://evil.example', 'x-forwarded-host': 'evil.example' })
     expect(res.status).toBe(200)
@@ -412,7 +412,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       trustProxy: true,
       rateLimit: { max: 2, windowMs: 60_000 },
     })
-    const app = await testApp({ root: appDir, trustProxy: true, plugins: [auth.plugin] })
+    const app = await testApp({ root: appDir, trustProxy: true, plugins: [auth] })
 
     const r1 = await app.post('/auth/signin', { email: 'x@y.com', password: 'wrong' })
     const r2 = await app.post('/auth/signin', { email: 'x@y.com', password: 'wrong' })
@@ -488,7 +488,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       },
     }
 
-    const app = await testApp({ root: appDir, plugins: [auth.plugin, internalPlugin] })
+    const app = await testApp({ root: appDir, plugins: [auth, internalPlugin] })
     const signup = await app.post('/auth/signup', { email: 'lazy@example.com', password: 'password123456' })
     expect(signup.status).toBe(201)
 

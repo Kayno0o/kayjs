@@ -3,10 +3,10 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
-import { contentPlugin } from '../../plugin-content/src/index'
+import { content } from '../../plugin-content/src/index'
 import { i18n } from '../../plugin-i18n/src/index'
 import { images } from '../../plugin-images/src/plugin'
-import { mailer, mailPlugin } from '../../plugin-mail/src/index'
+import { createMailer } from '../../plugin-mail/src/index'
 import { mcp } from '../../plugin-mcp/src/index'
 import { seo } from '../../plugin-seo/src/index'
 import { build, createBuildCache } from '../src/build/index'
@@ -99,9 +99,9 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
       }
     `)
 
-    // Reversed plugin order: contentPlugin BEFORE images
+    // Reversed plugin order: content BEFORE images
     const buildPlugins = [
-      contentPlugin(),
+      content(),
       images({
         widths: [320],
         formats: ['webp'],
@@ -114,7 +114,7 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
     // Simulate a cold-start server with brand-new plugin instances whose build() was NEVER called
     const coldApp = await createServer({
       root: dir,
-      plugins: [contentPlugin(), images()],
+      plugins: [content(), images()],
     })
     const res = await coldApp.handle(new Request('http://localhost/'))
     expect(res.status).toBe(200)
@@ -312,12 +312,12 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
       tools: {},
     })
 
-    const mail = mailer({ from: 'test@example.test', to: 'user@example.test', optional: true })
+    const mail = createMailer({ from: 'test@example.test', to: 'user@example.test', optional: true })
     await mail.send({ subject: 'Hello CSP', text: 'Plain body' })
 
     const app = await testApp({
       root: dir,
-      plugins: [auth.plugin, mcpPlugin, mailPlugin(mail)],
+      plugins: [auth, mcpPlugin, mail],
     })
 
     // 1. @kayjs/auth trustedOrigins works WITHOUT duplicating trustedOrigins in KayConfig

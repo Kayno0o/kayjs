@@ -110,3 +110,75 @@ describe('kay upgrade moves an app onto @kayjs/kay (#3591)', () => {
     expect(read(dir, 'node_modules/lib/index.ts')).toBe('import { signal } from \'kay\'\n')
   })
 })
+
+describe('kay upgrade registers stateful plugins as their handle (#3579)', () => {
+  it('renames mailer and contentPlugin at every use, leaving property keys alone', () => {
+    const dir = appWith({
+      'src/services.ts': [
+        'import { createAuth } from \'@kayjs/auth\'',
+        'import { mailer } from \'@kayjs/mail\'',
+        'export const mail = mailer({ from: \'a@b.test\' })',
+        'export const auth = createAuth({ mailer: mail })',
+        'export const make = () => mail.mailer',
+        '',
+      ].join('\n'),
+      'src/feeds.ts': 'import { contentPlugin as feeds } from \'@kayjs/content\'\nexport const rss = feeds()\n',
+      'src/factories.ts': 'import { mailer } from \'@kayjs/mail\'\nexport const factories = { mailer }\n',
+      'src/reexport.ts': 'import { mailer } from \'@kayjs/mail\'\nexport { mailer }\n',
+      'src/blog.ts': 'import { contentPlugin, defineCollection } from \'@kayjs/content\'\nconst content = defineCollection({ dir: \'posts\' })\nexport const plugin = contentPlugin({ collections: [content] })\n',
+    })
+    expect(upgradeProject(dir)).toEqual({ changed: ['src/blog.ts', 'src/factories.ts', 'src/feeds.ts', 'src/reexport.ts', 'src/services.ts'], manual: [] })
+    expect(read(dir, 'src/factories.ts')).toBe('import { createMailer as mailer } from \'@kayjs/mail\'\nexport const factories = { mailer }\n')
+    expect(read(dir, 'src/reexport.ts')).toBe('import { createMailer as mailer } from \'@kayjs/mail\'\nexport { mailer }\n')
+    expect(read(dir, 'src/services.ts')).toBe([
+      'import { createAuth } from \'@kayjs/auth\'',
+      'import { createMailer } from \'@kayjs/mail\'',
+      'export const mail = createMailer({ from: \'a@b.test\' })',
+      'export const auth = createAuth({ mailer: mail })',
+      'export const make = () => mail.mailer',
+      '',
+    ].join('\n'))
+    expect(read(dir, 'src/feeds.ts')).toBe('import { content as feeds } from \'@kayjs/content\'\nexport const rss = feeds()\n')
+    expect(read(dir, 'src/blog.ts')).toBe('import { content as contentPlugin, defineCollection } from \'@kayjs/content\'\nconst content = defineCollection({ dir: \'posts\' })\nexport const plugin = contentPlugin({ collections: [content] })\n')
+  })
+
+  it('registers auth, mail and rooms themselves, and names each registration whose options must move', () => {
+    const dir = appWith({
+      'kay.config.ts': [
+        'import { defineConfig } from \'@kayjs/kay/config\'',
+        'import { contentPlugin } from \'@kayjs/content\'',
+        'import { mailPlugin } from \'@kayjs/mail\'',
+        'import { auth, mail, rooms } from \'./src/services\'',
+        'export default defineConfig({',
+        '  plugins: [auth.plugin, mail.plugin(), mailPlugin(mail), rooms.plugin({ path: \'/live\', member: () => \'guest\' }), mailPlugin(mail, { preview: false }), contentPlugin({ feeds: [] })],',
+        '})',
+        '',
+      ].join('\n'),
+    })
+    expect(upgradeProject(dir).manual).toEqual([
+      'kay.config.ts:6: register rooms itself and move the options of rooms.plugin(...) into the createX() call that made it.',
+      'kay.config.ts:6: register mail itself and move the options of mailPlugin(...) into its createMailer().',
+    ])
+    expect(read(dir, 'kay.config.ts')).toBe([
+      'import { defineConfig } from \'@kayjs/kay/config\'',
+      'import { content } from \'@kayjs/content\'',
+      'import { mailPlugin } from \'@kayjs/mail\'',
+      'import { auth, mail, rooms } from \'./src/services\'',
+      'export default defineConfig({',
+      '  plugins: [auth, mail, mail, rooms.plugin({ path: \'/live\', member: () => \'guest\' }), mailPlugin(mail, { preview: false }), content({ feeds: [] })],',
+      '})',
+      '',
+    ].join('\n'))
+  })
+
+  it('drops the mailPlugin import once every use is gone, counting lines in the file it writes', () => {
+    const dir = appWith({
+      'kay.config.ts': 'import { mailPlugin } from \'@kayjs/mail\'\nimport { mail, rooms } from \'./src/services\'\nexport default {\n  plugins: [mailPlugin(mail), rooms.plugin({ path: \'/live\' })],\n}\n',
+    })
+    expect(upgradeProject(dir)).toEqual({
+      changed: ['kay.config.ts'],
+      manual: ['kay.config.ts:3: register rooms itself and move the options of rooms.plugin(...) into the createX() call that made it.'],
+    })
+    expect(read(dir, 'kay.config.ts')).toBe('import { mail, rooms } from \'./src/services\'\nexport default {\n  plugins: [mail, rooms.plugin({ path: \'/live\' })],\n}\n')
+  })
+})

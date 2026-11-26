@@ -36,14 +36,14 @@ export const auth = createAuth({
 - **`requireEmailVerification`**: Defaults to `true`. `POST /auth/signup` creates an unverified account, mails a one-time verification link (`kind: 'verify-email'`), and returns `202 { ok: true, verificationRequired: true }` without opening a session cookie. `POST /auth/signin` refuses unverified accounts with `403`. Set `requireEmailVerification: false` explicitly only if you intentionally allow unverified password sessions (for example, local development without mail).
 - **`trustProxy`**: Defaults to `false`. Rate limiting keys on `ctx.ip` (populated by Kay's server) plus the normalized email address on email-bearing endpoints, and covers sign-up, sign-in, magic-link, verification, and OAuth endpoints. Forwarded headers are ignored unless `trustProxy` is set: `true` trusts one proxy, a number trusts that many hops, and only the entry those hops wrote counts.
 
-Register `auth.plugin` in `kay.config.ts`:
+The object `createAuth()` returns is also the plugin. Register it in `kay.config.ts`:
 
 ```ts
 import { defineConfig } from '@kayjs/kay/config'
 import { auth } from './src/auth'
 
 export default defineConfig({
-  plugins: [auth.plugin],
+  plugins: [auth],
 })
 ```
 

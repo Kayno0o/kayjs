@@ -11,5 +11,5 @@ export const auth = createAuth({
 })
 
 export default defineConfig({
-  plugins: [auth.plugin, ui({ grammar: false, emitGrammars: true })],
+  plugins: [auth, ui({ grammar: false, emitGrammars: true })],
 })

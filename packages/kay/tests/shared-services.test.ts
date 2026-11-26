@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
-import { mailer } from '../../plugin-mail/src/index'
+import { createMailer } from '../../plugin-mail/src/index'
 import { build } from '../src/build/index'
 import { devServer } from '../src/dev/index'
 import { createServer } from '../src/server/index'
@@ -38,7 +38,7 @@ describe('Shared server module instances & createAuth({ mailer }) (#3552)', () =
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
     writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <h1>Hi</h1> }\n')
 
-    const mail = mailer({ from: 'App <noreply@example.test>', optional: true })
+    const mail = createMailer({ from: 'App <noreply@example.test>', optional: true })
     const auth = createAuth({
       store: memoryAuthStore(),
       secret: 'test-secret-for-auth-mailer-option-at-least-32-bytes',
@@ -48,7 +48,7 @@ describe('Shared server module instances & createAuth({ mailer }) (#3552)', () =
     const app = await testApp({
       root: dir,
       site: 'https://app.example.test',
-      plugins: [auth.plugin, mail.plugin()],
+      plugins: [auth, mail],
     })
 
     const res = await app.post('/auth/magic-link', { email: 'alice@example.test' })
@@ -69,16 +69,20 @@ describe('Shared server module instances & createAuth({ mailer }) (#3552)', () =
     writeFileSync(join(dir, 'src/services.ts'), `
       import { createAuth, memoryAuthStore } from '@kayjs/auth'
       import { createRooms } from '@kayjs/live'
-      import { mailer } from '@kayjs/mail'
+      import { createMailer } from '@kayjs/mail'
 
-      export const mail = mailer({ from: 'Demo <noreply@demo.local>', optional: true })
+      export const mail = createMailer({ from: 'Demo <noreply@demo.local>', optional: true })
       export const auth = createAuth({
         store: memoryAuthStore(),
         secret: 'single-instance-test-secret-at-least-32-bytes',
         requireEmailVerification: false,
         mailer: mail,
       })
-      export const rooms = createRooms<{ text: string }, string>()
+      export const rooms = createRooms<{ text: string }, string>({
+        path: '/api/events',
+        room: 'main',
+        member: () => 'guest',
+      })
     `)
 
     writeFileSync(join(dir, 'kay.config.ts'), `
@@ -87,15 +91,7 @@ describe('Shared server module instances & createAuth({ mailer }) (#3552)', () =
 
       export default defineConfig({
         site: 'http://localhost',
-        plugins: [
-          auth.plugin,
-          mail.plugin(),
-          rooms.plugin({
-            path: '/api/events',
-            room: 'main',
-            member: () => 'guest',
-          }),
-        ],
+        plugins: [auth, mail, rooms],
       })
     `)
 
@@ -129,7 +125,7 @@ describe('Shared server module instances & createAuth({ mailer }) (#3552)', () =
       const first = await reader.read()
       expect(new TextDecoder().decode(first.value)).toContain('retry:')
 
-      // Route sees the exact same `rooms` subscriber opened by kay.config.ts's `rooms.plugin()`
+      // The route sees the subscriber opened through the `rooms` plugin kay.config.ts registers
       const pubRes = await app.handle(new Request('http://localhost/publish'))
       const pubJson = await pubRes.json() as { size: number, outbox: number }
       expect(pubJson.size).toBe(1)

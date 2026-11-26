@@ -1,8 +1,8 @@
 // RSS 2.0 XML feed generation and ETag matching for @kayjs/content.
 
 import type { Collection, ContentEntry } from './collection'
-import { getAppContext } from '@kayjs/kay/internal/server'
 import { escAttr } from '@kayjs/kay/server'
+import { currentApp } from './app'
 
 export interface RssFeedConfig<TData = Record<string, unknown>> {
   /** Public path for the RSS XML file (default: '/rss.xml'). */
@@ -40,7 +40,7 @@ export interface ContentFeed {
 }
 
 export function renderRss<TData>(feed: RssFeedConfig<TData>): string {
-  const site = (feed.site ?? getAppContext()?.site ?? '').replace(/\/$/, '')
+  const site = (feed.site ?? currentApp.site() ?? '').replace(/\/$/, '')
   const prefix = (feed.linkPrefix ?? '').replace(/\/$/, '')
   const items = feed.collection.all(feed.locale).map((entry) => {
     const rawData = entry.data as Record<string, unknown>

@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { icons } from '../../plugin-icons/src/index'
 import { images } from '../../plugin-images/src/index'
-import type { MailPluginOptions } from '../../plugin-mail/src/index'
-import { mailer, MailNotConfiguredError, mailPlugin } from '../../plugin-mail/src/index'
+import type { MailerOptions } from '../../plugin-mail/src/index'
+import { createMailer, MailNotConfiguredError } from '../../plugin-mail/src/index'
 import { seo } from '../../plugin-seo/src/index'
 import { build } from '../src/build/index'
 import { testApp } from '../src/test/index'
@@ -39,7 +39,7 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
     writeFileSync(join(dir, 'src/assets/favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#c2593f"/></svg>')
     writeFileSync(join(dir, 'src/assets/inter-400.woff2'), new Uint8Array([0x77, 0x4F, 0x46, 0x32, 0x00, 0x01, 0x00, 0x00]))
 
-    const contactMailer = mailer({ from: 'site@example.test', to: 'owner@example.test', optional: true })
+    const contactMailer = createMailer({ from: 'site@example.test', to: 'owner@example.test', optional: true })
 
     const customIcons = icons({
       sets: {
@@ -79,7 +79,6 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
       },
     })
 
-    const mailP = mailPlugin(contactMailer)
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
       import { Head } from '@kayjs/kay'
@@ -119,7 +118,7 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
       }
     `)
 
-    const plugins = [customIcons, imagePlugin, seoPlugin, mailP]
+    const plugins = [customIcons, imagePlugin, seoPlugin, contactMailer]
     const t0 = performance.now()
     const manifest = await build({ root: dir, plugins, static: true })
     const coldMs = performance.now() - t0
@@ -232,7 +231,7 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
 
   it('enforces MailNotConfiguredError in production when required and delegates to custom transport', async () => {
     const delivered: string[] = []
-    const custom = mailer({
+    const custom = createMailer({
       from: 'a@b.test',
       to: 'c@d.test',
       transport: {
@@ -249,24 +248,25 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
     process.env.NODE_ENV = 'production'
     delete process.env.KAY_DEV
     try {
-      const strict = mailer({ optional: false })
+      const strict = createMailer({ optional: false })
       await expect(strict.send({ subject: 'Fail' })).rejects.toBeInstanceOf(MailNotConfiguredError)
 
-      // Verify mailPlugin does NOT expose /_kay/mail in production by default
+      // The mailer's preview is never mounted in production
       const dir = makeTemp('kay-mail-prod-')
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       writeFileSync(join(dir, 'src/routes/index.tsx'), `export default async function Home() { return <h1>Prod</h1> }`)
-      const prodApp = await testApp({ root: dir, plugins: [mailPlugin(strict)] })
+      const prodApp = await testApp({ root: dir, plugins: [strict] })
       expect((await prodApp.get('/_kay/mail')).status).toBe(404)
       expect((await prodApp.get('/_kay/mail.json')).status).toBe(404)
 
       // An untyped config passing preview: true still mounts nothing in production
-      const forcedApp = await testApp({ root: dir, plugins: [mailPlugin(strict, { preview: true } as unknown as MailPluginOptions)] })
+      const forced = createMailer({ optional: false, preview: true } as unknown as MailerOptions)
+      const forcedApp = await testApp({ root: dir, plugins: [forced] })
       expect((await forcedApp.get('/_kay/mail')).status).toBe(404)
       expect((await forcedApp.get('/_kay/mail.json')).status).toBe(404)
 
       // Mail a transport delivered in production is not kept in memory
-      const delivering = mailer({ transport: { async send() {} } })
+      const delivering = createMailer({ transport: { async send() {} } })
       await delivering.send({ subject: 'Sign-in link', text: 'https://example.test/auth/magic?token=secret' })
       expect(delivering.outbox).toEqual([])
     }

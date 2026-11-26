@@ -149,8 +149,8 @@ export interface GuardOptions<TUser extends AuthUser = AuthUser> {
   allow?: ((user: PublicUser<TUser>, ctx: RequestContext) => boolean | Promise<boolean>) | undefined
 }
 
-export interface Auth<TUser extends AuthUser = AuthUser> {
-  readonly plugin: KayPlugin
+/** The plugin `kay.config.ts` registers, and the handle routes and actions call. */
+export interface Auth<TUser extends AuthUser = AuthUser> extends KayPlugin {
   readonly store: AuthStore<TUser>
   readonly basePath: string
   getUser(ctx: { locals: KayLocals }): PublicUser<TUser> | undefined
@@ -833,7 +833,7 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
   })
 
   return {
-    plugin,
+    ...plugin,
     store,
     basePath,
     getUser(ctx) {

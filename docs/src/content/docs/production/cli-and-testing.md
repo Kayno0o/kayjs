@@ -16,7 +16,7 @@ order: 4
 | `kay build --static` | Static HTML + asset export into `dist/` |
 | `kay build --compile [out]` | Compile into a single standalone Bun executable |
 | `kay start [dir] [--port 3000] [--host [addr]]` | Serve a built `dist/` app on `Bun.serve()` (binds `127.0.0.1` by default) |
-| `kay upgrade [dir] [--no-install]` | Move an app onto the `@kayjs/kay` spelling: renames the dependency, sets `jsxImportSource` and rewrites every `kay` import, then runs `bun install`. Imports it cannot move are printed with their file and line |
+| `kay upgrade [dir] [--no-install]` | Move an app onto the `@kayjs/kay` spelling: renames the dependency, sets `jsxImportSource` and rewrites every `kay` import, registers `auth`, `mail` and `rooms` as the handles `createX()` returned, then runs `bun install`. What it cannot move is printed with its file and line |
 | `kay ui-eject <grammar> [dest]` | Eject a `@kayjs/ui` CSS Grammar into your repo |
 | `kay mcp-footprint` | Print `@kayjs/mcp` tool sizes in bytes and estimated tokens |
 | `kay i18n-check` | List missing translation keys across `@kayjs/i18n` locales |

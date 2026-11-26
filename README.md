@@ -123,7 +123,7 @@ kay build [--analyze]                  # Production client + server build (optio
 kay build --static                     # Pure static HTML export
 kay build --compile [out]              # Single standalone executable
 kay start [--port 3000] [--host [addr]] # Serve built production app
-kay upgrade [--no-install]             # Move an app from bare kay imports onto @kayjs/kay
+kay upgrade [--no-install]             # Move an app onto the current kay APIs
 kay ui-eject <grammar> [dest]          # Eject a standalone @kayjs/ui CSS Grammar
 kay mcp-footprint                      # Inspect @kayjs/mcp tool byte & token budgets
 ```

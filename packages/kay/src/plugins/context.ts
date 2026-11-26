@@ -1,5 +1,6 @@
 // Per-build / per-server scoped runtime context (AsyncLocalStorage-backed, zero mutable process globals).
 
+import type { ServiceKey } from './services'
 import { AsyncLocalStorage } from 'node:async_hooks'
 
 export interface AppRuntimeContext {
@@ -9,8 +10,8 @@ export interface AppRuntimeContext {
   readonly assetPrefix: string
   readonly site?: string | undefined
   readonly dev: boolean
-  provide<T>(key: string, value: T): void
-  inject<T>(key: string): T | undefined
+  provide<T>(key: ServiceKey<T>, value: T): void
+  inject<T>(key: ServiceKey<T>): T | undefined
   registerPublicFile(relPath: string): void
 }
 
@@ -40,11 +41,12 @@ export function createAppContext(options: CreateAppContextOptions): AppRuntimeCo
     assetPrefix: options.assetPrefix,
     ...(site !== undefined && site !== '' ? { site } : {}),
     dev: options.dev,
-    provide<T>(key: string, value: T): void {
-      services.set(key, value)
+    // Keyed by name: the natively loaded config and the bundled app each hold their own key object.
+    provide<T>(key: ServiceKey<T>, value: T): void {
+      services.set(key.name, value)
     },
-    inject<T>(key: string): T | undefined {
-      return services.get(key) as T | undefined
+    inject<T>(key: ServiceKey<T>): T | undefined {
+      return services.get(key.name) as T | undefined
     },
     registerPublicFile(relPath: string): void {
       options.onRegisterPublicFile?.(relPath)

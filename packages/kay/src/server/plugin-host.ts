@@ -102,8 +102,6 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
   const readonlyRuntimeConfig: Readonly<Record<string, unknown>> = Object.freeze({ ...forwardedConfig })
 
   for (const plugin of plugins) {
-    if (plugin.dispose !== undefined)
-      shutdownHooks.push(() => plugin.dispose!())
     if (plugin.server !== undefined) {
       const pluginApi: ServerPluginAPI = {
         root: options.root,

@@ -1,9 +1,8 @@
 // renderMarkdown: Bun's native Markdown renderer plus highlight hook, embedded components, heading ids and TOC.
 
 import type { ContentHeading, MarkdownImageResolver, MarkdownImageResult, RenderMarkdownOptions } from './index'
-import { CONTENT_IMAGE_RESOLVER_SERVICE } from '@kayjs/kay/config'
-import { getAppContext } from '@kayjs/kay/internal/server'
 import { escAttr } from '@kayjs/kay/server'
+import { currentApp } from './app'
 import { expandComponents } from './components'
 import { sanitizeMarkdownHtml } from './sanitize'
 
@@ -31,7 +30,7 @@ function stripTags(html: string): string {
 function findDefaultImageResolver(file: string | undefined): MarkdownImageResolver | undefined {
   if (!file)
     return undefined
-  return getAppContext()?.inject<MarkdownImageResolver>(CONTENT_IMAGE_RESOLVER_SERVICE)
+  return currentApp.imageResolver()
 }
 
 const FENCE_RE = /^([`~]{3,})([^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm

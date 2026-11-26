@@ -10,7 +10,7 @@ Every remaining capability is an opt-in package built strictly on `KayPlugin` vi
 ## Conventions & ordering
 
 - **Stateless plugins** export a single camelCase factory matching the package name from the package root: `tailwind()`, `icons()`, `images()`, `i18n()`, `content()`, `seo()`, `spa()`, `mcp()`.
-- **Stateful service plugins** (which also export a runtime handle used by routes/actions) expose `.plugin` / `.plugin(opts)` on the instance: `auth.plugin`, `rooms.plugin(opts)`, `mail.plugin(opts)` (with `mailPlugin(mail, opts)` and `contentPlugin(opts)` kept as aliases).
+- **Stateful service plugins** also give routes and actions a handle. Their `createX()` returns one object that is both the plugin and the handle: `plugins: [auth, mail, rooms]` registers what `createAuth()`, `createMailer()` and `createRooms()` returned.
 - **Client-safe UI barrel exception**: `@kayjs/ui` exports only browser-safe JSX components; its build plugin lives at `@kayjs/ui/plugin` (`ui()`).
 - **Declarative ordering**: plugins declare `enforce: 'pre' | 'post'`, `after: ['...']`, `providesLocals`, and `readsLocals`. Core sorts plugins deterministically (`pre` → normal → `post`, respecting `after`) and fails at startup if a plugin declares `readsLocals` before its provider runs.
 
@@ -39,16 +39,16 @@ Send transactional email through Resend or any custom `MailTransport`, with a de
 
 ```ts
 // src/mail.ts
-import { mailer, mailPlugin, resend } from '@kayjs/mail'
+import { createMailer, resend } from '@kayjs/mail'
 
-export const mail = mailer({
+export const mail = createMailer({
   from: 'hello@example.com',
   // Omit transport to auto-use RESEND_API_KEY when set
   transport: process.env.RESEND_API_KEY ? resend() : undefined,
 })
 ```
 
-Register `mailPlugin(mail)` in `kay.config.ts`. In development and tests, sent messages are recorded in `mail.outbox` and rendered at `/_kay/mail`. In `NODE_ENV=production`, the preview routes are never mounted and no outbox copy is kept in memory.
+Register `mail` in `kay.config.ts`. In development and tests, sent messages are recorded in `mail.outbox` and rendered at `/_kay/mail`. In `NODE_ENV=production`, the preview routes are never mounted and no outbox copy is kept in memory.
 
 ## `@kayjs/icons`
 

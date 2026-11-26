@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { contentPlugin, defineCollection, parseFrontmatter, renderMarkdown } from '../../plugin-content/src/index'
+import { content, defineCollection, parseFrontmatter, renderMarkdown } from '../../plugin-content/src/index'
 import { alternateLinks, formatDate, formatNumber, i18n, localizePath } from '../../plugin-i18n/src/index'
 import { images, shareCard } from '../../plugin-images/src/index'
 import { build } from '../src/build/index'
@@ -166,7 +166,7 @@ Hidden from production.
       }
     `)
 
-    const plugin = contentPlugin({
+    const plugin = content({
       feeds: [{
         path: '/rss.xml',
         title: 'Kay Blog',
@@ -430,14 +430,14 @@ date: 2026-11-24
       })
     `)
     writeFileSync(join(dir, 'kay.config.ts'), `
-      import { contentPlugin } from ${JSON.stringify(contentPkg)}
+      import { content } from ${JSON.stringify(contentPkg)}
       import { images } from ${JSON.stringify(imagesPkg)}
       import { posts } from './src/content'
 
       export default {
         plugins: [
           images({ widths: [640], formats: ['webp'], quality: 80 }),
-          contentPlugin({
+          content({
             feeds: [{
               path: '/rss.xml',
               title: 'Auto Feed',
@@ -476,7 +476,7 @@ date: 2026-11-24
     expect(readFileSync(join(dir, 'dist/rss.xml'), 'utf8')).toContain('<title>Auto Images &amp; Single Collection</title>')
   })
 
-  it('#3554: kay check validates frontmatter with file:line and contentPlugin() auto-watches registered collections', async () => {
+  it('#3554: kay check validates frontmatter with file:line and content() auto-watches registered collections', async () => {
     const dir = makeTemp('kay-content-check-')
     mkdirSync(join(dir, 'src/content/posts'), { recursive: true })
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
@@ -508,10 +508,10 @@ date: 2026-11-24
       export const posts = defineCollection({ dir: 'src/content/posts', schema })
     `)
 
-    // Notice kay.config.ts passes contentPlugin() with NO collections list and NO import of src/collections.ts!
+    // Notice kay.config.ts passes content() with NO collections list and NO import of src/collections.ts!
     writeFileSync(join(dir, 'kay.config.ts'), `
-      import { contentPlugin } from ${JSON.stringify(contentPkg)}
-      export default { plugins: [contentPlugin()] }
+      import { content } from ${JSON.stringify(contentPkg)}
+      export default { plugins: [content()] }
     `)
 
     const { checkProject } = await import('../src/cli/check')
@@ -520,8 +520,8 @@ date: 2026-11-24
     expect(checked.errors).toContain('src/content/posts/bad.md:2:1: error: @kayjs/content: title: title is required')
     expect(checked.errors).toContain('src/content/posts/bad.md:3:1: error: @kayjs/content: date: date must be YYYY-MM-DD')
 
-    // Auto-registration: watchPaths includes the collection directory without listing it in contentPlugin()
-    const plugin = contentPlugin()
+    // Auto-registration: watchPaths includes the collection directory without listing it in content()
+    const plugin = content()
     const watched = typeof plugin.watchPaths === 'function' ? plugin.watchPaths(dir) : []
     expect(watched).toContain(join(dir, 'src/content/posts'))
   })

@@ -34,7 +34,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         },
       })
       try {
-        const app = await testApp({ root: appDir, plugins: [auth.plugin] })
+        const app = await testApp({ root: appDir, plugins: [auth] })
 
         const signupRes = await app.post('/auth/signup', {
           email: 'Alice@Example.com',
@@ -111,7 +111,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         sendMail: (m) => { sentUrl = m.url },
       })
       try {
-        const app = await testApp({ root: appDir, plugins: [auth.plugin] })
+        const app = await testApp({ root: appDir, plugins: [auth] })
         const signupRes = await app.post('/auth/signup', { email: 'bob@example.com', password: 'password1234' })
         expect(signupRes.status).toBe(202)
         expect(app.cookies.has('kay_session')).toBe(false)
@@ -138,7 +138,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         sendMail: (m) => { mailed.push(m.url) },
       })
       try {
-        const app = await testApp({ root: appDir, plugins: [auth.plugin] })
+        const app = await testApp({ root: appDir, plugins: [auth] })
         const res = await app.post(
           'http://evil.example/auth/signup',
           { email: 'victim@example.com', password: 'password1234' },
@@ -160,7 +160,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         requireEmailVerification: false,
       })
       try {
-        const app = await testApp({ root: appDir, plugins: [auth.plugin] })
+        const app = await testApp({ root: appDir, plugins: [auth] })
         const res = await app.post('/auth/signup', { email: 'optout@example.com', password: 'password1234' })
         expect(res.status).toBe(201)
         expect(app.cookies.has('kay_session')).toBe(true)
@@ -231,7 +231,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         rateLimit: { max: 2, windowMs: 60_000 },
       })
       try {
-        const app = await testApp({ root: appDir, plugins: [auth.plugin] })
+        const app = await testApp({ root: appDir, plugins: [auth] })
         // Different spoofed X-Forwarded-For headers must NOT bypass rate limiting when trustProxy is false
         const r1 = await app.post('/auth/signin', { email: 'a1@example.com', password: 'x' }, { 'x-forwarded-for': '1.1.1.1' })
         const r2 = await app.post('/auth/signin', { email: 'a2@example.com', password: 'x' }, { 'x-forwarded-for': '2.2.2.2' })
@@ -261,7 +261,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
             })
           },
         }
-        const app2 = await testApp({ root: appDir, plugins: [injectIpPlugin as never, authCtxIp.plugin] })
+        const app2 = await testApp({ root: appDir, plugins: [injectIpPlugin as never, authCtxIp] })
         const a1 = await app2.post('/auth/signin', { email: 'p1@example.com', password: 'x' }, { 'x-forwarded-for': '198.51.100.1' })
         const a2 = await app2.post('/auth/signin', { email: 'p2@example.com', password: 'x' }, { 'x-forwarded-for': '198.51.100.2' })
         expect(a1.status).toBe(401)
@@ -284,7 +284,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         rateLimit: { max: 2, windowMs: 60_000 },
       })
       try {
-        const app = await testApp({ root: appDir, trustProxy: true, plugins: [auth.plugin] })
+        const app = await testApp({ root: appDir, trustProxy: true, plugins: [auth] })
 
         // Sign-in: distinct IPs, same email (different casing) -> blocked on 3rd attempt
         const s1 = await app.post('/auth/signin', { email: 'Target@Example.com', password: 'bad' }, { 'x-forwarded-for': '10.0.0.1' })
@@ -342,7 +342,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         ],
       })
       try {
-        const app = await testApp({ root: appDir, plugins: [auth.plugin] })
+        const app = await testApp({ root: appDir, plugins: [auth] })
 
         // /magic-link/verify
         expect((await app.get('/auth/magic-link/verify?token=bad1')).status).toBe(400)
@@ -448,8 +448,8 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         pruneIntervalMs: 25,
       })
       const appDir = makeMinimalApp('box19-timer')
-      const first = await testApp({ root: appDir, plugins: [auth.plugin] })
-      const second = await testApp({ root: appDir, prebuilt: true, plugins: [auth.plugin] })
+      const first = await testApp({ root: appDir, plugins: [auth] })
+      const second = await testApp({ root: appDir, prebuilt: true, plugins: [auth] })
       await first.app.dispose?.()
       const count = (table: string): number => store.db.query<{ c: number }, []>(`SELECT COUNT(*) as c FROM ${table}`).get()!.c
       try {
@@ -490,7 +490,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         requireEmailVerification: false,
       })
       try {
-        const app1 = await testApp({ root: appDir, plugins: [authDefault.plugin] })
+        const app1 = await testApp({ root: appDir, plugins: [authDefault] })
 
         // Default CNIL minPasswordLength: 11 chars rejected, 12 chars accepted
         const shortPw = await app1.post('/auth/signup', { email: 'short@example.com', password: '11chars-pw!' }, {
@@ -517,7 +517,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         const s6 = await authDefault.listSessions(u6.id)
         expect(s6[0]!.ip).toBe('2001:db8:85a3::')
 
-        const appFull = await testApp({ root: appDir, plugins: [authFullIp.plugin] })
+        const appFull = await testApp({ root: appDir, plugins: [authFullIp] })
         await appFull.post('/auth/signup', { email: 'fullip@example.com', password: 'password1234' }, {
           'x-forwarded-for': '203.0.113.42',
         })
@@ -525,7 +525,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         const sFull = await authFullIp.listSessions(uFull.id)
         expect(sFull[0]!.ip).toBe('203.0.113.42')
 
-        const app2 = await testApp({ root: appDir, plugins: [authNone.plugin] })
+        const app2 = await testApp({ root: appDir, plugins: [authNone] })
         await app2.post('/auth/signup', { email: 'noip@example.com', password: 'password1234' }, {
           'x-forwarded-for': '203.0.113.42',
         })

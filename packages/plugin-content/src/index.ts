@@ -7,7 +7,7 @@ import type { ContentFeed, RssFeedConfig } from './rss'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { definePlugin } from '@kayjs/kay/config'
-import { getAppContext } from '@kayjs/kay/internal/server'
+import { currentApp } from './app'
 import {
   COLLECTION_DIR_FOR_ROOT_KEY,
   COLLECTION_VALIDATE_KEY,
@@ -39,11 +39,11 @@ export { renderMarkdown } from './markdown'
 export { renderRss } from './rss'
 export type { ContentFeed, RssFeedConfig } from './rss'
 
-export function contentPlugin<const TDataList extends readonly unknown[] = readonly unknown[]>(options?: {
+export function content<const TDataList extends readonly unknown[] = readonly unknown[]>(options?: {
   feeds?: { [K in keyof TDataList]: RssFeedConfig<TDataList[K]> } | undefined
   collections?: readonly Collection<unknown>[] | undefined
 }): KayPlugin
-export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefined, collections?: readonly Collection<unknown>[] | undefined } = {}): KayPlugin {
+export function content(options: { feeds?: readonly ContentFeed[] | undefined, collections?: readonly Collection<unknown>[] | undefined } = {}): KayPlugin {
   const feeds = options.feeds ?? []
   const extraCollections = options.collections ?? []
 
@@ -57,7 +57,7 @@ export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefi
       out.add(f.collection as InternalCollection)
     for (const c of extraCollections)
       out.add(c as InternalCollection)
-    const absRoot = root !== undefined ? resolve(root) : getAppContext()?.root
+    const absRoot = root !== undefined ? resolve(root) : currentApp.root()
     for (const c of registeredCollections) {
       const dir = dirOf(c, absRoot)
       if (!existsSync(dir))
@@ -127,6 +127,3 @@ export function contentPlugin(options: { feeds?: readonly ContentFeed[] | undefi
     },
   })
 }
-
-/** Alias of `contentPlugin` matching the standard plugin factory naming (`seo()`, `i18n()`, `images()`, `content()`). */
-export const content = contentPlugin

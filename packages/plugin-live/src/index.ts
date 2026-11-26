@@ -30,10 +30,23 @@ export interface ConnectionLimits {
   highWaterMark?: number | undefined
 }
 
-export interface RoomsOptions extends ConnectionLimits {
+interface RoomsBaseOptions extends ConnectionLimits {
   /** Optional authorization hook checked before opening an SSE stream. */
   authorize?: LiveAuthorizeHook | undefined
 }
+
+/** The SSE endpoint the rooms plugin mounts at `path`, the member it streams as read from each request. */
+export interface RoomsEndpointOptions<TMember> extends RoomsBaseOptions {
+  path: string
+  room?: string | ((ctx: RequestContext) => string) | undefined
+  member: (ctx: RequestContext) => TMember | Promise<TMember>
+  pingMs?: number | undefined
+  onJoin?: ((room: string, member: TMember) => void) | undefined
+  onLeave?: ((room: string, member: TMember) => void) | undefined
+}
+
+/** Without `path`, no endpoint is mounted and routes open streams with `rooms.stream()`. */
+export type RoomsOptions<TMember = undefined> = RoomsEndpointOptions<TMember> | (RoomsBaseOptions & { path?: undefined })
 
 export interface StreamOptions<TMember> extends ConnectionLimits {
   room: string
@@ -43,17 +56,8 @@ export interface StreamOptions<TMember> extends ConnectionLimits {
   onLeave?: ((room: string, member: TMember) => void) | undefined
 }
 
-export interface LivePluginOptions<TMember> extends ConnectionLimits {
-  path: string
-  room?: string | ((ctx: RequestContext) => string) | undefined
-  member: (ctx: RequestContext) => TMember | Promise<TMember>
-  pingMs?: number | undefined
-  onJoin?: ((room: string, member: TMember) => void) | undefined
-  onLeave?: ((room: string, member: TMember) => void) | undefined
-  authorize?: LiveAuthorizeHook | undefined
-}
-
-export interface Rooms<TMessage, TMember = undefined> {
+/** The plugin `kay.config.ts` registers (mounting the endpoint when `path` is set), and the handle routes publish with. */
+export interface Rooms<TMessage, TMember = undefined> extends KayPlugin {
   join(room: string, sub: Subscriber<TMember>): void
   leave(room: string, sub: Subscriber<TMember>): void
   members(room: string): TMember[]
@@ -63,8 +67,6 @@ export interface Rooms<TMessage, TMember = undefined> {
   coalesce(build: (room: string) => TMessage, event?: string): (room: string) => void
   /** Create a streaming SSE Response for a room with automatic keepalive, caps, backpressure drop, and disconnect cleanup. */
   stream(ctx: RequestContext, options: StreamOptions<TMember>): Response
-  /** Optional KayPlugin helper to mount an SSE endpoint directly via `kay.config.ts`. */
-  plugin(options: LivePluginOptions<TMember>): KayPlugin
 }
 
 const DEFAULT_MAX_PER_ROOM = 1_000
@@ -101,9 +103,9 @@ const PING_CHUNK = encoder.encode(': ping\n\n')
 const RETRY_CHUNK = encoder.encode('retry: 2000\n\n')
 
 export function createRooms<TMessage, TMember = undefined>(
-  options: RoomsOptions = {},
+  options: RoomsOptions<TMember> = {},
 ): Rooms<TMessage, TMember> {
-  const defaultOpts: RoomsOptions = options
+  const defaultOpts: RoomsOptions<TMember> = options
 
   const map = new Map<string, Set<Subscriber<TMember>>>()
   const clientCounts = new Map<string, number>()
@@ -307,15 +309,16 @@ export function createRooms<TMessage, TMember = undefined>(
     })
   }
 
-  function plugin(opts: LivePluginOptions<TMember>): KayPlugin {
+  function endpoint(opts: RoomsEndpointOptions<TMember>): KayPlugin {
+    if (typeof opts.member !== 'function')
+      throw new TypeError(`@kayjs/live: createRooms({ path: '${opts.path}' }) needs member(ctx), the member each stream joins as`)
     return definePlugin({
       name: `@kayjs/live(${opts.path})`,
       server(api) {
         api.route('GET', opts.path, async (ctx) => {
           const room = typeof opts.room === 'function' ? opts.room(ctx) : (opts.room ?? 'default')
-          const authFn = opts.authorize ?? defaultOpts.authorize
-          if (authFn !== undefined) {
-            const decision = await authFn(ctx, room)
+          if (opts.authorize !== undefined) {
+            const decision = await opts.authorize(ctx, room)
             if (decision instanceof Response)
               return decision
             if (decision === false)
@@ -328,5 +331,6 @@ export function createRooms<TMessage, TMember = undefined>(
     })
   }
 
-  return { join, leave, members, size, publish, coalesce, stream, plugin }
+  const plugin = options.path === undefined ? definePlugin({ name: '@kayjs/live' }) : endpoint(options)
+  return { ...plugin, join, leave, members, size, publish, coalesce, stream }
 }

@@ -3,7 +3,7 @@
 import type { PinnedNotice } from './db'
 import { createAuth } from '@kayjs/auth'
 import { createRooms } from '@kayjs/live'
-import { mailer } from '@kayjs/mail'
+import { createMailer } from '@kayjs/mail'
 import { authStore } from './db'
 
 export type BoardMessage =
@@ -12,7 +12,7 @@ export type BoardMessage =
 
 export const BOARD_ROOM = 'board'
 
-export const mail = mailer({
+export const mail = createMailer({
   from: 'Noticeboard <board@noticeboard.local>',
   optional: true,
 })
@@ -28,7 +28,16 @@ export const auth = createAuth({
   mailer: mail,
 })
 
-export const board = createRooms<BoardMessage, string | null>()
+export const board = createRooms<BoardMessage, string | null>({
+  path: '/api/board',
+  room: BOARD_ROOM,
+  member: (ctx) => {
+    const user = auth.getUser(ctx)
+    return user ? (user.name || user.email) : null
+  },
+  onJoin: room => sendPresence(room),
+  onLeave: room => sendPresence(room),
+})
 
 export const sendPresence = board.coalesce((room): BoardMessage => {
   const members = board.members(room)
