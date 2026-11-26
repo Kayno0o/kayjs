@@ -1,6 +1,6 @@
 import type { FeatureExtractionPipeline } from '@huggingface/transformers'
 import { pipeline } from '@huggingface/transformers'
-import { byStem, nameWords, stem } from '../src/name-words'
+import { nameWords } from '../src/name-words'
 
 // An icon set's names with the tags its makers wrote for each.
 export type Tagged = Map<string, string[]>
@@ -203,7 +203,7 @@ async function nearest(keys: string[], candidates: string[], keep: number, floor
 }
 
 // Both sources summed per word pair, meaning weighted by `meaningWeight`, as the `word percent word percent` lines the runtime reads.
-// The forms of a word share one line, under the shortest, as the search reads the others as that one; a line keeps one form of each other stem, the strongest, and none of its own, which the search finds in the names.
+// Folding a word's forms into one line was benched and lost 3 to 5 points of typo recall, as a typo respells into the form it was typed from.
 export function merge(tags: Related, meaning: Related, meaningWeight: number): Record<string, string> {
   const merged: Related = new Map()
 
@@ -217,26 +217,13 @@ export function merge(tags: Related, meaning: Related, meaningWeight: number): R
       add(merged, word, target, weight * meaningWeight)
   }
 
-  const forms = byStem(merged.keys())
-  const lines: Related = new Map()
-
-  for (const [word, row] of merged) {
-    const form = forms.get(stem(word))!
-    const line = lines.get(form) ?? new Map<string, number>()
-
-    lines.set(form, line)
-    for (const [target, weight] of row)
-      line.set(target, Math.max(line.get(target) ?? 0, Math.min(1, weight)))
-  }
-
   const table: Record<string, string> = {}
 
-  for (const word of [...lines.keys()].sort()) {
-    const stems = new Set([stem(word)])
-    const kept = [...lines.get(word)!]
+  for (const word of [...merged.keys()].sort()) {
+    const kept = [...merged.get(word)!]
+      .map(([target, weight]) => [target, Math.min(1, weight)] as const)
       .filter(([, weight]) => weight >= WEAKEST)
       .sort((a, b) => b[1] - a[1])
-      .filter(([target]) => !stems.has(stem(target)) && stems.add(stem(target)))
       .slice(0, KEPT)
 
     if (kept.length > 0)
