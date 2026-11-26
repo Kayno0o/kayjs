@@ -91,11 +91,10 @@ for (const [train, test] of [['tabler', 'lucide'], ['lucide', 'tabler']] as cons
 
   console.log(`\n${train} tags -> ${test} (${Object.entries(suites).map(([kind, list]) => `${list.length} ${kind}`).join(', ')})`)
 
+  const names = [...sets[test].keys()]
+
   for (const [label, table] of Object.entries(tables)) {
     replaceTable(table)
-    // A fresh array per table, as the search keeps one index per names array.
-    const names = [...sets[test].keys()]
-
     console.log(`  ${label.padEnd(15)} ${Object.entries(suites).map(([kind, suite]) => `${kind} ${score(names, suite)}`).join('  ')}`)
   }
 }

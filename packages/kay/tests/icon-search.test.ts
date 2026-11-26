@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { icons } from '../../plugin-icons/src/plugin'
-import { findIcons } from '../../plugin-icons/src/search'
+import { findIcons, relatedWords } from '../../plugin-icons/src/search'
 import { replaceTable } from '../../plugin-icons/src/table'
 
 // Each test swaps in the small table it needs, so the shipped one can change without moving these cases.
@@ -83,6 +83,65 @@ describe('findIcons', () => {
 
   it('lists every name for an empty query, paged', () => {
     expect(findIcons(['a', 'b', 'c'], '  ', { offset: 1, limit: 1 })).toEqual(['b'])
+  })
+
+  it('lists the names for an empty query without reading the word table', () => {
+    replaceTable(new Proxy({}, { get: () => { throw new Error('read the table') }, has: () => { throw new Error('read the table') }, ownKeys: () => { throw new Error('read the table') } }))
+
+    expect(findIcons(['home', 'star'], '', { limit: 1 })).toEqual(['home'])
+  })
+
+  // `dog` holds no name, so only the readings of `hous` answer: `house` by completion and respelling, `hour` by respelling.
+  it('credits a word reached by both a completion and a respelling once', () => {
+    expect(findIcons(['hour', 'house'], 'hous dog')).toEqual(['hour', 'house'])
+  })
+
+  it('counts a word repeated in the query once', () => {
+    expect(findIcons(['trash', 'home'], 'trash home home')).toEqual(['trash', 'home'])
+  })
+
+  it('ranks an icon matching more of the query words above one matching fewer', () => {
+    expect(findIcons(['left', 'arrow-big-left'], 'arrow left')).toEqual(['arrow-big-left', 'left'])
+  })
+
+  it('respells a typo into the most used of equally close words', () => {
+    expect(findIcons(['mark', 'dark', 'bark', 'park', 'park-car', 'park-bus'], 'tark')).toEqual(['dark', 'bark', 'park', 'park-car', 'park-bus'])
+  })
+
+  it('counts a query word once for an icon however many of its readings name it', () => {
+    replaceTable({ bin: 'trash 90 delete 90', box: 'crate 10' })
+
+    expect(findIcons(['delete-trash', 'crate-delete'], 'bin box')).toEqual(['crate-delete', 'delete-trash'])
+  })
+
+  it('reads a table replaced after the names were first searched', () => {
+    const names = ['delete']
+
+    expect(findIcons(names, 'trahs')).toEqual([])
+    expect(findIcons(names, 'tra')).toEqual([])
+    replaceTable({ trash: 'delete 80' })
+
+    expect(findIcons(names, 'trahs')).toEqual(['delete'])
+    expect(findIcons(names, 'tra')).toEqual(['delete'])
+  })
+
+  it('refuses a page that is not whole, a negative offset or a limit below 1', () => {
+    const refusal = '@kayjs/icons: findIcons pages from a whole offset of 0 or more, by a whole limit of 1 or more: clamp the page a request asks for before searching.'
+
+    expect(() => findIcons(['home'], 'home', { offset: -1 })).toThrow(refusal)
+    expect(() => findIcons(['home'], 'home', { offset: 0.5 })).toThrow(refusal)
+    expect(() => findIcons(['home'], 'home', { limit: 0 })).toThrow(refusal)
+    expect(() => findIcons(['home'], 'home', { limit: 1.5 })).toThrow(refusal)
+    expect(() => findIcons(['home'], 'home', { limit: Number.NaN })).toThrow(refusal)
+    expect(findIcons(['home'], 'home', { offset: 0, limit: 1 })).toEqual(['home'])
+  })
+})
+
+describe('relatedWords', () => {
+  it('gives the words the table relates to a word, with their strength', () => {
+    replaceTable({ bin: 'trash 90 delete 40' })
+
+    expect(relatedWords('bin')).toEqual([['trash', 0.9], ['delete', 0.4]])
   })
 })
 

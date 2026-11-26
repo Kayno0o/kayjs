@@ -3,10 +3,10 @@ const SHORTEST_COMPLETED = 3
 const SHORTEST_RESPELLED = 4
 // From this length a word may be two edits off, else one.
 const TWO_EDITS_FROM = 8
-const MOST = 3
+export const MOST = 3
 
-// The known words starting with `word`, the most used first, then the shortest.
-export function completions(word: string, vocabulary: Iterable<string>, uses: (word: string) => number): string[] {
+// Every known word starting with `word`, unsorted.
+export function completions(word: string, vocabulary: Iterable<string>): string[] {
   if (word.length < SHORTEST_COMPLETED)
     return []
 
@@ -17,11 +17,11 @@ export function completions(word: string, vocabulary: Iterable<string>, uses: (w
       found.push(candidate)
   }
 
-  return found.sort((a, b) => uses(b) - uses(a) || a.length - b.length).slice(0, MOST)
+  return found
 }
 
-// The known words one edit from `word` (two for a long one), a swap of neighbour letters counting as one, the closest first.
-export function closeWords(word: string, vocabulary: Iterable<string>): string[] {
+// Every known word one edit from `word` (two for a long one), a swap of neighbour letters counting as one, with its edits, unsorted.
+export function respellings(word: string, vocabulary: Iterable<string>): [string, number][] {
   if (word.length < SHORTEST_RESPELLED)
     return []
 
@@ -38,7 +38,12 @@ export function closeWords(word: string, vocabulary: Iterable<string>): string[]
       found.push([candidate, edits])
   }
 
-  return found.sort((a, b) => a[1] - b[1]).slice(0, MOST).map(([candidate]) => candidate)
+  return found
+}
+
+// The known words closest to `word`, as `respellings` finds them, the closest first.
+export function closeWords(word: string, vocabulary: Iterable<string>): string[] {
+  return respellings(word, vocabulary).sort((a, b) => a[1] - b[1]).slice(0, MOST).map(([candidate]) => candidate)
 }
 
 // Damerau-Levenshtein distance (optimal string alignment), giving up past `most` once a whole row is above it.
