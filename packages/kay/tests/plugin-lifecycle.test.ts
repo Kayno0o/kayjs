@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -28,6 +28,46 @@ function makeTemp(prefix: string): string {
 afterAll(() => {
   for (const d of tempDirs)
     rmSync(d, { recursive: true, force: true })
+})
+
+describe('a throwing onError or onShutdown hook (#3584)', () => {
+  it('is logged with its owner, and the other hooks still run', async () => {
+    const dir = makeTemp('kay-hook-errors-')
+    const files: Record<string, string> = {
+      'kay.config.ts': `
+        const seen = (globalThis as { hookLog?: string[] }).hookLog ??= []
+        export default {
+          onError() { throw new Error('app hook broke') },
+          plugins: [
+            { name: 'first', onError() { throw new Error('first broke') }, server(api: any) { api.onShutdown(() => { throw new Error('first shutdown broke') }) } },
+            { name: 'second', onError(info: { error: Error }) { seen.push(\`second saw \${info.error.message}\`) }, server(api: any) { api.onShutdown(() => { seen.push('second closed') }) } },
+          ],
+        }
+      `,
+      'src/routes/index.ts': 'export function GET(): Response { throw new Error(\'route broke\') }\n',
+    }
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(join(dir, file, '..'), { recursive: true })
+      writeFileSync(join(dir, file), text)
+    }
+    await build({ root: dir })
+    const logged: unknown[][] = []
+    const spy = spyOn(console, 'error').mockImplementation((...args: unknown[]) => { logged.push(args) })
+    try {
+      const app = await createServer({ root: dir })
+      expect((await app.handle(new Request('http://localhost/'))).status).toBe(500)
+      await app.dispose?.()
+    }
+    finally {
+      spy.mockRestore()
+    }
+    expect((globalThis as { hookLog?: string[] }).hookLog).toEqual(['second saw route broke', 'second closed'])
+    expect(logged.map(([message, error]) => `${String(message)} ${(error as Error).message}`)).toEqual([
+      'kay: the onError hook of kay.config.ts threw; the other hooks still run. app hook broke',
+      'kay: the onError hook of first threw; the other hooks still run. first broke',
+      'kay: the onShutdown hook of first threw; the other hooks still run. first shutdown broke',
+    ])
+  })
 })
 
 describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#3566)', () => {

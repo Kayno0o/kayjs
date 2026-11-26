@@ -11,7 +11,7 @@ order: 4
 | :--- | :--- |
 | `kay new <dir> [--template minimal\|fullstack\|blog\|app] [--force]` | Scaffold a new project |
 | `kay check [dir] [--no-typecheck]` | Run Kay compiler checks, route checks, plugin `check()` hooks, and `bun check`/`tsgo`/`tsc` |
-| `kay dev [dir] [--port 3000] [--host [addr]]` | Dev server with live reload (binds `127.0.0.1` by default; pass `--host` for `0.0.0.0`) |
+| `kay dev [dir] [--port 3000] [--host [addr]]` | Dev server with live reload (binds `127.0.0.1` by default; pass `--host` for `0.0.0.0`). A `kay.config.ts` that fails to load stops it with the error and its `file:line:column` |
 | `kay build [dir] [--analyze]` | Single-pass production build into `dist/`; `--analyze` prints per-route JS/CSS weights |
 | `kay build --static` | Static HTML + asset export into `dist/` |
 | `kay build --compile [out]` | Compile into a single standalone Bun executable |

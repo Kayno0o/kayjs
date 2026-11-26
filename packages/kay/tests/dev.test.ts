@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { build, createBuildCache } from '../src/build/index'
+import { runCli } from '../src/cli/index'
 import { devServer } from '../src/dev/index'
 
 const KAY_PKG_DIR = join(import.meta.dir, '..')
@@ -302,5 +303,29 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
     finally {
       srv.stop()
     }
+  })
+})
+
+describe('kay dev with a broken kay.config.ts (#3584)', () => {
+  function appWithConfig(config: string): string {
+    const dir = makeTemp('kay-dev-broken-config-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>Home</p> }\n')
+    writeFileSync(join(dir, 'src/plugin.ts'), 'export function badPlugin(): never {\n  throw new Error(\'plugin factory broke\')\n}\n')
+    writeFileSync(join(dir, 'kay.config.ts'), config)
+    return dir
+  }
+
+  it('fails with the config\'s error at the config line that threw', async () => {
+    const dir = appWithConfig('import { badPlugin } from \'./src/plugin\'\nexport default {\n  plugins: [badPlugin()],\n}\n')
+    await expect(devServer({ root: dir, port: 0 })).rejects.toThrow('kay: kay.config.ts:3:13: plugin factory broke')
+    expect(process.env.KAY_DEV).toBeUndefined()
+  })
+
+  it('fails with the syntax error and its position, from the CLI too', async () => {
+    const dir = appWithConfig('export default {\n  port: 3000\n  lang: \'fr\',\n}\n')
+    const lines: string[] = []
+    expect(await runCli(['dev', dir, '--port', '0'], { stdout: line => lines.push(line), stderr: line => lines.push(line) })).toBe(1)
+    expect(lines).toEqual(['kay: kay.config.ts:3:3: Expected "}" but found "lang"'])
   })
 })

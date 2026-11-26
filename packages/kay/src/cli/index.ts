@@ -314,7 +314,14 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
   }
 
   if (cmd === 'dev') {
-    const config = await loadConfig(root).catch(() => ({} as Awaited<ReturnType<typeof loadConfig>>))
+    let config: Awaited<ReturnType<typeof loadConfig>>
+    try {
+      config = await loadConfig(root)
+    }
+    catch (error) {
+      err((error as Error).message)
+      return 1
+    }
     const portRes = parsePort(flags.get('--port') ?? (process.env.PORT || config.port), 3000)
     if (!portRes.ok) {
       err(portRes.error)
