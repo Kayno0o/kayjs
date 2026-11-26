@@ -2,6 +2,9 @@
 
 * { box-sizing: border-box; }
 
+/* Code runs in the system's monospace face: JetBrains Mono cost 21 KB of every first load (#3645). */
+:root { --ui-font-mono: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace; }
+
 html {
   scroll-padding-top: 5rem;
   background-color: var(--ui-paper);
