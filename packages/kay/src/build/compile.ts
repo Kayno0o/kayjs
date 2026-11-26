@@ -117,12 +117,12 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     }
     catch (err) {
       if (err instanceof AggregateError && err.errors.length > 0)
-        throw new Error(`kay build --compile failed:\n${formatBunBuildLogs(err.errors, root)}`)
+        throw new Error(`kay build: --compile failed:\n${formatBunBuildLogs(err.errors, root)}`)
       throw err
     }
     if (!res.success) {
       const msgs = formatBunBuildLogs(res.logs, root)
-      throw new Error(`kay build --compile failed:\n${msgs}`)
+      throw new Error(`kay build: --compile failed:\n${msgs}`)
     }
   }
   finally {

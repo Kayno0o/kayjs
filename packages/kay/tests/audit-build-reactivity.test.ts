@@ -174,6 +174,22 @@ describe('audit #3526 — Box 32: --static staging, non-200 failure, dynamic ski
     expect(leftovers).toEqual([])
   })
 
+  test.each([true, false])('a prerender failure (static %p) names the route and carries the page error and its stack behind one prefix (#3650)', async (isStatic) => {
+    const dir = makeTempProject('kay-prerender-cause-')
+    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>ok</p> }')
+    writeFileSync(join(dir, 'src/routes/broken.tsx'), `
+      export const prerender = true
+      export default function Broken() {
+        throw new Error('render failure in Broken')
+      }
+    `)
+
+    const error = await build({ root: dir, static: isStatic }).then(() => undefined, (err: unknown) => err as Error)
+
+    expect(error?.message).toStartWith('kay build: prerender route "/broken" answered HTTP 500: render failure in Broken\n')
+    expect(error?.message).toContain('at Broken')
+  })
+
   test('warns when dynamic route without paths() is skipped during --static and allows _404.tsx', async () => {
     const dir = makeTempProject('kay-audit-box32-warn-')
     mkdirSync(join(dir, 'src/routes/posts'), { recursive: true })

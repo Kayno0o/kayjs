@@ -66,12 +66,29 @@ export interface PrerenderOptions {
   routes: RouteManifestEntry[]
 }
 
+// The build fails through the CLI, which prints only the message: the page's own error and its stack go in it.
+export function pageFailure(head: string, error: unknown): Error {
+  if (error === undefined)
+    return new Error(`${head}.`)
+  if (!(error instanceof Error))
+    return new Error(`${head}: ${String(error)}`, { cause: error })
+  const title = `${error.name}: ${error.message}`
+  const stack = error.stack ?? ''
+  const frames = stack.startsWith(title) ? stack.slice(title.length) : `\n${stack}`
+  return new Error(`${head}: ${error.message}${frames}`, { cause: error })
+}
+
 /** Renders every route to HTML, records `route.prerendered`, and returns the server and entry the pages were rendered with. */
 export async function prerender(options: PrerenderOptions) {
   const { root, outDir, prerenderDir, isStatic } = options
   // Pages render with the runtime's own plugin instances, from the bundled config; `options.plugins` are the build's native ones.
   const { startBuiltApp } = await import('../server/loader')
-  const { app, entry } = await startBuiltApp({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, site: options.site, plugins: options.pluginOverride, dev: options.isDev, nodeEnv: options.nodeEnv })
+  const pageErrors = new Map<string, unknown>()
+  const errorSink = ({ error, request }: { error: unknown, request: Request }): void => {
+    if (!pageErrors.has(request.url))
+      pageErrors.set(request.url, error)
+  }
+  const { app, entry } = await startBuiltApp({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, site: options.site, plugins: options.pluginOverride, dev: options.isDev, nodeEnv: options.nodeEnv, errorSink })
   const origin = prerenderOrigin(options.site)
   mkdirSync(prerenderDir, { recursive: true })
 
@@ -111,11 +128,12 @@ export async function prerender(options: PrerenderOptions) {
     const styleHashes: Record<string, string[]> = {}
     for (let i = 0; i < urls.length; i += CONCURRENCY) {
       await Promise.all(urls.slice(i, i + CONCURRENCY).map(async (u) => {
-        const res = await app.handle(new Request(`${origin}${u}`))
+        const request = new Request(`${origin}${u}`)
+        const res = await app.handle(request)
         const isExplicit404 = u === '/404' && res.status === 404
         if (res.status !== 200 && !isExplicit404) {
           if (isStatic || res.status >= 500)
-            throw new Error(`kay build${isStatic ? ' --static' : ''}: prerender route "${u}" returned HTTP ${res.status} (expected 200).`)
+            throw pageFailure(`kay build: prerender route "${u}" answered HTTP ${res.status}`, pageErrors.get(request.url))
           return
         }
         const ct = res.headers.get('content-type')

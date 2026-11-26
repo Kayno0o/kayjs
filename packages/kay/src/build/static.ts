@@ -11,7 +11,7 @@ import { createDocumentHooks, createHtmlHeaders } from '../server/document'
 import { createNavigation } from '../ssr/navigation'
 import { createFallbackPages } from '../server/errors'
 import { precompressFile, walkAllFiles } from './files'
-import { prerenderOrigin } from './prerender'
+import { pageFailure, prerenderOrigin } from './prerender'
 
 const LEADING_SLASH_RE = /^\//
 
@@ -69,15 +69,13 @@ async function renderStaticNotFound(options: StaticExportOptions): Promise<strin
     })
     const url = new URL('/404', origin)
     const res = await buildNotFoundResponse(url, new Request(url))
-    if (renderError !== undefined)
-      throw new Error(`kay build --static: _404 page failed to render: ${renderError instanceof Error ? renderError.message : String(renderError)}`)
-    if (res.status >= 500)
-      throw new Error(`kay build --static: _404 page returned HTTP ${res.status}.`)
+    if (renderError !== undefined || res.status >= 500)
+      throw pageFailure(`kay build: the _404 page of the static export answered HTTP ${res.status}`, renderError)
     return await res.text()
   }
   const res = await options.app!.handle(new Request(`${origin}/__kay_404__`))
   if (res.status >= 500)
-    throw new Error(`kay build --static: _404 page returned HTTP ${res.status}.`)
+    throw pageFailure(`kay build: the _404 page of the static export answered HTTP ${res.status}`, undefined)
   return await res.text()
 }
 
