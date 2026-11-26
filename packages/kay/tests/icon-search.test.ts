@@ -104,6 +104,18 @@ describe('findIcons', () => {
     expect(findIcons(['left', 'arrow-big-left'], 'arrow left')).toEqual(['arrow-big-left', 'left'])
   })
 
+  it('finds an icon named by one letter through a related word', () => {
+    replaceTable({ close: 'x 80' })
+
+    expect(findIcons(['lock-open', 'circle-x', 'x'], 'close')).toEqual(['x', 'circle-x'])
+  })
+
+  it('counts every segment of a name, so a variant ranks below the plain icon', () => {
+    replaceTable({ add: 'plus 80' })
+
+    expect(findIcons(['user-x', 'user-2', 'user', 'user-plus'], 'add user')).toEqual(['user-plus', 'user', 'user-x', 'user-2'])
+  })
+
   it('respells a typo into the most used of equally close words', () => {
     expect(findIcons(['mark', 'dark', 'bark', 'park', 'park-car', 'park-bus'], 'tark')).toEqual(['dark', 'bark', 'park', 'park-car', 'park-bus'])
   })

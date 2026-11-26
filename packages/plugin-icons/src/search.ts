@@ -1,4 +1,4 @@
-import { nameWords } from './name-words'
+import { nameParts, nameWords } from './name-words'
 import { completions, MOST, respellings } from './spelling'
 import { relatedWords, tableCompletions, tableRespellings } from './table'
 
@@ -45,7 +45,7 @@ function indexOf(source: readonly string[] | IconifyNames): Index {
   for (const name of names) {
     const words = new Set(nameWords(name))
 
-    wordCount.set(name, words.size)
+    wordCount.set(name, nameParts(name))
 
     for (const word of words) {
       const list = byWord.get(word)
