@@ -1109,8 +1109,11 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
       // Each child claims its own SSR nodes while hydrating, so the siblings after a dynamic one keep theirs (#3596).
       const items = meaningful.map((child) => {
-        if (isJsxNode(child))
-          return compileRootJsx(child, scopeRewrites)
+        if (isJsxNode(child)) {
+          // The server brackets a component or a nested fragment among siblings, so it claims that range like an expression.
+          const inPlace = child.type === 'JSXElement' && !isComponentTag(jsxTagName(child.openingElement.name))
+          return inPlace ? compileRootJsx(child, scopeRewrites) : `${use('fragInsert')}(() => ${compileRootJsx(child, scopeRewrites)})`
+        }
         if (child.type === 'JSXText')
           return `${use('fragText')}(${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value)))})`
         if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression') {

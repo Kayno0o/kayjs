@@ -147,6 +147,23 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
   })
 }
 
+// Removes rendered nodes; an array is a run of siblings, removed whole with what inner inserts added between its ends since.
+function clearRendered(current: Node | Node[] | null): void {
+  if (Array.isArray(current) && current.length > 1) {
+    const last = current[current.length - 1]!
+    let node: Node | null = current[0]!
+    if (last.parentNode !== null && node.parentNode === last.parentNode) {
+      while (node !== null) {
+        const next: Node | null = node === last ? null : node.nextSibling
+        node.parentNode!.removeChild(node)
+        node = next
+      }
+      return
+    }
+  }
+  clearInserted(current)
+}
+
 function clearInserted(current: Node | Node[] | null): void {
   if (current === null)
     return
@@ -227,7 +244,7 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
     }
 
     if (next == null || typeof next === 'boolean') {
-      clearInserted(current)
+      clearRendered(current)
       if (ssrNodes !== undefined)
         clearInserted(ssrNodes)
       current = null
@@ -239,7 +256,7 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
     if (typeof next === 'string' || typeof next === 'number') {
       const str = String(next)
       if (current !== null) {
-        clearInserted(current)
+        clearRendered(current)
         current = null
       }
       if (textNode === undefined) {
@@ -282,7 +299,7 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
         current = next
         return
       }
-      clearInserted(current)
+      clearRendered(current)
       if (ssrNodes !== undefined)
         clearInserted(ssrNodes)
       if (next.nodeType === 11) {
@@ -298,7 +315,7 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
     }
 
     if (Array.isArray(next)) {
-      clearInserted(current)
+      clearRendered(current)
       if (ssrNodes !== undefined) {
         const kept = new Set(next)
         clearInserted(ssrNodes.filter(n => !kept.has(n)))
@@ -308,16 +325,16 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
   })
 }
 
-// A dynamic child of a root fragment: hydrates against its SSR range, or renders before a comment anchor that travels with the fragment.
+// A dynamic child of a root fragment: hydrates against its SSR range, or renders between two comments that travel with the fragment, so whoever removes the fragment's nodes removes what it renders later.
 export function fragInsert(value: () => unknown): Node | null {
   const start = claimRange()
   if (start !== null) {
-    insert(start.parentNode!, value, start)
+    insert(start.parentNode!, value, skipRange(start), start)
     return null
   }
   const f = document.createDocumentFragment()
-  const anchor = f.appendChild(document.createComment(''))
-  insert(f, value, anchor)
+  f.appendChild(document.createComment(''))
+  insert(f, value, f.appendChild(document.createComment('')))
   return f
 }
 
@@ -339,8 +356,7 @@ export function show(
       disposeOwner(owner)
       owner = undefined
     }
-    for (let i = 0; i < nodes.length; i++)
-      nodes[i]!.parentNode?.removeChild(nodes[i]!)
+    clearRendered(nodes)
     nodes = []
   }
 

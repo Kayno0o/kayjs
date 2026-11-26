@@ -89,3 +89,74 @@ describe('#3596 root fragment hydration', () => {
     expect(host.textContent).toContain('Clicks: 1')
   })
 })
+
+describe('#3596 fragments nested in ranges', () => {
+  let env: string | undefined
+  beforeEach(() => {
+    GlobalRegistrator.register()
+    env = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+  })
+  afterEach(async () => {
+    if (env === undefined)
+      delete process.env.NODE_ENV
+    else
+      process.env.NODE_ENV = env
+    await GlobalRegistrator.unregister()
+  })
+
+  // Renders `src`'s default export on the server, then hydrates it in production mode.
+  function hydrated(src: string): HTMLElement {
+    const host = document.createElement('kay-island')
+    host.innerHTML = (load(compileSsr('X.tsx', src, { isIsland: true }).code)({}) as { __html: string }).__html
+    document.body.appendChild(host)
+    const X = load(compileDom('X.tsx', src).code)
+    domCore.hydrate(host, () => X({}) as Node)
+    return host
+  }
+
+  test('a component among a root fragment\'s children hydrates in its range, and the button after it works', () => {
+    const host = hydrated(`
+      function Kid() { return <span>kid</span> }
+      function Pair({ show }) { return <>{show.value && <u>u</u>}<span>pair</span></> }
+      export default function X() {
+        const n = signal(0)
+        const show = signal(false)
+        return <><Kid /><Pair show={show} /><button onClick={() => { n.value++; show.value = !show.value }}>+</button><p>n={n.value}</p></>
+      }
+    `)
+    host.querySelector('button')!.click()
+    expect(host.querySelector('p')!.textContent).toBe('n=1')
+    expect([...host.querySelectorAll('span')].map(e => e.textContent)).toEqual(['kid', 'pair'])
+    expect(host.querySelectorAll('u').length).toBe(1)
+  })
+
+  test('a root fragment whose only child is a conditional hydrates it', () => {
+    const host = hydrated(`
+      export default function X() {
+        const on = signal(false)
+        return <>{on.value ? <button onClick={() => { on.value = false }}>on</button> : <button onClick={() => { on.value = true }}>off</button>}</>
+      }
+    `)
+    host.querySelector('button')!.click()
+    expect(host.textContent).toBe('on')
+    host.querySelector('button')!.click()
+    expect(host.textContent).toBe('off')
+  })
+
+  test('a client-mounted fragment\'s conditional goes with the fragment when an outer conditional hides it', () => {
+    const src = `
+      function Inner({ open }) { return <><p>x</p>{open.value && <i>c</i>}<span>s</span></> }
+      export default function X({ show, open }) { return <div>{show.value && <Inner open={open} />}</div> }
+    `
+    const show = signal(true)
+    const open = signal(false)
+    const host = document.createElement('div')
+    domCore.mount(host, () => load(compileDom('X.tsx', src).code)({ show, open }) as Node)
+    open.value = true
+    show.value = false
+    expect(host.querySelector('div')!.children.length).toBe(0)
+    show.value = true
+    expect([...host.querySelector('div')!.children].map(e => e.tagName)).toEqual(['P', 'I', 'SPAN'])
+  })
+})

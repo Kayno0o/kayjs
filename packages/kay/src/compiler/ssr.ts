@@ -248,7 +248,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   // Emits JSX directly into a string accumulator variable `_out` (zero closures on nested `.map()` loops!)
   function emitIntoBuffer(node: JSXElement | JSXFragment, bufVar: string, parts: StringParts, flushParts: () => void, pushStmt: (stmt: string) => void): void {
     if (node.type === 'JSXFragment') {
-      emitChildrenIntoBuffer(node.children, bufVar, parts, flushParts, pushStmt)
+      emitChildrenIntoBuffer(node.children, bufVar, parts, flushParts, pushStmt, undefined, emitMarkers, true)
       return
     }
 
@@ -328,10 +328,13 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     pushStmt: (stmt: string) => void,
     rawTextTag?: 'style' | 'script',
     slotMarkers = emitMarkers,
+    inFragment = false,
   ): void {
     const meaningful = filterMeaningfulChildren(children)
     const slots = meaningful.map(c => ({ child: c, slot: classifyJsxChild(c, jsxNodes) })).filter(s => s.slot !== undefined)
     const hasSiblings = slots.length > 1
+    // A fragment may sit inside another range, so its dynamic slots are bracketed even alone and always closed, for the markers to balance (#3596).
+    const bracketed = slotMarkers && (hasSiblings || inFragment)
     let hadVariableRange = false
 
     for (let i = 0; i < slots.length; i++) {
@@ -371,7 +374,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         if (slotMarkers && hasSiblings) {
           parts.pushStatic('<!--k[-->')
           emitIntoBuffer(slot.node, bufVar, parts, flushParts, pushStmt)
-          if (!isLast)
+          if (!isLast || inFragment)
             parts.pushStatic('<!--k]-->')
         }
         else {
@@ -383,7 +386,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
       if (slot.kind === 'loop') {
         const { match } = slot
-        const needsBracket = slotMarkers && (!isLast || hadVariableRange)
+        const needsBracket = slotMarkers && (inFragment || !isLast || hadVariableRange)
         if (needsBracket)
           parts.pushStatic('<!--k[-->')
 
@@ -429,7 +432,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       if (slot.kind === 'and-show') {
         const left = compileSubExpression(slot.expr.left)
         const right = compileJsxToStringExpr(slot.right)
-        if (slotMarkers && hasSiblings) {
+        if (bracketed) {
           parts.pushStatic('<!--k[-->')
           parts.pushExpr(`((${left}) ? (${right}) : "")`)
           parts.pushStatic('<!--k]-->')
@@ -445,7 +448,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         const test = compileSubExpression(slot.expr.test)
         const cons = compileExpressionAsString(slot.cons)
         const alt = compileExpressionAsString(slot.alt)
-        if (slotMarkers && hasSiblings) {
+        if (bracketed) {
           parts.pushStatic('<!--k[-->')
           parts.pushExpr(`((${test}) ? (${cons}) : (${alt}))`)
           parts.pushStatic('<!--k]-->')
@@ -461,10 +464,10 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       const exprCode = compileSubExpression(slot.expr)
       const rendered = `${use('esc')}(${exprCode})`
       if (isNodeCapableExpr(slot.expr, jsxNodes)) {
-        if (slotMarkers && hasSiblings) {
+        if (bracketed) {
           parts.pushStatic('<!--k[-->')
           parts.pushExpr(rendered)
-          if (!isLast)
+          if (!isLast || inFragment)
             parts.pushStatic('<!--k]-->')
         }
         else {
@@ -472,10 +475,10 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         }
         hadVariableRange = true
       }
-      else if (slotMarkers && hasSiblings) {
+      else if (bracketed) {
         parts.pushStatic('<!---->')
         parts.pushExpr(rendered)
-        if (!isLast)
+        if (!isLast || inFragment)
           parts.pushStatic('<!---->')
       }
       else {
