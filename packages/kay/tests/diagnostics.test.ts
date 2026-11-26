@@ -142,6 +142,35 @@ describe('Compile, check, and build error locations & code frames (#3546)', () =
     expect(res.warnings).toEqual([expect.stringMatching(/^src\/routes\/index\.tsx:12:24: warning: kay compiler: onChange on <input> in src\/routes\/index\.tsx fires/)])
   })
 
+  it('preserves exact line:col offsets and fix hints for island(), async interactive, and <Head> in island errors (#3630)', async () => {
+    const dir = makeTemp('kay-diag-3630-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/removed.tsx'), [
+      '// line 1',
+      'import { island } from "@kayjs/kay"',
+      'export default function Removed() { return <p>{String(island)}</p> }',
+    ].join('\n'))
+    writeFileSync(join(dir, 'src/routes/async-page.tsx'), [
+      'import { signal } from "@kayjs/kay"',
+      'export default async function AsyncPage() {',
+      '  const n = signal(0)',
+      '  return <p>{n.value}</p>',
+      '}',
+    ].join('\n'))
+    writeFileSync(join(dir, 'src/routes/head-island.tsx'), [
+      'import { Head } from "@kayjs/kay"',
+      'export default function HeadIsland() {',
+      '  return <button onClick={() => 1}><Head><title>x</title></Head></button>',
+      '}',
+    ].join('\n'))
+
+    const res = await checkProject(dir, { skipTypecheck: true })
+    expect(res.ok).toBe(false)
+    expect(res.errors.some(e => e.startsWith('src/routes/removed.tsx:2:10: error:') && e.includes('export const hydrate'))).toBe(true)
+    expect(res.errors.some(e => e.startsWith('src/routes/async-page.tsx:3:13: error:') && e.includes('Move interactive state/handlers into a non-async component'))).toBe(true)
+    expect(res.errors.some(e => e.startsWith('src/routes/head-island.tsx:3:18: error:') && e.includes('move <Head> to the page or a layout'))).toBe(true)
+  })
+
   it('preserves file:line:col and source line from Bun.build logs on build failures', async () => {
     // Unit test of formatBunBuildLogs
     const formatted = formatBunBuildLogs([

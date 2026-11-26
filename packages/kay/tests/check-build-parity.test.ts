@@ -351,4 +351,79 @@ describe('kay check and kay build share island planning and reachability checks 
     const manifest = await build({ root: staticDir, minify: false })
     expect(manifest.actions.map(a => a.exportName)).toEqual(['save'])
   })
+
+  it('detects custom .ts hooks, exported state containers, and namespace imports of barrel-reexported state as islands (#3630)', async () => {
+    const dir = appWith('kay-3630-missed-islands-', {
+      'src/hooks/base.ts': 'import { signal } from \'@kayjs/kay\'\nexport function useBase(n: number) { return signal(n) }\n',
+      'src/hooks/useCounter.ts': 'import { useBase } from \'./base\'\nexport function useCounter(start = 0) { const count = useBase(start); return { count } }\n',
+      'src/state/raw.ts': 'import { signal } from \'@kayjs/kay\'\nexport const appState = { total: signal(1) }\nexport const liveCount = signal(2)\n',
+      'src/state/index.ts': 'export * from \'./raw\'\n',
+      'src/ui/HookWidget.tsx': 'import { useCounter } from \'../hooks/useCounter\'\nexport function HookWidget() { const { count } = useCounter(0); return <output>{count.value}</output> }\n',
+      'src/ui/ContainerWidget.tsx': 'import { appState } from \'../state/raw\'\nexport function ContainerWidget() { return <output>{appState.total.value}</output> }\n',
+      'src/ui/BarrelWidget.tsx': 'import * as S from \'../state\'\nexport function BarrelWidget() { return <output>{S.liveCount.value}</output> }\n',
+      'src/routes/index.tsx': [
+        'import { HookWidget } from \'../ui/HookWidget\'',
+        'import { ContainerWidget } from \'../ui/ContainerWidget\'',
+        'import { BarrelWidget } from \'../ui/BarrelWidget\'',
+        'export default function Home() { return <main><HookWidget /><ContainerWidget /><BarrelWidget /></main> }',
+      ].join('\n'),
+    })
+    expect(await checkProject(dir, { skipTypecheck: true })).toMatchObject({ ok: true, errors: [] })
+    const manifest = await build({ root: dir, minify: false })
+    expect(Object.keys(manifest.islands).map(k => k.slice(dir.length)).sort()).toEqual([
+      '/src/ui/BarrelWidget.tsx#BarrelWidget',
+      '/src/ui/ContainerWidget.tsx#ContainerWidget',
+      '/src/ui/HookWidget.tsx#HookWidget',
+    ])
+  })
+
+  it('catches cross-file <Head>/<Region>/<Suspense> inside islands, bare imported signals, wildcard action re-exports, and dynamic server-only imports in both check and build (#3630)', async () => {
+    // 1. Cross-file <Head> rendered inside an island
+    const headDir = appWith('kay-3630-cross-head-', {
+      'src/ui/Seo.tsx': 'import { Head } from \'@kayjs/kay\'\nexport function Seo({ title }: { title: string }) { return <Head><title>{title}</title></Head> }\n',
+      'src/ui/Widget.tsx': 'import { signal } from \'@kayjs/kay\'\nimport { Seo } from \'./Seo\'\nexport function Widget() { const n = signal(0); return <div><Seo title={String(n.value)} /><button onClick={() => n.value++}>+</button></div> }\n',
+      'src/routes/index.tsx': 'import { Widget } from \'../ui/Widget\'\nexport default function Home() { return <main><Widget /></main> }\n',
+    })
+    const headCheck = await checkProject(headDir, { skipTypecheck: true })
+    expect(headCheck.ok).toBe(false)
+    expect(headCheck.errors).toEqual([expect.stringMatching(/^src\/ui\/Widget\.tsx:3:\d+: error: kay compiler: <Head> in an island in src\/ui\/Widget\.tsx:/)])
+    await expect(build({ root: headDir, minify: false })).rejects.toThrow(/<Head> in an island/)
+
+    // 2. Bare read of imported signal (named + namespace through barrel)
+    const bareDir = appWith('kay-3630-bare-imported-', {
+      'src/state.ts': 'import { signal } from \'@kayjs/kay\'\nexport const count = signal(0)\n',
+      'src/barrel.ts': 'export * from \'./state\'\n',
+      'src/routes/index.tsx': 'import { count } from \'../state\'\nimport * as S from \'../barrel\'\nexport default function Home() { return <p>{count} {S.count}</p> }\n',
+    })
+    const bareCheck = await checkProject(bareDir, { skipTypecheck: true })
+    expect(bareCheck.ok).toBe(false)
+    expect(bareCheck.errors.some(e => e.includes('count without .value'))).toBe(true)
+    expect(bareCheck.errors.some(e => e.includes('S.count without .value'))).toBe(true)
+    await expect(build({ root: bareDir, minify: false })).rejects.toThrow(/count without \.value/)
+
+    // 3. Wildcard barrel re-export of a non-action from a server action file
+    const actionBarrelDir = appWith('kay-3630-action-star-', {
+      'src/actions/notes.ts': 'import { action } from \'@kayjs/kay/server\'\nexport const MAX = 10\nexport const add = action(async () => \'ok\')\n',
+      'src/lib/barrel.ts': 'export * from \'../actions/notes\'\n',
+      'src/routes/index.tsx': 'import { signal } from \'@kayjs/kay\'\nimport { MAX } from \'../lib/barrel\'\nexport default function Home() { const n = signal(0); return <button onClick={() => n.value++}>{MAX + n.value}</button> }\n',
+    })
+    const actionCheck = await checkProject(actionBarrelDir, { skipTypecheck: true })
+    expect(actionCheck.ok).toBe(false)
+    expect(actionCheck.errors.some(e => e.includes('non-action "MAX"'))).toBe(true)
+    await expect(build({ root: actionBarrelDir, minify: false })).rejects.toThrow(/MAX/)
+
+    // 4. Dynamic import() of server-only module inside an island (allowed inside load())
+    const dynDir = appWith('kay-3630-dyn-import-', {
+      'src/routes/index.tsx': [
+        'import { signal } from \'@kayjs/kay\'',
+        'export async function load() { const z = await import(\'node:zlib\'); return { ok: Boolean(z) } }',
+        'export default function Home() { const n = signal(0); return <button onClick={async () => { await import(\'node:perf_hooks\'); n.value++ }}>{n.value}</button> }',
+      ].join('\n'),
+    })
+    const dynCheck = await checkProject(dynDir, { skipTypecheck: true })
+    expect(dynCheck.ok).toBe(false)
+    expect(dynCheck.errors.some(e => e.includes('node:perf_hooks'))).toBe(true)
+    expect(dynCheck.errors.some(e => e.includes('node:zlib'))).toBe(false)
+    await expect(build({ root: dynDir, minify: false })).rejects.toThrow(/node:perf_hooks/)
+  })
 })

@@ -2,8 +2,9 @@
 
 import type { JSXAttribute, JSXAttributeItem, JSXElement, Node } from 'oxc-parser'
 import type { ServerOnlyInIsland } from './interactivity'
+import { URL_ATTRS } from '../attrs'
 import { walk } from './ast'
-import { calleeName, EVENT_ATTR, filterMeaningfulChildren, isComponentTag, jsxTagName, unwrapParens, VOID_ELEMENTS } from './shared'
+import { calleeName, EVENT_ATTR, filterMeaningfulChildren, isComponentTag, isUnsafeUrlAttr, jsxTagName, unwrapParens, unwrapTsExpr, VOID_ELEMENTS } from './shared'
 
 // The kay prop for each DOM event, keyed by the event name kay binds (`onKeyDown` binds `keydown`).
 const EVENT_PROPS = new Map(Object.entries({
@@ -95,13 +96,17 @@ export function collectMistakes<T>(fn: () => T): { value: T | undefined, mistake
   }
 }
 
-export function islandRemoved(filename: string): Error {
-  return mistake('island()', filename, 'it is gone; write export const hydrate = \'visible\' in the component\'s file, or set $hydrate where it renders')
+export function islandRemoved(filename: string, start?: number): KayMistake {
+  const err = mistake('island()', filename, 'it is gone; write export const hydrate = \'visible\' in the component\'s file, or set $hydrate where it renders')
+  err.start = start
+  return err
 }
 
 // `<Head>` and `<Suspense>` run during server rendering only, so in an island they never update.
-export function serverOnlyTagError(filename: string, { tag, island, reason }: ServerOnlyInIsland): Error {
-  return mistake(`<${tag}> in an island`, filename, `${island} is an island because it ${reason}; move <${tag}> to the page or a layout, outside any component with state or handlers`)
+export function serverOnlyTagError(filename: string, { tag, island, reason, offset }: ServerOnlyInIsland): KayMistake {
+  const err = mistake(`<${tag}> in an island`, filename, `${island} is an island because it ${reason}; move <${tag}> to the page or a layout, outside any component with state or handlers`)
+  err.start = offset
+  return err
 }
 
 const BARE_KAY_RE = /^kay(?:\/|$)/
@@ -119,6 +124,31 @@ const MEDIA_MODE = /^media\(.+\)$/
 export function checkHydrateMode(mode: string, what: string, filename: string): void {
   if (mode !== '*' && !HYDRATE_MODES.has(mode) && !MEDIA_MODE.test(mode))
     throw mistake(what, filename, 'use load, visible, idle, interaction, client or media(<query>)')
+}
+
+/** Extracts a static string literal or zero-interpolation template literal after unwrapping TS assertions. */
+export function staticStringValue(node: Node | null | undefined): string | undefined {
+  if (node === null || node === undefined)
+    return undefined
+  const val = unwrapTsExpr(node)
+  if (val.type === 'Literal' && typeof val.value === 'string')
+    return val.value
+  return val.type === 'TemplateLiteral' && val.expressions.length === 0 ? (val.quasis[0]?.value.cooked ?? undefined) : undefined
+}
+
+/** Validates an `export const hydrate = ...` initializer and returns its string mode when statically known. */
+export function checkExportHydrate(init: Node | null | undefined, filename: string): string | undefined {
+  if (init === null || init === undefined)
+    return undefined
+  const mode = staticStringValue(init)
+  if (mode !== undefined) {
+    guarded(init.start, () => checkHydrateMode(mode, `hydrate = "${mode}"`, filename))
+    return mode
+  }
+  const val = unwrapTsExpr(init)
+  if (val.type === 'Literal' || val.type === 'ArrayExpression' || val.type === 'ObjectExpression' || (val.type === 'Identifier' && val.name === 'undefined'))
+    guarded(init.start, () => { throw mistake('hydrate', filename, 'use load, visible, idle, interaction, client or media(<query>)') })
+  return undefined
 }
 
 function checkHandler(name: string, value: JSXAttribute['value'], filename: string, code: string): void {
@@ -165,7 +195,11 @@ function checkRef(value: JSXAttribute['value'], filename: string): void {
     throw mistake('ref={{ ... }}', filename, 'pass a function, ref={el => ...}, kay has no ref objects')
 }
 
+const CAMEL_ARIA = /^aria[A-Z]/
+
 function checkSpelling(name: string, value: JSXAttribute['value'], filename: string): void {
+  if (CAMEL_ARIA.test(name))
+    throw mistake(name, filename, `write aria-${name.slice(4).toLowerCase()}={...}, ARIA attributes use kebab-case`)
   const kebab = name.replace(CAMEL_HUMP, hump => `-${hump.toLowerCase()}`)
   if (kebab !== name && KEBAB_SVG_ATTRS.has(kebab))
     throw mistake(name, filename, `write ${kebab}={...}, SVG attributes are case-sensitive`)
@@ -231,10 +265,29 @@ function checkInnerHtml(element: JSXElement, tag: string, attr: JSXAttribute, fi
     throw mistake('innerHTML with children', filename, 'keep one, the children or innerHTML')
 }
 
-function checkElementAttribute(attr: JSXAttribute, isCustomElement: boolean, filename: string, code: string): void {
+function staticStringAttr(value: JSXAttribute['value']): string | undefined {
+  if (value === null)
+    return undefined
+  if (value.type === 'Literal' && typeof value.value === 'string')
+    return value.value
+  if (value.type === 'JSXExpressionContainer' && value.expression.type !== 'JSXEmptyExpression') {
+    const expr = unwrapParens(value.expression)
+    if (expr.type === 'Literal' && typeof expr.value === 'string')
+      return expr.value
+    if (expr.type === 'TemplateLiteral' && expr.expressions.length === 0)
+      return expr.quasis[0]?.value.cooked ?? undefined
+  }
+  return undefined
+}
+
+function checkElementAttribute(attr: JSXAttribute, tag: string, isCustomElement: boolean, filename: string, code: string, warnings: CompilerWarning[]): void {
   if (attr.name.type !== 'JSXIdentifier')
     return
   const name = attr.name.name
+  if (name === '$hydrate')
+    throw mistake(`$hydrate on <${tag}>`, filename, 'only components can be islands; drop $hydrate, or move it onto a component tag')
+  if (name.toLowerCase() === 'srcdoc')
+    throw mistake(`${name} on <${tag}>`, filename, 'kay blocks srcdoc for XSS safety; serve the document from a route and load it with src')
   if (name === 'dangerouslySetInnerHTML')
     throw mistake(name, filename, `write innerHTML={${reactHtmlSource(attr.value, code) ?? '...'}}`)
   if (name === 'classList')
@@ -242,6 +295,11 @@ function checkElementAttribute(attr: JSXAttribute, isCustomElement: boolean, fil
   if (name === 'ref')
     return checkRef(attr.value, filename)
   checkSpelling(name, attr.value, filename)
+  if (URL_ATTRS.has(name.toLowerCase())) {
+    const urlText = staticStringAttr(attr.value)
+    if (urlText !== undefined && isUnsafeUrlAttr(name, urlText, tag))
+      warnings.push({ message: `kay compiler: unsafe URL in ${name} on <${tag}> in ${filename}; kay strips javascript:, vbscript:, and non-image data: URLs.`, start: attr.start })
+  }
   if (LOWERCASE_EVENT.test(name) && EVENT_PROPS.has(name.slice(2)))
     throw mistake(name, filename, `write ${eventProp(name.slice(2))}={...}, kay binds camelCase event props only`)
   if (!EVENT_ATTR.test(name))
@@ -318,9 +376,14 @@ export function checkMistakes(
   }
   const attributes = element.openingElement.attributes
   guarded(element.start, () => checkRegionMarkup(tag, canonical, isElement, attributes, filename, element, resolveTag))
+  if (isElement && VOID_ELEMENTS.has(tag) && (filterMeaningfulChildren(element.children).length > 0 || staticAttr(attributes, 'children') !== undefined))
+    guarded(element.start, () => { throw mistake(`<${tag}> with children`, filename, `a void element has no content; write <${tag} />`) })
   const className = isElement && staticAttr(attributes, 'class') !== undefined ? staticAttr(attributes, 'className') : undefined
   if (className !== undefined)
     guarded(className.start, () => { throw mistake('class and className', filename, 'keep one, they set the same attribute') })
+  const htmlFor = isElement && staticAttr(attributes, 'for') !== undefined ? staticAttr(attributes, 'htmlFor') : undefined
+  if (htmlFor !== undefined)
+    guarded(htmlFor.start, () => { throw mistake('for and htmlFor', filename, 'keep one, they set the same attribute') })
   if (isElement)
     checkFocusAndChange(tag, attributes, filename, warnings)
   for (const attr of attributes) {
@@ -332,7 +395,7 @@ export function checkMistakes(
       else if (isElement && attr.name.name === 'innerHTML')
         checkInnerHtml(element, tag, attr, filename, code)
       else if (isElement)
-        checkElementAttribute(attr, isCustomElement, filename, code)
+        checkElementAttribute(attr, tag, isCustomElement, filename, code, warnings)
     })
   }
 }

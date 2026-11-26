@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { JSXElement, JSXFragment } from 'oxc-parser'
 import { analyzeModule, compileDom, compileSsr } from '../src/compiler/index'
-import { readsPrivateEnv } from '../src/compiler/server-only'
+import { isServerOnlyModule, readsPrivateEnv, SERVER_ONLY_FILTER } from '../src/compiler/server-only'
 import { planChildSlots, createExprContext } from '../src/compiler/shared'
 import { setInnerHtml } from '../src/dom/extras'
 import { raw, ssrRaw, ssrRawText } from '../src/ssr/index'
@@ -314,6 +314,53 @@ describe('islands per component, not per file (#3587)', () => {
     expect(analyzeModule('index.tsx', page).exports.get('default')).toEqual({ interactive: false })
     expect(() => analyzeModule('index.tsx', page.replace('<main>', '<main onClick={() => 1}>'))).toThrow(/async route component/)
     expect(() => analyzeModule('index.tsx', page.replace('async ', '').replace('<main>', '<main onClick={() => 1}>'))).toThrow('kay compiler: <Head> in an island in index.tsx: Home is an island because it uses onClick')
+  })
+
+  test('local param/const/property named signal and TS typeof queries do not promote static components (#3630)', () => {
+    const code = `
+      import { signal } from '@kayjs/kay'
+      export function Counter() { const n = signal(0); return <button onClick={() => n.value++}>{n.value}</button> }
+      export type CounterType = typeof Counter
+      export function ParamSignal({ signal }: { signal: string }) { return <p>{signal}</p> }
+      export function LocalSignal() { const signal = 'green'; return <p>{signal}</p> }
+      export function PropSignal(obj: { signal: string }) { const o = { signal: obj.signal }; return <p>{o.signal}</p> }
+      export function TypeQueryOnly(_p: { ref?: typeof Counter, s?: typeof signal }) { type T = typeof Counter; void (null as T | null); return <p>ok</p> }
+    `
+    const res = facts(code)
+    expect(res.Counter).toMatchObject({ interactive: true })
+    expect(res.ParamSignal).toEqual({ interactive: false })
+    expect(res.LocalSignal).toEqual({ interactive: false })
+    expect(res.PropSignal).toEqual({ interactive: false })
+    expect(res.TypeQueryOnly).toEqual({ interactive: false })
+  })
+
+  test('exported state containers appear in stateExports (not signalExports), and server-only detects env defaults/computed keys and node:* modules (#3630)', () => {
+    const state = `
+      import { signal } from '@kayjs/kay'
+      export const direct = signal(0)
+      export const container = { count: signal(0) }
+    `
+    const analyzed = analyzeModule('state.ts', state)
+    expect(analyzed.stateExports.sort()).toEqual(['container', 'direct'])
+    expect(analyzed.signalExports).toEqual(['direct'])
+
+    for (const snippet of [
+      'export function f(x = process.env.SECRET) { return x }',
+      'export function f({ a = process.env.SECRET }: { a?: string }) { return a }',
+      'export function f(o: Record<string, string>) { const { [process.env.SECRET!]: v } = o; return v }',
+      'export const o = { [process.env.SECRET!]: 1 }',
+      'export const s = process.env.SECRET!',
+      'export const s = process.env.SECRET as string',
+    ]) {
+      expect(readsPrivateEnv(analyzeModule('m.ts', snippet).program)).toBe(true)
+    }
+
+    for (const mod of ['node:zlib', 'node:dns/promises', 'node:perf_hooks', 'node:future_builtin', 'bun:ffi', '@kayjs/kay/internal/ssr']) {
+      expect(isServerOnlyModule(mod)).toBe(true)
+      expect(SERVER_ONLY_FILTER.test(mod)).toBe(true)
+    }
+    expect(isServerOnlyModule('@kayjs/kay')).toBe(false)
+    expect(SERVER_ONLY_FILTER.test('@kayjs/kay')).toBe(false)
   })
 })
 

@@ -204,7 +204,7 @@ export interface CommonAttributes<T extends Element = Element> extends DOMEventH
   children?: KayChild | undefined
   key?: string | number | undefined
   ref?: ((el: T) => void) | undefined
-  $hydrate?: HydrateStrategy | undefined
+  $hydrate?: never
   innerHTML?: string | Html | null | undefined
   // Spellings from React and Solid that kay refuses at compile time, refused here first.
   dangerouslySetInnerHTML?: never
@@ -217,7 +217,11 @@ export interface CommonAttributes<T extends Element = Element> extends DOMEventH
 }
 
 type WritableKeys<T> = {
-  [K in keyof T]-?: (<F>() => F extends { [Q in K]: T[K] } ? 1 : 2) extends (<F>() => F extends { -readonly [Q in K]: T[K] } ? 1 : 2)
+  [K in keyof T]-?:
+  string extends K ? never :
+  number extends K ? never :
+  symbol extends K ? never :
+  (<F>() => F extends { [Q in K]: T[K] } ? 1 : 2) extends (<F>() => F extends { -readonly [Q in K]: T[K] } ? 1 : 2)
     ? K
     : never
 }[keyof T]
@@ -239,11 +243,39 @@ type BlockedDomProps =
   | 'prefix'
   | 'localName'
   | 'namespaceURI'
+  | 'httpEquiv'
+  | 'acceptCharset'
+  | 'encoding'
+  | 'defaultSelected'
+  | 'defaultMuted'
+  | 'defaultPlaybackRate'
+  | 'currentTime'
+  | 'playbackRate'
+  | 'preservesPitch'
+  | 'volume'
+  | 'disableRemotePlayback'
+  | 'disablePictureInPicture'
+  | 'selectedIndex'
+  | 'length'
+  | 'hash'
+  | 'host'
+  | 'hostname'
+  | 'pathname'
+  | 'port'
+  | 'protocol'
+  | 'search'
+  | 'username'
+  | 'password'
+  | 'text'
+  | 'srcdoc'
+  | 'htmlFor'
 
 type PrimitiveDomPropKeys<E> = {
-  [K in Exclude<WritableKeys<E>, BlockedDomProps | `on${string}`>]:
+  [K in Exclude<WritableKeys<E>, BlockedDomProps | `on${string}` | `aria${string}`>]:
   NonNullable<E[K]> extends string | number | boolean ? K : never
-}[Exclude<WritableKeys<E>, BlockedDomProps | `on${string}`>]
+}[Exclude<WritableKeys<E>, BlockedDomProps | `on${string}` | `aria${string}`>]
+
+export type FormActionAttr = string | { readonly __kayAction: true } | undefined
 
 type DomAttrValue<V> =
   NonNullable<V> extends boolean
@@ -270,7 +302,8 @@ interface HtmlElementOverrides {
     popoverTarget?: string | undefined
     popovertargetaction?: 'hide' | 'show' | 'toggle' | undefined
     popoverTargetAction?: 'hide' | 'show' | 'toggle' | undefined
-    formaction?: string | ((...args: never[]) => unknown) | undefined
+    formaction?: FormActionAttr
+    formAction?: FormActionAttr
     formenctype?: string | undefined
     formmethod?: string | undefined
     formnovalidate?: boolean | undefined
@@ -280,8 +313,11 @@ interface HtmlElementOverrides {
   dialog: { closedby?: 'any' | 'closerequest' | 'none' | undefined }
   fieldset: { form?: string | undefined }
   form: {
-    action?: string | ((...args: never[]) => unknown) | undefined
+    action?: FormActionAttr
     method?: 'get' | 'post' | 'dialog' | 'GET' | 'POST' | undefined
+    name?: string | undefined
+    rel?: string | undefined
+    target?: string | undefined
     enctype?: string | undefined
     encType?: string | undefined
     novalidate?: boolean | undefined
@@ -294,7 +330,7 @@ interface HtmlElementOverrides {
     loading?: 'lazy' | 'eager' | undefined
     referrerpolicy?: string | undefined
     sandbox?: string | undefined
-    srcdoc?: string | undefined
+    srcdoc?: never
   }
   img: {
     crossorigin?: string | undefined
@@ -320,7 +356,8 @@ interface HtmlElementOverrides {
     popoverTarget?: string | undefined
     popovertargetaction?: 'hide' | 'show' | 'toggle' | undefined
     popoverTargetAction?: 'hide' | 'show' | 'toggle' | undefined
-    formaction?: string | ((...args: never[]) => unknown) | undefined
+    formaction?: FormActionAttr
+    formAction?: FormActionAttr
     formenctype?: string | undefined
     formmethod?: string | undefined
     formnovalidate?: boolean | undefined
@@ -380,11 +417,16 @@ interface HtmlElementOverrides {
   video: { crossorigin?: string | undefined, playsinline?: boolean | undefined, playsInline?: boolean | undefined }
 }
 
+type VoidElementTagName =
+  | 'area' | 'base' | 'br' | 'col' | 'embed' | 'hr' | 'img' | 'input'
+  | 'link' | 'meta' | 'param' | 'source' | 'track' | 'wbr'
+
 type HtmlIntrinsicElements = {
   [K in keyof HTMLElementTagNameMap]:
-  K extends keyof HtmlElementOverrides
-    ? Omit<HTMLAttributes<HTMLElementTagNameMap[K]>, keyof HtmlElementOverrides[K]> & HtmlElementOverrides[K]
-    : HTMLAttributes<HTMLElementTagNameMap[K]>
+  (K extends keyof HtmlElementOverrides
+    ? Omit<HTMLAttributes<HTMLElementTagNameMap[K]>, keyof HtmlElementOverrides[K] | (K extends VoidElementTagName ? 'children' : never)> & HtmlElementOverrides[K]
+    : Omit<HTMLAttributes<HTMLElementTagNameMap[K]>, K extends VoidElementTagName ? 'children' : never>)
+  & (K extends VoidElementTagName ? { children?: never } : unknown)
 }
 
 export interface SVGAttributes<T extends SVGElement = SVGElement> extends CommonAttributes<T> {

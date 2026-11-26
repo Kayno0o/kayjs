@@ -5,9 +5,10 @@ import type { ServerOnlyInIsland } from '../compiler/interactivity'
 import type { ModuleGraph } from './graph'
 import { basename, extname } from 'node:path'
 import { asyncInteractiveError } from '../compiler/analyze'
-import { withStateReads } from '../compiler/interactivity'
-import { serverOnlyTagError } from '../compiler/mistakes'
-import { findPrivateEnvOffset, SERVER_ONLY_MODULES } from '../compiler/server-only'
+import { findCrossFileServerOnly, withStateReads } from '../compiler/interactivity'
+import { collectMistakes, serverOnlyTagError } from '../compiler/mistakes'
+import { findPrivateEnv, isServerOnlyModule } from '../compiler/server-only'
+import { checkBareSignals } from '../compiler/signal-reads'
 import { isTsFile, relPosix } from './files'
 
 export interface IslandTarget {
@@ -26,7 +27,8 @@ export type IslandIssue
     | { kind: 'interactive-action', file: string, name: string, offset: number, reason: string | undefined }
     | { kind: 'action-export', file: string, target: string, name: string, offset: number, reexport: boolean }
     | { kind: 'server-only-import', file: string, island: string, source: string, offset: number, reexport: boolean }
-    | { kind: 'private-env', file: string, island: string, offset: number }
+    | { kind: 'private-env', file: string, island: string, offset: number, envKind: 'process' | 'bun' }
+    | { kind: 'compiler-mistake', file: string, offset: number, message: string }
 
 export interface IslandPlan {
   /** Island roots keyed `file#exportName`. */
@@ -118,36 +120,199 @@ function resolveExportTarget(
   return { file, exportName }
 }
 
-function createPromoter(graph: ModuleGraph, load: LoadModule, issues: IslandIssue[]): LoadModule {
-  const promotedFiles = new Set<string>()
-  return (file: string): ModuleAnalysis | undefined => {
-    const analysis = load(file)
-    if (analysis === undefined || !file.endsWith('.tsx') || promotedFiles.has(file))
-      return analysis
-    promotedFiles.add(file)
-    const promoted = withStateReads(analysis, (imp, imported) => {
-      const resolved = graph.resolve(file, imp.source)
-      if (resolved === undefined || !isTsFile(resolved))
-        return false
-      if (imported === '*')
-        return (load(resolved)?.stateExports.length ?? 0) > 0
-      const target = resolveExportTarget(graph, load, resolved, imported)
-      return target !== undefined && load(target.file)?.stateExports.includes(target.exportName) === true
-    })
+const EMPTY_SET = new Set<string>()
+
+function moduleHasInteractiveExport(graph: ModuleGraph, load: LoadModule, file: string, seen = new Set<string>()): boolean {
+  if (seen.has(file))
+    return false
+  seen.add(file)
+  const analysis = graph.analyses.get(file) ?? load(file)
+  if (analysis === undefined)
+    return false
+  if (analysis.stateExports.length > 0 || [...analysis.exports.values()].some(e => e.interactive))
+    return true
+  for (const re of analysis.reexports) {
+    const next = graph.resolve(file, re.source)
+    if (next === undefined || !isTsFile(next))
+      continue
+    if (re.exported === '*') {
+      if (moduleHasInteractiveExport(graph, load, next, seen))
+        return true
+    }
+    else {
+      const target = resolveExportTarget(graph, load, next, re.local)
+      const targetAnalysis = target === undefined ? undefined : (graph.analyses.get(target.file) ?? load(target.file))
+      if (target !== undefined && (targetAnalysis?.stateExports.includes(target.exportName) === true || targetAnalysis?.exports.get(target.exportName)?.interactive === true))
+        return true
+    }
+  }
+  return false
+}
+
+function collectExportedSignals(graph: ModuleGraph, load: LoadModule, file: string, out: Set<string>, seen = new Set<string>()): void {
+  if (seen.has(file))
+    return
+  seen.add(file)
+  const analysis = graph.analyses.get(file) ?? load(file)
+  if (analysis === undefined)
+    return
+  for (const name of analysis.signalExports)
+    out.add(name)
+  for (const re of analysis.reexports) {
+    const next = graph.resolve(file, re.source)
+    if (next === undefined || !isTsFile(next))
+      continue
+    if (re.exported === '*') {
+      collectExportedSignals(graph, load, next, out, seen)
+    }
+    else {
+      const target = resolveExportTarget(graph, load, next, re.local)
+      if (target !== undefined && (graph.analyses.get(target.file) ?? load(target.file))?.signalExports.includes(target.exportName) === true)
+        out.add(re.exported)
+    }
+  }
+}
+
+function interactivityChanged(prev: ModuleAnalysis, next: { isInteractive: boolean, exports: Map<string, { interactive: boolean }> }): boolean {
+  if (prev.isInteractive !== next.isInteractive)
+    return true
+  for (const [name, fact] of next.exports) {
+    if (prev.exports.get(name)?.interactive !== fact.interactive)
+      return true
+  }
+  return false
+}
+
+function createPromoter(graph: ModuleGraph, load: LoadModule, issues: IslandIssue[]): { promoteAll: () => void, loadPromoted: LoadModule } {
+  const initialAsyncInteractive = new Set<string>()
+  const initialServerOnly = new Set<string>()
+  const reportedAsync = new Set<string>()
+  const reportedServerOnly = new Set<string>()
+
+  const recordInitial = (file: string, a: ModuleAnalysis): void => {
+    if (a.hasAsyncDefault && a.exports.get('default')?.interactive === true)
+      initialAsyncInteractive.add(file)
+    if (a.serverOnly !== undefined)
+      initialServerOnly.add(file)
+  }
+  for (const [file, a] of graph.analyses)
+    recordInitial(file, a)
+
+  const isInteractiveTarget = (file: string, source: string, imported: string): boolean => {
+    const resolved = graph.resolve(file, source)
+    if (resolved === undefined || !isTsFile(resolved))
+      return false
+    if (imported === '*')
+      return moduleHasInteractiveExport(graph, load, resolved)
+    const target = resolveExportTarget(graph, load, resolved, imported)
+    if (target === undefined)
+      return false
+    const targetAnalysis = graph.analyses.get(target.file) ?? load(target.file)
+    return targetAnalysis?.stateExports.includes(target.exportName) === true
+      || targetAnalysis?.exports.get(target.exportName)?.interactive === true
+  }
+
+  const promoteOne = (file: string): boolean => {
+    if (NODE_MODULES_RE.test(file) || !isTsFile(file))
+      return false
+    const analysis = graph.analyses.get(file)
+    if (analysis === undefined)
+      return false
+    const promoted = withStateReads(analysis, (imp, imported) => isInteractiveTarget(file, imp.source, imported))
     if (promoted === undefined)
-      return analysis
+      return false
     const page = promoted.exports.get('default')
     if (analysis.hasAsyncDefault && page?.interactive === true) {
-      issues.push({ kind: 'async-interactive', file, offset: page.offset ?? 0, reason: page.reason })
-      return analysis
+      if (!initialAsyncInteractive.has(file) && !reportedAsync.has(file)) {
+        reportedAsync.add(file)
+        issues.push({ kind: 'async-interactive', file, offset: page.offset ?? 0, reason: page.reason })
+      }
+      return false
     }
     if (promoted.serverOnly !== undefined) {
-      issues.push({ kind: 'server-only-tag', file, serverOnly: promoted.serverOnly })
-      return analysis
+      if (!initialServerOnly.has(file) && !reportedServerOnly.has(file)) {
+        reportedServerOnly.add(file)
+        issues.push({ kind: 'server-only-tag', file, serverOnly: promoted.serverOnly })
+      }
+      return false
     }
-    const next = { ...analysis, ...promoted }
-    graph.analyses.set(file, next)
-    return next
+    if (!interactivityChanged(analysis, promoted))
+      return false
+    graph.analyses.set(file, { ...analysis, ...promoted })
+    return true
+  }
+
+  const promoteAll = (): void => {
+    for (let pass = 0; pass < MAX_REEXPORT_DEPTH; pass++) {
+      let changed = false
+      for (const file of [...graph.analyses.keys()]) {
+        if (promoteOne(file))
+          changed = true
+      }
+      if (!changed)
+        break
+    }
+  }
+
+  const loadPromoted: LoadModule = (file: string): ModuleAnalysis | undefined => {
+    const existed = graph.analyses.has(file)
+    const analysis = graph.analyses.get(file) ?? load(file)
+    if (analysis === undefined)
+      return undefined
+    if (!existed) {
+      recordInitial(file, analysis)
+      promoteAll()
+    }
+    return graph.analyses.get(file) ?? analysis
+  }
+
+  return { promoteAll, loadPromoted }
+}
+
+function checkImportedBareSignals(graph: ModuleGraph, load: LoadModule, root: string, issues: IslandIssue[]): void {
+  for (const [file, analysis] of [...graph.analyses]) {
+    if (NODE_MODULES_RE.test(file) || !isTsFile(file))
+      continue
+    const importedSignals = new Set<string>()
+    const importedSignalMembers = new Map<string, Set<string>>()
+    for (const imp of analysis.imports) {
+      const resolved = graph.resolve(file, imp.source)
+      if (resolved === undefined || !isTsFile(resolved))
+        continue
+      for (const spec of imp.specifiers) {
+        if (spec.imported === '*') {
+          const members = new Set<string>()
+          collectExportedSignals(graph, load, resolved, members)
+          if (members.size > 0)
+            importedSignalMembers.set(spec.local, members)
+        }
+        else {
+          const target = resolveExportTarget(graph, load, resolved, spec.imported)
+          if (target !== undefined && (graph.analyses.get(target.file) ?? load(target.file))?.signalExports.includes(target.exportName) === true)
+            importedSignals.add(spec.local)
+        }
+      }
+    }
+    if (importedSignals.size === 0 && importedSignalMembers.size === 0)
+      continue
+    const { mistakes } = collectMistakes(() => checkBareSignals(analysis.program, EMPTY_SET, relPosix(root, file), importedSignals, importedSignalMembers))
+    for (const m of mistakes)
+      issues.push({ kind: 'compiler-mistake', file, offset: m.start ?? 0, message: m.message })
+  }
+}
+
+function checkCrossFileServerOnlyTags(graph: ModuleGraph, load: LoadModule, issues: IslandIssue[]): void {
+  const loadMod = (f: string): ModuleAnalysis | undefined => graph.analyses.get(f) ?? load(f)
+  const resolveTarget = (fromFile: string, source: string, exportName: string): { file: string, exportName: string } | undefined => {
+    const resolved = graph.resolve(fromFile, source)
+    return resolved !== undefined && isTsFile(resolved) ? resolveExportTarget(graph, load, resolved, exportName) : undefined
+  }
+  for (const [file, analysis] of [...graph.analyses]) {
+    if (NODE_MODULES_RE.test(file) || !analysis.isInteractive)
+      continue
+    const serverOnly = findCrossFileServerOnly(file, analysis, loadMod, resolveTarget)
+    if (serverOnly !== undefined)
+      issues.push({ kind: 'server-only-tag', file, serverOnly })
   }
 }
 
@@ -209,62 +374,63 @@ function checkReachEdges(
   const loadTarget = (target: string): ModuleAnalysis | undefined =>
     NODE_MODULES_RE.test(target) ? graph.analyses.get(target) : load(target)
 
-  for (const imp of analysis.imports) {
-    if (SERVER_ONLY_MODULES.has(imp.source)) {
-      if (checkFileLeaks && !reported.has(imp.source)) {
-        reported.add(imp.source)
-        issues.push({ kind: 'server-only-import', file, island, source: imp.source, offset: imp.start, reexport: false })
-      }
-      continue
+  const reportActionExport = (target: string, name: string, offset: number, reexport: boolean): void => {
+    const key = `action:${target}:${name}`
+    if (!reported.has(key)) {
+      reported.add(key)
+      issues.push({ kind: 'action-export', file, target, name, offset, reexport })
     }
-    const target = graph.resolve(file, imp.source)
-    if (target === undefined)
-      continue
-    if (target.endsWith('.css')) {
-      cssFiles.add(target)
-      continue
-    }
-    if (!isTsFile(target))
-      continue
-    const targetAnalysis = loadTarget(target)
-    if (isStubbedActionFile(targetAnalysis)) {
-      const missing = imp.specifiers.find(s => s.imported !== '*' && !targetAnalysis!.exportedActions.includes(s.imported))
-      if (missing !== undefined && !reported.has(`action:${target}:${missing.imported}`)) {
-        reported.add(`action:${target}:${missing.imported}`)
-        issues.push({ kind: 'action-export', file, target, name: missing.imported, offset: imp.start, reexport: false })
-      }
-      continue
-    }
-    enqueue(target, island)
   }
 
-  for (const re of analysis.reexports) {
-    if (SERVER_ONLY_MODULES.has(re.source)) {
-      if (checkFileLeaks && !reported.has(re.source)) {
-        reported.add(re.source)
-        issues.push({ kind: 'server-only-import', file, island, source: re.source, offset: re.start, reexport: true })
+  const checkSpecifiers = (target: string, targetAnalysis: ModuleAnalysis | undefined, names: readonly string[], offset: number, reexport: boolean): boolean => {
+    if (isStubbedActionFile(targetAnalysis)) {
+      for (const name of names) {
+        if (name !== '*' && !targetAnalysis!.exportedActions.includes(name))
+          reportActionExport(target, name, offset, reexport)
       }
-      continue
+      return true
     }
-    const target = graph.resolve(file, re.source)
+    // Check wildcard-barrel re-exports (`export * from './actions'`), leaving explicit named re-exports to the barrel itself.
+    for (const name of names) {
+      if (name === '*' || targetAnalysis?.reexports.some(r => r.exported === name) === true)
+        continue
+      const resolvedTarget = resolveExportTarget(graph, load, target, name)
+      if (resolvedTarget !== undefined && resolvedTarget.file !== target) {
+        const finalAnalysis = loadTarget(resolvedTarget.file)
+        if (isStubbedActionFile(finalAnalysis) && !finalAnalysis!.exportedActions.includes(resolvedTarget.exportName))
+          reportActionExport(resolvedTarget.file, resolvedTarget.exportName, offset, reexport)
+      }
+    }
+    return false
+  }
+
+  const visitEdge = (source: string, offset: number, reexport: boolean, names: readonly string[]): void => {
+    if (isServerOnlyModule(source)) {
+      if (checkFileLeaks && !reported.has(source)) {
+        reported.add(source)
+        issues.push({ kind: 'server-only-import', file, island, source, offset, reexport })
+      }
+      return
+    }
+    const target = graph.resolve(file, source)
     if (target === undefined)
-      continue
+      return
     if (target.endsWith('.css')) {
       cssFiles.add(target)
-      continue
+      return
     }
     if (!isTsFile(target))
-      continue
-    const targetAnalysis = loadTarget(target)
-    if (isStubbedActionFile(targetAnalysis)) {
-      if (re.local !== '*' && !targetAnalysis!.exportedActions.includes(re.local) && !reported.has(`action:${target}:${re.local}`)) {
-        reported.add(`action:${target}:${re.local}`)
-        issues.push({ kind: 'action-export', file, target, name: re.local, offset: re.start, reexport: true })
-      }
-      continue
-    }
-    enqueue(target, island)
+      return
+    if (!checkSpecifiers(target, loadTarget(target), names, offset, reexport))
+      enqueue(target, island)
   }
+
+  for (const imp of analysis.imports)
+    visitEdge(imp.source, imp.start, false, imp.specifiers.map(s => s.imported))
+  for (const re of analysis.reexports)
+    visitEdge(re.source, re.start, true, [re.local])
+  for (const dyn of analysis.dynamicImports)
+    visitEdge(dyn.source, dyn.start, false, [])
 }
 
 function walkIslandReach(
@@ -306,9 +472,9 @@ function walkIslandReach(
     const checkFileLeaks = checkLeaks && !inNodeModules
     checkReachEdges(graph, load, file, island, analysis, checkFileLeaks, cssFiles, issues, enqueue)
     if (checkFileLeaks) {
-      const envOffset = findPrivateEnvOffset(analysis.program)
-      if (envOffset !== undefined)
-        issues.push({ kind: 'private-env', file, island, offset: envOffset })
+      const envMatch = findPrivateEnv(analysis.program)
+      if (envMatch !== undefined)
+        issues.push({ kind: 'private-env', file, island, offset: envMatch.offset, envKind: envMatch.kind })
     }
   }
 
@@ -345,12 +511,11 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
     return target
   }
 
-  // A component reading reactive state another module exports runs in the browser too. The promoted analysis lives in this run's map only, so the cached one still reflects the file alone.
-  const loadPromoted = createPromoter(graph, load, issues)
-  for (const file of [...graph.analyses.keys()]) {
-    if (file.endsWith('.tsx'))
-      loadPromoted(file)
-  }
+  // A component or hook reading reactive state or calling an interactive hook runs in the browser too. The promoted analysis lives in this run's map only, so the cached one still reflects the file alone.
+  const { promoteAll, loadPromoted } = createPromoter(graph, load, issues)
+  promoteAll()
+  checkImportedBareSignals(graph, load, root, issues)
+  checkCrossFileServerOnlyTags(graph, load, issues)
 
   const pageBindings = discoverBindings(graph, load, loadPromoted, pageSet, registerIsland)
 
@@ -403,6 +568,8 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
     }
     if (issue.kind === 'server-only-import')
       leaks.add(issue.reexport ? `${rel} re-exports from server-only module "${issue.source}"` : `${rel} imports server-only module "${issue.source}"`)
+    if (issue.kind === 'compiler-mistake')
+      throw new Error(issue.message)
     if (issue.kind === 'private-env')
       leaks.add(`${rel} reads process.env or Bun.env (only a process.env.PUBLIC_* set at build time is inlined)`)
   }

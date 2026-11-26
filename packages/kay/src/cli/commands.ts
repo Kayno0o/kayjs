@@ -89,7 +89,7 @@ function checkCommand(cwd: string): Commands[string] {
       if (values.json === true) {
         const errors = res.errors.map(e => diagnosticData(e, 'error'))
         const warnings = res.warnings.map(w => diagnosticData(w, 'warning'))
-        console.log(JSON.stringify({ ok: res.ok, checkedFiles: res.checkedFiles, errors, warnings }, null, 2))
+        console.log(JSON.stringify({ ok: !failed, checkedFiles: res.checkedFiles, errors, warnings }, null, 2))
         return failed ? 1 : 0
       }
       for (const warning of res.warnings)

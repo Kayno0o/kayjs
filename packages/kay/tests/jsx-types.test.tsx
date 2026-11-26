@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { action } from '../src/server/action'
 import { raw } from '../src/ssr/index'
 
 declare module '@kayjs/kay/jsx-runtime' {
@@ -66,10 +67,44 @@ test('JSX types refuse unknown tags, unknown attrs, React/Solid spellings, and t
       onInput={(e) => { inputVal = e.currentTarget.value }}
     />,
     <svg ref={(el) => { svgRef = el }} viewBox="0 0 10 10"><path d="M0 0" stroke-width="2" /></svg>,
-    // Async component typechecks as JSX tag
-    <AsyncBanner title="hi" />,
+    // Async component typechecks as JSX tag (and accepts $hydrate)
+    <AsyncBanner title="hi" $hydrate="visible" />,
     // Custom element registered via module augmentation
     <my-widget label="ok" onSelected={() => {}} />,
+    // #3630: tightened JSX types — camelCase aria, DOM-only props, branded form actions, $hydrate on elements, void children, iframe.srcdoc
+    // @ts-expect-error camelCase ariaLabel is rejected in favor of aria-label
+    <div ariaLabel="box" />,
+    // @ts-expect-error DOM-only property httpEquiv is rejected in favor of http-equiv
+    <meta httpEquiv="refresh" content="5" />,
+    // @ts-expect-error DOM-only property acceptCharset is rejected in favor of accept-charset
+    <form acceptCharset="utf-8" />,
+    // @ts-expect-error DOM-only property defaultSelected is rejected
+    <option defaultSelected value="a">A</option>,
+    // @ts-expect-error DOM-only property currentTime is rejected
+    <video currentTime={5} />,
+    // @ts-expect-error DOM-only hyperlink getter pathname is rejected
+    <a href="/ok" pathname="/bad">x</a>,
+    // @ts-expect-error plain function is rejected on form action (only string or branded server action)
+    <form action={() => {}} />,
+    // @ts-expect-error plain function is rejected on button formaction
+    <button formaction={() => {}} />,
+    // @ts-expect-error $hydrate is not allowed on intrinsic HTML elements
+    <div $hydrate="visible" />,
+    // @ts-expect-error $hydrate is not allowed on intrinsic SVG elements
+    <svg $hydrate="idle" />,
+    // @ts-expect-error void elements cannot have children
+    <img src="/a.png">nope</img>,
+    // @ts-expect-error void elements cannot have children
+    <input>nope</input>,
+    // @ts-expect-error void elements cannot have children
+    <br>nope</br>,
+    // @ts-expect-error iframe srcdoc is blocked by Kay
+    <iframe srcdoc="<p>x</p>" />,
+    // Valid branded server action & string URL on form/button
+    <form action={action(async () => 'ok')} method="post"><button formaction={action(async () => 'ok')}>Go</button></form>,
+    <form action="/submit" method="post"><button formaction="/alt">Alt</button></form>,
+    <meta http-equiv="refresh" content="5" />,
+    <form accept-charset="utf-8" />,
   ]
 
   expect(elements.length).toBeGreaterThan(10)

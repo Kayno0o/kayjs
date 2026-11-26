@@ -2,12 +2,13 @@
 
 import type { MemberExpression, Node, Program } from 'oxc-parser'
 import { loadDeclarations } from './analyze'
-import { collectPatternNames } from './shared'
+import { unwrapTsExpr } from './shared'
 
 export const SERVER_ONLY_MODULES = new Set([
   '@kayjs/kay/server',
   '@kayjs/kay/config',
   '@kayjs/kay/internal/server',
+  '@kayjs/kay/internal/ssr',
   '@kayjs/kay/build',
   '@kayjs/kay/test',
   'bun',
@@ -17,32 +18,63 @@ export const SERVER_ONLY_MODULES = new Set([
   'bun:dns',
   'bun:test',
   'bun:jsc',
+  'node:assert',
+  'node:assert/strict',
+  'node:async_hooks',
+  'node:buffer',
+  'node:child_process',
+  'node:cluster',
+  'node:constants',
+  'node:crypto',
+  'node:dgram',
+  'node:diagnostics_channel',
+  'node:dns',
+  'node:dns/promises',
+  'node:domain',
+  'node:events',
   'node:fs',
   'node:fs/promises',
-  'node:child_process',
-  'node:crypto',
-  'node:dns',
-  'node:async_hooks',
-  'node:module',
-  'node:vm',
-  'node:inspector',
-  'node:process',
-  'node:sqlite',
-  'node:net',
   'node:http',
-  'node:https',
   'node:http2',
+  'node:https',
+  'node:inspector',
+  'node:inspector/promises',
+  'node:module',
+  'node:net',
   'node:os',
-  'node:worker_threads',
-  'node:cluster',
-  'node:dgram',
-  'node:tls',
+  'node:path',
+  'node:path/posix',
+  'node:path/win32',
+  'node:perf_hooks',
+  'node:process',
+  'node:punycode',
+  'node:querystring',
   'node:readline',
+  'node:readline/promises',
+  'node:sqlite',
+  'node:stream',
+  'node:stream/promises',
+  'node:stream/web',
+  'node:string_decoder',
+  'node:test',
+  'node:timers',
+  'node:timers/promises',
+  'node:tls',
+  'node:trace_events',
+  'node:tty',
+  'node:url',
+  'node:util',
+  'node:v8',
+  'node:vm',
+  'node:wasi',
+  'node:worker_threads',
+  'node:zlib',
   'fs',
   'fs/promises',
   'child_process',
   'crypto',
   'dns',
+  'dns/promises',
   'async_hooks',
   'module',
   'vm',
@@ -53,12 +85,26 @@ export const SERVER_ONLY_MODULES = new Set([
   'dgram',
   'tls',
   'readline',
+  'readline/promises',
   'net',
   'http',
   'https',
+  'zlib',
+  'perf_hooks',
+  'inspector',
+  'inspector/promises',
+  'sqlite',
+  'v8',
+  'tty',
+  'diagnostics_channel',
+  'wasi',
 ])
 
-export const SERVER_ONLY_FILTER = new RegExp(`^(?:${[...SERVER_ONLY_MODULES].map(m => m.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|')})$`)
+export function isServerOnlyModule(source: string): boolean {
+  return source.startsWith('node:') || source.startsWith('bun:') || SERVER_ONLY_MODULES.has(source)
+}
+
+export const SERVER_ONLY_FILTER = new RegExp(`^(?:node:.+|bun:.+|${[...SERVER_ONLY_MODULES].map(m => m.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|')})$`)
 
 // The client build inlines PUBLIC_* (from its own environment) and NODE_ENV; any other read ships a server variable name and crashes in the browser.
 const CLIENT_ENV_KEY = /^(?:PUBLIC_\w*|NODE_ENV)$/
@@ -72,34 +118,105 @@ function propKeyName(member: MemberExpression): string | undefined {
 }
 
 function isEnvRoot(node: Node, shadowed: ReadonlySet<string>): 'process' | 'bun' | undefined {
-  if (node.type !== 'MemberExpression')
+  const inner = unwrapTsExpr(node)
+  if (inner.type !== 'MemberExpression')
     return undefined
-  if (propKeyName(node) !== 'env')
+  if (propKeyName(inner) !== 'env')
     return undefined
-  const obj = node.object
+  const obj = unwrapTsExpr(inner.object)
   if (obj.type === 'Identifier') {
     if (obj.name === 'process' && !shadowed.has('process'))
       return 'process'
     if (obj.name === 'Bun' && !shadowed.has('Bun'))
       return 'bun'
   }
-  if (obj.type === 'MemberExpression' && obj.object.type === 'Identifier' && obj.object.name === 'globalThis' && !shadowed.has('globalThis')) {
-    const key = propKeyName(obj)
-    if (key === 'process')
-      return 'process'
-    if (key === 'Bun')
-      return 'bun'
+  if (obj.type === 'MemberExpression') {
+    const base = unwrapTsExpr(obj.object)
+    if (base.type === 'Identifier' && base.name === 'globalThis' && !shadowed.has('globalThis')) {
+      const key = propKeyName(obj)
+      if (key === 'process')
+        return 'process'
+      if (key === 'Bun')
+        return 'bun'
+    }
   }
   return undefined
 }
 
-/** Byte offset of the first `process.env` or `Bun.env` read outside `load()` for a key the client build does not inline, or `undefined`. */
-export function findPrivateEnvOffset(program: Program, isInlined: (key: string) => boolean = key => CLIENT_ENV_KEY.test(key)): number | undefined {
-  let foundOffset: number | undefined
+export interface PrivateEnvMatch {
+  offset: number
+  kind: 'process' | 'bun'
+}
+
+/** Offset and source (`process` or `bun`) of the first private `process.env` or `Bun.env` read outside `load()`, or `undefined`. */
+export function findPrivateEnv(program: Program, isInlined: (key: string) => boolean = key => CLIENT_ENV_KEY.test(key)): PrivateEnvMatch | undefined {
+  let found: PrivateEnvMatch | undefined
   const loadCode = new Set<Node>(loadDeclarations(program))
 
+  function visitPattern(pattern: Node | null | undefined, shadowed: Set<string>): void {
+    if (found !== undefined || pattern === null || pattern === undefined)
+      return
+    switch (pattern.type) {
+      case 'Identifier':
+        shadowed.add(pattern.name)
+        return
+      case 'AssignmentPattern':
+        visit(pattern.right, shadowed)
+        visitPattern(pattern.left, shadowed)
+        return
+      case 'RestElement':
+        visitPattern(pattern.argument, shadowed)
+        return
+      case 'TSParameterProperty':
+        visitPattern(pattern.parameter, shadowed)
+        return
+      case 'ArrayPattern':
+        for (const el of pattern.elements) {
+          if (el !== null)
+            visitPattern(el, shadowed)
+        }
+        return
+      case 'ObjectPattern':
+        for (const prop of pattern.properties) {
+          if (prop.type === 'RestElement') {
+            visitPattern(prop.argument, shadowed)
+          }
+          else {
+            if (prop.computed)
+              visit(prop.key, shadowed)
+            visitPattern(prop.value, shadowed)
+          }
+        }
+    }
+  }
+
+  function visitStatements(body: readonly Node[], shadowed: Set<string>): void {
+    for (const stmt of body) {
+      const decl = (stmt.type === 'ExportNamedDeclaration' || stmt.type === 'ExportDefaultDeclaration') ? stmt.declaration : stmt
+      if ((decl?.type === 'FunctionDeclaration' || decl?.type === 'ClassDeclaration') && decl.id !== null)
+        shadowed.add(decl.id.name)
+    }
+    for (const stmt of body) {
+      if (stmt.type === 'VariableDeclaration') {
+        for (const d of stmt.declarations) {
+          visit(d.init, shadowed)
+          visitPattern(d.id, shadowed)
+        }
+      }
+      else if (stmt.type === 'ExportNamedDeclaration' && stmt.declaration?.type === 'VariableDeclaration') {
+        for (const d of stmt.declaration.declarations) {
+          visit(d.init, shadowed)
+          visitPattern(d.id, shadowed)
+        }
+      }
+      else {
+        visit(stmt, shadowed)
+      }
+    }
+  }
+
   function visit(node: unknown, shadowed: Set<string>): void {
-    if (foundOffset !== undefined || node === null || typeof node !== 'object')
+    if (found !== undefined || node === null || typeof node !== 'object')
       return
     if (Array.isArray(node)) {
       for (let i = 0; i < node.length; i++)
@@ -115,16 +232,17 @@ export function findPrivateEnvOffset(program: Program, isInlined: (key: string) 
       if (rootKind !== undefined) {
         // Bun.env is never statically inlined in browser bundles.
         if (rootKind === 'bun') {
-          foundOffset = n.start
+          found = { offset: n.start, kind: 'bun' }
           return
         }
         const key = propKeyName(n)
         if (key === undefined || !isInlined(key))
-          foundOffset = n.start
+          found = { offset: n.start, kind: 'process' }
         return
       }
-      if (isEnvRoot(n, shadowed) !== undefined) {
-        foundOffset = n.start
+      const directKind = isEnvRoot(n, shadowed)
+      if (directKind !== undefined) {
+        found = { offset: n.start, kind: directKind }
         return
       }
     }
@@ -134,34 +252,17 @@ export function findPrivateEnvOffset(program: Program, isInlined: (key: string) 
       if (n.type !== 'ArrowFunctionExpression' && n.id !== null)
         next.add(n.id.name)
       for (const p of n.params)
-        collectPatternNames(p, next)
+        visitPattern(p, next)
       visit(n.body, next)
       return
     }
-    if (n.type === 'BlockStatement') {
-      const next = new Set(shadowed)
-      for (const stmt of n.body) {
-        if (stmt.type === 'FunctionDeclaration' && stmt.id !== null)
-          next.add(stmt.id.name)
-        else if (stmt.type === 'ClassDeclaration' && stmt.id !== null)
-          next.add(stmt.id.name)
-      }
-      for (const stmt of n.body) {
-        if (stmt.type === 'VariableDeclaration') {
-          for (const d of stmt.declarations) {
-            visit(d.init, next)
-            collectPatternNames(d.id, next)
-          }
-        }
-        else {
-          visit(stmt, next)
-        }
-      }
+    if (n.type === 'Program' || n.type === 'BlockStatement') {
+      visitStatements(n.body, new Set(shadowed))
       return
     }
     if (n.type === 'CatchClause') {
       const next = new Set(shadowed)
-      collectPatternNames(n.param, next)
+      visitPattern(n.param, next)
       visit(n.body, next)
       return
     }
@@ -170,7 +271,10 @@ export function findPrivateEnvOffset(program: Program, isInlined: (key: string) 
       const next = new Set(shadowed)
       if (n.left.type === 'VariableDeclaration') {
         for (const d of n.left.declarations)
-          collectPatternNames(d.id, next)
+          visitPattern(d.id, next)
+      }
+      else {
+        visit(n.left, shadowed)
       }
       visit(n.body, next)
       return
@@ -181,7 +285,7 @@ export function findPrivateEnvOffset(program: Program, isInlined: (key: string) 
         if (n.init.type === 'VariableDeclaration') {
           for (const d of n.init.declarations) {
             visit(d.init, next)
-            collectPatternNames(d.id, next)
+            visitPattern(d.id, next)
           }
         }
         else {
@@ -193,7 +297,10 @@ export function findPrivateEnvOffset(program: Program, isInlined: (key: string) 
       visit(n.body, next)
       return
     }
-
+    if (n.type === 'TSAsExpression' || n.type === 'TSSatisfiesExpression' || n.type === 'TSNonNullExpression' || n.type === 'TSTypeAssertion' || n.type === 'TSInstantiationExpression') {
+      visit(n.expression, shadowed)
+      return
+    }
     if (n.type.startsWith('TS'))
       return
     for (const [key, val] of Object.entries(n)) {
@@ -205,7 +312,12 @@ export function findPrivateEnvOffset(program: Program, isInlined: (key: string) 
   }
 
   visit(program, new Set())
-  return foundOffset
+  return found
+}
+
+/** Byte offset of the first `process.env` or `Bun.env` read outside `load()` for a key the client build does not inline, or `undefined`. */
+export function findPrivateEnvOffset(program: Program, isInlined: (key: string) => boolean = key => CLIENT_ENV_KEY.test(key)): number | undefined {
+  return findPrivateEnv(program, isInlined)?.offset
 }
 
 /** True when the module reads `process.env` or `Bun.env` outside its `load()` (stripped from client code) for a key the client build does not inline. */

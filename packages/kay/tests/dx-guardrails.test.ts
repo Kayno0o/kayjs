@@ -117,6 +117,47 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     expect(res.errors.filter(e => e.includes('<Modal>'))).toEqual([expect.stringContaining('cannot pass JSX in prop "header" from a server component into island <Modal>; pass it as children, which render on the server, or build it inside the island.')])
   })
 
+  it('catches $hydrate on non-islands, children={<div/>}, parenthesized/TS-cast island props, and Bun.env messaging (#3630)', async () => {
+    const dir = makeTemp('kay-3630-check-parity-')
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+
+    writeFileSync(join(dir, 'src/components/Card.tsx'), 'export function Card() { return <div>static</div> }\n')
+    writeFileSync(join(dir, 'src/components/Counter.tsx'), [
+      'import { signal } from \'@kayjs/kay\'',
+      'export function Counter({ onDone, header, client, children }: any) {',
+      '  const n = signal(0)',
+      '  void onDone; void header; void client',
+      '  return <button onClick={() => n.value++}>{Bun.env.PUBLIC_URL}{n.value}{children}</button>',
+      '}',
+    ].join('\n'))
+    writeFileSync(join(dir, 'src/routes/index.tsx'), [
+      'import { Card } from \'../components/Card\'',
+      'import { Counter } from \'../components/Counter\'',
+      'class Custom {}',
+      'export function Other() { const fn = () => {}; return <Counter onDone={fn} /> }',
+      'export default function Home() {',
+      '  const fn = (() => {}) as () => void',
+      '  return (',
+      '    <main>',
+      '      <Card $hydrate="visible" />',
+      '      <Counter onDone={(() => {}) as () => void} header={(<span />)} client={(new Custom()) as unknown} children={<div />} />',
+      '      <Counter onDone={fn} />',
+      '    </main>',
+      '  )',
+      '}',
+    ].join('\n'))
+
+    const res = await checkProject(dir, { skipTypecheck: true })
+    expect(res.ok).toBe(false)
+    expect(res.errors.some(e => e.includes('$hydrate on <Card>') && e.includes('Card is not an island'))).toBe(true)
+    expect(res.errors.some(e => e.includes('cannot pass JSX in prop "children"') && e.includes('<Counter>'))).toBe(true)
+    expect(res.errors.some(e => e.includes('cannot pass JSX in prop "header"') && e.includes('<Counter>'))).toBe(true)
+    expect(res.errors.some(e => e.includes('new Custom()') && e.includes('prop "client"'))).toBe(true)
+    expect(res.errors.filter(e => e.includes('function prop "onDone"')).length).toBe(3)
+    expect(res.errors.some(e => e.includes('reads Bun.env') && !e.includes('reads process.env'))).toBe(true)
+  })
+
   it('kay check follows an island into a workspace package the way the build does', async () => {
     const dir = makeTemp('kay-island-package-')
     mkdirSync(join(dir, 'src/routes'), { recursive: true })

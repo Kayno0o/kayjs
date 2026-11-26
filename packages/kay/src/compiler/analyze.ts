@@ -1,38 +1,21 @@
 // OXC-based static analysis for TSX/TS files: automatic island detection, actions, prerender, Head/Suspense.
 
-import type {
-  CallExpression,
-  ExportNamedDeclaration,
-  Function as OxcFunction,
-  Node,
-  Program,
-  Statement,
-  VariableDeclaration,
-} from 'oxc-parser'
+import type { CallExpression, ExportNamedDeclaration, Function as OxcFunction, Node, Program, Statement, VariableDeclaration } from 'oxc-parser'
 import { parseSync } from 'oxc-parser'
 import { computeJsxNodes, walk } from './ast'
 import type { BindingFacts, Interactivity } from './interactivity'
 import type { CompilerWarning } from './mistakes'
 import { analyzeDefaultDataKeys } from './data-keys'
 import { resolveInteractivity } from './interactivity'
-import { assertScopedKayImport, checkHabits, checkHydrateMode, checkMistakes, guarded, islandRemoved, mistake, serverOnlyTagError } from './mistakes'
+import { assertScopedKayImport, checkExportHydrate, checkHabits, checkHydrateMode, checkMistakes, guarded, islandRemoved, KayMistake, mistake, serverOnlyTagError, staticStringValue } from './mistakes'
+import { walkScoped } from './scope'
 import { calleeName, EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, resolveKayTag, unwrapTsExpr } from './shared'
 import { checkBareSignals } from './signal-reads'
 
 export { computeJsxNodes } from './ast'
 
 
-const REACTIVE_IMPORTS = new Set([
-  'signal',
-  'computed',
-  'effect',
-  'onMount',
-  'onCleanup',
-  'selector',
-  'store',
-  'useAction',
-])
-
+const REACTIVE_IMPORTS = new Set(['signal', 'computed', 'effect', 'onMount', 'onCleanup', 'selector', 'store', 'useAction'])
 // Primitives whose result is reactive state another module can import and read.
 const STATE_PRIMITIVES = new Set(['signal', 'computed', 'selector', 'store'])
 const KAY_SOURCES = new Set(['@kayjs/kay'])
@@ -72,12 +55,16 @@ export interface ModuleAnalysis extends Interactivity {
   hydrateModes: Set<string>
   /** Component tags the module renders, `NS.Tag` included. */
   jsxTags: Set<string>
-  /** Exported names bound to reactive state (`export const count = signal(0)`). */
+  /** Exported names bound to reactive state (`export const count = signal(0)` or `{ count: signal(0) }`). */
   stateExports: string[]
+  /** Exported names bound directly to a `signal()` or `computed()` (read via `.value`). */
+  signalExports: string[]
   /** Static top-level keys of `data` read by the default export (when statically bounded; `undefined` if `data` escapes). */
   defaultDataKeys?: string[] | undefined
   exportedActions: string[]
   imports: ImportInfo[]
+  /** Static `import('...')` calls outside `load()` / `clientData()`. */
+  dynamicImports: { source: string, start: number }[]
   reexports: ReexportInfo[]
   exportedNames: string[]
   /** Facts per top-level binding, which `kay build` and `kay check` re-resolve once imported state is known. */
@@ -143,8 +130,10 @@ export function parseTsx(filename: string, code: string): Program {
   return result.program
 }
 
-export function asyncInteractiveError(filename: string, reason: string | undefined): Error {
-  return new Error(`kay compiler: async route component in ${filename} cannot use browser interactivity (${reason}). Move interactive state/handlers into a non-async component and render it from the async page.`)
+export function asyncInteractiveError(filename: string, reason: string | undefined, start?: number): KayMistake {
+  const err = new KayMistake(`kay compiler: async route component in ${filename} cannot use browser interactivity (${reason}). Move interactive state/handlers into a non-async component and render it from the async page.`)
+  err.start = start
+  return err
 }
 
 function isAsyncFunction(node: Node | null | undefined): boolean {
@@ -167,33 +156,15 @@ function actionVariable(program: Program, call: CallExpression): string | undefi
 
 // The mode a `$hydrate` attribute names: its string, or `*` when an expression picks it at runtime.
 function hydrateMode(value: Node | null | undefined): string {
-  const raw = value?.type === 'JSXExpressionContainer' ? value.expression : value
-  if (raw === null || raw === undefined)
-    return '*'
-  const node = unwrapTsExpr(raw)
-  if (node.type === 'Literal' && typeof node.value === 'string')
-    return node.value
-  if (node.type === 'TemplateLiteral' && node.expressions.length === 0)
-    return node.quasis[0]?.value.cooked ?? '*'
-  return '*'
+  return staticStringValue(value?.type === 'JSXExpressionContainer' ? value.expression : value) ?? '*'
 }
 
 function isActionCall(node: Node, actionLocalName: string | undefined, serverNamespaces: ReadonlySet<string>): node is CallExpression {
   if (node.type !== 'CallExpression')
     return false
-  if (actionLocalName !== undefined && node.callee.type === 'Identifier' && node.callee.name === actionLocalName)
-    return true
-  if (
-    node.callee.type === 'MemberExpression'
-    && !node.callee.computed
-    && node.callee.object.type === 'Identifier'
-    && serverNamespaces.has(node.callee.object.name)
-    && node.callee.property.type === 'Identifier'
-    && node.callee.property.name === 'action'
-  ) {
-    return true
-  }
-  return false
+  const name = calleeName(node.callee)
+  return (actionLocalName !== undefined && name === actionLocalName)
+    || (name.endsWith('.action') && serverNamespaces.has(name.slice(0, -'.action'.length)))
 }
 
 
@@ -231,7 +202,7 @@ function scanImports(program: Program, filename: string): ImportScan {
         if (imported === undefined)
           continue
         specifiers.push({ local: spec.local.name, imported })
-        scanKayImport(scan, source, imported, spec.local.name, filename)
+        scanKayImport(scan, source, imported, spec.local.name, filename, spec.start)
       }
       else if (spec.type === 'ImportDefaultSpecifier') {
         specifiers.push({ local: spec.local.name, imported: 'default' })
@@ -249,12 +220,12 @@ function scanImports(program: Program, filename: string): ImportScan {
   return scan
 }
 
-function scanKayImport(scan: ImportScan, source: string, imported: string, local: string, filename: string): void {
+function scanKayImport(scan: ImportScan, source: string, imported: string, local: string, filename: string, start: number): void {
   if (KAY_SOURCES.has(source)) {
     if (REACTIVE_IMPORTS.has(imported))
       scan.reactiveLocals.set(local, `uses ${imported}`)
     if (imported === 'island')
-      throw islandRemoved(filename)
+      guarded(start, () => { throw islandRemoved(filename, start) })
     if (STATE_PRIMITIVES.has(imported))
       scan.stateCallees.add(local)
     if (imported === 'signal' || imported === 'computed')
@@ -345,6 +316,9 @@ function scanDeclarations(program: Program, filename: string, imports: ImportSca
         scanExportedDeclaration(scan, stmt.declaration, filename, imports, collectInits, addExport)
     }
   }
+  const hydrateLocal = scan.defaultHydrate === undefined ? scan.exportLocals.get('hydrate') : undefined
+  if (hydrateLocal !== undefined)
+    scan.defaultHydrate = checkExportHydrate(scan.localInits.get(hydrateLocal), filename)
   return scan
 }
 
@@ -366,11 +340,8 @@ function scanExportedDeclaration(scan: DeclarationScan, decl: NonNullable<Export
       addExport(name, name)
       if (name === 'prerender' && d.init?.type === 'Literal' && d.init.value === true)
         scan.hasPrerender = true
-      if (name === 'hydrate' && d.init?.type === 'Literal' && typeof d.init.value === 'string') {
-        const mode = d.init.value
-        guarded(d.init.start, () => checkHydrateMode(mode, `hydrate = "${mode}"`, filename))
-        scan.defaultHydrate = d.init.value
-      }
+      if (name === 'hydrate' && d.init !== null)
+        scan.defaultHydrate = checkExportHydrate(d.init, filename)
       if (d.init !== null && isActionCall(d.init, imports.actionLocalName, imports.serverNamespaces)) {
         scan.exportedActions.push(name)
         scan.registeredActions.add(d.init)
@@ -383,6 +354,8 @@ function scanExportedDeclaration(scan: DeclarationScan, decl: NonNullable<Export
 function bindingUnits(program: Program): { name: string, node: Node }[] {
   const units: { name: string, node: Node }[] = []
   const add = (node: Node): void => {
+    if (node.type.startsWith('TS'))
+      return
     if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id !== null) {
       units.push({ name: node.id.name, node })
     }
@@ -400,7 +373,7 @@ function bindingUnits(program: Program): { name: string, node: Node }[] {
         add(stmt.declaration)
     }
     else if (stmt.type === 'ExportDefaultDeclaration') {
-      const decl = stmt.declaration
+      const decl = unwrapTsExpr(stmt.declaration)
       if ((decl.type === 'FunctionDeclaration' || decl.type === 'ClassDeclaration') && decl.id !== null)
         add(decl)
       else if (decl.type !== 'Identifier')
@@ -420,62 +393,83 @@ interface BodyScan {
   deferredIslandTags: Set<string>
   hydrateModes: Set<string>
   jsxTags: Set<string>
+  dynamicImports: { source: string, start: number }[]
   bindings: BindingFacts[]
 }
 
+const TS_EXPR_WRAPPERS = new Set(['TSAsExpression', 'TSNonNullExpression', 'TSSatisfiesExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
+
 // Walks each top-level binding for JSX, mistakes, action() placement and what makes it run in the browser.
-function scanBody(program: Program, filename: string, code: string, imports: ImportScan, decls: DeclarationScan, warnings: CompilerWarning[]): BodyScan {
-  const body: BodyScan = { hasJsx: false, usesRenderContext: imports.usesRenderContext, deferredIslandTags: new Set(), hydrateModes: new Set(), jsxTags: new Set(), bindings: [] }
+function scanBody(program: Program, filename: string, code: string, imports: ImportScan, decls: DeclarationScan, warnings: CompilerWarning[], loadCode: ReadonlySet<Node>): BodyScan {
+  const body: BodyScan = { hasJsx: false, usesRenderContext: imports.usesRenderContext, deferredIslandTags: new Set(), hydrateModes: new Set(), jsxTags: new Set(), dynamicImports: [], bindings: [] }
   const units = bindingUnits(program)
   const tracked = new Set(units.map(u => u.name))
   for (const imp of imports.imports) {
     for (const spec of imp.specifiers)
       tracked.add(spec.local)
   }
-  // Identifiers naming a property or a member, which are no reference to a binding.
-  const keys = new Set<number>()
   const checkActions = imports.actionLocalName !== undefined || imports.serverNamespaces.size > 0
   const isEffect = (callee: string): boolean => imports.effectCallees.has(callee) || (callee.endsWith('.effect') && imports.kayNamespaces.has(callee.slice(0, -'.effect'.length)))
-  let current: BindingFacts | undefined
   const ref = (binding: BindingFacts, name: string, offset: number): void => {
     if (tracked.has(name) && !binding.refs.has(name))
       binding.refs.set(name, offset)
   }
-  const resolveTag = (tag: string): string | undefined => resolveKayTag(tag, imports.imports)
-  const visit = (node: Node): void => {
-    const binding = current!
-    if (isJsxNode(node))
-      body.hasJsx = true
-    if (node.type === 'JSXElement')
-      checkMistakes(node, filename, code, warnings, resolveTag)
-    checkHabits(node, isEffect, filename)
-    if (checkActions && isActionCall(node, imports.actionLocalName, imports.serverNamespaces) && !decls.registeredActions.has(node))
-      guarded(node.start, () => { throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${imports.actionLocalName ?? 'action'}(...) at the top level, only those get a URL`) })
-    if (node.type === 'JSXOpeningElement') {
-      scanOpeningElement(node, binding, body, imports, filename)
-      const root = jsxTagName(node.name).split('.')[0]!
-      if (isComponentTag(root))
-        ref(binding, root, node.start)
-    }
-    else if (node.type === 'MemberExpression') {
-      if (!node.computed)
-        keys.add(node.property.start)
-      scanKayMember(node, binding, body, imports, filename)
-    }
-    else if (node.type === 'Property' && !node.computed && !node.shorthand) {
-      keys.add(node.key.start)
-    }
-    else if (node.type === 'Identifier' && !keys.has(node.start)) {
-      ref(binding, node.name, node.start)
-      const reason = imports.reactiveLocals.get(node.name)
-      if (reason !== undefined)
-        binding.fact ??= { reason, offset: node.start }
-    }
+  const addMember = (binding: BindingFacts, name: string, member: string): void => {
+    if (!tracked.has(name))
+      return
+    const set = binding.memberRefs.get(name) ?? new Set<string>()
+    set.add(member)
+    binding.memberRefs.set(name, set)
   }
+  const resolveTag = (tag: string): string | undefined => resolveKayTag(tag, imports.imports)
   for (const unit of units) {
-    current = { name: unit.name, start: unit.node.start, end: unit.node.end, fact: undefined, refs: new Map(), tags: new Set(), serverOnlyTag: undefined }
-    body.bindings.push(current)
-    walk(unit.node, visit)
+    const binding: BindingFacts = { name: unit.name, start: unit.node.start, end: unit.node.end, fact: undefined, refs: new Map(), valueRefs: new Map(), memberRefs: new Map(), tags: new Set(), serverOnlyTag: undefined }
+    body.bindings.push(binding)
+    const freeIds = new Map<number, string>()
+    const memberObjStarts = new Set<number>()
+    walkScoped(unit.node, {
+      onIdentifier(id) {
+        freeIds.set(id.start, id.name)
+        ref(binding, id.name, id.start)
+        if (tracked.has(id.name) && !binding.valueRefs.has(id.name))
+          binding.valueRefs.set(id.name, id.start)
+        const reason = imports.reactiveLocals.get(id.name)
+        if (reason !== undefined)
+          binding.fact ??= { reason, offset: id.start }
+      },
+    })
+    const isLoadUnit = loadCode.has(unit.node) || (unit.node.type === 'VariableDeclarator' && unit.node.init !== null && loadCode.has(unit.node.init))
+    walk(unit.node, (node): boolean | void => {
+      if (node.type.startsWith('TS') && !TS_EXPR_WRAPPERS.has(node.type))
+        return false
+      if (isJsxNode(node))
+        body.hasJsx = true
+      if (node.type === 'JSXElement')
+        checkMistakes(node, filename, code, warnings, resolveTag)
+      checkHabits(node, isEffect, filename)
+      if (checkActions && isActionCall(node, imports.actionLocalName, imports.serverNamespaces) && !decls.registeredActions.has(node))
+        guarded(node.start, () => { throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${imports.actionLocalName ?? 'action'}(...) at the top level, only those get a URL`) })
+      if (node.type === 'ImportExpression' && !isLoadUnit) {
+        const src = staticStringValue(node.source)
+        if (src !== undefined)
+          body.dynamicImports.push({ source: src, start: node.start })
+      }
+      else if (node.type === 'JSXOpeningElement') {
+        scanOpeningElement(node, binding, body, imports, filename)
+        const root = jsxTagName(node.name).split('.')[0]!
+        if (isComponentTag(root))
+          ref(binding, root, node.start)
+      }
+      else if (node.type === 'MemberExpression' && !node.computed && node.object.type === 'Identifier' && freeIds.has(node.object.start) && node.property.type === 'Identifier') {
+        memberObjStarts.add(node.object.start)
+        addMember(binding, node.object.name, node.property.name)
+        scanKayMember(node, binding, body, imports, filename)
+      }
+    })
+    for (const [start, name] of freeIds) {
+      if (!memberObjStarts.has(start))
+        addMember(binding, name, '*')
+    }
   }
   return body
 }
@@ -518,7 +512,7 @@ function scanKayMember(node: Extract<Node, { type: 'MemberExpression' }>, bindin
   const member = node.property.name
   const callee = `${node.object.name}.${member}`
   if (member === 'island')
-    throw islandRemoved(filename)
+    guarded(node.start, () => { throw islandRemoved(filename, node.start) })
   if (REACTIVE_IMPORTS.has(member))
     binding.fact ??= { reason: `calls ${callee}`, offset: node.start }
   if (STATE_PRIMITIVES.has(member))
@@ -529,21 +523,29 @@ function scanKayMember(node: Extract<Node, { type: 'MemberExpression' }>, bindin
     body.usesRenderContext = true
 }
 
-function stateExportsOf(decls: DeclarationScan, stateCallees: ReadonlySet<string>): string[] {
-  const isStateCall = (init: Node | undefined): boolean => {
-    const call = init === undefined ? undefined : unwrapTsExpr(init)
-    if (call?.type !== 'CallExpression')
-      return false
-    return stateCallees.has(calleeName(call.callee))
-  }
-  return [...decls.exportLocals].filter(([, local]) => isStateCall(decls.localInits.get(local))).map(([exported]) => exported)
+function containsStateInit(init: Node | undefined, callees: ReadonlySet<string>, containers: boolean): boolean {
+  if (init === undefined)
+    return false
+  const inner = unwrapTsExpr(init)
+  if (inner.type === 'CallExpression')
+    return callees.has(calleeName(inner.callee))
+  if (!containers)
+    return false
+  if (inner.type === 'ObjectExpression')
+    return inner.properties.some(p => p.type === 'Property' && containsStateInit(p.value, callees, true))
+  return inner.type === 'ArrayExpression' && inner.elements.some(el => el !== null && el.type !== 'SpreadElement' && containsStateInit(el, callees, true))
+}
+
+function stateExportsOf(decls: DeclarationScan, callees: ReadonlySet<string>, containers: boolean): string[] {
+  return [...decls.exportLocals].filter(([, local]) => containsStateInit(decls.localInits.get(local), callees, containers)).map(([exported]) => exported)
 }
 
 export function analyzeModule(filename: string, code: string, program: Program = parseTsx(filename, code)): ModuleAnalysis {
   const imports = scanImports(program, filename)
   const decls = scanDeclarations(program, filename, imports)
   const warnings: CompilerWarning[] = []
-  const body = scanBody(program, filename, code, imports, decls, warnings)
+  const loadNodes = loadDeclarations(program)
+  const body = scanBody(program, filename, code, imports, decls, warnings, new Set(loadNodes))
   checkBareSignals(program, imports.signalCallees, filename)
 
   for (const [name, init] of decls.localInits) {
@@ -554,9 +556,9 @@ export function analyzeModule(filename: string, code: string, program: Program =
   const interactivity = resolveInteractivity(body.bindings, decls.exportLocals)
   const page = interactivity.exports.get('default')
   if (hasAsyncDefault && page?.interactive === true)
-    throw asyncInteractiveError(filename, page.reason)
+    guarded(page.offset ?? 0, () => { throw asyncInteractiveError(filename, page.reason, page.offset) })
   if (interactivity.serverOnly !== undefined)
-    throw serverOnlyTagError(filename, interactivity.serverOnly)
+    guarded(interactivity.serverOnly.offset, () => { throw serverOnlyTagError(filename, interactivity.serverOnly!) })
 
   return {
     filename,
@@ -564,7 +566,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
     warnings,
     ...interactivity,
     hasAsyncDefault,
-    hasLoadExport: decls.hasLoadExport || loadDeclarations(program).length > 0,
+    hasLoadExport: decls.hasLoadExport || loadNodes.length > 0,
     hasJsx: body.hasJsx,
     jsxNodes: body.hasJsx ? computeJsxNodes(program) : new WeakSet<Node>(),
     hasPrerender: decls.hasPrerender,
@@ -574,10 +576,12 @@ export function analyzeModule(filename: string, code: string, program: Program =
     deferredIslandTags: body.deferredIslandTags,
     hydrateModes: body.hydrateModes,
     jsxTags: body.jsxTags,
-    stateExports: stateExportsOf(decls, imports.stateCallees),
+    stateExports: stateExportsOf(decls, imports.stateCallees, true),
+    signalExports: stateExportsOf(decls, imports.signalCallees, false),
     defaultDataKeys: page?.interactive === true ? analyzeDefaultDataKeys(program, decls.defaultLocal, decls.localInits) : undefined,
     exportedActions: decls.exportedActions,
     imports: imports.imports,
+    dynamicImports: body.dynamicImports,
     reexports: decls.reexports,
     exportedNames: decls.exportedNames,
     bindings: body.bindings,

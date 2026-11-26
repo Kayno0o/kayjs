@@ -14,11 +14,15 @@ export interface BindingFacts {
   end: number
   /** The first thing its own code does that needs the browser. */
   fact: Fact | undefined
-  /** Top-level bindings and imports its code names, each at its first use. */
+  /** Top-level bindings and imports its code names (including JSX tags), each at its first use. */
   refs: Map<string, number>
+  /** Top-level bindings and imports referenced in value expressions (excluding JSX tag names), each at its first use. */
+  valueRefs: Map<string, number>
+  /** Non-computed member names read from a value reference (`S.count` -> `'count'`), or `'*'` when read bare. */
+  memberRefs: Map<string, Set<string>>
   /** Component tags it renders, `NS.Tag` included. */
   tags: Set<string>
-  /** The first `<Head>` or `<Suspense>` it renders. */
+  /** The first `<Head>`, `<Region>`, or `<Suspense>` it renders. */
   serverOnlyTag: string | undefined
 }
 
@@ -99,10 +103,24 @@ function spreadFacts(bindings: readonly BindingFacts[], named: ReadonlyMap<strin
   let moduleFact: Fact | undefined
   for (const b of bindings) {
     let own = b.fact
-    for (const [ref, offset] of b.refs) {
-      const reason = own === undefined ? reads.get(ref) : undefined
-      if (reason !== undefined)
+    for (const [ref, offset] of b.valueRefs) {
+      if (own !== undefined)
+        break
+      const reason = reads.get(ref)
+      if (reason !== undefined) {
         own = { reason, offset }
+        continue
+      }
+      const members = b.memberRefs.get(ref)
+      if (members !== undefined) {
+        for (const m of members) {
+          const mReason = reads.get(`${ref}.${m}`)
+          if (mReason !== undefined) {
+            own = { reason: mReason, offset }
+            break
+          }
+        }
+      }
     }
     if (own !== undefined)
       facts.set(b, own)
@@ -161,14 +179,168 @@ function serverOnlyInIsland(bindings: readonly BindingFacts[], named: ReadonlyMa
   return undefined
 }
 
-/** The module re-resolved once its imports of other modules' reactive state are known, or `undefined` when it imports none. */
+/** The module re-resolved once its imports of other modules' reactive state or hooks are known, or `undefined` when it imports none. */
 export function withStateReads(analysis: { imports: ImportInfo[], jsxTags: Set<string>, bindings: BindingFacts[], exportLocals: Map<string, string> }, isState: (imp: ImportInfo, imported: string) => boolean): Interactivity | undefined {
   const reads = new Map<string, string>()
+  const allValueRefs = new Set<string>()
+  const allMemberRefs = new Map<string, Set<string>>()
+  for (const b of analysis.bindings) {
+    for (const ref of b.valueRefs.keys())
+      allValueRefs.add(ref)
+    for (const [ref, members] of b.memberRefs) {
+      let set = allMemberRefs.get(ref)
+      if (set === undefined) {
+        set = new Set()
+        allMemberRefs.set(ref, set)
+      }
+      for (const m of members)
+        set.add(m)
+    }
+  }
   for (const imp of analysis.imports) {
     for (const spec of imp.specifiers) {
-      if (!analysis.jsxTags.has(spec.local) && isState(imp, spec.imported))
+      if (!allValueRefs.has(spec.local))
+        continue
+      if (spec.imported === '*') {
+        const members = allMemberRefs.get(spec.local)
+        if (members === undefined)
+          continue
+        for (const m of members) {
+          if (isState(imp, m))
+            reads.set(`${spec.local}.${m}`, `reads ${spec.local} from '${imp.source}'`)
+        }
+      }
+      else if (isState(imp, spec.imported)) {
         reads.set(spec.local, `reads ${spec.local} from '${imp.source}'`)
+      }
     }
   }
   return reads.size === 0 ? undefined : resolveInteractivity(analysis.bindings, analysis.exportLocals, reads)
+}
+
+export interface CrossFileModuleLike {
+  isInteractive: boolean
+  imports: ImportInfo[]
+  bindings: BindingFacts[]
+  exportLocals: Map<string, string>
+  exports: Map<string, ExportFacts>
+}
+
+function localReach(bindings: readonly BindingFacts[], localName: string): BindingFacts[] {
+  const named = new Map<string, BindingFacts>()
+  for (const b of bindings) {
+    if (b.name !== '')
+      named.set(b.name, b)
+  }
+  const root = named.get(localName)
+  if (root === undefined)
+    return []
+  const seen = new Set<BindingFacts>()
+  const stack = [root]
+  const list: BindingFacts[] = []
+  for (let b = stack.pop(); b !== undefined; b = stack.pop()) {
+    if (seen.has(b))
+      continue
+    seen.add(b)
+    list.push(b)
+    for (const ref of b.refs.keys()) {
+      const dep = named.get(ref)
+      if (dep !== undefined)
+        stack.push(dep)
+    }
+  }
+  return list
+}
+
+function importedTargetsOf(
+  file: string,
+  analysis: CrossFileModuleLike,
+  bindings: readonly BindingFacts[],
+  resolveTarget: (fromFile: string, source: string, exportName: string) => { file: string, exportName: string } | undefined,
+): { file: string, exportName: string, offset: number }[] {
+  const out: { file: string, exportName: string, offset: number }[] = []
+  for (const imp of analysis.imports) {
+    for (const spec of imp.specifiers) {
+      for (const b of bindings) {
+        if (spec.imported === '*') {
+          const members = new Set<string>()
+          for (const tag of b.tags) {
+            if (tag.startsWith(`${spec.local}.`))
+              members.add(tag.slice(spec.local.length + 1).split('.')[0]!)
+          }
+          for (const m of b.memberRefs.get(spec.local) ?? []) {
+            if (m !== '*')
+              members.add(m)
+          }
+          const offset = b.refs.get(spec.local) ?? b.start
+          for (const member of members) {
+            const target = resolveTarget(file, imp.source, member)
+            if (target !== undefined)
+              out.push({ file: target.file, exportName: target.exportName, offset })
+          }
+        }
+        else {
+          const offset = b.refs.get(spec.local)
+          if (offset !== undefined) {
+            const target = resolveTarget(file, imp.source, spec.imported)
+            if (target !== undefined)
+              out.push({ file: target.file, exportName: target.exportName, offset })
+          }
+        }
+      }
+    }
+  }
+  return out
+}
+
+/** Finds `<Head>`, `<Region>`, or `<Suspense>` rendered across file boundaries by an interactive export of `file`. */
+export function findCrossFileServerOnly(
+  file: string,
+  analysis: CrossFileModuleLike,
+  loadModule: (file: string) => CrossFileModuleLike | undefined,
+  resolveTarget: (fromFile: string, source: string, exportName: string) => { file: string, exportName: string } | undefined,
+): ServerOnlyInIsland | undefined {
+  if (!analysis.isInteractive)
+    return undefined
+  for (const [exportName, expFact] of analysis.exports) {
+    if (!expFact.interactive)
+      continue
+    const local = analysis.exportLocals.get(exportName)
+    if (local === undefined)
+      continue
+    const startBindings = localReach(analysis.bindings, local)
+    const visited = new Set<string>()
+    const findInTarget = (tFile: string, tExport: string): string | undefined => {
+      const key = `${tFile}\0${tExport}`
+      if (visited.has(key))
+        return undefined
+      visited.add(key)
+      const a = loadModule(tFile)
+      if (a === undefined)
+        return undefined
+      const tLocal = a.exportLocals.get(tExport)
+      if (tLocal === undefined)
+        return undefined
+      const reached = localReach(a.bindings, tLocal)
+      const hit = reached.find(b => b.serverOnlyTag !== undefined)
+      if (hit !== undefined)
+        return hit.serverOnlyTag
+      for (const next of importedTargetsOf(tFile, a, reached, resolveTarget)) {
+        const nested = findInTarget(next.file, next.exportName)
+        if (nested !== undefined)
+          return nested
+      }
+      return undefined
+    }
+    for (const next of importedTargetsOf(file, analysis, startBindings, resolveTarget)) {
+      if (next.file === file)
+        continue
+      const tag = findInTarget(next.file, next.exportName)
+      if (tag !== undefined) {
+        const island = local === 'default' ? 'the default export' : local
+        return { tag, island, reason: expFact.reason ?? 'is interactive', offset: next.offset }
+      }
+    }
+  }
+  return undefined
 }

@@ -109,7 +109,7 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
   })
 
   test('a signal used without .value, which renders [object Object] or is always truthy', () => {
-    const page = (jsx: string): string => `import { signal, computed } from '@kayjs/kay'\nexport default function Page() { const count = signal(0); const label = computed(() => 'x'); return ${jsx} }`
+    const page = (jsx: string): string => `import { signal, computed } from '@kayjs/kay'\nconst Card = (p: any) => <div>{p.children}</div>\nexport default function Page() { const flag = true; const count = signal(0); const label = computed(() => 'x'); return ${jsx} }`
     const refusesPage = (jsx: string, message: RegExp): void => {
       expect(() => compileSsr('Page.tsx', page(jsx))).toThrow(message)
       expect(() => compileDom('Page.tsx', page(jsx))).toThrow(message)
@@ -118,7 +118,13 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     refusesPage('<p title={label}>x</p>', /label without \.value in Page\.tsx: write label\.value/)
     refusesPage('<div>{count > 0 && <b>x</b>}</div>', /count without \.value/)
     refusesPage('<div>{label ? <b>x</b> : null}</div>', /label without \.value/)
+    refusesPage('<div>{flag ? count : 0}</div>', /count without \.value/)
+    refusesPage('<div>{flag ? 0 : count}</div>', /count without \.value/)
+    refusesPage('<Card>{count}</Card>', /count without \.value/)
+    refusesPage('<p>{count!}</p>', /count without \.value/)
+    refusesPage('<p>{(count as unknown)}</p>', /count without \.value/)
     refusesPage('<p>{`n=${count}`}</p>', /count without \.value/)
+    expect(() => compileSsr('Page.tsx', `import { signal } from '@kayjs/kay'\nexport default function Page() { const count = signal(0) as any; return <p>{count}</p> }`)).toThrow(/count without \.value/)
     expect(() => compileSsr('Page.tsx', page('<p>{count.value} {label.value}</p>'))).not.toThrow()
     expect(() => compileSsr('Page.tsx', page('<Child n={count} />').replace('export default', 'const Child = (p: any) => <p>{p.n.value}</p>\nexport default'))).not.toThrow()
     expect(() => compileSsr('Page.tsx', `import { signal } from '@kayjs/kay'\nconst A = () => { const n = signal(0); return <p>{n.value}</p> }\nexport default function B({ n }: { n: number }) { return <p>{n}</p> }`)).not.toThrow()
@@ -164,7 +170,20 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     refuses('<input defaultValue="x" />', /defaultValue in Page\.tsx: write value=\{\.\.\.\}/)
     refuses('<input type="checkbox" defaultChecked />', /defaultChecked in Page\.tsx: write checked=\{\.\.\.\}/)
     refuses('<div class="a" className="b" />', /class and className in Page\.tsx: keep one/)
+    refuses('<label for="a" htmlFor="b">x</label>', /for and htmlFor in Page\.tsx: keep one/)
+    refuses('<div ariaLabel="box" />', /ariaLabel in Page\.tsx: write aria-label=\{\.\.\.\}, ARIA attributes use kebab-case/)
+    refuses('<div ariaDescribedBy="hint" />', /ariaDescribedBy in Page\.tsx: write aria-describedby=\{\.\.\.\}/)
+    accepts('<Dialog ariaLabel="box" />', 'const Dialog = (p: any) => <div aria-label={p.ariaLabel} />')
+    refuses('<div $hydrate="visible" />', /\$hydrate on <div> in Page\.tsx: only components can be islands/)
+    refuses('<img src="/a.png">bad</img>', /<img> with children in Page\.tsx: a void element has no content/)
+    refuses('<input children="bad" />', /<input> with children in Page\.tsx: a void element has no content/)
+    refuses('<iframe srcdoc="<p>x</p>" />', /srcdoc on <iframe> in Page\.tsx: kay blocks srcdoc/)
     refuses('<button disabled="false">x</button>', /disabled="false" in Page\.tsx: write disabled=\{false\}, any string turns it on/)
+    const urlWarnings = (jsx: string): string[] => analyzeModule('Page.tsx', `export default function Page() { return ${jsx} }`).warnings.map(w => w.message)
+    expect(urlWarnings('<a href="javascript:alert(1)">x</a>')).toEqual([expect.stringContaining('unsafe URL in href on <a>')])
+    expect(urlWarnings('<iframe src="data:text/html,<script>1</script>" />')).toEqual([expect.stringContaining('unsafe URL in src on <iframe>')])
+    expect(urlWarnings('<link rel="icon" href="data:image/svg+xml,%3Csvg/%3E" />')).toEqual([])
+    expect(urlWarnings('<img src="data:image/svg+xml,%3Csvg/%3E" />')).toEqual([])
     accepts('<svg viewBox="0 0 1 1" preserveAspectRatio="none"><linearGradient gradientUnits="userSpaceOnUse" /></svg>')
     accepts('<input readOnly tabIndex={0} autoComplete="off" />')
   })
@@ -175,6 +194,10 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<Counter $hydrate="media(max-width: 600px)" />', counter)
     accepts('<Counter $hydrate={mode} />', `${counter}\nconst mode = 'idle'`)
     expect(() => compileSsr('Counter.tsx', 'export const hydrate = \'idle \'\nexport default function C() { return <p>x</p> }')).toThrow(/hydrate = "idle " in Counter\.tsx: use load, visible/)
+    expect(() => compileSsr('Counter.tsx', 'export const hydrate = true\nexport default function C() { return <p>x</p> }')).toThrow(/hydrate in Counter\.tsx: use load, visible/)
+    expect(() => compileSsr('Counter.tsx', 'export const hydrate = \'bad\' as const\nexport default function C() { return <p>x</p> }')).toThrow(/hydrate = "bad" in Counter\.tsx: use load, visible/)
+    expect(() => compileSsr('Counter.tsx', 'const hydrate = \'bad\'\nexport { hydrate }\nexport default function C() { return <p>x</p> }')).toThrow(/hydrate = "bad" in Counter\.tsx: use load, visible/)
+    expect(analyzeModule('Counter.tsx', 'export const hydrate = \'visible\' as const\nexport default function C() { return <p>x</p> }').defaultHydrate).toBe('visible')
   })
 
   test('<Head> or <Suspense> in an island, which renders once on the server and never updates (#3583)', () => {

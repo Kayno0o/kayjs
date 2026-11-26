@@ -47,6 +47,13 @@ describe('#3568 CLI argument parsing, plugin commands & dev config fidelity', ()
       const report = JSON.parse(res.out) as { ok: boolean, checkedFiles: number, errors: unknown[], warnings: unknown[] }
       expect(report).toMatchObject({ ok: true, checkedFiles: 1, errors: [] })
       expect(report.warnings).toEqual([{ file: 'src/routes/index.tsx', line: 2, col: 29, severity: 'warning', message: expect.stringContaining('kay compiler: onChange on <input>') }])
+
+      // #3630: --json --strict must report ok: false when exiting 1 due to warnings
+      const strictRes = await kay(['check', '--no-typecheck', '--json', '--strict'], dir)
+      expect(strictRes.code).toBe(1)
+      const strictReport = JSON.parse(strictRes.out) as { ok: boolean, warnings: unknown[] }
+      expect(strictReport.ok).toBe(false)
+      expect(strictReport.warnings).toHaveLength(1)
     }
     finally {
       rmSync(dir, { recursive: true, force: true })
