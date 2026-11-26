@@ -1,21 +1,21 @@
 {
   "bench-app": {
-    "/": 4204,
+    "/": 4206,
     "/regions": 3926,
-    "/table": 7104
+    "/table": 7106
   },
   "examples/noticeboard": {
-    "/": 16251,
-    "/login": 10032,
-    "/notices/:id": 10032
+    "/": 16252,
+    "/login": 10033,
+    "/notices/:id": 10033
   },
   "examples/showcase": {
-    "/account": 10011,
-    "/": 19741
+    "/account": 10013,
+    "/": 19743
   },
   "docs": {
-    "/docs/*slug": 12210,
-    "/grammars": 16222,
-    "/": 12210
+    "/docs/*slug": 5899,
+    "/grammars": 14515,
+    "/": 5899
   }
 }
