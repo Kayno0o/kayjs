@@ -3,6 +3,8 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import rootPkg from '../../../package.json' with { type: 'json' }
+import pkg from '../package.json' with { type: 'json' }
 import { build } from '../src/build/index'
 import { checkProject } from '../src/cli/check'
 import { scaffoldProject } from '../src/cli/new'
@@ -315,6 +317,24 @@ describe('Milestone 4: CSS Modules, public/ static files, and plugins in --compi
 })
 
 describe('Milestone 4: kay new scaffolder & kay check validator', () => {
+  // Their types are checked by the repo's tsconfig, which includes packages/kay/templates.
+  for (const template of ['minimal', 'fullstack', 'blog', 'app'] as const) {
+    it(`scaffolds the ${template} template on kay's version and the repo's TypeScript, passing kay check and kay build (#3586)`, async () => {
+      const dir = join(makeTemp('kay-3586-'), 'my-app')
+      const { files } = scaffoldProject(dir, { template })
+      linkKay(dir)
+
+      expect(await checkProject(dir, { skipTypecheck: true })).toMatchObject({ ok: true, errors: [], warnings: [] })
+      expect((await build({ root: dir })).routes.map(r => r.path)).toContain('/')
+      const json = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
+      expect(json.name).toBe('my-app')
+      expect(Object.values(json.dependencies)).toEqual(Object.keys(json.dependencies).map(() => `^${pkg.version}`))
+      expect(json.devDependencies.typescript).toBe(rootPkg.devDependencies.typescript)
+      expect(files).toContain('tsconfig.json')
+      expect(files.filter(file => readFileSync(join(dir, file), 'utf8').includes('__'))).toEqual([])
+    })
+  }
+
   it('scaffolds minimal & fullstack templates that build, pass check, and serve correctly', async () => {
     const dir = makeTemp('kay-m4-new-')
     const fullDir = join(dir, 'my-fullstack-app')

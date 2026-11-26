@@ -1,7 +1,5 @@
 #!/usr/bin/env bun
-// Bumps every package under packages/*/package.json (plus peerDependencies.kay,
-// packages/kay/src/cli/new.ts default version, bun.lock and docs/bun.lock) in lockstep,
-// then commits and creates annotated tag v<next>.
+// Bumps every package under packages/*/package.json (plus peerDependencies.kay, bun.lock and docs/bun.lock) in lockstep, then commits and creates annotated tag v<next>.
 // Usage: bun scripts/version.ts <alpha|beta|rc|patch|minor|major|X.Y.Z[-pre]> [--dry-run]
 
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -76,15 +74,6 @@ for (const p of manifests) {
   writeFileSync(p, `${JSON.stringify(pkg, null, 2)}\n`)
 }
 
-const newCliPath = 'packages/kay/src/cli/new.ts'
-const newCli = readFileSync(newCliPath, 'utf8')
-const updatedNewCli = newCli.replace(
-  /const kayVersion = options\.kayVersion \?\? '\^[^']+'/,
-  `const kayVersion = options.kayVersion ?? '^${next}'`,
-)
-if (updatedNewCli === newCli)
-  throw new Error(`Failed to update default kayVersion in ${newCliPath}`)
-writeFileSync(newCliPath, updatedNewCli)
 
 const run = (cmd: string[]) => {
   const proc = Bun.spawnSync(cmd, { stdout: 'inherit', stderr: 'inherit' })
@@ -94,7 +83,7 @@ const run = (cmd: string[]) => {
 
 run(['bun', 'install', '--silent'])
 run(['bun', 'install', '--silent', '--cwd', 'docs'])
-run(['git', 'add', ...manifests, newCliPath, 'bun.lock', 'docs/bun.lock'])
+run(['git', 'add', ...manifests, 'bun.lock', 'docs/bun.lock'])
 run(['git', 'commit', '-m', `chore(release): ${tag}`])
 run(['git', 'tag', '-a', tag, '-m', `Kay ${tag}`])
 

@@ -1,0 +1,20 @@
+{
+  "name": "__APP_NAME__",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "kay dev",
+    "build": "kay build",
+    "start": "kay start",
+    "check": "kay check"
+  },
+  "dependencies": {
+    "@kayjs/kay": "__KAY_VERSION__",
+    "@kayjs/auth": "__KAY_VERSION__",
+    "@kayjs/ui": "__KAY_VERSION__"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^6.0.3"
+  }
+}
