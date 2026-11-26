@@ -47,7 +47,7 @@ export function moduleHeader(used: Set<string>, templates: readonly { name: stri
       header += `import { loop as __loop } from '@kayjs/kay/internal/dom-loop';\n`
   }
   for (const t of templates)
-    header += `const ${t.name} = __template(${JSON.stringify(t.html)}${t.isSvg ? ', true' : ''});\n`
+    header += `const ${t.name} = /* @__PURE__ */ __template(${JSON.stringify(t.html)}${t.isSvg ? ', true' : ''});\n`
   if (delegatedEvents.size > 0)
     header += `__delegate(${JSON.stringify([...delegatedEvents].sort())});\n`
   return header

@@ -356,6 +356,31 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     expect(chunkText('src/components/ui.tsx#Button')).toContain('Button as default')
   })
 
+  test('an island chunk leaves out the static components of its file (#3646)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-pure-templates-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/components'), { recursive: true })
+      writeFileSync(join(dir, 'src/components/Widgets.tsx'), `
+        import { signal } from '@kayjs/kay'
+        export function Card() { return <section><p>Static card copy</p></section> }
+        export function Counter() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{n.value}</button> }
+      `)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { Card, Counter } from '../components/Widgets'
+        export default function Page() { return <main><Card /><Counter /></main> }
+      `)
+      await build({ root: dir, minify: true })
+      const clientDir = join(dir, 'dist/client')
+      const clientJs = [...new Bun.Glob('**/*.js').scanSync(clientDir)].map(f => readFileSync(join(clientDir, f), 'utf8')).join('\n')
+      expect(clientJs).toContain('<button type="button">')
+      expect(clientJs).not.toContain('Static card copy')
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   test('only names rendered as tags become islands, including a namespace member tag', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-island-tags-'))
     try {
