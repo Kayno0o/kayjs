@@ -1,20 +1,20 @@
 {
   "bench-app": {
-    "/": 3794,
-    "/table": 6186
+    "/": 3868,
+    "/table": 6235
   },
   "examples/noticeboard": {
-    "/": 14282,
-    "/login": 8674,
-    "/notices/:id": 8674
+    "/": 14615,
+    "/login": 8587,
+    "/notices/:id": 8587
   },
   "examples/showcase": {
-    "/account": 10400,
-    "/": 17512
+    "/account": 8727,
+    "/": 18453
   },
   "docs": {
-    "/docs/*slug": 10491,
-    "/grammars": 13942,
-    "/": 10491
+    "/docs/*slug": 10485,
+    "/grammars": 14500,
+    "/": 10485
   }
 }
