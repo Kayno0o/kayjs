@@ -18,6 +18,8 @@ const WHOLE_WORD = /^[a-z]{3,}$/
 // Keeps a table line to the strongest words, and drops those under 5%.
 const KEPT = 12
 const WEAKEST = 0.05
+// Leaves out a word whose strongest relation is under 20%: benched neutral on recall, it cuts the table by a fifth, while 25% lost a point and dropping two-letter or numeric targets lost or changed nothing.
+const WEAKEST_LINE = 0.2
 // The words icon sets name a drawing style with, which say nothing of what an icon shows.
 const STYLES = new Set(['bold', 'duotone', 'fill', 'filled', 'line', 'outline', 'outlined', 'regular', 'round', 'rounded', 'sharp', 'solid', 'thin', 'twotone'])
 // Words no search means by meaning, which the prompt draws close to every word: function words, and the prompt's own `icon`.
@@ -233,7 +235,7 @@ export function merge(tags: Related, meaning: Related, meaningWeight: number): R
       .sort((a, b) => b[1] - a[1])
       .slice(0, KEPT)
 
-    if (kept.length > 0)
+    if (kept.length > 0 && Math.round(kept[0]![1] * 100) >= WEAKEST_LINE * 100)
       table[word] = kept.map(([target, weight]) => `${target} ${Math.round(weight * 100)}`).join(' ')
   }
 

@@ -129,7 +129,7 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
         const lookup = lookupIn(root)
         if (target === 'client') {
           b.onResolve({ filter: SEARCH_ENTRY_RE }, (args) => {
-            console.warn(`@kayjs/icons: ${relative(root, args.importer)} imports @kayjs/icons/search into an island, which ships its 2.3 MB word table to the browser. Search on the server instead, in a route or an action.`)
+            console.warn(`@kayjs/icons: ${relative(root, args.importer)} imports @kayjs/icons/search into an island, which ships its 1.7 MB word table to the browser. Search on the server instead, in a route or an action.`)
             return undefined
           })
         }

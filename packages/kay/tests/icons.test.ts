@@ -464,7 +464,7 @@ describe('@kayjs/icons/search in an island', () => {
     try {
       await build({ root, plugins: [icons()], static: true })
 
-      expect(warn.mock.calls.map(call => String(call[0])).filter(line => line.startsWith('@kayjs/icons'))).toEqual(['@kayjs/icons: src/Picker.tsx imports @kayjs/icons/search into an island, which ships its 2.3 MB word table to the browser. Search on the server instead, in a route or an action.'])
+      expect(warn.mock.calls.map(call => String(call[0])).filter(line => line.startsWith('@kayjs/icons'))).toEqual(['@kayjs/icons: src/Picker.tsx imports @kayjs/icons/search into an island, which ships its 1.7 MB word table to the browser. Search on the server instead, in a route or an action.'])
     }
     finally {
       warn.mockRestore()

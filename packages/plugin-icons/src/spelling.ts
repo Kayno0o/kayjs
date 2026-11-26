@@ -46,7 +46,7 @@ export function closeWords(word: string, vocabulary: Iterable<string>): string[]
   return respellings(word, vocabulary).sort((a, b) => a[1] - b[1]).slice(0, MOST).map(([candidate]) => candidate)
 }
 
-// Three rows reused by every distance, as one is measured against each of some 25,000 words per typed word.
+// Three rows reused by every distance, as one is measured against each of some 29,000 words per typed word.
 let rows = [new Int32Array(64), new Int32Array(64), new Int32Array(64)]
 
 // Damerau-Levenshtein distance (optimal string alignment), giving up past `most` once a whole row is above it.
