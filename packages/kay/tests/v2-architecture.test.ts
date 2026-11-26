@@ -101,7 +101,7 @@ describe('Kay v2 architecture & regression suite', () => {
     const app = await createServer({ root: dir, onError: info => errors.push(info.error) })
     try {
       const page = await (await app.handle(new Request('http://localhost/'))).text()
-      expect(page.slice(page.indexOf('<body>'), page.indexOf('</body>'))).toMatch(/^<body><kay-island c="[^"]+" i="i1-"><section id="k-i1-0">l<kay-slot><i id="k-0">dark-m<\/i><kay-island c="\/_kay\/clicker-[^"]+"><b>0<\/b><\/kay-island><\/kay-slot><\/section><\/kay-island>$/)
+      expect(page.slice(page.indexOf('<body>'), page.indexOf('</body>'))).toMatch(/^<body><kay-island c="[^"]+" i="i1-"><section id="k-i1-0"><!--k\[-->l<!--k\]--><!--k\[--><kay-slot><i id="k-0">dark-m<\/i><kay-island c="\/_kay\/clicker-[^"]+"><b>0<\/b><\/kay-island><\/kay-slot><!--k\]--><\/section><\/kay-island>$/)
       expect((await app.handle(new Request('http://localhost/counter'))).status).toBe(500)
       expect(errors).toEqual([new Error('kay: <Counter> reads a context provided outside the island, which the browser never sees; pass its value as a prop.')])
     }
