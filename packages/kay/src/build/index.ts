@@ -18,7 +18,7 @@ import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from 
 import { actionHash } from '../server/action'
 import { buildClient, buildServer, linkOrCopyFile, pluginBunPlugins, standaloneCssFiles } from './bundle'
 import { compileExecutable } from './compile'
-import { assertSafeOutDir, fileSize, relPosix, walkAllFiles, walkRoutes } from './files'
+import { assertSafeOutDir, fileSize, isInNodeModules, relPosix, walkAllFiles, walkRoutes } from './files'
 import { ModuleGraph } from './graph'
 import { renderProblems } from './render-rules'
 import { planIslands } from './islands'
@@ -213,7 +213,6 @@ function emitBuildWarnings(run: BuildRun, graph: ModuleGraph, routeFiles: readon
   }
 }
 
-const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
 
 /** Plans the islands, then runs the rules `kay check` also runs on the whole graph: what server code renders wrong, and dynamic prerendered routes with no `paths()`. Throws them all at once, each placed with a code frame. */
 function planCheckedIslands(root: string, routesDir: string, graph: ModuleGraph, pageFiles: string[], specialFiles: string[], isStatic: boolean): ReturnType<typeof planIslands> {
@@ -224,7 +223,7 @@ function planCheckedIslands(root: string, routesDir: string, graph: ModuleGraph,
     placed.push(`${formatDiagnostic(formatLoc(relPosix(root, file), source, offset), message)}\n${formatCodeFrame(source, offset)}`)
   }
   for (const [file, analysis] of graph.analyses) {
-    if (!file.endsWith('.tsx') || NODE_MODULES_RE.test(file))
+    if (!file.endsWith('.tsx') || isInNodeModules(file))
       continue
     for (const problem of renderProblems(analysis, islands, file, relPosix(root, file), 'kay build'))
       place(file, problem.offset, problem.message)

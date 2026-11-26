@@ -8,11 +8,17 @@ import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 
 const TEST_FILE_RE = /\.(?:test|spec)\.(?:tsx|ts)$/
 const BACKSLASH_RE = /\\/g
+const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
 const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.mjs', '.css', '.svg', '.xml', '.json', '.txt', '.webmanifest', '.wasm'])
 
 /** `relative(from, to)` with forward slashes, the form manifests and messages use. */
 export function relPosix(from: string, to: string): string {
   return relative(from, to).replace(BACKSLASH_RE, '/')
+}
+
+/** Whether `file` sits under a `node_modules` folder, with either path separator. */
+export function isInNodeModules(file: string): boolean {
+  return NODE_MODULES_RE.test(file)
 }
 
 export function isTsFile(file: string): boolean {

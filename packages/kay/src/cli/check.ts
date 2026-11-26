@@ -6,7 +6,7 @@ import type { ComplianceConfig } from '../compiler/compliance'
 import type { CheckPluginContext, KayPlugin } from '../plugins/index'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
-import { isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
+import { isInNodeModules, isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
 import { renderProblems } from '../build/render-rules'
 import { analyzeIslands } from '../build/islands'
@@ -42,7 +42,6 @@ export function diagnosticData(text: string, severity: 'error' | 'warning'): Che
   return { file: m[1]!, line: Number(m[2]), col: Number(m[3]), severity: m[4] as 'error' | 'warning', message: m[5]! }
 }
 
-const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
 
 function walkTsFiles(dir: string): string[] {
   return walkFiles(dir, {
@@ -250,7 +249,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   // 3b. Static guardrails: non-serializable island props, route exports, route conflicts, missing paths()
   const seenRoutes = new Map<string, string>()
   for (const [file, analysis] of [...analyses]) {
-    if (NODE_MODULES_RE.test(file))
+    if (isInNodeModules(file))
       continue
     const rel = relPosix(root, file)
 

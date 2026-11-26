@@ -6,6 +6,7 @@ import type { BuildCacheStats } from '../build/graph'
 import type { KayApp } from '../server/index'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
+import { isInNodeModules } from '../build/files'
 import { clearBuildCache } from '../build/graph'
 import { build, createBuildCache } from '../build/index'
 import { createAppContext, loadConfig, resolvePlugins, resolveServerConfig, runWithAppContext } from '../plugins/index'
@@ -216,7 +217,7 @@ export async function devServer(options: DevServerOptions): Promise<{
     }
     catch {}
     for (const file of watchedFiles) {
-      if (file.includes('/node_modules/') || file.includes('\\node_modules\\'))
+      if (isInNodeModules(file))
         continue
       if (isInsideDir(devRoot, file) || isInsideDir(join(root, '.kay-cache'), file))
         continue

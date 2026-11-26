@@ -9,7 +9,7 @@ import { findCrossFileServerOnly, withStateReads } from '../compiler/interactivi
 import { collectMistakes, serverOnlyTagError } from '../compiler/mistakes'
 import { findPrivateEnv, isServerOnlyModule } from '../compiler/server-only'
 import { checkBareSignals } from '../compiler/signal-reads'
-import { isTsFile, relPosix } from './files'
+import { isInNodeModules, isTsFile, relPosix } from './files'
 
 /** A component that is not an island, as a module renders it. */
 export interface StaticTag { async: boolean }
@@ -64,7 +64,6 @@ export interface AnalyzeIslandsOptions {
 type LoadModule = (file: string) => ModuleAnalysis | undefined
 
 const MAX_REEXPORT_DEPTH = 8
-const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
 
 export function islandKey(target: { file: string, exportName: string }): string {
   return `${target.file}#${target.exportName}`
@@ -218,7 +217,7 @@ function createPromoter(graph: ModuleGraph, load: LoadModule, issues: IslandIssu
   }
 
   const promoteOne = (file: string): boolean => {
-    if (NODE_MODULES_RE.test(file) || !isTsFile(file))
+    if (isInNodeModules(file) || !isTsFile(file))
       return false
     const analysis = graph.analyses.get(file)
     if (analysis === undefined)
@@ -276,7 +275,7 @@ function createPromoter(graph: ModuleGraph, load: LoadModule, issues: IslandIssu
 
 function checkImportedBareSignals(graph: ModuleGraph, load: LoadModule, root: string, issues: IslandIssue[]): void {
   for (const [file, analysis] of [...graph.analyses]) {
-    if (NODE_MODULES_RE.test(file) || !isTsFile(file))
+    if (isInNodeModules(file) || !isTsFile(file))
       continue
     const importedSignals = new Set<string>()
     const importedSignalMembers = new Map<string, Set<string>>()
@@ -313,7 +312,7 @@ function checkCrossFileServerOnlyTags(graph: ModuleGraph, load: LoadModule, issu
     return resolved !== undefined && isTsFile(resolved) ? resolveExportTarget(graph, load, resolved, exportName) : undefined
   }
   for (const [file, analysis] of [...graph.analyses]) {
-    if (NODE_MODULES_RE.test(file) || !analysis.isInteractive)
+    if (isInNodeModules(file) || !analysis.isInteractive)
       continue
     const serverOnly = findCrossFileServerOnly(file, analysis, loadMod, resolveTarget)
     if (serverOnly !== undefined)
@@ -386,7 +385,7 @@ function checkReachEdges(
 ): void {
   const reported = new Set<string>()
   const loadTarget = (target: string): ModuleAnalysis | undefined =>
-    NODE_MODULES_RE.test(target) ? graph.analyses.get(target) : load(target)
+    isInNodeModules(target) ? graph.analyses.get(target) : load(target)
 
   const reportActionExport = (target: string, name: string, offset: number, reexport: boolean): void => {
     const key = `action:${target}:${name}`
@@ -473,7 +472,7 @@ function walkIslandReach(
     const { file, island } = queue[i]!
     if (file.endsWith('.tsx'))
       reach.add(file)
-    const inNodeModules = NODE_MODULES_RE.test(file)
+    const inNodeModules = isInNodeModules(file)
     const analysis = inNodeModules ? graph.analyses.get(file) : load(file)
     if (analysis === undefined)
       continue
@@ -542,7 +541,7 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
 
   // An interactive module ships to the browser, so co-locating `action()` in it would bundle server action code into the client.
   for (const [file, analysis] of graph.analyses) {
-    if (NODE_MODULES_RE.test(file) || !analysis.isInteractive || analysis.exportedActions.length === 0)
+    if (isInNodeModules(file) || !analysis.isInteractive || analysis.exportedActions.length === 0)
       continue
     const name = analysis.exportedActions[0]!
     const offset = analysis.bindings.find(b => b.name === name)?.start ?? 0

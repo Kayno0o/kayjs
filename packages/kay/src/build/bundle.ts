@@ -11,7 +11,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { compileSsr } from '../compiler/index'
 import { readsPrivateEnv } from '../compiler/server-only'
 import { clientPlugin, KAY_SPECIFIER_FILTER, TS_FILTER } from './client-plugin'
-import { formatBunBuildLogs, isOutsideRoot, isTsFile, relPosix } from './files'
+import { formatBunBuildLogs, isInNodeModules, isOutsideRoot, isTsFile, relPosix } from './files'
 import { stampFiles, stampsMatch } from './graph'
 import { clientLeakError, islandKey } from './islands'
 import { pluginHookError } from './plugin-host'
@@ -352,7 +352,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
         continue
       const abs = resolveMetaPath(inKey)
       let program = graph.analyses.get(abs)?.program
-      if (program === undefined && existsSync(abs) && isTsFile(abs) && !/[\\/]node_modules[\\/]/.test(abs))
+      if (program === undefined && existsSync(abs) && isTsFile(abs) && !isInNodeModules(abs))
         program = graph.load(abs).program
       if (program !== undefined && readsPrivateEnv(program, inlinedEnvKey))
         clientLeaks.add(`${relPosix(root, abs)} reads process.env or Bun.env (only a process.env.PUBLIC_* set at build time is inlined)`)
@@ -459,7 +459,7 @@ function resolveServerImports(b: PluginBuilder, isDev: boolean, root: string, re
     if (isDev && isTsFile(resolved)) {
       try {
         const real = realpathSync(resolved)
-        if (!real.includes('/node_modules/') && !real.includes('\\node_modules\\'))
+        if (!isInNodeModules(real))
           return { path: resolved }
       }
       catch {}
@@ -539,7 +539,7 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
       resolveServerImports(b, env.isDev, root, reachesTsx, externalOutDir)
       b.onLoad({ filter: TS_FILTER }, (args) => {
         if (!args.path.endsWith('.tsx')) {
-          if (!transforms.active || args.path.includes('/node_modules/'))
+          if (!transforms.active || isInNodeModules(args.path))
             return undefined
           const raw = graph.source(args.path)
           const transformed = transforms.apply(raw, args.path, 'server')

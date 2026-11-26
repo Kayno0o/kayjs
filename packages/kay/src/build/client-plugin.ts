@@ -6,7 +6,7 @@ import type { ActionsByFile } from './islands'
 import { parseSync } from 'oxc-parser'
 import { compileDom } from '../compiler/index'
 import { SERVER_ONLY_FILTER } from '../compiler/server-only'
-import { relPosix } from './files'
+import { isInNodeModules, relPosix } from './files'
 import { resolveKaySpecifier } from './resolve'
 
 export const KAY_SPECIFIER_FILTER = /^@kayjs\/kay(?:\/.*)?$/
@@ -102,7 +102,7 @@ export function clientPlugin(env: ClientPluginEnv): BunPlugin {
     setup(b) {
       // Bun swaps node built-ins for empty shims in a browser build, so a server-only import would ship silently.
       b.onResolve({ filter: SERVER_ONLY_FILTER }, (args) => {
-        if (!args.importer.includes('/node_modules/'))
+        if (!isInNodeModules(args.importer))
           leaks.add(`${relPosix(root, args.importer)} imports server-only module "${args.path}"`)
         return undefined
       })
@@ -125,7 +125,7 @@ export function clientPlugin(env: ClientPluginEnv): BunPlugin {
 
         if (!args.path.endsWith('.tsx')) {
           const raw = graph.source(args.path)
-          const own = transforms.active && !args.path.includes('/node_modules/') ? transforms.apply(raw, args.path, 'client') : raw
+          const own = transforms.active && !isInNodeModules(args.path) ? transforms.apply(raw, args.path, 'client') : raw
           const direct = directKayImports(own, graph, args.path)
           return direct !== raw ? { contents: direct, loader: 'ts' } : undefined
         }
