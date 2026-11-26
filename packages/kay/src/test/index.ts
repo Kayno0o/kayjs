@@ -131,3 +131,6 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     },
   }
 }
+
+export { testBrowser } from './browser'
+export type { BrowserPage, BrowserTest, BrowserTestOptions } from './browser'

@@ -40,5 +40,13 @@
   "dependencies": {
     "@kaynooo/cli-kit": "^0.52.0",
     "oxc-parser": "^0.155.0"
+  },
+  "peerDependencies": {
+    "playwright-core": "^1.64.0"
+  },
+  "peerDependenciesMeta": {
+    "playwright-core": {
+      "optional": true
+    }
   }
 }
