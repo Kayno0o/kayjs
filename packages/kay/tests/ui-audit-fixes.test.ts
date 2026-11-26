@@ -5,9 +5,9 @@ import { describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { createDataTable } from '@kayjs/ui'
+import { createDataTable, toast } from '@kayjs/ui'
 import { build } from '../src/build/index'
-import { createOwner, disposeOwner, effect, runWithOwner } from '../src/reactivity/index'
+import { createOwner, disposeOwner, effect, runWithOwner, signal } from '../src/reactivity/index'
 import { createServer } from '../src/server/index'
 
 const UI_MOD = resolve(import.meta.dir, '../../ui/src/index.ts')
@@ -156,5 +156,100 @@ export default function Page() {
     finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('#3636 @kayjs/ui RGAA accessibility & state regressions', () => {
+  test('<Field><Select /></Field> in SSR associates <label for> with the Select combobox trigger id', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3636-field-select-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+import { Field, Select } from ${JSON.stringify(UI_MOD)}
+export default function Page() {
+  return (
+    <Field id="plan" label="Billing plan" error="Required" required>
+      <Select name="plan" options={[{ value: 'free', label: 'Free' }, { value: 'pro', label: 'Pro' }]} />
+    </Field>
+  )
+}
+`)
+      await build({ root: dir, prerender: false })
+      const app = await createServer({ root: dir })
+      const html = await (await app.handle(new Request('http://localhost/'))).text()
+
+      expect(html).toContain('for="plan"')
+      expect(html).toMatch(/<button\b[^>]*id="plan"[^>]*role="combobox"/)
+      expect(html).toContain('aria-invalid="true"')
+      expect(html).toContain('aria-describedby="plan-error"')
+      expect(html).not.toMatch(/id="kui-select-[^"]*-trigger"/)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('createDataTable clamps page.value when rows shrink and evicts removed row signals from rowSelected', () => {
+    const rowsSig = signal([
+      { id: 1, name: 'A' },
+      { id: 2, name: 'B' },
+      { id: 3, name: 'C' },
+      { id: 4, name: 'D' },
+      { id: 5, name: 'E' },
+    ])
+    const table = createDataTable({ rows: () => rowsSig.value, getKey: r => r.id, pageSize: 2 })
+
+    // Navigate to last page (page 3 of 3)
+    table.page.value = 3
+    expect(table.page.value).toBe(3)
+    expect(table.totalPages.value).toBe(3)
+    expect(table.visible.value.map(r => r.id)).toEqual([5])
+
+    // Shrink rows to 3 items (totalPages = 2) -> page.value clamps immediately to 2
+    rowsSig.value = [
+      { id: 1, name: 'A' },
+      { id: 2, name: 'B' },
+      { id: 3, name: 'C' },
+    ]
+    expect(table.totalPages.value).toBe(2)
+    expect(table.page.value).toBe(2)
+    expect(table.visible.value.map(r => r.id)).toEqual([3])
+
+    // Decrementing from clamped page 2 lands directly on page 1
+    table.page.value--
+    expect(table.page.value).toBe(1)
+
+    // Eviction of removed row keys from rowSelected Map
+    let row1Runs = 0
+    const owner = createOwner(undefined)
+    try {
+      runWithOwner(owner, () => {
+        effect(() => {
+          void table.isSelected(1)
+          row1Runs++
+        })
+      })
+      expect(row1Runs).toBe(1)
+      table.toggleSelect(1)
+      expect(row1Runs).toBe(2)
+
+      // Remove row 1 from rows and recompute filtered -> old row 1 signal is evicted
+      rowsSig.value = [{ id: 2, name: 'B' }, { id: 3, name: 'C' }]
+      expect(table.filtered.value.map(r => r.id)).toEqual([2, 3])
+
+      // Toggling evicted key 1 must NOT retain or notify the evicted Signal
+      table.toggleSelect(1)
+      expect(row1Runs).toBe(2)
+    }
+    finally {
+      disposeOwner(owner)
+    }
+  })
+
+  test('toast does not store items on globalThis or schedule timers during SSR', () => {
+    const id = toast.show('Server secret', 'Must not leak across SSR requests', 5000)
+    expect(id).toBe('')
+    expect(toast.items.value).toEqual([])
+    expect((globalThis as Record<symbol, unknown>)[Symbol.for('kay.ui.toasts')]).toBeUndefined()
   })
 })

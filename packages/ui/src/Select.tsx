@@ -3,7 +3,7 @@
 
 import type { Signal } from '@kayjs/kay'
 import { signal } from '@kayjs/kay'
-import { createListPopup, nextUiId } from './behaviors'
+import { createListPopup, nextUiId, useFieldContext } from './behaviors'
 
 export interface SelectOption {
   value: string
@@ -22,36 +22,44 @@ export interface SelectProps {
   onChange?: ((value: string) => void) | undefined
 }
 
-export function Select({ id, options, value, defaultValue, name, placeholder = 'Select…', ariaLabel, onChange }: SelectProps) {
-  const baseId = id ?? nextUiId('kui-select')
-  const triggerId = `${baseId}-trigger`
+export function Select(props: SelectProps) {
+  const field = useFieldContext()
+  const baseId = props.id ?? field?.id ?? nextUiId('kui-select')
+  let triggerId = props.id ?? field?.id ?? `${baseId}-trigger`
   const listboxId = `${baseId}-listbox`
   const optionId = (idx: number) => `${baseId}-opt-${idx}`
+  const name = props.name
+  const placeholder = props.placeholder ?? 'Select…'
+  const ariaLabel = props.ariaLabel
 
-  const selected = value ?? signal(defaultValue ?? options[0]?.value ?? '')
-  const currentLabel = () => options.find(o => o.value === selected.value)?.label ?? placeholder
+  const selected = props.value ?? signal(props.defaultValue ?? props.options[0]?.value ?? '')
+  const currentLabel = () => props.options.find(o => o.value === selected.value)?.label ?? placeholder
 
   const pick = (opt: SelectOption) => {
     if (opt.disabled)
       return
     selected.value = opt.value
-    onChange?.(opt.value)
-    popup.open.value = false
+    props.onChange?.(opt.value)
+    popup.close(true)
   }
 
   const popup = createListPopup<SelectOption>({
-    items: () => options,
+    items: () => props.options,
     itemId: optionId,
     isDisabled: opt => Boolean(opt.disabled),
     onSelect: pick,
-    initialIndex: () => options.findIndex(o => o.value === selected.value && !o.disabled),
+    initialIndex: () => props.options.findIndex(o => o.value === selected.value && !o.disabled),
   })
 
   return (
     <div
       data-ui="select"
       data-state={popup.open.value ? 'open' : 'closed'}
-      ref={(el) => { popup.setRoot(el) }}
+      ref={(el) => {
+        popup.setRoot(el)
+        if (!props.id && !field)
+          triggerId = el.closest('[data-ui="field"]')?.querySelector('label')?.htmlFor || triggerId
+      }}
     >
       {name && <input type="hidden" name={name} value={selected.value} />}
       <button
@@ -62,9 +70,10 @@ export function Select({ id, options, value, defaultValue, name, placeholder = '
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={popup.open.value ? 'true' : 'false'}
-        aria-controls={listboxId}
+        aria-controls={popup.open.value ? listboxId : undefined}
         aria-activedescendant={popup.activeDescendantId()}
         onClick={e => popup.toggle(e)}
+        onKeyDown={e => popup.onTriggerKeyDown(e)}
       >
         <span data-part="value">{currentLabel()}</span>
         <span aria-hidden="true">▾</span>
@@ -77,7 +86,7 @@ export function Select({ id, options, value, defaultValue, name, placeholder = '
           aria-label={ariaLabel}
           aria-labelledby={ariaLabel ? undefined : triggerId}
         >
-          {options.map((opt, idx) => (
+          {props.options.map((opt, idx) => (
             <button
               key={opt.value}
               id={optionId(idx)}
@@ -93,7 +102,7 @@ export function Select({ id, options, value, defaultValue, name, placeholder = '
               onClick={() => pick(opt)}
             >
               <span>{opt.label}</span>
-              {selected.value === opt.value && <span aria-hidden="true">✓</span>}
+              <span aria-hidden="true">{selected.value === opt.value ? '✓' : ''}</span>
             </button>
           ))}
         </div>

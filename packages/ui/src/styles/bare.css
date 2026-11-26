@@ -211,6 +211,11 @@
     inset-inline-start: calc(100% - 2px);
     transform: translateX(-100%);
   }
+  [data-ui="switch"]:has(input:focus-visible) [data-part="track"],
+  [data-ui="switch"] input:focus-visible + [data-part="track"] {
+    outline: 2px solid var(--ui-accent, currentColor);
+    outline-offset: 2px;
+  }
   [data-ui="radio-group"] {
     border: 0;
     padding: 0;
@@ -239,6 +244,11 @@
     width: 100%;
     border-collapse: collapse;
     text-align: left;
+  }
+  table[data-ui="table"] > caption {
+    text-align: start;
+    font-weight: 600;
+    margin-block-end: 0.5rem;
   }
 
   [data-ui="popover"][popover] {

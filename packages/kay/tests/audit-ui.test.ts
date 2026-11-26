@@ -90,7 +90,12 @@ function parseRootTokens(css: string): GrammarTokens {
 let builtDir = ''
 let mountFn!: (container: Element, render: () => Node | DocumentFragment | null) => () => void
 let signal!: <T>(initial: T) => Signal<T>
-let toastApi!: { show: (title: string, description?: string, durationMs?: number) => string, clear: () => void }
+let toastApi!: {
+  items: Signal<Array<{ id: string, title: string }>>
+  show: (title: string, description?: string, durationMs?: number) => string
+  dismiss: (id: string) => void
+  clear: () => void
+}
 let uiMods: Record<string, (...args: any[]) => any> = {}
 let ssrHtml = ''
 
@@ -99,12 +104,26 @@ beforeAll(async () => {
   mkdirSync(join(builtDir, 'src/routes'), { recursive: true })
   mkdirSync(join(builtDir, 'src/components'), { recursive: true })
 
-  // A tiny island that exposes `mount`, `signal`, and `toast` from the exact same bundled client runtime used by the UI islands.
+  // A tiny island that exposes `mount`, `signal`, `toast`, and an interactive Field+Select island from the exact same bundled client runtime.
   writeFileSync(join(builtDir, 'src/components/SigHost.tsx'), `
     import { signal } from '@kayjs/kay'
     import { mount } from '@kayjs/kay/internal/dom'
-    import { toast } from ${JSON.stringify(UI_ENTRY)}
-    ;(globalThis as Record<string, unknown>).__kayAuditTest = { mount, signal, toast }
+    import { Field, Select, toast } from ${JSON.stringify(UI_ENTRY)}
+    export function FieldIsland(props: { err: ReturnType<typeof signal<string | undefined>> }) {
+      return (
+        <Field id="isl-email" label="Email" hint="Work email" error={props.err.value} required>
+          <input name="email" type="email" aria-describedby="extra-island" />
+        </Field>
+      )
+    }
+    export function FieldSelectIsland(props: { err: ReturnType<typeof signal<string | undefined>> }) {
+      return (
+        <Field id="isl-plan" label="Plan" hint="Pick a tier" error={props.err.value} required>
+          <Select name="plan" options={[{ value: 'free', label: 'Free' }, { value: 'pro', label: 'Pro' }]} />
+        </Field>
+      )
+    }
+    ;(globalThis as Record<string, unknown>).__kayAuditTest = { mount, signal, toast, FieldIsland, FieldSelectIsland }
     export function SigHost() {
       const s = signal(0)
       return <span>{s.value}</span>
@@ -180,10 +199,18 @@ beforeAll(async () => {
   }
 
   await loadIsland('SigHost')
-  const helpers = (globalThis as Record<string, unknown>).__kayAuditTest as { mount: typeof mountFn, signal: typeof signal, toast: typeof toastApi }
+  const helpers = (globalThis as Record<string, unknown>).__kayAuditTest as {
+    mount: typeof mountFn
+    signal: typeof signal
+    toast: typeof toastApi
+    FieldIsland: (...args: any[]) => any
+    FieldSelectIsland: (...args: any[]) => any
+  }
   mountFn = helpers.mount
   signal = helpers.signal
   toastApi = helpers.toast
+  uiMods.FieldIsland = helpers.FieldIsland
+  uiMods.FieldSelectIsland = helpers.FieldSelectIsland
 
   for (const name of ['Menu', 'Select', 'CommandPalette', 'Dialog', 'Drawer', 'DataTable', 'Toaster']) {
     const mod = await loadIsland(name)
@@ -211,7 +238,7 @@ function mountInBody(render: () => Node | DocumentFragment | null): { host: HTML
 }
 
 describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant accessibility', () => {
-  it('Menu: unique IDs, aria-controls, aria-activedescendant, accessible menu name, tabindex=-1, Home/End, skip disabled, Tab closes without preventing default', () => {
+  it('Menu: unique IDs, conditional aria-controls, no aria-activedescendant on button, roving menuitem focus, ArrowDown/Up open, Home/End, skip disabled, Tab closes without preventing default', async () => {
     const picked: string[] = []
     const MenuComp = uiMods.Menu!
     const m1 = mountInBody(() => MenuComp({
@@ -234,19 +261,20 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
       const trig1 = m1.host.querySelector<HTMLButtonElement>('[data-part="trigger"]')!
       const trig2 = m2.host.querySelector<HTMLButtonElement>('[data-part="trigger"]')!
 
-      // Closed state: aria-controls is wired, aria-activedescendant is absent, IDs are unique across instances
-      const ctrl1 = trig1.getAttribute('aria-controls')
-      const ctrl2 = trig2.getAttribute('aria-controls')
-      expect(ctrl1).toBeTruthy()
-      expect(ctrl2).toBeTruthy()
-      expect(ctrl1).not.toBe(ctrl2)
+      // Closed state: aria-controls is omitted (no dangling IDREF), aria-activedescendant is never set on role="button"
+      expect(trig1.getAttribute('aria-controls')).toBeNull()
+      expect(trig2.getAttribute('aria-controls')).toBeNull()
       expect(trig1.getAttribute('aria-activedescendant')).toBeNull()
 
-      // Open menu 1
+      // Open menu 1 via click
       trig1.click()
       const menuEl = m1.host.querySelector<HTMLElement>('[role="menu"]')!
       expect(menuEl).toBeTruthy()
-      expect(menuEl.id).toBe(ctrl1!)
+      const ctrl1 = trig1.getAttribute('aria-controls')
+      expect(ctrl1).toBe(menuEl.id)
+      // Must NOT place aria-activedescendant on <button aria-haspopup="menu">
+      expect(trig1.getAttribute('aria-activedescendant')).toBeNull()
+
       // Menu has accessible name via aria-labelledby referencing trigger or aria-label
       const labelledBy = menuEl.getAttribute('aria-labelledby')
       const ariaLabel = menuEl.getAttribute('aria-label')
@@ -254,9 +282,23 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
       if (labelledBy)
         expect(trig1.id).toBe(labelledBy)
 
-      const items = [...menuEl.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      // Open menu 2 briefly to confirm unique menu IDs
+      trig2.click()
+      const ctrl2 = trig2.getAttribute('aria-controls')
+      expect(ctrl2).toBeTruthy()
+      expect(ctrl1).not.toBe(ctrl2)
+      trig2.click()
+      expect(trig2.getAttribute('aria-controls')).toBeNull()
+
+      // Re-open menu 1 via ArrowDown when trigger is focused -> opens on first enabled item ('open', index 1)
+      trig1.focus()
+      trig1.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+      const openMenu = m1.host.querySelector<HTMLElement>('[role="menu"]')!
+      expect(openMenu).toBeTruthy()
+      expect(trig1.getAttribute('aria-controls')).toBe(openMenu.id)
+
+      const items = [...openMenu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
       expect(items.length).toBe(5)
-      // Every item has a unique id and tabindex="-1"
       const ids = new Set(items.map(i => i.id))
       expect(ids.size).toBe(5)
       for (const item of items) {
@@ -264,34 +306,42 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
         expect(item.getAttribute('tabindex')).toBe('-1')
       }
 
-      // First enabled item ('open', index 1) should be active
-      expect(trig1.getAttribute('aria-activedescendant')).toBe(items[1]!.id)
+      // First enabled item ('open', index 1) is highlighted and focused
+      await Promise.resolve()
+      expect(items[1]!.getAttribute('data-highlighted')).toBe('true')
+      expect(document.activeElement?.id).toBe(items[1]!.id)
 
       // ArrowDown skips disabled item at index 2 -> lands on index 3 ('rename')
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
-      expect(trig1.getAttribute('aria-activedescendant')).toBe(items[3]!.id)
+      expect(items[3]!.getAttribute('data-highlighted')).toBe('true')
+      expect(document.activeElement?.id).toBe(items[3]!.id)
 
       // End jumps to last enabled item (index 4, 'delete')
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }))
-      expect(trig1.getAttribute('aria-activedescendant')).toBe(items[4]!.id)
+      expect(items[4]!.getAttribute('data-highlighted')).toBe('true')
+      expect(document.activeElement?.id).toBe(items[4]!.id)
 
       // Home jumps to first enabled item (index 1, 'open')
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }))
-      expect(trig1.getAttribute('aria-activedescendant')).toBe(items[1]!.id)
+      expect(items[1]!.getAttribute('data-highlighted')).toBe('true')
+      expect(document.activeElement?.id).toBe(items[1]!.id)
 
-      // Tab closes the menu WITHOUT preventing default (does not trap focus)
+      // Tab closes the menu WITHOUT preventing default (does not trap focus), and removes aria-controls
       const tabEvt = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
       document.dispatchEvent(tabEvt)
       expect(tabEvt.defaultPrevented).toBe(false)
       expect(m1.host.querySelector('[role="menu"]')).toBeNull()
-      expect(trig1.getAttribute('aria-activedescendant')).toBeNull()
+      expect(trig1.getAttribute('aria-controls')).toBeNull()
 
-      // Re-open, End, Enter selects 'delete'
-      trig1.click()
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }))
+      // ArrowUp on focused closed trigger opens on last enabled item ('delete', index 4), Enter selects it
+      trig1.focus()
+      trig1.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
+      const items2 = [...m1.host.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      expect(items2[4]!.getAttribute('data-highlighted')).toBe('true')
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
       expect(picked).toEqual(['delete'])
       expect(m1.host.querySelector('[role="menu"]')).toBeNull()
+      expect(trig1.getAttribute('aria-controls')).toBeNull()
     }
     finally {
       m1.dispose()
@@ -299,7 +349,7 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
     }
   })
 
-  it('Select: unique IDs, aria-controls, aria-activedescendant, accessible listbox name, tabindex=-1, Home/End, Tab closes without preventing default', () => {
+  it('Select: unique IDs, conditional aria-controls, aria-activedescendant, ArrowDown/Up open, accessible listbox name, tabindex=-1, Home/End, Tab closes without preventing default', () => {
     const changes: string[] = []
     const SelectComp = uiMods.Select!
     const s1 = mountInBody(() => SelectComp({
@@ -321,20 +371,35 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
       const trig1 = s1.host.querySelector<HTMLButtonElement>('[data-part="trigger"]')!
       const trig2 = s2.host.querySelector<HTMLButtonElement>('[data-part="trigger"]')!
 
-      const ctrl1 = trig1.getAttribute('aria-controls')
-      const ctrl2 = trig2.getAttribute('aria-controls')
-      expect(ctrl1).toBeTruthy()
-      expect(ctrl2).toBeTruthy()
-      expect(ctrl1).not.toBe(ctrl2)
+      // Closed state: aria-controls omitted (no dangling IDREF)
+      expect(trig1.getAttribute('aria-controls')).toBeNull()
+      expect(trig2.getAttribute('aria-controls')).toBeNull()
       expect(trig1.getAttribute('aria-activedescendant')).toBeNull()
 
-      trig1.click()
+      // ArrowDown on focused closed trigger opens listbox
+      trig1.focus()
+      trig1.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
       const listbox = s1.host.querySelector<HTMLElement>('[role="listbox"]')!
       expect(listbox).toBeTruthy()
-      expect(listbox.id).toBe(ctrl1!)
+      const ctrl1 = trig1.getAttribute('aria-controls')
+      expect(ctrl1).toBe(listbox.id)
       expect(Boolean(listbox.getAttribute('aria-label') || listbox.getAttribute('aria-labelledby'))).toBe(true)
 
-      const opts = [...listbox.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+      // Open s2 to verify unique listbox IDs
+      trig2.click()
+      const ctrl2 = trig2.getAttribute('aria-controls')
+      expect(ctrl2).toBeTruthy()
+      expect(ctrl1).not.toBe(ctrl2)
+      trig2.click()
+      expect(trig2.getAttribute('aria-controls')).toBeNull()
+
+      // Re-open s1 via ArrowUp
+      trig1.focus()
+      trig1.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
+      const listbox1 = s1.host.querySelector<HTMLElement>('[role="listbox"]')!
+      expect(listbox1).toBeTruthy()
+
+      const opts = [...listbox1.querySelectorAll<HTMLButtonElement>('[role="option"]')]
       expect(opts.length).toBe(3)
       for (const opt of opts) {
         expect(opt.id).toBeTruthy()
@@ -352,11 +417,12 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }))
       expect(trig1.getAttribute('aria-activedescendant')).toBe(opts[2]!.id)
 
-      // Tab closes without preventing default
+      // Tab closes without preventing default and removes aria-controls
       const tabEvt = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
       document.dispatchEvent(tabEvt)
       expect(tabEvt.defaultPrevented).toBe(false)
       expect(s1.host.querySelector('[role="listbox"]')).toBeNull()
+      expect(trig1.getAttribute('aria-controls')).toBeNull()
       expect(trig1.getAttribute('aria-activedescendant')).toBeNull()
 
       // Open, End, Enter selects 'enterprise'
@@ -364,6 +430,7 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }))
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
       expect(changes).toEqual(['enterprise'])
+      expect(trig1.getAttribute('aria-controls')).toBeNull()
     }
     finally {
       s1.dispose()
@@ -371,16 +438,19 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
     }
   })
 
-  it('CommandPalette: binds aria-expanded to open state, wires aria-controls/aria-activedescendant, tabindex=-1, Home/End/Tab, and polite live status region', () => {
+  it('CommandPalette: binds aria-expanded to open state, initializes activeIdx on first enabled item, preserves Home/End caret editing, handles Tab without closing modal, and polite live status region', () => {
     const CommandComp = uiMods.CommandPalette!
     const openSig = signal(false)
+    const ran: string[] = []
     const c = mountInBody(() => CommandComp({
       open: openSig,
       items: [
+        { id: 'locked', label: 'Alpha locked', disabled: true },
         { id: 'alpha', label: 'Alpha command' },
         { id: 'beta', label: 'Beta command' },
         { id: 'gamma', label: 'Gamma command' },
       ],
+      onSelect: (id: string) => ran.push(id),
     }))
 
     try {
@@ -396,24 +466,40 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
       expect(input.getAttribute('aria-activedescendant')).toBeNull()
       expect(liveRegion).toBeTruthy()
 
-      // Open palette
+      // Open palette -> activeIdx initializes via findFirstEnabledIndex (skips disabled index 0 -> lands on index 1 'alpha')
       openSig.value = true
       expect(input.getAttribute('aria-expanded')).toBe('true')
 
       const opts = [...list.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-      expect(opts.length).toBe(3)
+      expect(opts.length).toBe(4)
       for (const opt of opts) {
         expect(opt.id).toBeTruthy()
         expect(opt.getAttribute('tabindex')).toBe('-1')
       }
-      expect(input.getAttribute('aria-activedescendant')).toBe(opts[0]!.id)
-      expect(liveRegion.textContent?.trim()).toMatch(/3\s+results/i)
+      expect(input.getAttribute('aria-activedescendant')).toBe(opts[1]!.id)
+      expect(liveRegion.textContent?.trim()).toMatch(/4\s+results/i)
 
-      // End -> index 2, Home -> index 0
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }))
+      // Home and End inside the search text input must NOT be intercepted (caret movement preserved!)
+      const endEvt = new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true })
+      input.dispatchEvent(endEvt)
+      expect(endEvt.defaultPrevented).toBe(false)
+      expect(input.getAttribute('aria-activedescendant')).toBe(opts[1]!.id)
+
+      const homeEvt = new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true })
+      input.dispatchEvent(homeEvt)
+      expect(homeEvt.defaultPrevented).toBe(false)
+      expect(input.getAttribute('aria-activedescendant')).toBe(opts[1]!.id)
+
+      // ArrowDown moves to index 2 ('beta')
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
       expect(input.getAttribute('aria-activedescendant')).toBe(opts[2]!.id)
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }))
-      expect(input.getAttribute('aria-activedescendant')).toBe(opts[0]!.id)
+
+      // Filter matching disabled item first ('alpha') -> activeIdx still picks first enabled ('alpha', index 1)
+      input.value = 'alpha'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      const alphaOpts = [...list.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+      expect(alphaOpts.length).toBe(2)
+      expect(input.getAttribute('aria-activedescendant')).toBe(alphaOpts[1]!.id)
 
       // Filter to 1 result -> live region announces "1 result"
       input.value = 'beta'
@@ -426,12 +512,21 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
       expect(liveRegion.textContent?.trim()).toMatch(/no\s+results/i)
       expect(input.getAttribute('aria-activedescendant')).toBeNull()
 
-      // Tab closes palette without preventing default
+      // Tab inside modal <dialog> does NOT prevent default and does NOT prematurely close the modal
       const tabEvt = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
       input.dispatchEvent(tabEvt)
       expect(tabEvt.defaultPrevented).toBe(false)
+      expect(openSig.value).toBe(true)
+
+      // Escape closes the modal cleanly
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
       expect(openSig.value).toBe(false)
       expect(input.getAttribute('aria-expanded')).toBe('false')
+
+      // Re-open and press Enter immediately -> runs first enabled item ('alpha'), NOT disabled index 0
+      openSig.value = true
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      expect(ran).toEqual(['alpha'])
     }
     finally {
       c.dispose()
@@ -526,15 +621,24 @@ describe('Box 21 — Dialog, Drawer, Field, DataTable search & CommandPalette la
     const ToasterComp = uiMods.Toaster!
     const t = mountInBody(() => TableComp({
       rows: [{ id: '1', name: 'A' }, { id: '2', name: 'B' }],
-      columns: [{ key: 'name', label: 'Name' }],
+      columns: [
+        { key: 'name', label: 'Name' },
+        { key: 'id', label: 'ID', sortable: false },
+      ],
       pageSize: 1,
       selectable: true,
+      caption: 'Liste des utilisateurs',
       searchLabel: 'Filtrer les utilisateurs',
       selectColumnLabel: 'Sélectionner',
       selectRowLabel: 'Sélectionner la ligne',
       rowsLabel: 'lignes',
       prevLabel: 'Précédent',
       nextLabel: 'Suivant',
+    }))
+    const tLabelled = mountInBody(() => TableComp({
+      rows: [{ id: '1', name: 'A' }],
+      columns: [{ key: 'name', label: 'Name' }],
+      ariaLabel: 'Users table',
     }))
     const c = mountInBody(() => CommandComp({
       items: [],
@@ -554,7 +658,27 @@ describe('Box 21 — Dialog, Drawer, Field, DataTable search & CommandPalette la
     const tst = mountInBody(() => ToasterComp({ dismissLabel: 'Ignorer' }))
     try {
       expect(t.host.querySelector('[data-part="search"]')?.getAttribute('aria-label')).toBe('Filtrer les utilisateurs')
-      expect(t.host.querySelector('th[data-part="select-col"]')?.getAttribute('aria-label')).toBe('Sélectionner')
+      // RGAA 5.4 / 5.6 / 5.7: caption, aria-label fallback, scope="col", non-empty selectable <th>, aria-hidden sort arrows
+      expect(t.host.querySelector('table > caption')?.textContent).toBe('Liste des utilisateurs')
+      expect(t.host.querySelector('table')?.getAttribute('aria-label')).toBeNull()
+      expect(tLabelled.host.querySelector('table > caption')).toBeNull()
+      expect(tLabelled.host.querySelector('table')?.getAttribute('aria-label')).toBe('Users table')
+      const ths = [...t.host.querySelectorAll('thead th')]
+      expect(ths.length).toBe(3)
+      for (const th of ths)
+        expect(th.getAttribute('scope')).toBe('col')
+      const selectTh = t.host.querySelector('th[data-part="select-col"]')!
+      expect(selectTh.textContent?.trim()).toBe('Sélectionner')
+      expect(selectTh.querySelector('.kui-sr-only')?.textContent).toBe('Sélectionner')
+      // Non-sortable column omits aria-sort
+      expect(ths[2]!.getAttribute('aria-sort')).toBeNull()
+      // Sort arrow indicator is aria-hidden="true"
+      const sortBtn = t.host.querySelector<HTMLButtonElement>('button[data-part="sort"]')!
+      sortBtn.click()
+      const arrowSpan = sortBtn.querySelector<HTMLElement>('[aria-hidden="true"]')!
+      expect(arrowSpan).toBeTruthy()
+      expect(arrowSpan.textContent).toContain('↑')
+
       expect(t.host.querySelector('td[data-part="select-col"] input')?.getAttribute('aria-label')).toBe('Sélectionner la ligne 1')
       expect(t.host.textContent).toContain('Précédent')
       expect(t.host.textContent).toContain('Suivant')
@@ -567,10 +691,95 @@ describe('Box 21 — Dialog, Drawer, Field, DataTable search & CommandPalette la
     finally {
       toastApi.clear()
       t.dispose()
+      tLabelled.dispose()
       c.dispose()
       dlg.dispose()
       drw.dispose()
       tst.dispose()
+    }
+  })
+
+  it('#3636 Field error ARIA wiring & Field+Select label association in interactive islands + Switch focus indicator + Toast timer cleanup', () => {
+    // 1. Field dynamic error ARIA wiring in an interactive island without remounting the input
+    const FieldIsland = uiMods.FieldIsland!
+    const err = signal<string | undefined>(undefined)
+    const f = mountInBody(() => FieldIsland({ err }))
+    try {
+      const input = f.host.querySelector<HTMLInputElement>('input[name="email"]')!
+      expect(input.id).toBe('isl-email')
+      expect(input.getAttribute('aria-invalid')).toBeNull()
+      expect(input.getAttribute('aria-describedby')).toContain('extra-island')
+      expect(input.getAttribute('aria-describedby')).toContain('isl-email-hint')
+
+      input.value = 'not-an-email'
+      err.value = 'Invalid email'
+      // Same DOM node preserved (user input not wiped), ARIA updated reactively
+      expect(f.host.querySelector('input[name="email"]')).toBe(input)
+      expect(input.value).toBe('not-an-email')
+      expect(input.getAttribute('aria-invalid')).toBe('true')
+      expect(input.getAttribute('aria-describedby')).toContain('extra-island')
+      expect(input.getAttribute('aria-describedby')).toContain('isl-email-error')
+      expect(input.getAttribute('aria-describedby')).not.toContain('isl-email-hint')
+
+      err.value = undefined
+      expect(input.getAttribute('aria-invalid')).toBeNull()
+      expect(input.getAttribute('aria-describedby')).toContain('extra-island')
+      expect(input.getAttribute('aria-describedby')).toContain('isl-email-hint')
+      expect(input.getAttribute('aria-describedby')).not.toContain('isl-email-error')
+    }
+    finally {
+      f.dispose()
+    }
+
+    // 2. <Field><Select /></Field> wires trigger id to match <label for> and updates error ARIA
+    const FieldSelectIsland = uiMods.FieldSelectIsland!
+    const selErr = signal<string | undefined>('Choose a plan')
+    const fs = mountInBody(() => FieldSelectIsland({ err: selErr }))
+    try {
+      const label = fs.host.querySelector<HTMLLabelElement>('label[data-part="label"]')!
+      const trigger = fs.host.querySelector<HTMLButtonElement>('[data-ui="select"] [data-part="trigger"]')!
+      expect(label.getAttribute('for')).toBe('isl-plan')
+      expect(trigger.id).toBe('isl-plan')
+      expect(trigger.getAttribute('aria-invalid')).toBe('true')
+      expect(trigger.getAttribute('aria-describedby')).toBe('isl-plan-error')
+
+      trigger.click()
+      const listbox = fs.host.querySelector<HTMLElement>('[role="listbox"]')!
+      expect(listbox.getAttribute('aria-labelledby')).toBe('isl-plan')
+
+      selErr.value = undefined
+      expect(trigger.getAttribute('aria-invalid')).toBeNull()
+      expect(trigger.getAttribute('aria-describedby')).toBe('isl-plan-hint')
+    }
+    finally {
+      fs.dispose()
+    }
+
+    // 3. Switch keyboard focus-visible indicator exists in bare.css
+    const bareCss = readFileSync(join(STYLES_DIR, 'bare.css'), 'utf8')
+    expect(bareCss).toContain('[data-ui="switch"]:has(input:focus-visible) [data-part="track"]')
+
+    // 4. Toast clears setTimeout handles on manual dismiss() and clear()
+    const cleared: unknown[] = []
+    const origClearTimeout = globalThis.clearTimeout
+    globalThis.clearTimeout = ((id: unknown) => {
+      cleared.push(id)
+      return origClearTimeout(id as ReturnType<typeof setTimeout>)
+    }) as typeof clearTimeout
+    try {
+      const id1 = toastApi.show('One', undefined, 60_000)
+      toastApi.dismiss(id1)
+      expect(cleared.length).toBe(1)
+
+      toastApi.show('Two', undefined, 60_000)
+      toastApi.show('Three', undefined, 60_000)
+      toastApi.clear()
+      expect(cleared.length).toBe(3)
+      expect(toastApi.items.value.length).toBe(0)
+    }
+    finally {
+      globalThis.clearTimeout = origClearTimeout
+      toastApi.clear()
     }
   })
 })

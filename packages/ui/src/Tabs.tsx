@@ -2,7 +2,8 @@
 // Accessible Tabs primitive with roving arrow-key + Home/End keyboard navigation.
 
 import type { KayChild } from '@kayjs/kay'
-import { createTabs, nextUiId } from './behaviors'
+import { nextUiId } from './behaviors'
+import { createTabs } from './tabs-state'
 
 export interface TabDef {
   id: string

@@ -1,7 +1,7 @@
 /** @jsxImportSource @kayjs/kay */
 // Live-region Toast stack driven by the reactive `toast` store.
 
-import { toast } from './behaviors'
+import { toast } from './toast'
 
 export interface ToasterProps {
   dismissLabel?: string | undefined

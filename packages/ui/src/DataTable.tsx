@@ -1,7 +1,7 @@
 /** @jsxImportSource @kayjs/kay */
 // Interactive DataTable island powered by headless `createDataTable()` signals (sort, filter, select, paginate).
 
-import { createDataTable } from './behaviors'
+import { createDataTable } from './table-state'
 
 export interface DataTableColumn {
   key: string
@@ -16,6 +16,8 @@ export interface DataTableProps {
   pageSize?: number | undefined
   searchable?: boolean | undefined
   selectable?: boolean | undefined
+  caption?: string | undefined
+  ariaLabel?: string | undefined
   placeholder?: string | undefined
   searchLabel?: string | undefined
   selectColumnLabel?: string | undefined
@@ -27,27 +29,29 @@ export interface DataTableProps {
   nextLabel?: string | undefined
 }
 
-export function DataTable({
-  rows,
-  columns,
-  rowKey = 'id',
-  pageSize = 10,
-  searchable = true,
-  selectable = false,
-  placeholder = 'Filter rows...',
-  searchLabel = 'Search',
-  selectColumnLabel = 'Select',
-  selectRowLabel = 'Select row',
-  rowsLabel = 'rows',
-  selectedLabel = 'selected',
-  pageLabel = 'Page',
-  prevLabel = 'Prev',
-  nextLabel = 'Next',
-}: DataTableProps) {
+export function DataTable(props: DataTableProps) {
+  const rowKey = props.rowKey ?? 'id'
+  const searchable = props.searchable ?? true
+  const selectable = props.selectable ?? false
+  const caption = props.caption
+  const ariaLabel = props.ariaLabel
+  const placeholder = props.placeholder ?? 'Filter rows...'
+  const searchLabel = props.searchLabel ?? 'Search'
+  const selectColumnLabel = props.selectColumnLabel ?? 'Select'
+  const selectRowLabel = props.selectRowLabel ?? 'Select row'
+  const rowsLabel = props.rowsLabel ?? 'rows'
+  const selectedLabel = props.selectedLabel ?? 'selected'
+  const pageLabel = props.pageLabel ?? 'Page'
+  const prevLabel = props.prevLabel ?? 'Prev'
+  const nextLabel = props.nextLabel ?? 'Next'
+  const columns = props.columns
+  const keyOf = (r: Record<string, string | number>) => String(r[rowKey] ?? '')
+  const sortOf = (k: string) => (table.sortBy.value === k ? table.sortDir.value : undefined)
+
   const table = createDataTable({
-    rows: () => rows,
-    getKey: r => String(r[rowKey] ?? ''),
-    pageSize,
+    rows: () => props.rows,
+    getKey: keyOf,
+    pageSize: props.pageSize ?? 10,
     searchText: r => columns.map(c => String(r[c.key] ?? '')).join(' '),
   })
 
@@ -67,38 +71,37 @@ export function DataTable({
             }}
           />
           <span data-part="meta">
-            {table.filtered.value.length}
-            {' '}
-            {rowsLabel}
-            {selectable && table.selected.value.size > 0 ? ` · ${table.selected.value.size} ${selectedLabel}` : ''}
+            {`${table.filtered.value.length} ${rowsLabel}${selectable && table.selected.value.size > 0 ? ` · ${table.selected.value.size} ${selectedLabel}` : ''}`}
           </span>
         </div>
       )}
 
       <div data-part="scroll">
-        <table data-ui="table">
+        <table data-ui="table" aria-label={caption ? undefined : ariaLabel}>
+          {caption && <caption data-part="caption">{caption}</caption>}
           <thead>
             <tr>
-              {selectable && <th data-part="select-col" aria-label={selectColumnLabel} />}
+              {selectable && (
+                <th scope="col" data-part="select-col">
+                  <span class="kui-sr-only">{selectColumnLabel}</span>
+                </th>
+              )}
               {columns.map(col => (
                 <th
                   key={col.key}
-                  aria-sort={
-                    table.sortBy.value === col.key
-                      ? (table.sortDir.value === 'asc' ? 'ascending' : 'descending')
-                      : 'none'
-                  }
+                  scope="col"
+                  aria-sort={col.sortable === false ? undefined : sortOf(col.key) === 'asc' ? 'ascending' : sortOf(col.key) === 'desc' ? 'descending' : 'none'}
                 >
                   {col.sortable !== false
                     ? (
                         <button
                           type="button"
                           data-part="sort"
-                          data-active={table.sortBy.value === col.key ? 'true' : undefined}
+                          data-active={sortOf(col.key) ? 'true' : undefined}
                           onClick={() => table.toggleSort(col.key)}
                         >
                           {col.label}
-                          {table.sortBy.value === col.key ? (table.sortDir.value === 'asc' ? ' ↑' : ' ↓') : ''}
+                          <span aria-hidden="true">{sortOf(col.key) === 'asc' ? ' ↑' : sortOf(col.key) === 'desc' ? ' ↓' : ''}</span>
                         </button>
                       )
                     : col.label}
@@ -108,14 +111,14 @@ export function DataTable({
           </thead>
           <tbody>
             {table.visible.value.map(row => (
-              <tr key={String(row[rowKey] ?? '')} data-selected={table.isSelected(String(row[rowKey] ?? '')) ? 'true' : undefined}>
+              <tr key={keyOf(row)} data-selected={table.isSelected(keyOf(row)) ? 'true' : undefined}>
                 {selectable && (
                   <td data-part="select-col">
                     <input
                       type="checkbox"
-                      checked={table.isSelected(String(row[rowKey] ?? ''))}
-                      aria-label={`${selectRowLabel} ${String(row[rowKey] ?? '')}`}
-                      onChange={() => table.toggleSelect(String(row[rowKey] ?? ''))}
+                      checked={table.isSelected(keyOf(row))}
+                      aria-label={`${selectRowLabel} ${keyOf(row)}`}
+                      onChange={() => table.toggleSelect(keyOf(row))}
                     />
                   </td>
                 )}
@@ -131,7 +134,7 @@ export function DataTable({
       {table.totalPages.value > 1 && (
         <div data-part="pagination" data-layout="split">
           <span data-part="meta">
-            {pageLabel} {table.page.value} / {table.totalPages.value}
+            {`${pageLabel} ${table.page.value} / ${table.totalPages.value}`}
           </span>
           <div data-layout="cluster">
             <button
@@ -140,7 +143,7 @@ export function DataTable({
               data-size="sm"
               type="button"
               disabled={table.page.value <= 1}
-              onClick={() => { table.page.value = Math.max(1, table.page.value - 1) }}
+              onClick={() => { table.page.value-- }}
             >
               {prevLabel}
             </button>
@@ -150,7 +153,7 @@ export function DataTable({
               data-size="sm"
               type="button"
               disabled={table.page.value >= table.totalPages.value}
-              onClick={() => { table.page.value = Math.min(table.totalPages.value, table.page.value + 1) }}
+              onClick={() => { table.page.value++ }}
             >
               {nextLabel}
             </button>

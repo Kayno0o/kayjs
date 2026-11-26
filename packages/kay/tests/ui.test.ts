@@ -153,7 +153,7 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
       import { Head } from '@kayjs/kay'
-      import { Card, CardBody, CardHeader, CommandPalette, DataTable, Dialog, Drawer, Grid, Menu, Popover, Select, Stack, Tabs, Toaster } from ${JSON.stringify(UI_ENTRY)}
+      import { Card, CardBody, CardHeader, CommandPalette, DataTable, Dialog, Drawer, Field, Grid, Menu, Popover, Select, Stack, Switch, Tabs, Toaster } from ${JSON.stringify(UI_ENTRY)}
       import { ToastDemo } from '../components/ToastDemo'
 
       export default async function Demo() {
@@ -213,15 +213,18 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
                 { id: 'del', label: 'Delete item' },
               ]}
             />
-            <Select
-              name="plan"
-              ariaLabel="Plan"
-              defaultValue="free"
-              options={[
-                { value: 'free', label: 'Free' },
-                { value: 'pro', label: 'Pro' },
-              ]}
-            />
+            <Field id="plan-field" label="Plan">
+              <Select
+                name="plan"
+                ariaLabel="Plan"
+                defaultValue="free"
+                options={[
+                  { value: 'free', label: 'Free' },
+                  { value: 'pro', label: 'Pro' },
+                ]}
+              />
+            </Field>
+            <Switch id="alerts-switch" name="alerts" label="Enable alerts" />
             <ToastDemo />
             <Toaster />
           </main>
@@ -300,11 +303,22 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
       await page.click('[data-ui="menu"] [role="menuitem"]:first-child')
       expect(await page.locator('[data-ui="menu"] [role="menu"]').count()).toBe(0)
 
-      // 4. Select open + pick option updates trigger & hidden form input
+      // 4. Select inside <Field> keeps label-for id after hydration + open + pick option updates trigger & hidden form input
+      expect(await page.locator('[data-ui="select"] [data-part="trigger"]').getAttribute('id')).toBe('plan-field')
       await page.click('[data-ui="select"] [data-part="trigger"]')
       await page.click('[data-ui="select"] [role="option"]:nth-child(2)')
       expect(await page.locator('[data-ui="select"] [data-part="value"]').textContent()).toBe('Pro')
       expect(await page.locator('input[name="plan"]').inputValue()).toBe('pro')
+
+      // 4a. Switch displays visible keyboard focus indicator on [data-part="track"] (RGAA 10.7)
+      await page.locator('[data-ui="select"] [data-part="trigger"]').focus()
+      await page.keyboard.press('Tab')
+      const switchOutline = await page.locator('[data-ui="switch"] [data-part="track"]').evaluate((el) => {
+        const s = getComputedStyle(el)
+        return { style: s.outlineStyle, width: Number.parseFloat(s.outlineWidth) }
+      })
+      expect(switchOutline.style).not.toBe('none')
+      expect(switchOutline.width).toBeGreaterThanOrEqual(2)
 
       // 4b. Once closed, Menu and Select no longer capture arrow keys on the rest of the page
       const arrowPrevented = await page.evaluate(() => {

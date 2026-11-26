@@ -1,5 +1,5 @@
 /** @jsxImportSource @kayjs/kay */
-// Accessible dropdown Menu primitive with aria-activedescendant navigation, link items, Escape/Tab close & click-outside dismiss.
+// Accessible dropdown Menu primitive with roving menuitem focus, link items, ArrowDown/Up trigger open, Escape/Tab close & click-outside dismiss.
 
 import type { ButtonVariant } from './static'
 import { createListPopup, nextUiId } from './behaviors'
@@ -20,27 +20,30 @@ export interface MenuProps {
   onSelect?: ((id: string) => void) | undefined
 }
 
-export function Menu({ id, label, items, variant = 'outline', onSelect }: MenuProps) {
-  const baseId = id ?? nextUiId('kui-menu')
+export function Menu(props: MenuProps) {
+  const baseId = props.id ?? nextUiId('kui-menu')
   const triggerId = `${baseId}-trigger`
   const menuId = `${baseId}-menu`
   const itemId = (idx: number) => `${baseId}-item-${idx}`
+  const variant = props.variant ?? 'outline'
+  const label = props.label
 
   const activate = (item: MenuItemDef, navigateHref: boolean) => {
     if (item.disabled)
       return
     item.onSelect?.()
-    onSelect?.(item.id)
-    popup.close()
+    props.onSelect?.(item.id)
+    popup.close(item.href === undefined)
     if (navigateHref && item.href !== undefined && typeof location !== 'undefined')
       location.assign(item.href)
   }
 
   const popup = createListPopup<MenuItemDef>({
-    items: () => items,
+    items: () => props.items,
     itemId,
     isDisabled: it => Boolean(it.disabled),
     onSelect: active => activate(active, true),
+    focusActive: true,
   })
 
   return (
@@ -57,9 +60,9 @@ export function Menu({ id, label, items, variant = 'outline', onSelect }: MenuPr
         type="button"
         aria-haspopup="menu"
         aria-expanded={popup.open.value ? 'true' : 'false'}
-        aria-controls={menuId}
-        aria-activedescendant={popup.activeDescendantId()}
+        aria-controls={popup.open.value ? menuId : undefined}
         onClick={e => popup.toggle(e)}
+        onKeyDown={e => popup.onTriggerKeyDown(e)}
       >
         {label}
       </button>
@@ -69,8 +72,9 @@ export function Menu({ id, label, items, variant = 'outline', onSelect }: MenuPr
           data-part="content"
           role="menu"
           aria-labelledby={triggerId}
+          ref={() => { popup.focusActive() }}
         >
-          {items.map((item, idx) => (
+          {props.items.map((item, idx) => (
             item.href !== undefined && !item.disabled
               ? (
                   <a

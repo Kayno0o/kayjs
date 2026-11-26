@@ -3,7 +3,7 @@
 
 import type { Signal } from '@kayjs/kay'
 import { computed, effect, onMount, signal } from '@kayjs/kay'
-import { handleListKeyDown, isDialogBackdropClick, nextUiId, syncDialogOpen } from './behaviors'
+import { findFirstEnabledIndex, handleListKeyDown, isDialogBackdropClick, nextUiId, syncDialogOpen } from './behaviors'
 
 export interface CommandItem {
   id: string
@@ -31,33 +31,31 @@ export interface CommandPaletteProps {
   onSelect?: ((id: string) => void) | undefined
 }
 
-export function CommandPalette({
-  id,
-  items,
-  placeholder = 'Type a command or search...',
-  inputLabel = 'Search commands',
-  ariaLabel = 'Command palette',
-  triggerLabel = 'Search (⌘K)',
-  emptyLabel = 'No matching commands.',
-  noResultsLabel = 'No results',
-  resultLabel = 'result',
-  resultsLabel = 'results',
-  shortcutKey = 'k',
-  open,
-  onSelect,
-}: CommandPaletteProps) {
-  const baseId = id ?? nextUiId('kui-cmd')
+const isItemDisabled = (it: CommandItem) => Boolean(it.disabled)
+
+export function CommandPalette(props: CommandPaletteProps) {
+  const baseId = props.id ?? nextUiId('kui-cmd')
   const listId = `${baseId}-list`
   const optionId = (idx: number) => `${baseId}-opt-${idx}`
+  const placeholder = props.placeholder ?? 'Type a command or search...'
+  const inputLabel = props.inputLabel ?? 'Search commands'
+  const ariaLabel = props.ariaLabel ?? 'Command palette'
+  const triggerLabel = props.triggerLabel ?? 'Search (⌘K)'
+  const emptyLabel = props.emptyLabel ?? 'No matching commands.'
+  const noResultsLabel = props.noResultsLabel ?? 'No results'
+  const resultLabel = props.resultLabel ?? 'result'
+  const resultsLabel = props.resultsLabel ?? 'results'
+  const shortcutKey = (props.shortcutKey ?? 'k').toLowerCase()
 
-  const isOpen = open ?? signal(false)
+  const isOpen = props.open ?? signal(false)
   const query = signal('')
-  const activeIdx = signal(0)
+  const activeIdx = signal(findFirstEnabledIndex(props.items, isItemDisabled))
   let dialogEl: HTMLDialogElement | undefined
   let inputEl: HTMLInputElement | undefined
 
   const filtered = computed(() => {
     const q = query.value.trim().toLowerCase()
+    const items = props.items
     if (!q)
       return items
     return items.filter(it =>
@@ -68,9 +66,7 @@ export function CommandPalette({
   const activeOptionId = () => {
     const list = filtered.value
     const idx = activeIdx.value
-    if (!isOpen.value || idx < 0 || idx >= list.length || list[idx]?.disabled)
-      return undefined
-    return optionId(idx)
+    return !isOpen.value || idx < 0 || idx >= list.length || list[idx]?.disabled ? undefined : optionId(idx)
   }
 
   const statusText = () => {
@@ -84,13 +80,13 @@ export function CommandPalette({
 
   const onOpened = () => {
     query.value = ''
-    activeIdx.value = 0
+    activeIdx.value = findFirstEnabledIndex(props.items, isItemDisabled)
     queueMicrotask(() => inputEl?.focus())
   }
 
   onMount(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === shortcutKey.toLowerCase()) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === shortcutKey) {
         e.preventDefault()
         isOpen.value = !isOpen.value
       }
@@ -108,7 +104,7 @@ export function CommandPalette({
       return
     isOpen.value = false
     item.onSelect?.()
-    onSelect?.(item.id)
+    props.onSelect?.(item.id)
     if (item.href)
       window.location.assign(item.href)
   }
@@ -158,16 +154,18 @@ export function CommandPalette({
               value={query.value}
               onInput={(e) => {
                 query.value = e.currentTarget.value
-                activeIdx.value = 0
+                activeIdx.value = findFirstEnabledIndex(filtered.value, isItemDisabled)
               }}
               onKeyDown={(e) => {
                 handleListKeyDown(e, {
                   items: () => filtered.value,
                   activeIndex: activeIdx,
-                  isDisabled: it => Boolean(it.disabled),
-                  onSelect: item => runItem(item),
+                  isDisabled: isItemDisabled,
+                  onSelect: runItem,
                   onClose: () => { isOpen.value = false },
                   selectOnSpace: false,
+                  homeEnd: false,
+                  closeOnTab: false,
                 })
               }}
             />
@@ -185,7 +183,10 @@ export function CommandPalette({
                 data-part="item"
                 data-highlighted={activeIdx.value === idx ? 'true' : undefined}
                 aria-selected={activeIdx.value === idx ? 'true' : 'false'}
-                onMouseEnter={() => { activeIdx.value = idx }}
+                onMouseEnter={() => {
+                  if (!item.disabled)
+                    activeIdx.value = idx
+                }}
                 onClick={() => runItem(item)}
               >
                 <span data-part="item-label">{item.label}</span>
