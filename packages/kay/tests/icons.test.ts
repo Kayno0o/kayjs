@@ -432,6 +432,22 @@ describe('an icon or set that does not exist', () => {
 
     expect((await checkProject(root, { skipTypecheck: true })).errors.filter(error => error.includes('@kayjs/icons'))).toEqual([])
   })
+
+  it('checks only real imports, not an import spelled in a string, a template or a comment (#3618)', async () => {
+    const root = linkedApp({
+      'src/snippets.ts': [
+        '// copy: import x from \'~icons/demo/arow\'',
+        'export const quoted = "import x from \'~icons/demo/nope\'"',
+        'export function snippet(set: string, name: string): string { return `import x from \'~icons/${set}/${name}\'` }',
+        'export const lazy = (): Promise<unknown> => import(\'~icons/demo/gone\')',
+        '',
+      ].join('\n'),
+      'kay.config.ts': `import { icons } from '@kayjs/icons/plugin'\nexport default { plugins: [icons({ sets: { demo: ${JSON.stringify(DEMO)} } })] }\n`,
+    })
+
+    expect((await checkProject(root, { skipTypecheck: true })).errors.filter(error => error.includes('@kayjs/icons')))
+      .toEqual(['src/snippets.ts:4:52: error: @kayjs/icons: no icon "gone" in set "demo". Search with kay icons-find <words>.'])
+  })
 })
 
 describe('the type of an ~icons import', () => {

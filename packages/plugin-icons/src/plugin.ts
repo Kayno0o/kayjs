@@ -22,6 +22,19 @@ const ICON_IMPORT_RE = /\b(?:from|import)\s*\(?\s*(['"])(~icons\/[^/'"]+\/[^'"]+
 const SELF_CLOSING_RE = /<([a-z][\w:-]*)([^<>]*?)\s*\/>/gi
 const LOCAL_DIR = 'src/icons'
 
+const transpilers = { ts: new Bun.Transpiler({ loader: 'ts' }), tsx: new Bun.Transpiler({ loader: 'tsx' }) }
+
+// The ~icons specifiers a file imports or loads with import(), leaving out one only spelled in a string or a comment. A file that does not parse is left to the typecheck.
+function importedIcons(code: string, file: string): Set<string> {
+  try {
+    const imports = transpilers[file.endsWith('.tsx') ? 'tsx' : 'ts'].scanImports(code)
+    return new Set(imports.map(i => i.path).filter(path => path.startsWith('~icons/')))
+  }
+  catch {
+    return new Set()
+  }
+}
+
 // Spells `<path d="…"/>` as `<path d="…"></path>`, the way a browser serializes SVG, so hydrating an island finds the server's body unchanged and keeps its nodes.
 function withEndTags(body: string): string {
   return body.replace(SELF_CLOSING_RE, '<$1$2></$1>')
@@ -111,7 +124,11 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
       }
       for (const file of new Bun.Glob('src/**/*.{ts,tsx,mts}').scanSync({ cwd: ctx.root })) {
         const code = await Bun.file(join(ctx.root, file)).text()
+        const imported = importedIcons(code, file)
         for (const found of code.matchAll(ICON_IMPORT_RE)) {
+          // The regex finds where a specifier is spelled; only one the file really imports is checked, once.
+          if (!imported.delete(found[2]!))
+            continue
           const [, prefix, name] = ICON_SPEC_RE.exec(found[2]!)!
           // A broken file is reported once above, not at each import.
           if (await fileProblem(lookup, ctx.root, prefix!, name!) !== undefined)
