@@ -317,6 +317,18 @@ describe('an icon or set that does not exist', () => {
   })
 })
 
+describe('the type of an ~icons import', () => {
+  it('comes with registering icons(), so an app declares no module', async () => {
+    const root = linkedApp({
+      'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, jsx: 'react-jsx', jsxImportSource: '@kayjs/kay' }, include: ['src', 'kay.config.ts'] }),
+      'kay.config.ts': `import { icons } from '@kayjs/icons/plugin'\nexport default { plugins: [icons({ sets: { demo: ${JSON.stringify(DEMO)} } })] }\n`,
+      'src/size.ts': `import arrow from '~icons/demo/arrow'\nexport const width: string = arrow.width\n`,
+    })
+
+    expect((await checkProject(root)).errors.filter(error => error.includes('src/size.ts'))).toEqual([])
+  })
+})
+
 describe('@kayjs/icons/search in an island', () => {
   it('warns at build that the island ships the word table, naming the file', async () => {
     const root = linkedApp({

@@ -61,6 +61,8 @@ import arrowRight from '~icons/tabler/arrow-right'
 <Icon icon={arrowRight} class="size-4" />
 ```
 
+Registering `icons()` also types the `~icons/*` imports. A tsconfig that leaves `kay.config.ts` out gets them from `/// <reference types="@kayjs/icons/ambient" />` in a `.d.ts` file.
+
 `<Icon>` takes any SVG attribute. Your `width`, `height` and `viewBox` replace the icon's own. An icon given a non-blank `aria-label` or `aria-labelledby` gets `role="img"`; any other is `aria-hidden`.
 
 An import of an icon or set that does not exist fails `kay check` and the build, naming the file and the closest icons that do.

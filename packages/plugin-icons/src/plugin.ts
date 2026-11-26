@@ -1,4 +1,6 @@
+/// <reference path="./ambient.d.ts" />
 // The build side of @kayjs/icons: resolves `~icons/<set>/<name>` imports to inline SVG data at compile time, and adds `kay icons-find`.
+// The reference above types those imports in every app registering icons() in kay.config.ts.
 
 import type { BunPlugin } from 'bun'
 import type { KayPlugin } from '@kayjs/kay/config'
