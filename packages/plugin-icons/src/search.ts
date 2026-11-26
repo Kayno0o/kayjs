@@ -38,7 +38,7 @@ function indexOf(source: readonly string[] | IconifyNames): Index {
   if (known)
     return known
 
-  const names = namesOf(source)
+  const names = isNames(source) ? source : [...Object.keys(source.icons), ...Object.keys(source.aliases ?? {})]
   const byWord = new Map<string, string[]>()
   const wordCount = new Map<string, number>()
 
@@ -64,9 +64,10 @@ function indexOf(source: readonly string[] | IconifyNames): Index {
   return index
 }
 
-function namesOf(source: readonly string[] | IconifyNames): readonly string[] {
-  return Array.isArray(source) ? source : [...Object.keys(source.icons), ...Object.keys(source.aliases ?? {})]
+function isNames(source: readonly string[] | IconifyNames): source is readonly string[] {
+  return Array.isArray(source)
 }
+
 
 // What a typed word stands for, with its weight: itself when the names or the table know it, else the three most used of its completions and the three closest of its respellings, the most used first among equals.
 // The table's side of a typed word is read once for every set; a word reached both ways keeps the larger weight.
