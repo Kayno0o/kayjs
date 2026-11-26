@@ -41,6 +41,14 @@ function findRegion(name: string): HTMLElement | null {
   return document.querySelector<HTMLElement>(`[data-kay-region="${name.replace(/["\\]/g, '\\$&')}"]`)
 }
 
+// A region's path from the outermost one around it: `results/sets` for `sets` inside `results`. The server renders through the outer ones.
+function pathOf(region: HTMLElement): string {
+  const names: string[] = []
+  for (let el: Element | null = region; el !== null; el = el.parentElement?.closest('[data-kay-region]') ?? null)
+    names.unshift(el.getAttribute('data-kay-region')!)
+  return names.join('/')
+}
+
 async function load(url: URL, region: string, signal: AbortSignal): Promise<PrefetchEntry | undefined> {
   const key = fetchKeyOf(url, region)
   const ready = getCachedHtml(key) ?? await inflightPrefetch.get(key)
@@ -54,14 +62,14 @@ async function load(url: URL, region: string, signal: AbortSignal): Promise<Pref
   return { html: await res.text(), url: res.url, ts: Date.now(), region: res.headers.get('x-kay-region') }
 }
 
-// The region's inner HTML: the whole response when the server answered with the region alone, else the region cut out of a full page (a prerendered page, a proxy that dropped the header).
-function contentOf(entry: PrefetchEntry, name: string): DocumentFragment | undefined {
+// The region's inner HTML: the answer itself when the server sent the region alone, else the region cut out of a full page (a prerendered page, a proxy that dropped the header).
+function contentOf(entry: PrefetchEntry, path: string): DocumentFragment | undefined {
   const template = document.createElement('template')
-  if (entry.region === name) {
+  if (entry.region === path) {
     template.innerHTML = entry.html
     return template.content
   }
-  const found = new DOMParser().parseFromString(entry.html, 'text/html').querySelector(`[data-kay-region="${name.replace(/["\\]/g, '\\$&')}"]`)
+  const found = new DOMParser().parseFromString(entry.html, 'text/html').querySelector(`[data-kay-region="${path.split('/').at(-1)!.replace(/["\\]/g, '\\$&')}"]`)
   if (found === null)
     return undefined
   template.innerHTML = found.innerHTML
@@ -70,6 +78,9 @@ function contentOf(entry: PrefetchEntry, name: string): DocumentFragment | undef
 
 function record(url: URL, name: string, mode: 'push' | 'replace' | 'burst'): void {
   clearTimeout(burstTimer)
+  // A replace inside the region the entry was made for keeps that region, so back and forward restore the whole of it.
+  const before = stateOf(history.state)?.__kayRegion
+  const around = mode === 'replace' && before !== undefined && before !== name && findRegion(before)?.contains(findRegion(name)) === true ? before : name
   let push = mode === 'push' || (mode === 'burst' && !burstOpen)
   if (mode === 'burst') {
     burstOpen = true
@@ -86,12 +97,12 @@ function record(url: URL, name: string, mode: 'push' | 'replace' | 'burst'): voi
     // The entry left behind is stamped first, so back and forward can tell it from a page of another document.
     history.replaceState({ ...prev, __kayIdx: idx }, '')
     idx++
-    history.pushState({ __kayIdx: idx, __kayRegion: name }, '', next)
+    history.pushState({ __kayIdx: idx, __kayRegion: around }, '', next)
   }
   else {
-    history.replaceState({ ...prev, __kayIdx: idx, __kayRegion: name }, '', next)
+    history.replaceState({ ...prev, __kayIdx: idx, __kayRegion: around }, '', next)
   }
-  lastRegion = name
+  lastRegion = around
 }
 
 function focusNode(el: Element | null | undefined): void {
@@ -133,6 +144,9 @@ function apply(region: HTMLElement, content: DocumentFragment, swap: Swap): void
     region.append(content)
   }
   else {
+    // A fetch for a region about to be replaced must not land in the new one.
+    for (const inner of region.querySelectorAll('[data-kay-region]'))
+      controllers.get(inner.getAttribute('data-kay-region')!)?.abort()
     region.replaceChildren(content)
   }
   syncParams()
@@ -153,12 +167,13 @@ async function swapRegion(swap: Swap): Promise<void> {
   controllers.get(name)?.abort()
   const controller = new AbortController()
   controllers.set(name, controller)
+  const path = pathOf(findRegion(name)!)
   const busy = setTimeout(() => findRegion(name)?.setAttribute('aria-busy', 'true'), BUSY_DELAY)
   try {
-    const entry = await load(swap.url, name, controller.signal)
+    const entry = await load(swap.url, path, controller.signal)
     if (controller.signal.aborted)
       return
-    const content = entry === undefined ? undefined : contentOf(entry, name)
+    const content = entry === undefined ? undefined : contentOf(entry, path)
     const region = findRegion(name)
     if (content === undefined || region === null) {
       location.assign(swap.url.href)
@@ -246,7 +261,11 @@ if (typeof document !== 'undefined') {
       return
     const url = new URL(link.href, location.href)
     if (url.origin === location.origin && `${url.pathname}${url.search}` !== `${location.pathname}${location.search}`)
-      void prefetch(url.href, link.getAttribute('data-kay-target')!)
+      {
+      const region = findRegion(link.getAttribute('data-kay-target')!)
+      if (region !== null)
+        void prefetch(url.href, pathOf(region))
+    }
   }
   document.addEventListener('pointerover', onIntent, { passive: true })
   document.addEventListener('focusin', onIntent, { passive: true })

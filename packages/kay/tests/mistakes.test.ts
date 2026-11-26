@@ -82,6 +82,8 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     const region = 'import { Region } from \'@kayjs/kay\''
     refuses('<Region><p>x</p></Region>', /<Region> without a name in Page\.tsx: write <Region name="pane">/, region)
     accepts('<Region name="pane"><p>x</p></Region>', region)
+    accepts('<Region name="a"><Region name="b"><p>x</p></Region></Region>', region)
+    refuses('<Region name="a"><div><Region name="a"><p>x</p></Region></div></Region>', /<Region name="a"> inside <Region name="a"> in Page\.tsx: give the inner one its own name/, region)
     accepts('<Region {...{ name: \'pane\' }}><p>x</p></Region>', region)
     refuses('<button data-kay-target="pane">x</button>', /data-kay-target on <button> in Page\.tsx: put it on the <a href>/)
     refuses('<form method="post" data-kay-target="pane"></form>', /data-kay-target on a <form method="post"> in Page\.tsx: a region swaps from a GET/)

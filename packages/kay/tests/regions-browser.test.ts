@@ -63,6 +63,35 @@ beforeAll(async () => {
       )
     }
   `)
+  // A live-search region around a sidebar and a list, and Load more appending to the list alone (#3621); its title follows the query (#3622).
+  writeFileSync(join(dir, 'src/routes/sets.tsx'), `
+    import { Head, Region } from '@kayjs/kay'
+    import type { RequestContext } from '@kayjs/kay/server'
+    const FRUIT = ['apple', 'apricot', 'banana', 'blueberry', 'cherry', 'cranberry', 'date']
+    export function load(ctx: RequestContext) {
+      const q = ctx.url.searchParams.get('q') ?? ''
+      const page = Number(ctx.url.searchParams.get('page') ?? 1)
+      const all = FRUIT.filter(f => f.includes(q))
+      return { q, page, items: all.slice((page - 1) * 2, page * 2), more: all.length > page * 2 }
+    }
+    export default function Sets({ data }: { data: { q: string, page: number, items: string[], more: boolean } }) {
+      return (
+        <main>
+          <Head><title>{'Sets: ' + data.q}</title></Head>
+          <form id="search" method="get" data-kay-target="results" data-kay-live>
+            <input id="q" type="search" name="q" value={data.q} data-kay-sync />
+          </form>
+          <Region name="results" id="results">
+            <aside id="side">side {data.q}</aside>
+            <Region name="sets" id="sets">
+              <ul>{data.items.map(i => <li>{i}</li>)}</ul>
+              {data.more && <a id="more" href={'/sets?q=' + data.q + '&page=' + (data.page + 1)} data-kay-target="sets" data-kay-append>More</a>}
+            </Region>
+          </Region>
+        </main>
+      )
+    }
+  `)
   browser = await testBrowser({ root: dir })
 }, 90_000)
 
@@ -193,4 +222,58 @@ describe('regions() swaps one region of a page (#3597)', () => {
     await page.waitFor(() => location.search === '?icon=bad')
     expect(page.errors.some(e => e.includes('has no <Region name="nope">'))).toBe(true)
   }, 30_000)
+
+  describe('a region inside another (#3621)', () => {
+    const type = (page: BrowserPage, value: string) => page.evaluate(`(() => { const q = document.getElementById('q'); q.value = ${JSON.stringify(value)}; q.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+    const items = (page: BrowserPage) => page.evaluate<string>('[...document.querySelectorAll("#sets li")].map(li => li.textContent).join()')
+
+    it('appends Load more to the inner list alone: one sidebar, the list grown', async () => {
+      const page = await open('/sets')
+      await page.click('#more')
+      await page.waitFor(() => document.querySelectorAll('#sets li').length === 4)
+      expect(await items(page)).toBe('apple,apricot,banana,blueberry')
+      expect(await page.evaluate('document.querySelectorAll("#side").length')).toBe(1)
+      expect(await page.evaluate('document.querySelectorAll("#more").length')).toBe(1)
+      expect(await marker(page)).toBe(true)
+      expect(page.errors).toEqual([])
+    }, 30_000)
+
+    it('finds the new inner region after the outer one is swapped, and appends to that one', async () => {
+      const page = await open('/sets')
+      await type(page, 'a')
+      await page.waitFor(() => document.getElementById('side')?.textContent === 'side a')
+      expect(await items(page)).toBe('apple,apricot')
+      await page.click('#more')
+      await page.waitFor(() => document.querySelectorAll('#sets li').length === 4)
+      expect(await items(page)).toBe('apple,apricot,banana,cranberry')
+      expect(await page.evaluate('document.querySelectorAll("#side").length')).toBe(1)
+      expect(await page.evaluate('document.querySelectorAll("#results #sets").length')).toBe(1)
+    }, 30_000)
+
+    it('goes back and forward across an outer swap followed by an inner append', async () => {
+      const page = await open('/sets')
+      await type(page, 'a')
+      await page.waitFor(() => document.getElementById('side')?.textContent === 'side a')
+      await page.click('#more')
+      await page.waitFor(() => document.querySelectorAll('#sets li').length === 4)
+      await page.evaluate('history.back()')
+      await page.waitFor(() => document.getElementById('side')?.textContent === 'side ')
+      expect(await items(page)).toBe('apple,apricot')
+      expect(await page.evaluate('location.search')).toBe('')
+      await page.evaluate('history.forward()')
+      await page.waitFor(() => document.getElementById('side')?.textContent === 'side a')
+      expect(await page.evaluate('document.querySelectorAll("#side").length')).toBe(1)
+      expect(await marker(page)).toBe(true)
+    }, 30_000)
+
+    it('drops an inner fetch that is still out when the outer region is swapped', async () => {
+      const page = await open('/sets')
+      await page.evaluate('window.fetch = (f => (u, o) => String(u).includes("page=2") ? new Promise(r => setTimeout(() => r(f(u, o)), 600)) : f(u, o))(window.fetch)')
+      await page.click('#more')
+      await type(page, 'b')
+      await page.waitFor(() => document.getElementById('side')?.textContent === 'side b')
+      await Bun.sleep(900)
+      expect(await items(page)).toBe('banana,blueberry')
+    }, 30_000)
+  })
 })

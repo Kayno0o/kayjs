@@ -8,15 +8,14 @@ import { escAttr, raw, ssrChild, ssrSpread } from './index'
 
 const TAG_RE = /^[a-z][a-z0-9-]*$/
 
-function renderChildren(ctx: RenderContext | undefined, name: string, children: () => KayChild): string {
-  if (ctx === undefined)
-    return ssrChild(children())
-  ctx.inRegion = name
+// The requested region's children render with `inTarget` set, so the regions inside it come out in full.
+function renderTarget(ctx: RenderContext, children: () => KayChild): string {
+  ctx.inTarget = true
   try {
     return ssrChild(children())
   }
   finally {
-    ctx.inRegion = undefined
+    ctx.inTarget = false
   }
 }
 
@@ -30,16 +29,16 @@ export function Region(props: RegionProps): Html {
   if (ctx !== undefined) {
     if (ctx.regionNames.has(name))
       throw new Error(`kay: two <Region name="${name}"> on one page: give each region its own name.`)
-    if (ctx.inRegion !== undefined)
-      throw new Error(`kay: <Region name="${name}"> inside <Region name="${ctx.inRegion}">: put the two side by side.`)
     ctx.regionNames.add(name)
-    if (ctx.region !== undefined) {
+    if (ctx.region !== undefined && !ctx.inTarget) {
       if (ctx.region === name)
-        ctx.regionHtml = renderChildren(ctx, name, () => props.children)
+        ctx.regionHtml = renderTarget(ctx, () => props.children)
+      else if (ctx.regionAncestors.has(name))
+        ssrChild(props.children)
       return raw('')
     }
   }
-  const inner = renderChildren(ctx, name, () => props.children)
+  const inner = ssrChild(props.children)
   // Copied key by key: spreading `props` would read `children`, a lazy getter the other regions must never trigger.
   const attributes: Record<string, unknown> = {}
   for (const key of Object.keys(props)) {

@@ -60,7 +60,7 @@ describe('regions: the server renders only the requested region (#3597)', () => 
     expect(seen.__regionHeavy).toBe(1)
   })
 
-  it('fails with the fix when the route has no such region, two share a name, or one sits in another', async () => {
+  it('fails with the fix when the route has no such region or two share a name', async () => {
     const dir = appWith({
       'src/routes/index.tsx': `
         import { Region } from '@kayjs/kay'
@@ -70,20 +70,16 @@ describe('regions: the server renders only the requested region (#3597)', () => 
         import { Region } from '@kayjs/kay'
         export default function Twice() { return <main><Region name="a"><p>1</p></Region><Region name="a"><p>2</p></Region></main> }
       `,
-      'src/routes/nested.tsx': `
-        import { Region } from '@kayjs/kay'
-        export default function Nested() { return <main><Region name="a"><Region name="b"><p>1</p></Region></Region></main> }
-      `,
+
     })
     const errors: string[] = []
     const app = await testApp({ root: dir, onError: (info: { error: unknown }) => { errors.push((info.error as Error).message) } })
     expect((await app.get('/', { 'x-kay-region': 'nope' })).status).toBe(500)
     expect((await app.get('/twice')).status).toBe(500)
-    expect((await app.get('/nested')).status).toBe(500)
+
     expect(errors).toEqual([
       expect.stringContaining('kay: the route / does not render <Region name="nope">'),
       expect.stringContaining('kay: two <Region name="a"> on one page'),
-      expect.stringContaining('kay: <Region name="b"> inside <Region name="a">'),
     ])
   })
 
@@ -125,5 +121,41 @@ describe('kay check names a region link that targets no region (#3597)', () => {
     expect(broken.errors).toEqual([expect.stringContaining('[regions] src/routes/index.tsx: data-kay-target="pane" names no <Region name="pane"> in src/')])
     expect((await checkProject(make(page('pane', '<Region name="pane"><p>x</p></Region>')), { skipTypecheck: true })).errors).toEqual([])
     expect((await checkProject(make(page('pane', '<Region name={String(1)}><p>x</p></Region>')), { skipTypecheck: true })).errors).toEqual([])
+  })
+})
+
+describe('a region inside another (#3621)', () => {
+  const nested = {
+    'src/routes/index.tsx': `
+      import { Region } from '@kayjs/kay'
+      const hits = globalThis as { __sidebar?: number, __list?: number, __pane?: number }
+      function Pane() { hits.__pane = (hits.__pane ?? 0) + 1; return <p>pane</p> }
+      function Sidebar() { hits.__sidebar = (hits.__sidebar ?? 0) + 1; return <aside>SIDEBAR</aside> }
+      function List() { hits.__list = (hits.__list ?? 0) + 1; return <ul><li>one</li></ul> }
+      export default function Home() {
+        return (
+          <main>
+            <Region name="results"><Sidebar /><Region name="sets" class="inner"><List /></Region></Region>
+            <Region name="pane"><Pane /></Region>
+          </main>
+        )
+      }
+    `,
+  }
+  it('renders the inner region alone when asked for it by its path, and sends nothing of the outer one, and never builds its siblings', async () => {
+    const app = await testApp({ root: appWith(nested) })
+    const hits = globalThis as { __list?: number, __pane?: number }
+    const res = await app.get('/', { 'x-kay-region': 'results/sets' })
+    expect(await res.text()).toBe('<ul><li>one</li></ul>')
+    expect(res.headers.get('x-kay-region')).toBe('results/sets')
+    expect(hits.__list).toBe(1)
+    expect(hits.__pane).toBeUndefined()
+  })
+
+  it('renders the outer region with a fresh inner wrapper, and the whole page with both', async () => {
+    const app = await testApp({ root: appWith(nested) })
+    expect(await (await app.get('/', { 'x-kay-region': 'results' })).text()).toBe('<aside>SIDEBAR</aside><div data-kay-region="sets" class="inner"><ul><li>one</li></ul></div>')
+    const full = await (await app.get('/')).text()
+    expect(full).toContain('<div data-kay-region="results"><aside>SIDEBAR</aside><div data-kay-region="sets" class="inner">')
   })
 })

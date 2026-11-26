@@ -42,8 +42,10 @@ export interface RenderContext {
   /** The requested region's HTML, once the page rendered it. */
   regionHtml: string | undefined
   regionNames: Set<string>
-  /** The region whose children are rendering. */
-  inRegion: string | undefined
+  /** The regions around the requested one: rendered through, their own HTML dropped. */
+  regionAncestors: ReadonlySet<string>
+  /** True while the requested region's children render: regions inside it render in full. */
+  inTarget: boolean
 }
 
 const STORAGE_KEY = Symbol.for('kay.render.storage')
@@ -92,7 +94,7 @@ registerServerContextBridge({
   },
 })
 
-export function createRenderContext(region?: string): RenderContext {
+export function createRenderContext(region?: string, ancestors: ReadonlySet<string> = new Set()): RenderContext {
   return {
     headParts: [],
     title: undefined,
@@ -111,7 +113,8 @@ export function createRenderContext(region?: string): RenderContext {
     region,
     regionHtml: undefined,
     regionNames: new Set(),
-    inRegion: undefined,
+    regionAncestors: ancestors,
+    inTarget: false,
   }
 }
 

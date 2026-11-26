@@ -13,7 +13,7 @@ const PREFETCH_MAX = 8
 export const prefetchCache = new Map<string, PrefetchEntry>()
 export const inflightPrefetch = new Map<string, Promise<PrefetchEntry | undefined>>()
 
-/** The cache key of a page, or of one region of it. */
+/** The cache key of a page, or of one region of it, given by its path from the outermost region (`results/sets`). */
 export function fetchKeyOf(url: URL, region?: string): string {
   const key = `${url.origin}${url.pathname}${url.search}`
   return region === undefined ? key : `${region} ${key}`
