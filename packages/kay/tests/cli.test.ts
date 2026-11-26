@@ -61,6 +61,29 @@ describe('#3568 CLI argument parsing, plugin commands & dev config fidelity', ()
     }
   })
 
+  test('kay check says whether it typechecked, with which tool, or why not (#3657)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-check-typecheck-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>Home</p> }\n')
+      writeFileSync(join(dir, 'src/routes/legal.tsx'), 'export default function Legal() { return <p>Legal</p> }\n')
+      expect(JSON.parse((await kay(['check', '--no-typecheck', '--json'], dir)).out).typecheck).toEqual({ ran: false, reason: 'skipped by --no-typecheck' })
+      expect((await kay(['check'], dir)).out).toContain('kay check passed (2 files, no typecheck: the app has no tsconfig.json) in ')
+
+      writeFileSync(join(dir, 'tsconfig.json'), '{ "files": ["typed.ts"] }\n')
+      writeFileSync(join(dir, 'typed.ts'), 'export const n: number = 1\n')
+      expect((await kay(['check'], dir)).out).toContain('kay check passed (2 files, typechecked with bun check) in ')
+
+      writeFileSync(join(dir, 'src/routes/broken.ts'), 'export function GET() { return new Response(\'x\') }\nexport const n = 1 +\n')
+      const failed = await kay(['check', '--no-typecheck'], dir)
+      expect(failed.code).toBe(1)
+      expect(failed.err).toContain('kay check: no typecheck: skipped by --no-typecheck.')
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   test('an unknown option is a usage error that exits 2 and names the option', async () => {
     const res = await kay(['check', '--nope'])
     expect(res.code).toBe(2)

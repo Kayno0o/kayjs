@@ -17,11 +17,37 @@ import { collectMistakes, KayMistake, serverOnlyTagError } from '../compiler/mis
 import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 
+/** Whether `kay check` typechecked the app, with which tool, or why it did not. */
+export type TypecheckRun = { ran: true, tool: string } | { ran: false, reason: string }
+
 export interface CheckResult {
   ok: boolean
   checkedFiles: number
   errors: string[]
   warnings: string[]
+  typecheck: TypecheckRun
+}
+
+// `bun check` first, else the app's or the PATH's tsgo or tsc; its output, when it fails, becomes one error.
+function runTypecheck(root: string, errors: string[]): TypecheckRun {
+  const tsconfigPath = join(root, 'tsconfig.json')
+  if (!existsSync(tsconfigPath))
+    return { ran: false, reason: 'the app has no tsconfig.json' }
+  const bunCheck = Bun.spawnSync([process.execPath, 'check', '--no-script', '-p', tsconfigPath], { cwd: root })
+  if (bunCheck.exitCode === 0)
+    return { ran: true, tool: 'bun check' }
+  const bunOut = (bunCheck.stdout.toString() + bunCheck.stderr.toString()).trim()
+  if (!bunOut.includes('Script not found "check"') && !bunOut.includes('Unknown command')) {
+    errors.push(bunOut || `bun check exited with code ${bunCheck.exitCode}`)
+    return { ran: true, tool: 'bun check' }
+  }
+  const bin = [join(root, 'node_modules/.bin/tsgo'), join(root, 'node_modules/.bin/tsc'), 'tsgo', 'tsc'].find(c => c.includes('/') ? existsSync(c) : Bun.which(c) !== null)
+  if (bin === undefined)
+    return { ran: false, reason: 'this Bun has no `bun check`, and neither tsgo nor tsc is installed' }
+  const proc = Bun.spawnSync([bin, '--noEmit', '-p', tsconfigPath], { cwd: root })
+  if (proc.exitCode !== 0)
+    errors.push((proc.stdout.toString() + proc.stderr.toString()).trim() || `${bin} exited with code ${proc.exitCode}`)
+  return { ran: true, tool: bin.includes('tsgo') ? 'tsgo' : 'tsc' }
 }
 
 /** One diagnostic of `kay check --json`; one without a place (a typecheck dump) has no file, line or col. */
@@ -290,44 +316,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   // 3d. Plugin check(ctx) hooks
   await runPluginChecks(plugins, { root, routesDir, outDir, assetPrefix }, errors, warnings)
 
-  // 4. Run TypeScript check (`bun check` preferred, fallback to `tsgo` then `tsc`) when tsconfig.json exists
-  const tsconfigPath = join(root, 'tsconfig.json')
-  if (!options.skipTypecheck && existsSync(tsconfigPath)) {
-    const bunCheck = Bun.spawnSync([process.execPath, 'check', '--no-script', '-p', tsconfigPath], { cwd: root })
-    if (bunCheck.exitCode === 0) {
-      // Typecheck passed via built-in `bun check`
-    }
-    else {
-      const bunOut = (bunCheck.stdout.toString() + bunCheck.stderr.toString()).trim()
-      // Only fall back to tsgo/tsc if this Bun binary does not support `bun check`
-      const unsupported = bunOut.includes('Script not found "check"') || bunOut.includes('Unknown command')
-      if (!unsupported) {
-        errors.push(bunOut || `bun check exited with code ${bunCheck.exitCode}`)
-      }
-      else {
-        const candidates = [
-          join(root, 'node_modules/.bin/tsgo'),
-          join(root, 'node_modules/.bin/tsc'),
-          'tsgo',
-          'tsc',
-        ]
-        let bin: string | undefined
-        for (const c of candidates) {
-          if (c.includes('/') ? existsSync(c) : Bun.which(c) !== null) {
-            bin = c
-            break
-          }
-        }
-        if (bin !== undefined) {
-          const proc = Bun.spawnSync([bin, '--noEmit', '-p', tsconfigPath], { cwd: root })
-          if (proc.exitCode !== 0) {
-            const out = (proc.stdout.toString() + proc.stderr.toString()).trim()
-            errors.push(out || `${bin} exited with code ${proc.exitCode}`)
-          }
-        }
-      }
-    }
-  }
+  const typecheck = options.skipTypecheck === true ? { ran: false as const, reason: "skipped by --no-typecheck" } : runTypecheck(root, errors)
 
-  return { ok: errors.length === 0, checkedFiles: files.length, errors, warnings }
+  return { ok: errors.length === 0, checkedFiles: files.length, errors, warnings, typecheck }
 }
