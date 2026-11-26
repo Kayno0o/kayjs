@@ -65,7 +65,7 @@ import arrowRight from '~icons/tabler/arrow-right'
 
 An import of an icon or set that does not exist fails `kay check` and the build, naming the file and the closest icons that do.
 
-`kay icons-find garbage` prints the icons of the installed sets that match, such as `~icons/tabler/trash`, so an agent imports a name that exists. It also matches related words, typos and half-typed words. An app's own icon picker gets the same search from `findIcons(set, query, { limit, offset })` in `@kayjs/icons/search`. Call it on the server: it reads a 2 MB word table on first use.
+`kay icons-find garbage` prints the icons of the installed sets that match, such as `~icons/tabler/trash`, so an agent imports a name that exists. It also matches related words, typos and half-typed words. An app's own icon picker gets the same search from `findIcons(set, query, { limit, offset })` in `@kayjs/icons/search`. Call it on the server: it reads a 2 MB word table on first use, and `kay build` warns when an island imports it.
 
 ## `@kayjs/tailwind`
 

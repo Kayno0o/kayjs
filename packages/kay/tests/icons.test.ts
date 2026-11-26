@@ -316,3 +316,29 @@ describe('an icon or set that does not exist', () => {
     expect((await checkProject(root, { skipTypecheck: true })).errors.filter(error => error.includes('@kayjs/icons'))).toEqual([])
   })
 })
+
+describe('@kayjs/icons/search in an island', () => {
+  it('warns at build that the island ships the word table, naming the file', async () => {
+    const root = linkedApp({
+      'src/Picker.tsx': `
+        import { signal } from '@kayjs/kay'
+        import { findIcons } from '@kayjs/icons/search'
+        export function Picker() {
+          const query = signal('')
+          return <input value={query.value} onInput={e => { query.value = e.currentTarget.value }} title={findIcons(['home'], query.value).join(' ')} />
+        }
+      `,
+      'src/routes/index.tsx': `import { Picker } from '../Picker'\nexport default function Home() { return <main><Picker /></main> }`,
+    })
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await build({ root, plugins: [icons()], static: true })
+
+      expect(warn.mock.calls.map(call => String(call[0])).filter(line => line.startsWith('@kayjs/icons'))).toEqual(['@kayjs/icons: src/Picker.tsx imports @kayjs/icons/search into an island, which ships its 2.3 MB word table to the browser. Search on the server instead, in a route or an action.'])
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+})

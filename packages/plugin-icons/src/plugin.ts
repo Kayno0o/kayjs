@@ -12,6 +12,7 @@ import { installedSets, setFile } from './sets'
 
 const FOUND_PER_SET = 10
 const ICON_SPEC_RE = /^~icons\/([^/]+)\/(.+)$/
+const SEARCH_ENTRY_RE = /^@kayjs\/icons\/search$/
 const ICON_IMPORT_RE = /\b(?:from|import)\s*\(?\s*(['"])(~icons\/[^/'"]+\/[^'"]+)\1/g
 const SELF_CLOSING_RE = /<([a-z][\w:-]*)([^<>]*?)\s*\/>/gi
 
@@ -66,6 +67,12 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
       name: 'kayjs-icons',
       setup(b) {
         const lookup = lookupIn(root)
+        if (target === 'client') {
+          b.onResolve({ filter: SEARCH_ENTRY_RE }, (args) => {
+            console.warn(`@kayjs/icons: ${relative(root, args.importer)} imports @kayjs/icons/search into an island, which ships its 2.3 MB word table to the browser. Search on the server instead, in a route or an action.`)
+            return undefined
+          })
+        }
         // The first file importing each icon, for an error to name it.
         const importers = new Map<string, string>()
         b.onResolve({ filter: ICON_SPEC_RE }, (args) => {
