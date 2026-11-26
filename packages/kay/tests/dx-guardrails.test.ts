@@ -280,7 +280,7 @@ describe('kay is imported as @kayjs/kay (#3578)', () => {
       void signal
       export default function Home() { return <p>home</p> }
     `)
-    const message = `kay compiler: import from 'kay/server' in src/routes/index.tsx: write '@kayjs/kay/server'.`
+    const message = `kay compiler: import from 'kay/server' in src/routes/index.tsx: write '@kayjs/kay/server' (kay upgrade rewrites every import).`
     await expect(build({ root: dir, prerender: false })).rejects.toThrow(message)
     expect((await checkProject(dir, { skipTypecheck: true })).errors).toContain(`src/routes/index.tsx:1:1: error: ${message}`)
   })

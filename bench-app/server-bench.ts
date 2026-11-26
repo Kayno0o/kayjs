@@ -5,7 +5,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { measure } from 'mitata'
 import { build } from '@kayjs/kay/build'
-import { createServer } from '@kayjs/kay/internal/server'
+import { createServer } from '@kayjs/kay/server'
 
 const ROOT = import.meta.dir
 

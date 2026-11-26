@@ -55,7 +55,7 @@ const BARE_KAY_RE = /^kay(?:\/|$)/
 /** Refuses the bare `kay` spelling kay v1 used: v2 is imported as `@kayjs/kay`. */
 export function assertScopedKayImport(source: string, filename: string): void {
   if (BARE_KAY_RE.test(source))
-    throw mistake(`import from '${source}'`, filename, `write '@kayjs/${source}'`)
+    throw mistake(`import from '${source}'`, filename, `write '@kayjs/${source}' (kay upgrade rewrites every import)`)
 }
 
 const HYDRATE_MODES = new Set(['load', 'visible', 'idle', 'interaction', 'client'])
