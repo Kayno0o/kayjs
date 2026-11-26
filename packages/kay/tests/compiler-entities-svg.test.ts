@@ -88,6 +88,55 @@ export function Page() {
     }
   })
 
+  test('entities in string attributes and props decode once in SSR and DOM, innerHTML stays as written (#3653)', async () => {
+    const src = `
+function Tip({ label }) {
+  return <b id="prop" title={label}>{label}</b>
+}
+export function Page() {
+  let cls = 'k'
+  return (
+    <div>
+      <div id="attr" title="t&amp;u &eacute;"></div>
+      <a id="href" href="/s?a=1&amp;b=2">s</a>
+      <Tip label="a &amp; b" />
+      <p id="dyn" class={cls} title="x&lt;y">d</p>
+      <div id="inner" innerHTML="&lt;b&gt;x&lt;/b&gt;"></div>
+      <a id="js" href="javascript&#58;alert(1)">j</a>
+    </div>
+  )
+}
+`
+    const read = (root: { querySelector: (s: string) => Element | null }) => ({
+      attr: root.querySelector('#attr')!.getAttribute('title'),
+      href: root.querySelector('#href')!.getAttribute('href'),
+      propTitle: root.querySelector('#prop')!.getAttribute('title'),
+      propText: root.querySelector('#prop')!.textContent,
+      dyn: root.querySelector('#dyn')!.getAttribute('title'),
+      inner: root.querySelector('#inner')!.innerHTML,
+      js: root.querySelector('#js')!.getAttribute('href'),
+    })
+    const expected = { attr: 't&u é', href: '/s?a=1&b=2', propTitle: 'a & b', propText: 'a & b', dyn: 'x<y', inner: '&lt;b&gt;x&lt;/b&gt;', js: null }
+
+    const ssrHtml = ssrMod.ssrChild((evalSsr(src).Page as () => Parameters<typeof ssrMod.ssrChild>[0])())
+    const win = new Window()
+    const prevDoc = globalThis.document
+    const prevNode = globalThis.Node
+    try {
+      globalThis.document = win.document as unknown as Document
+      globalThis.Node = win.Node as unknown as typeof Node
+      const ssrContainer = win.document.createElement('div')
+      ssrContainer.innerHTML = ssrHtml
+      expect(read(ssrContainer as unknown as Element)).toEqual(expected)
+      expect(read((evalDom(src).Page as () => Element)())).toEqual(expected)
+    }
+    finally {
+      globalThis.document = prevDoc
+      globalThis.Node = prevNode
+      await win.happyDOM.close()
+    }
+  })
+
   test('SVG namespace follows enclosing <svg> for ambiguous tags like <a> and <title>, and resets inside <foreignObject>', () => {
     const svgLoop = compileDom('Svg.tsx', `
 export function Chart({ items, show }: { items: { href: string, label: string }[], show: boolean }) {

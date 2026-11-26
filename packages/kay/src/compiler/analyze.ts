@@ -10,7 +10,7 @@ import { checkCompliance } from './compliance'
 import { resolveInteractivity } from './interactivity'
 import { assertScopedKayImport, checkExportHydrate, checkHabits, checkHydrateMode, checkMistakes, guarded, islandRemoved, KayMistake, mistake, serverOnlyTagError, staticStringValue } from './mistakes'
 import { walkScoped } from './scope'
-import { calleeName, EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, resolveKayTag, unwrapTsExpr } from './shared'
+import { calleeName, decodeHtmlEntities, EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, resolveKayTag, unwrapTsExpr } from './shared'
 import { checkBareSignals } from './signal-reads'
 
 const REACTIVE_IMPORTS = new Set(['signal', 'computed', 'effect', 'onMount', 'onCleanup', 'selector', 'store', 'useAction'])
@@ -113,6 +113,20 @@ export function loadDeclarations(program: Program): Node[] {
   return found
 }
 
+// An entity cannot hide in `&&` or `a & b`: only `&name;`, `&#n;` or `&#xh;` decodes.
+const ENTITY_HINT_RE = /&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/i
+
+// JSX string attributes hold HTML entities as text children do (TypeScript and Babel decode both): decoded once here, every compile target reads the value. `innerHTML` stays as written, since it is markup.
+function decodeAttributeEntities(program: Program): void {
+  walk(program, (node) => {
+    if (node.type !== 'JSXAttribute' || node.value?.type !== 'Literal' || typeof node.value.value !== 'string')
+      return
+    if (node.name.type === 'JSXIdentifier' && node.name.name === 'innerHTML')
+      return
+    node.value.value = decodeHtmlEntities(node.value.value)
+  })
+}
+
 export function parseTsx(filename: string, code: string): Program {
   const lang = /\.[cm]?ts$/i.test(filename) ? 'ts' : 'tsx'
   const result = parseSync(filename, code, { lang, sourceType: 'module' })
@@ -125,6 +139,8 @@ export function parseTsx(filename: string, code: string): Program {
     const header = formatDiagnostic(loc, `kay compiler: syntax error: ${first.message}`)
     throw new Error(frame ? `${header}\n${frame}` : header)
   }
+  if (ENTITY_HINT_RE.test(code))
+    decodeAttributeEntities(result.program)
   return result.program
 }
 
