@@ -7,6 +7,7 @@ import { build } from '../build/index'
 import { devServer } from '../dev/index'
 import { loadConfig } from '../plugins/index'
 import { createServer } from '../server/index'
+import { handleSignals } from '../server/lifecycle'
 import { checkProject } from './check'
 import { scaffoldProject } from './new'
 import { upgradeProject } from './upgrade'
@@ -307,6 +308,7 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
     const hostname = resolveHostname(flags)
     const app = await createServer({ root })
     const server = app.serve(portRes.port, hostname)
+    handleSignals(app, server)
     out(`kay server listening on http://${hostname}:${server.port}`)
     return 0
   }

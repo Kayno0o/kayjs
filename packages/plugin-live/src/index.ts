@@ -309,12 +309,21 @@ export function createRooms<TMessage, TMember = undefined>(
     })
   }
 
+  // An open stream would hold a graceful stop until its timeout.
+  function closeAll(): void {
+    for (const set of [...map.values()]) {
+      for (const sub of [...set])
+        sub.close()
+    }
+  }
+
   function endpoint(opts: RoomsEndpointOptions<TMember>): KayPlugin {
     if (typeof opts.member !== 'function')
       throw new TypeError(`@kayjs/live: createRooms({ path: '${opts.path}' }) needs member(ctx), the member each stream joins as`)
     return definePlugin({
       name: `@kayjs/live(${opts.path})`,
       server(api) {
+        api.onShutdown(closeAll)
         api.route('GET', opts.path, async (ctx) => {
           const room = typeof opts.room === 'function' ? opts.room(ctx) : (opts.room ?? 'default')
           if (opts.authorize !== undefined) {
@@ -331,6 +340,6 @@ export function createRooms<TMessage, TMember = undefined>(
     })
   }
 
-  const plugin = options.path === undefined ? definePlugin({ name: '@kayjs/live' }) : endpoint(options)
+  const plugin = options.path === undefined ? definePlugin({ name: '@kayjs/live', server: api => api.onShutdown(closeAll) }) : endpoint(options)
   return { ...plugin, join, leave, members, size, publish, coalesce, stream }
 }

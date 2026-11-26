@@ -26,7 +26,8 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   // Evaluated first via ESM static import order so `kay.config.ts` and route modules see NODE_ENV=production!
   writeFileSync(prodEnvPath, `const _envKey = 'NODE_ENV';\nprocess.env[_envKey] ??= 'production';\n`)
   const entryJs = join(outDir, 'server', SERVER_ENTRY_FILE)
-  const imports: string[] = [`import ${JSON.stringify(prodEnvPath)};`, `import { createApp, kayConfig } from ${JSON.stringify(entryJs)};`]
+  const lifecycle = join(import.meta.dir, '../server/lifecycle.ts')
+  const imports: string[] = [`import ${JSON.stringify(prodEnvPath)};`, `import { createApp, kayConfig } from ${JSON.stringify(entryJs)};`, `import { handleSignals } from ${JSON.stringify(lifecycle)};`]
 
   // Embed client assets and public files natively via `with { type: "file" }` (0 base64, 0 startup decode!)
   const embeddedAssets: string[] = []
@@ -81,6 +82,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     `if (Bun.argv.includes('--health')) { const probeHost = !hostname || hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname; const r = await fetch(\`http://\${probeHost}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
     `const app = await createApp({ assetPrefix: ${JSON.stringify(assetPrefix)}, manifest, assets, publicAssets, publicEtags, prerenderedFiles });`,
     `const server = app.serve(port, hostname);`,
+    `handleSignals(app, server);`,
     `console.log(\`kay server listening on http://\${hostname ?? 'localhost'}:\${server.port}\`);`,
   ].join('\n')
 
