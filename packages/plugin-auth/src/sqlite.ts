@@ -73,11 +73,14 @@ function rowToSession(row: SessionRow | null): AuthSession | undefined {
 }
 
 export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthStore & { readonly db: Database } {
-  if (typeof dbOrPath === 'string' && dbOrPath !== ':memory:' && !dbOrPath.startsWith('file:'))
+  const ownsDb = typeof dbOrPath === 'string'
+  if (ownsDb && dbOrPath !== ':memory:' && !dbOrPath.startsWith('file:'))
     mkdirSync(dirname(dbOrPath), { recursive: true })
-  const db = typeof dbOrPath === 'string' ? new Database(dbOrPath, { create: true }) : dbOrPath
+  const db = ownsDb ? new Database(dbOrPath, { create: true }) : dbOrPath
+  let closed = false
 
   db.exec(`
+    PRAGMA busy_timeout = 5000;
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
 
@@ -176,6 +179,13 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
 
   return {
     db,
+    close() {
+      if (closed)
+        return
+      closed = true
+      if (ownsDb)
+        db.close()
+    },
     pruneExpired() {
       const now = Date.now()
       db.run('DELETE FROM kay_auth_sessions WHERE expires_at <= ?', [now])

@@ -1,5 +1,7 @@
 // Zero-dependency OAuth 2.0 + PKCE (S256) provider definitions for @kayjs/auth.
 
+export const OAUTH_FETCH_TIMEOUT_MS = 10_000
+
 export interface OAuthProfile {
   id: string
   email: string
@@ -29,6 +31,12 @@ export function oauthProvider(def: OAuthProvider): OAuthProvider {
   return def
 }
 
+interface GitHubEmail {
+  email: string
+  primary: boolean
+  verified: boolean
+}
+
 export function github(config: OAuthPresetConfig): OAuthProvider {
   return {
     id: 'github',
@@ -40,23 +48,38 @@ export function github(config: OAuthPresetConfig): OAuthProvider {
     pkce: false,
     async fetchProfile(accessToken) {
       const headers = { 'authorization': `Bearer ${accessToken}`, 'accept': 'application/vnd.github+json', 'user-agent': 'kayjs-auth' }
-      const userRes = await fetch('https://api.github.com/user', { headers })
+      const userRes = await fetch('https://api.github.com/user', {
+        headers,
+        signal: AbortSignal.timeout(OAUTH_FETCH_TIMEOUT_MS),
+      })
       if (!userRes.ok)
         throw new Error(`github profile fetch failed: ${userRes.status}`)
       const user = await userRes.json() as { id: number, email?: string | null, name?: string | null, login?: string, avatar_url?: string }
       let email = user.email ?? ''
       let emailVerified = false
-      if (!email) {
-        const emailRes = await fetch('https://api.github.com/user/emails', { headers })
-        if (emailRes.ok) {
-          const emails = await emailRes.json() as Array<{ email: string, primary: boolean, verified: boolean }>
-          const primary = emails.find(e => e.primary && e.verified) ?? emails.find(e => e.verified) ?? emails[0]
-          if (primary) {
-            email = primary.email
-            emailVerified = primary.verified
+
+      // Always query /user/emails: /user does not indicate whether a public email is verified.
+      const emailRes = await fetch('https://api.github.com/user/emails', {
+        headers,
+        signal: AbortSignal.timeout(OAUTH_FETCH_TIMEOUT_MS),
+      })
+      if (emailRes.ok) {
+        const raw = await emailRes.json() as unknown
+        const emails = Array.isArray(raw) ? raw as GitHubEmail[] : []
+        const matched = email ? emails.find(e => e.email.toLowerCase() === email.toLowerCase()) : undefined
+        if (matched?.verified) {
+          email = matched.email
+          emailVerified = true
+        }
+        else {
+          const best = emails.find(e => e.primary && e.verified) ?? emails.find(e => e.verified) ?? matched ?? emails[0]
+          if (best) {
+            email = best.email
+            emailVerified = Boolean(best.verified)
           }
         }
       }
+
       if (!email)
         throw new Error('github profile did not return an email address')
       return {
@@ -82,6 +105,7 @@ export function discord(config: OAuthPresetConfig): OAuthProvider {
     async fetchProfile(accessToken) {
       const res = await fetch('https://discord.com/api/users/@me', {
         headers: { authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(OAUTH_FETCH_TIMEOUT_MS),
       })
       if (!res.ok)
         throw new Error(`discord profile fetch failed: ${res.status}`)
@@ -112,6 +136,7 @@ export function google(config: OAuthPresetConfig): OAuthProvider {
     async fetchProfile(accessToken) {
       const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
         headers: { authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(OAUTH_FETCH_TIMEOUT_MS),
       })
       if (!res.ok)
         throw new Error(`google profile fetch failed: ${res.status}`)

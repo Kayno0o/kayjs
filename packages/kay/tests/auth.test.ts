@@ -169,11 +169,10 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
         name: 'Alice',
       })
       expect(signupRes.status).toBe(202)
-      const signupBody = await signupRes.json() as { ok: boolean, verificationRequired?: boolean, user: { email: string, passwordHash?: string } }
+      const signupBody = await signupRes.json() as { ok: boolean, verificationRequired?: boolean, user?: { email: string, passwordHash?: string } }
       expect(signupBody.ok).toBe(true)
       expect(signupBody.verificationRequired).toBe(true)
-      expect(signupBody.user.email).toBe('alice@example.com')
-      expect(signupBody.user.passwordHash).toBeUndefined() // never leaked!
+      expect(signupBody.user).toBeUndefined() // never leaks account existence or fields before verification
       expect(app.cookies.has('kay_session')).toBe(false)
 
       // Complete email verification to open Alice's session

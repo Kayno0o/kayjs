@@ -10,10 +10,12 @@ import type { RateLimitOptions } from './ratelimit'
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
 import { definePlugin } from '@kayjs/kay/config'
 import { isHttpsRequest, nodeEnv } from '@kayjs/kay/server'
-import { hashPassword, randomToken, safeRedirect, sha256Hex, verifyPassword } from './crypto'
-import { fail, formatSessionIp, isValidEmail, parseBody, resolveClientIp, wantsJson } from './http'
+import { hashPassword, randomToken, safeRedirect, sha256Hex } from './crypto'
+import { fail, isValidEmail, resolveClientIp, wantsJson } from './http'
 import { registerOAuthRoutes } from './oauth-routes'
 import { createRateLimiter } from './ratelimit'
+import { registerAuthRoutes } from './routes'
+import { createSessionManager } from './session'
 import { memoryAuthStore, normalizeEmail, toPublicUser } from './store'
 
 declare module '@kayjs/kay/server' {
@@ -34,7 +36,6 @@ export type { AuthSession, AuthStore, AuthUser, OAuthAccount, PublicUser, TokenK
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 const DEFAULT_PRUNE_INTERVAL_MS = 15 * 60 * 1000
-
 const MIN_PROD_SECRET_BYTES = 32
 const LINK_PATHS = { 'magic-link': 'magic-link/verify', 'verify-email': 'verify-email' } as const
 const LINK_MAILS = {
@@ -170,20 +171,23 @@ export interface Auth<TUser extends AuthUser = AuthUser> extends KayPlugin {
   dispose(): void
 }
 
-export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptions<TUser> = {}): Auth<TUser> {
-  if (options.secret !== undefined && options.secret.trim().length === 0)
+function resolveSecret(optionSecret: string | undefined): string {
+  if (optionSecret !== undefined && optionSecret.trim().length === 0)
     throw new Error('[kay/auth] `secret` must not be empty')
 
   const envSecret = process.env.AUTH_SECRET
-  const configuredSecret = options.secret ?? (envSecret && envSecret.trim().length > 0 ? envSecret : undefined)
+  const configured = optionSecret ?? (envSecret && envSecret.trim().length > 0 ? envSecret : undefined)
   if (nodeEnv() === 'production') {
-    if (configuredSecret === undefined)
+    if (configured === undefined)
       throw new Error('[kay/auth] `secret` (or `AUTH_SECRET` env) is required in production and must be at least 32 bytes')
-    if (Buffer.byteLength(configuredSecret, 'utf8') < MIN_PROD_SECRET_BYTES)
+    if (Buffer.byteLength(configured, 'utf8') < MIN_PROD_SECRET_BYTES)
       throw new Error(`[kay/auth] \`secret\` must be at least ${MIN_PROD_SECRET_BYTES} UTF-8 bytes in production`)
   }
-  const secret = configuredSecret ?? randomToken(32)
+  return configured ?? randomToken(32)
+}
 
+export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptions<TUser> = {}): Auth<TUser> {
+  const secret = resolveSecret(options.secret)
   const store = options.store ?? memoryAuthStore<TUser>()
   const basePath = (options.basePath ?? '/auth').replace(/\/$/, '')
   const cookieName = options.cookieName ?? 'kay_session'
@@ -213,8 +217,6 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
       : undefined)
   const requireEmailVerification = options.requireEmailVerification !== false
   let trustProxy = options.trustProxy ?? false
-  const storeIp = options.storeIp ?? 'truncate'
-  const storeUserAgent = options.storeUserAgent !== false
   const rateLimiter = createRateLimiter(options.rateLimit)
   const limitIp = (ctx: RequestContext, scope: string): Response | undefined =>
     rateLimiter.allow(`${scope}:ip:${resolveClientIp(ctx, trustProxy)}`) ? undefined : fail(ctx, 429, 'Too many requests')
@@ -223,8 +225,29 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     ? undefined
     : (options.pruneIntervalMs ?? DEFAULT_PRUNE_INTERVAL_MS)
 
+  const providers = new Map<string, OAuthProvider>()
+  for (const p of options.providers ?? [])
+    providers.set(p.id, p)
+
+  const isSecureCookie = (ctx: RequestContext): boolean =>
+    ctx.url.protocol === 'https:'
+    || isHttpsRequest(ctx.request, trustProxy)
+    || nodeEnv() === 'production'
+
+  const sessions = createSessionManager({
+    store,
+    cookieName,
+    sessionTtlMs,
+    renewalIntervalMs,
+    storeIp: options.storeIp ?? 'truncate',
+    storeUserAgent: options.storeUserAgent !== false,
+    getTrustProxy: () => trustProxy,
+    isSecureCookie,
+  })
+
   // One timer per server the plugin runs on: `kay dev` starts the next server before it shuts the previous one down.
   const pruneTimers = new Set<ReturnType<typeof setInterval>>()
+  let activeServers = 0
   const startPruneTimer = (): (() => void) | undefined => {
     if (pruneIntervalMs === undefined || pruneIntervalMs <= 0)
       return undefined
@@ -232,6 +255,7 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
       try {
         void Promise.resolve(store.pruneExpired?.()).catch(() => {})
         rateLimiter.sweep()
+        sessions.sweepRenewedAt()
       }
       catch {
         // Ignore prune errors if the underlying store has been closed
@@ -245,250 +269,19 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     }
   }
 
-  const providers = new Map<string, OAuthProvider>()
-  for (const p of options.providers ?? [])
-    providers.set(p.id, p)
-
-  const isSecureCookie = (ctx: RequestContext): boolean =>
-    ctx.url.protocol === 'https:'
-    || isHttpsRequest(ctx.request, trustProxy)
-    || nodeEnv() === 'production'
-
-  const setSessionCookie = (ctx: RequestContext, rawToken: string): void => {
-    ctx.cookies.set(cookieName, rawToken, {
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: isSecureCookie(ctx),
-      maxAge: Math.floor(sessionTtlMs / 1000),
-    })
-  }
-
-  const resolvedContexts = new WeakSet<object>()
-  const resolvedUsers = new WeakMap<object, PublicUser<TUser>>()
-  const pendingContexts = new WeakMap<object, Promise<{ user: PublicUser<TUser>, session: AuthSession } | undefined>>()
-  const renewedAt = new Map<string, number>()
-
-  function defineLocal(locals: KayLocals, key: 'user' | 'session', value: unknown): void {
-    if (value === undefined) {
-      delete locals[key]
-      return
-    }
-    Object.defineProperty(locals, key, {
-      value,
-      writable: true,
-      enumerable: true,
-      configurable: true,
-    })
-  }
-
-  function setResolvedUser(ctx: RequestContext, pub: PublicUser<TUser>): void {
-    resolvedUsers.set(ctx.locals, pub)
-    defineLocal(ctx.locals, 'user', pub)
-  }
-
-  function setResolvedSession(ctx: RequestContext, session: AuthSession): void {
-    defineLocal(ctx.locals, 'session', session)
-  }
-
-  function clearLazyLocals(locals: KayLocals): void {
-    resolvedUsers.delete(locals)
-    delete locals.user
-    delete locals.session
-  }
-
-  function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
-    return typeof value === 'object' && value !== null && typeof (value as PromiseLike<T>).then === 'function'
-  }
-
-  function maybeRenewSession(ctx: RequestContext, rawToken: string, tokenHash: string, session: AuthSession): void | Promise<void> {
+  async function insertUser(fields: Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>): Promise<TUser> {
     const now = Date.now()
-    if (session.expiresAt - now >= sessionTtlMs / 2)
-      return
-    const prev = renewedAt.get(tokenHash)
-    if (prev !== undefined && now - prev < renewalIntervalMs)
-      return
-    renewedAt.set(tokenHash, now)
-    const nextExpiry = now + sessionTtlMs
-    session.expiresAt = nextExpiry
-    setSessionCookie(ctx, rawToken)
-    return store.updateSessionExpiry(tokenHash, nextExpiry)
-  }
-
-  function sweepRenewedAt(): void {
-    if (renewedAt.size === 0)
-      return
-    const cutoff = Date.now() - Math.max(renewalIntervalMs, 1000)
-    for (const [k, ts] of renewedAt) {
-      if (ts <= cutoff)
-        renewedAt.delete(k)
-    }
-  }
-
-  function finalizeResolved(ctx: RequestContext, rawToken: string, tokenHash: string, session: AuthSession, userRecord: TUser): { user: PublicUser<TUser>, session: AuthSession } {
-    const pub = toPublicUser(userRecord)
-    resolvedContexts.add(ctx.locals)
-    setResolvedUser(ctx, pub)
-    setResolvedSession(ctx, session)
-    const renew = maybeRenewSession(ctx, rawToken, tokenHash, session)
-    if (isPromiseLike(renew))
-      void renew.catch(() => {})
-    return { user: pub, session }
-  }
-
-  function resolveRequestSessionSync(ctx: RequestContext): { user: PublicUser<TUser>, session: AuthSession } | undefined {
-    if (resolvedContexts.has(ctx.locals)) {
-      const user = resolvedUsers.get(ctx.locals) ?? (ctx.locals.user as PublicUser<TUser> | undefined)
-      const session = ctx.locals.session
-      return user && session ? { user, session } : undefined
-    }
-    const rawToken = ctx.cookies.get(cookieName)
-    if (!rawToken) {
-      resolvedContexts.add(ctx.locals)
-      clearLazyLocals(ctx.locals)
-      return undefined
-    }
-    const tokenHash = sha256Hex(rawToken)
-    const maybeSession = store.getSession(tokenHash)
-    if (isPromiseLike(maybeSession)) {
-      // Async store: kick off async resolution and cache its promise for `resolve()` / `guard()`.
-      void resolveRequestSession(ctx, maybeSession)
-      return undefined
-    }
-    if (!maybeSession || maybeSession.expiresAt <= Date.now()) {
-      resolvedContexts.add(ctx.locals)
-      clearLazyLocals(ctx.locals)
-      ctx.cookies.delete(cookieName, { path: '/' })
-      return undefined
-    }
-    const maybeUser = store.getUserById(maybeSession.userId)
-    if (isPromiseLike(maybeUser)) {
-      void resolveRequestSession(ctx, Promise.resolve(maybeSession), maybeUser)
-      return undefined
-    }
-    if (!maybeUser) {
-      resolvedContexts.add(ctx.locals)
-      clearLazyLocals(ctx.locals)
-      void Promise.resolve(store.deleteSession(tokenHash)).catch(() => {})
-      ctx.cookies.delete(cookieName, { path: '/' })
-      return undefined
-    }
-    return finalizeResolved(ctx, rawToken, tokenHash, maybeSession, maybeUser)
-  }
-
-  async function resolveRequestSession(
-    ctx: RequestContext,
-    preloadedSession?: Promise<AuthSession | undefined>,
-    preloadedUser?: Promise<TUser | undefined>,
-  ): Promise<{ user: PublicUser<TUser>, session: AuthSession } | undefined> {
-    if (resolvedContexts.has(ctx.locals)) {
-      const user = resolvedUsers.get(ctx.locals) ?? (ctx.locals.user as PublicUser<TUser> | undefined)
-      const session = ctx.locals.session
-      return user && session ? { user, session } : undefined
-    }
-    const inFlight = pendingContexts.get(ctx.locals)
-    if (inFlight !== undefined)
-      return inFlight
-
-    const run = (async (): Promise<{ user: PublicUser<TUser>, session: AuthSession } | undefined> => {
-      const rawToken = ctx.cookies.get(cookieName)
-      if (!rawToken) {
-        resolvedContexts.add(ctx.locals)
-        clearLazyLocals(ctx.locals)
-        return undefined
-      }
-
-      const tokenHash = sha256Hex(rawToken)
-      const session = preloadedSession !== undefined ? await preloadedSession : await store.getSession(tokenHash)
-      if (!session || session.expiresAt <= Date.now()) {
-        resolvedContexts.add(ctx.locals)
-        clearLazyLocals(ctx.locals)
-        ctx.cookies.delete(cookieName, { path: '/' })
-        return undefined
-      }
-
-      const userRecord = preloadedUser !== undefined ? await preloadedUser : await store.getUserById(session.userId)
-      if (!userRecord) {
-        resolvedContexts.add(ctx.locals)
-        clearLazyLocals(ctx.locals)
-        await store.deleteSession(tokenHash)
-        ctx.cookies.delete(cookieName, { path: '/' })
-        return undefined
-      }
-
-      const pub = toPublicUser(userRecord)
-      resolvedContexts.add(ctx.locals)
-      setResolvedUser(ctx, pub)
-      setResolvedSession(ctx, session)
-      await maybeRenewSession(ctx, rawToken, tokenHash, session)
-      return { user: pub, session }
-    })()
-
-    pendingContexts.set(ctx.locals, run)
-    try {
-      return await run
-    }
-    finally {
-      pendingContexts.delete(ctx.locals)
-    }
-  }
-
-  function attachLazySession(ctx: RequestContext): void {
-    if (resolvedContexts.has(ctx.locals) || !ctx.cookies.get(cookieName))
-      return
-    Object.defineProperties(ctx.locals, {
-      user: {
-        configurable: true,
-        enumerable: false,
-        get() {
-          return resolveRequestSessionSync(ctx)?.user
-        },
-        set(val: PublicUser<TUser> | undefined) {
-          defineLocal(ctx.locals, 'user', val)
-        },
-      },
-      session: {
-        configurable: true,
-        enumerable: false,
-        get() {
-          return resolveRequestSessionSync(ctx)?.session
-        },
-        set(val: AuthSession | undefined) {
-          defineLocal(ctx.locals, 'session', val)
-        },
-      },
-    })
-  }
-
-  async function createSessionForUser(userId: string, ctx: RequestContext): Promise<AuthSession> {
-    const rawToken = randomToken(32)
-    const now = Date.now()
-    const recordedIp = formatSessionIp(resolveClientIp(ctx, trustProxy), storeIp)
-    const recordedUa = storeUserAgent ? (ctx.request.headers.get('user-agent') ?? undefined) : undefined
-    const session: AuthSession = {
-      id: sha256Hex(rawToken),
-      userId,
+    const defaults = typeof options.defaultUserFields === 'function'
+      ? (options.defaultUserFields as () => Partial<TUser>)()
+      : (options.defaultUserFields as Partial<TUser> | undefined)
+    return sessions.observeAsync(store.createUser({
+      id: crypto.randomUUID(),
+      role: defaultRole,
       createdAt: now,
-      expiresAt: now + sessionTtlMs,
-      ...(recordedUa !== undefined ? { userAgent: recordedUa } : {}),
-      ...(recordedIp !== undefined ? { ip: recordedIp } : {}),
-    }
-    await store.createSession(session)
-    setSessionCookie(ctx, rawToken)
-    setResolvedSession(ctx, session)
-    return session
-  }
-
-  async function signOut(ctx: RequestContext): Promise<void> {
-    const rawToken = ctx.cookies.get(cookieName)
-    if (rawToken) {
-      const tokenHash = sha256Hex(rawToken)
-      renewedAt.delete(tokenHash)
-      await store.deleteSession(tokenHash)
-    }
-    ctx.cookies.delete(cookieName, { path: '/' })
-    resolvedContexts.add(ctx.locals)
-    clearLazyLocals(ctx.locals)
+      updatedAt: now,
+      ...defaults,
+      ...fields,
+    } as TUser))
   }
 
   async function createUser(input: CreateUserInput<TUser>): Promise<PublicUser<TUser>> {
@@ -496,7 +289,7 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     const email = normalizeEmail(rawEmail)
     if (!isValidEmail(email))
       throw new Error('Invalid email address')
-    if (await store.getUserByEmail(email))
+    if (await sessions.observeAsync(store.getUserByEmail(email)))
       throw new Error('Email is already registered')
 
     const passwordHash = password !== undefined ? await hashPassword(password) : undefined
@@ -522,9 +315,9 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
   // Whoever signed up with an address before it was proven may hold its password, sessions and provider links; proving it hands the account to the owner alone.
   // The password goes first, so a squatter cannot sign in again between the purge and the update.
   async function claimUnverified(user: TUser): Promise<TUser> {
-    const claimed = (await store.updateUser(user.id, { emailVerified: true, passwordHash: undefined } as Partial<Omit<TUser, 'id' | 'createdAt'>>)) ?? user
-    await store.deleteUserSessions(user.id)
-    await store.deleteUserOAuthAccounts(user.id)
+    const claimed = (await sessions.observeAsync(store.updateUser(user.id, { emailVerified: true, passwordHash: undefined } as Partial<Omit<TUser, 'id' | 'createdAt'>>))) ?? user
+    await sessions.observeAsync(store.deleteUserSessions(user.id))
+    await sessions.observeAsync(store.deleteUserOAuthAccounts(user.id))
     return claimed
   }
 
@@ -532,13 +325,14 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
   async function issueLink(kind: 'magic-link' | 'verify-email', userId: string | undefined, email: string, origin: string | undefined, redirectTo: string | undefined): Promise<string> {
     const normalized = normalizeEmail(email)
     const rawToken = randomToken(32)
-    await store.createToken({
-      tokenHash: sha256Hex(rawToken),
+    const tokenHash = sha256Hex(rawToken)
+    await sessions.observeAsync(store.createToken({
+      tokenHash,
       ...(userId !== undefined ? { userId } : {}),
       email: normalized,
       kind,
       expiresAt: Date.now() + tokenTtlMs,
-    })
+    }))
 
     const next = safeRedirect(redirectTo, defaultRedirect)
     const path = `${basePath}/${LINK_PATHS[kind]}?token=${encodeURIComponent(rawToken)}&redirect=${encodeURIComponent(next)}`
@@ -546,65 +340,56 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
 
     if (deliverMail && origin !== undefined) {
       const mail = LINK_MAILS[kind]
-      await deliverMail({
-        to: normalized,
-        subject: mail.subject,
-        text: `${mail.text}: ${url}`,
-        html: `<p>${mail.html}: <a href="${url}">${mail.label}</a></p>`,
-        url,
-        kind,
-      })
+      try {
+        await deliverMail({
+          to: normalized,
+          subject: mail.subject,
+          text: `${mail.text}: ${url}`,
+          html: `<p>${mail.html}: <a href="${url}">${mail.label}</a></p>`,
+          url,
+          kind,
+        })
+      }
+      catch (err) {
+        try {
+          await sessions.observeAsync(store.consumeToken(tokenHash, kind))
+        }
+        catch {
+          // Best-effort token cleanup if delivery fails.
+        }
+        throw err
+      }
     }
     return url
   }
 
   async function sendVerificationEmail(email: string, origin: string, redirectTo?: string): Promise<string> {
     const normalized = normalizeEmail(email)
-    const existing = await store.getUserByEmail(normalized)
+    const existing = await sessions.observeAsync(store.getUserByEmail(normalized))
     return issueLink('verify-email', existing?.id, normalized, origin, redirectTo)
   }
 
   async function sendMagicLink(email: string, origin: string, redirectTo?: string): Promise<string> {
     const normalized = normalizeEmail(email)
-    const existing = await store.getUserByEmail(normalized)
+    const existing = await sessions.observeAsync(store.getUserByEmail(normalized))
     return issueLink('magic-link', existing?.id, normalized, origin, redirectTo)
   }
 
   // Consumes a one-time token and loads the user it was issued for (by id, else by email).
   async function consumeLink(kind: 'magic-link' | 'verify-email', rawToken: string): Promise<{ email: string, user: TUser | undefined } | undefined> {
-    const consumed = await store.consumeToken(sha256Hex(rawToken), kind)
+    const consumed = await sessions.observeAsync(store.consumeToken(sha256Hex(rawToken), kind))
     if (!consumed)
       return undefined
-    const user = consumed.userId ? await store.getUserById(consumed.userId) : await store.getUserByEmail(consumed.email)
+    const user = consumed.userId
+      ? await sessions.observeAsync(store.getUserById(consumed.userId))
+      : await sessions.observeAsync(store.getUserByEmail(consumed.email))
     return { email: consumed.email, user }
-  }
-
-  async function insertUser(fields: Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>): Promise<TUser> {
-    const now = Date.now()
-    const defaults = typeof options.defaultUserFields === 'function'
-      ? (options.defaultUserFields as () => Partial<TUser>)()
-      : (options.defaultUserFields as Partial<TUser> | undefined)
-    return store.createUser({
-      id: crypto.randomUUID(),
-      role: defaultRole,
-      createdAt: now,
-      updatedAt: now,
-      ...defaults,
-      ...fields,
-    } as TUser)
-  }
-
-  function respondAuthError(ctx: RequestContext, status: number, error: string, redirectTo?: string): Response {
-    if (wantsJson(ctx.request) || !redirectTo)
-      return ctx.json({ ok: false, error }, { status })
-    const sep = redirectTo.includes('?') ? '&' : '?'
-    return ctx.redirect(`${redirectTo}${sep}error=${encodeURIComponent(error)}`, 303)
   }
 
   function guard(guardOpts: GuardOptions<TUser> = {}): Middleware {
     const roles = guardOpts.role === undefined ? undefined : (Array.isArray(guardOpts.role) ? guardOpts.role : [guardOpts.role])
     return async (ctx, next) => {
-      const resolved = await resolveRequestSession(ctx)
+      const resolved = await sessions.resolve(ctx)
       if (!resolved) {
         if (!wantsJson(ctx.request) && guardOpts.redirectTo) {
           const nextParam = encodeURIComponent(ctx.url.pathname + ctx.url.search)
@@ -621,28 +406,12 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     }
   }
 
-  async function handleVerifyEmail(ctx: RequestContext, rawToken: string, redirectTarget: string, redirectStatus: 302 | 303): Promise<Response> {
-    if (!rawToken)
-      return fail(ctx, 400, 'Missing token')
-
-    const userRecord = (await consumeLink('verify-email', rawToken))?.user
-    if (!userRecord)
-      return fail(ctx, 400, 'Invalid or expired verification link')
-
-    const verified = (await store.updateUser(userRecord.id, { emailVerified: true } as Partial<Omit<TUser, 'id' | 'createdAt'>>)) ?? { ...userRecord, emailVerified: true }
-    await createSessionForUser(verified.id, ctx)
-    const pub = toPublicUser(verified)
-    setResolvedUser(ctx, pub)
-
-    if (wantsJson(ctx.request))
-      return ctx.json({ ok: true, user: pub }, { status: 200 })
-    return ctx.redirect(redirectTarget, redirectStatus)
-  }
-
   const dispose = (): void => {
     for (const timer of pruneTimers)
       clearInterval(timer)
     pruneTimers.clear()
+    activeServers = 0
+    void Promise.resolve(store.close?.()).catch(() => {})
   }
 
   const plugin: KayPlugin = definePlugin({
@@ -654,164 +423,55 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         trustProxy = api.trustProxy
       if (options.site === undefined && api.site !== undefined)
         site = siteOrigin(api.site)
+      activeServers++
       const stopPruneTimer = startPruneTimer()
-      if (stopPruneTimer !== undefined)
-        api.onShutdown(stopPruneTimer)
+      let stopped = false
+      api.onShutdown(async () => {
+        if (stopped)
+          return
+        stopped = true
+        stopPruneTimer?.()
+        activeServers = Math.max(0, activeServers - 1)
+        if (activeServers === 0)
+          await store.close?.()
+      })
 
-      // Resolve session lazily on first read of ctx.locals.user/session; skip asset & internal non-action routes.
+      // Sync stores resolve lazily on first read of ctx.locals.user/session; async stores resolve before next().
       const internalPrefix = `${api.assetPrefix.replace(/\/$/, '')}/`
       const actionPrefix = `${internalPrefix}action/`
       api.use((ctx, next) => {
         const p = ctx.url.pathname
-        if (!p.startsWith(internalPrefix) || p.startsWith(actionPrefix))
-          attachLazySession(ctx)
+        if (!p.startsWith(internalPrefix) || p.startsWith(actionPrefix)) {
+          if (sessions.isAsyncStore()) {
+            if (ctx.cookies.get(cookieName))
+              return sessions.resolve(ctx).then(() => next())
+          }
+          else {
+            sessions.attachLazy(ctx)
+          }
+        }
         return next()
       })
 
-      // Shared auth route wrapper: origin check (on POST), IP + optional email rate limiting, and body parsing.
-      function authRoute(
-        method: 'GET' | 'POST',
-        path: string,
-        routeCfg: { limit?: string, emailLimit?: string, readBody?: boolean },
-        handler: (ctx: RequestContext, body: Record<string, string>) => Response | Promise<Response>,
-      ): void {
-        api.route(method, `${basePath}${path}`, async (ctx) => {
-          if (routeCfg.limit !== undefined) {
-            const limited = limitIp(ctx, routeCfg.limit)
-            if (limited)
-              return limited
-          }
-          let body: Record<string, string> = {}
-          if (routeCfg.readBody) {
-            const parsed = await parseBody(ctx)
-            if (parsed instanceof Response)
-              return parsed
-            body = parsed
-          }
-          if (routeCfg.emailLimit !== undefined) {
-            const email = normalizeEmail(body.email ?? '')
-            if (email && !rateLimiter.allow(`${routeCfg.emailLimit}:email:${email}`))
-              return fail(ctx, 429, 'Too many requests')
-          }
-          return handler(ctx, body)
-        }, method === 'POST' ? authRouteOpts : undefined)
-      }
-
-      authRoute('GET', '/session', {}, async (ctx) => {
-        const resolved = await resolveRequestSession(ctx)
-        return ctx.json({
-          user: resolved?.user ?? null,
-          session: resolved ? { id: resolved.session.id, expiresAt: resolved.session.expiresAt } : null,
-        })
-      })
-
-      authRoute('POST', '/signup', { limit: 'signup', emailLimit: 'signup', readBody: true }, async (ctx, body) => {
-        const email = normalizeEmail(body.email ?? '')
-        const password = body.password ?? ''
-        const name = body.name?.trim() || undefined
-        const redirectTarget = safeRedirect(body.redirect ?? body.next, defaultRedirect)
-
-        if (!isValidEmail(email))
-          return respondAuthError(ctx, 400, 'Please enter a valid email address')
-        if (password.length < minPasswordLength)
-          return respondAuthError(ctx, 400, `Password must be at least ${minPasswordLength} characters`)
-        if (await store.getUserByEmail(email))
-          return respondAuthError(ctx, 409, 'An account with this email already exists')
-
-        if (requireEmailVerification) {
-          const linkOrigin = mailedLinkOrigin(ctx.url)
-          if (deliverMail && linkOrigin === undefined) {
-            console.error(`[kay/auth] refusing to mail a verification link for host ${ctx.url.host}: set the auth \`site\` option to the public origin`)
-            return fail(ctx, 500, 'Verification links are not configured')
-          }
-          const user = await createUser({ email, password, name, emailVerified: false } as CreateUserInput<TUser>)
-          await issueLink('verify-email', user.id, user.email, linkOrigin, redirectTarget)
-
-          if (wantsJson(ctx.request))
-            return ctx.json({ ok: true, verificationRequired: true, user }, { status: 202 })
-          return ctx.redirect(redirectTarget, 303)
-        }
-
-        const user = await createUser({ email, password, name } as CreateUserInput<TUser>)
-        await createSessionForUser(user.id, ctx)
-        setResolvedUser(ctx, user)
-
-        if (wantsJson(ctx.request))
-          return ctx.json({ ok: true, user }, { status: 201 })
-        return ctx.redirect(redirectTarget, 303)
-      })
-
-      authRoute('GET', '/verify-email', { limit: 'verify-email' }, (ctx) => {
-        const rawToken = ctx.url.searchParams.get('token') ?? ''
-        const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
-        return handleVerifyEmail(ctx, rawToken, redirectTarget, 302)
-      })
-
-      authRoute('POST', '/verify-email', { limit: 'verify-email', readBody: true }, (ctx, body) => {
-        const rawToken = body.token ?? ctx.url.searchParams.get('token') ?? ''
-        const redirectTarget = safeRedirect(body.redirect ?? body.next ?? ctx.url.searchParams.get('redirect'), defaultRedirect)
-        return handleVerifyEmail(ctx, rawToken, redirectTarget, 303)
-      })
-
-      authRoute('POST', '/signin', { limit: 'signin', emailLimit: 'signin', readBody: true }, async (ctx, body) => {
-        const email = normalizeEmail(body.email ?? '')
-        const password = body.password ?? ''
-        const redirectTarget = safeRedirect(body.redirect ?? body.next, defaultRedirect)
-
-        const userRecord = email ? await store.getUserByEmail(email) : undefined
-        const valid = await verifyPassword(password, userRecord?.passwordHash)
-        if (!userRecord || !valid)
-          return respondAuthError(ctx, 401, 'Invalid email or password')
-
-        if (requireEmailVerification && !userRecord.emailVerified)
-          return respondAuthError(ctx, 403, 'Email not verified')
-
-        await createSessionForUser(userRecord.id, ctx)
-        const pub = toPublicUser(userRecord)
-        setResolvedUser(ctx, pub)
-
-        if (wantsJson(ctx.request))
-          return ctx.json({ ok: true, user: pub }, { status: 200 })
-        return ctx.redirect(redirectTarget, 303)
-      })
-
-      authRoute('POST', '/signout', {}, async (ctx) => {
-        await signOut(ctx)
-        if (wantsJson(ctx.request))
-          return ctx.json({ ok: true })
-        return ctx.redirect(safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect), 303)
-      })
-
-      authRoute('POST', '/magic-link', { limit: 'magic', emailLimit: 'magic', readBody: true }, async (ctx, body) => {
-        const email = normalizeEmail(body.email ?? '')
-        if (!isValidEmail(email))
-          return fail(ctx, 400, 'Please enter a valid email address')
-
-        const linkOrigin = mailedLinkOrigin(ctx.url)
-        if (linkOrigin === undefined) {
-          console.error(`[kay/auth] refusing to mail a sign-in link for host ${ctx.url.host}: set the auth \`site\` option to the public origin`)
-          return fail(ctx, 500, 'Sign-in links are not configured')
-        }
-        await sendMagicLink(email, linkOrigin, body.redirect ?? body.next)
-        return ctx.json({ ok: true, message: 'If that address can sign in, a link has been sent.' })
-      })
-
-      authRoute('GET', '/magic-link/verify', { limit: 'magic-verify' }, async (ctx) => {
-        const rawToken = ctx.url.searchParams.get('token') ?? ''
-        const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
-        if (!rawToken)
-          return fail(ctx, 400, 'Missing token')
-
-        const consumed = await consumeLink('magic-link', rawToken)
-        if (!consumed)
-          return fail(ctx, 400, 'Invalid or expired sign-in link')
-
-        const userRecord = !consumed.user
-          ? await insertUser({ email: consumed.email, emailVerified: true } as Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>)
-          : consumed.user.emailVerified ? consumed.user : await claimUnverified(consumed.user)
-
-        await createSessionForUser(userRecord.id, ctx)
-        return ctx.redirect(redirectTarget, 302)
+      registerAuthRoutes({
+        api,
+        store,
+        sessions,
+        rateLimiter,
+        limitIp,
+        basePath,
+        authRouteOpts,
+        minPasswordLength,
+        defaultRedirect,
+        requireEmailVerification,
+        hasMailTransport: deliverMail !== undefined,
+        mailedLinkOrigin,
+        createUser,
+        insertUser,
+        claimUnverified,
+        issueLink,
+        consumeLink,
+        sendMagicLink,
       })
 
       registerOAuthRoutes({
@@ -827,7 +487,9 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         isSecureCookie,
         claimUnverified,
         insertUser,
-        createSessionForUser,
+        createSessionForUser: sessions.createSessionForUser,
+        setResolvedUser: sessions.setResolvedUser,
+        observeAsync: sessions.observeAsync,
       })
     },
   })
@@ -836,38 +498,31 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     ...plugin,
     store,
     basePath,
-    getUser(ctx) {
-      const cached = resolvedUsers.get(ctx.locals)
-      if (cached !== undefined)
-        return cached
-      return ctx.locals.user as PublicUser<TUser> | undefined
-    },
-    getSession(ctx) {
-      return ctx.locals.session
-    },
-    resolve: resolveRequestSession,
+    getUser: sessions.getUser,
+    getSession: sessions.getSession,
+    resolve: sessions.resolve,
     guard,
     createUser,
-    createSessionForUser,
-    signOut,
+    createSessionForUser: sessions.createSessionForUser,
+    signOut: sessions.signOut,
     async revokeAllSessions(userId) {
-      await store.deleteUserSessions(userId)
+      await sessions.observeAsync(store.deleteUserSessions(userId))
     },
     sendMagicLink,
     sendVerificationEmail,
     async listSessions(userId) {
-      return await store.listSessions(userId)
+      return await sessions.observeAsync(store.listSessions(userId))
     },
     async exportUser(userId) {
-      return await store.exportUser(userId)
+      return await sessions.observeAsync(store.exportUser(userId))
     },
     async deleteUser(userId) {
-      await store.deleteUser(userId)
+      await sessions.observeAsync(store.deleteUser(userId))
     },
     async pruneExpired() {
       await store.pruneExpired?.()
       rateLimiter.sweep()
-      sweepRenewedAt()
+      sessions.sweepRenewedAt()
     },
     dispose,
   }

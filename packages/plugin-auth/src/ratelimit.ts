@@ -17,6 +17,13 @@ export interface RateLimiter {
   size(): number
 }
 
+function firstFreshIndex(list: number[], cutoff: number): number {
+  let i = 0
+  while (i < list.length && list[i]! <= cutoff)
+    i++
+  return i
+}
+
 export function createRateLimiter(opts: RateLimitOptions | false | undefined): RateLimiter {
   if (opts === false) {
     return {
@@ -35,13 +42,12 @@ export function createRateLimiter(opts: RateLimitOptions | false | undefined): R
     const cutoff = now - windowMs
     let removed = 0
     for (const [k, list] of hits) {
-      const fresh = list.filter(t => t > cutoff)
-      if (fresh.length === 0) {
+      if (list.length === 0 || list[list.length - 1]! <= cutoff) {
         hits.delete(k)
         removed++
       }
-      else if (fresh.length !== list.length) {
-        hits.set(k, fresh)
+      else if (list[0]! <= cutoff) {
+        hits.set(k, list.slice(firstFreshIndex(list, cutoff)))
       }
     }
     lastSweep = now
@@ -55,27 +61,38 @@ export function createRateLimiter(opts: RateLimitOptions | false | undefined): R
       const now = Date.now()
       const cutoff = now - windowMs
 
-      if (now - lastSweep >= windowMs || hits.size >= maxKeys)
+      // Sweep at most once per window; capacity pressure uses O(1) LRU eviction instead of an O(maxKeys) scan.
+      if (now - lastSweep >= windowMs)
         sweep(now)
 
       const existing = hits.get(key)
-      const list = existing ? existing.filter(t => t > cutoff) : []
+      let list: number[]
+      if (existing !== undefined) {
+        const start = firstFreshIndex(existing, cutoff)
+        if (start > 0)
+          existing.splice(0, start)
+        list = existing
+      }
+      else {
+        list = []
+      }
+
       if (list.length >= max) {
         hits.delete(key)
         hits.set(key, list)
         return false
       }
-      list.push(now)
-      hits.delete(key)
-      hits.set(key, list)
 
-      if (hits.size > maxKeys) {
-        for (const oldest of hits.keys()) {
-          if (hits.size <= maxKeys)
-            break
+      if (existing === undefined && hits.size >= maxKeys) {
+        const oldest = hits.keys().next().value
+        if (oldest !== undefined)
           hits.delete(oldest)
-        }
       }
+
+      list.push(now)
+      if (existing !== undefined)
+        hits.delete(key)
+      hits.set(key, list)
       return true
     },
   }

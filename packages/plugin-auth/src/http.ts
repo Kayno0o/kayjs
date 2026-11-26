@@ -36,6 +36,27 @@ export function fail(ctx: RequestContext, status: number, error: string): Respon
   return ctx.json({ ok: false, error }, { status })
 }
 
+export function respondAuthError(ctx: RequestContext, status: number, error: string, redirectTo?: string): Response {
+  if (wantsJson(ctx.request) || !redirectTo)
+    return ctx.json({ ok: false, error }, { status })
+  const sep = redirectTo.includes('?') ? '&' : '?'
+  return ctx.redirect(`${redirectTo}${sep}error=${encodeURIComponent(error)}`, 303)
+}
+
+export function withNoStore(res: Response): Response {
+  if (res.headers.has('cache-control'))
+    return res
+  try {
+    res.headers.set('cache-control', 'no-store')
+    return res
+  }
+  catch {
+    const headers = new Headers(res.headers)
+    headers.set('cache-control', 'no-store')
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+  }
+}
+
 export async function parseBody(ctx: RequestContext): Promise<Record<string, string> | Response> {
   try {
     return await readBody(ctx.request)

@@ -1,10 +1,12 @@
 // OAuth 2.0 authorization-code + PKCE routes: provider redirect and callback with a signed, short-lived state cookie.
 
 import type { RequestContext } from '@kayjs/kay/server'
-import type { OAuthProvider } from './oauth'
-import type { AuthStore, AuthUser } from './store'
-import { pkceChallenge, randomToken, safeRedirect, signPayload, verifyPayload } from './crypto'
-import { fail } from './http'
+import type { OAuthProfile, OAuthProvider } from './oauth'
+import type { AuthStore, AuthUser, PublicUser } from './store'
+import { pkceChallenge, randomToken, safeEqual, safeRedirect, signPayload, verifyPayload } from './crypto'
+import { fail, withNoStore } from './http'
+import { OAUTH_FETCH_TIMEOUT_MS } from './oauth'
+import { toPublicUser } from './store'
 
 interface OAuthStateCookie {
   provider: string
@@ -28,14 +30,20 @@ export interface OAuthRouteDeps<TUser extends AuthUser = AuthUser> {
   claimUnverified: (user: TUser) => Promise<TUser>
   insertUser: (fields: Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>) => Promise<TUser>
   createSessionForUser: (userId: string, ctx: RequestContext) => Promise<unknown>
+  setResolvedUser: (ctx: RequestContext, user: PublicUser<TUser>) => void
+  observeAsync: <T>(value: T | Promise<T>) => T | Promise<T>
 }
 
 export function registerOAuthRoutes<TUser extends AuthUser = AuthUser>(deps: OAuthRouteDeps<TUser>): void {
-  const { route, store, providers, secret, site, basePath, stateCookieName, defaultRedirect, limitIp } = deps
+  const { route, store, providers, secret, site, basePath, stateCookieName, defaultRedirect, limitIp, observeAsync } = deps
   const callbackUrlFor = (ctx: RequestContext, provider: OAuthProvider): string =>
     `${site ?? ctx.url.origin}${basePath}/oauth/${encodeURIComponent(provider.id)}/callback`
 
-  route('GET', `${basePath}/oauth/:provider`, (ctx) => {
+  const noStoreRoute = (method: string, path: string, handler: (ctx: RequestContext) => Response | Promise<Response>): void => {
+    route(method, path, async ctx => withNoStore(await handler(ctx)))
+  }
+
+  noStoreRoute('GET', `${basePath}/oauth/:provider`, (ctx) => {
     const limited = limitIp(ctx, 'oauth-start')
     if (limited)
       return limited
@@ -78,7 +86,7 @@ export function registerOAuthRoutes<TUser extends AuthUser = AuthUser>(deps: OAu
     return ctx.redirect(authUrl.toString(), 302)
   })
 
-  route('GET', `${basePath}/oauth/:provider/callback`, async (ctx) => {
+  noStoreRoute('GET', `${basePath}/oauth/:provider/callback`, async (ctx) => {
     const limited = limitIp(ctx, 'oauth-cb')
     if (limited)
       return limited
@@ -96,7 +104,7 @@ export function registerOAuthRoutes<TUser extends AuthUser = AuthUser>(deps: OAu
       return fail(ctx, 400, 'Invalid OAuth callback parameters')
 
     const saved = verifyPayload<OAuthStateCookie>(secret, rawCookie)
-    if (!saved || saved.exp <= Date.now() || saved.provider !== provider.id || saved.state !== returnedState)
+    if (!saved || saved.exp <= Date.now() || saved.provider !== provider.id || !safeEqual(saved.state, returnedState))
       return fail(ctx, 400, 'Invalid or expired OAuth state')
 
     const callbackUrl = callbackUrlFor(ctx, provider)
@@ -110,30 +118,46 @@ export function registerOAuthRoutes<TUser extends AuthUser = AuthUser>(deps: OAu
     if (saved.verifier !== undefined)
       tokenBody.set('code_verifier', saved.verifier)
 
-    const tokenRes = await fetch(provider.tokenUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-        'accept': 'application/json',
-      },
-      body: tokenBody.toString(),
-    })
-    if (!tokenRes.ok)
+    let tokenData: { access_token?: string }
+    try {
+      const tokenRes = await fetch(provider.tokenUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          'accept': 'application/json',
+        },
+        body: tokenBody.toString(),
+        signal: AbortSignal.timeout(OAUTH_FETCH_TIMEOUT_MS),
+      })
+      if (!tokenRes.ok)
+        return fail(ctx, 502, 'OAuth token exchange failed')
+      tokenData = await tokenRes.json() as { access_token?: string }
+    }
+    catch {
       return fail(ctx, 502, 'OAuth token exchange failed')
+    }
 
-    const tokenData = await tokenRes.json() as { access_token?: string }
-    if (!tokenData.access_token)
+    if (!tokenData?.access_token)
       return fail(ctx, 502, 'OAuth provider did not return an access token')
 
-    const profile = await provider.fetchProfile(tokenData.access_token)
-    const existingLink = await store.getOAuthAccount(provider.id, profile.id)
+    let profile: OAuthProfile
+    try {
+      profile = await provider.fetchProfile(tokenData.access_token)
+    }
+    catch {
+      return fail(ctx, 502, 'OAuth profile fetch failed')
+    }
+    if (!profile?.id || !profile.email)
+      return fail(ctx, 502, 'OAuth profile fetch failed')
+
+    const existingLink = await observeAsync(store.getOAuthAccount(provider.id, profile.id))
     let userRecord: TUser | undefined
 
     if (existingLink) {
-      userRecord = await store.getUserById(existingLink.userId)
+      userRecord = await observeAsync(store.getUserById(existingLink.userId))
     }
     else {
-      const byEmail = await store.getUserByEmail(profile.email)
+      const byEmail = await observeAsync(store.getUserByEmail(profile.email))
       if (byEmail && profile.emailVerified) {
         userRecord = byEmail.emailVerified ? byEmail : await deps.claimUnverified(byEmail)
       }
@@ -149,12 +173,12 @@ export function registerOAuthRoutes<TUser extends AuthUser = AuthUser>(deps: OAu
         return fail(ctx, 409, 'An account with this email already exists; verify email to link')
       }
       if (userRecord) {
-        await store.linkOAuthAccount({
+        await observeAsync(store.linkOAuthAccount({
           provider: provider.id,
           providerAccountId: profile.id,
           userId: userRecord.id,
           createdAt: Date.now(),
-        })
+        }))
       }
     }
 
@@ -162,6 +186,7 @@ export function registerOAuthRoutes<TUser extends AuthUser = AuthUser>(deps: OAu
       return fail(ctx, 500, 'Unable to resolve user account')
 
     await deps.createSessionForUser(userRecord.id, ctx)
+    deps.setResolvedUser(ctx, toPublicUser(userRecord))
     return ctx.redirect(safeRedirect(saved.redirect, defaultRedirect), 302)
   })
 }

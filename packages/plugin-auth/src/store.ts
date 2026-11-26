@@ -71,6 +71,7 @@ export interface AuthStore<TUser extends AuthUser = AuthUser> {
   consumeToken(tokenHash: string, kind: TokenKind): VerificationToken | undefined | Promise<VerificationToken | undefined>
 
   pruneExpired(): void | Promise<void>
+  close?(): void | Promise<void>
 }
 
 export function normalizeEmail(email: string): string {
