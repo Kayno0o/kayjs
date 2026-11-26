@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { iconData } from '../../plugin-icons/src/icon-data'
 import { icons } from '../../plugin-icons/src/plugin'
+import { svgIcon } from '../../plugin-icons/src/svg-dir'
 import { build } from '../src/build/index'
 import { checkProject } from '../src/cli/check'
 import { createServer } from '../src/server/index'
@@ -255,6 +256,122 @@ describe('icons() loading an installed set', () => {
   })
 })
 
+describe('svgIcon', () => {
+  it('keeps the glyph and the viewBox, wrapping the root\'s paint attributes around the glyph', () => {
+    expect(svgIcon('<?xml version="1.0"?>\n<!-- <svg viewBox="0 0 1 1"> -->\n<svg xmlns="http://www.w3.org/2000/svg" class="logo" viewBox="2,1 32 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M0 0h32"/></svg>\n'))
+      .toEqual({ body: '<g fill="none" stroke="currentColor" stroke-width="2"><path d="M0 0h32"/></g>', left: 2, top: 1, width: 32, height: 16 })
+  })
+
+  it('sizes an SVG with no viewBox from its width and height', () => {
+    expect(svgIcon('<svg width="24px" height=\'20\'><circle r="4"/></svg>')).toEqual({ body: '<circle r="4"/>', left: 0, top: 0, width: 24, height: 20 })
+  })
+
+  it('sizes an SVG from its width and height when its viewBox is malformed', () => {
+    expect(svgIcon('<svg viewBox="0 0 24" width="16" height="16"><circle r="4"/></svg>')).toEqual({ body: '<circle r="4"/>', left: 0, top: 0, width: 16, height: 16 })
+  })
+
+  it('refuses an SVG with no size', () => {
+    expect(svgIcon('<svg width="100%" height="100%"><circle r="4"/></svg>')).toBe('has no viewBox, nor a width and height, to size it: add viewBox="0 0 <width> <height>" to its <svg>')
+  })
+
+  it('refuses an SVG whose viewBox has no area', () => {
+    expect(svgIcon('<svg viewBox="0 0 0 16"><circle r="4"/></svg>')).toBe('has no viewBox, nor a width and height, to size it: add viewBox="0 0 <width> <height>" to its <svg>')
+  })
+
+  it('refuses a file with no <svg> element', () => {
+    expect(svgIcon('<!-- <svg viewBox="0 0 1 1"></svg> -->')).toBe('holds no <svg> element')
+  })
+})
+
+describe('a folder of .svg files as a set', () => {
+  const LOGO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 16"><path d="M0 0h32"/></svg>'
+  const page = (...specifiers: string[]): Record<string, string> => ({
+    'src/routes/index.tsx': `import { Icon } from '@kayjs/icons'\n${specifiers.map((specifier, i) => `import icon${i} from '${specifier}'`).join('\n')}\nexport default function Home() { return <main>${specifiers.map((_, i) => `<Icon icon={icon${i}} />`).join('')}</main> }\n`,
+  })
+  const html = (root: string): string => /<main>.*<\/main>/s.exec(readFileSync(join(root, 'dist/index.html'), 'utf8'))![0]
+
+  it('reads src/icons as the set local, with no option', async () => {
+    const root = linkedApp({ ...page('~icons/local/logo'), 'src/icons/logo.svg': LOGO })
+    await build({ root, plugins: [icons()], static: true })
+
+    expect(html(root)).toBe('<main><svg viewBox="0 0 32 16" width="2em" height="1em" aria-hidden="true"><path d="M0 0h32"/></svg></main>')
+  })
+
+  it('reads the folder once however many of its icons a build imports', async () => {
+    const root = linkedApp({ ...page('~icons/local/logo', '~icons/local/mark'), 'src/icons/logo.svg': LOGO, 'src/icons/mark.svg': LOGO })
+    const file = spyOn(Bun, 'file')
+
+    try {
+      await build({ root, plugins: [icons()], static: true })
+
+      expect(file.mock.calls.filter(([path]) => String(path).endsWith('src/icons/logo.svg'))).toHaveLength(1)
+    }
+    finally {
+      file.mockRestore()
+    }
+  })
+
+  it('adds the folders named in dirs beside local', async () => {
+    const root = linkedApp({ ...page('~icons/local/logo', '~icons/brand/mark'), 'src/icons/logo.svg': LOGO, 'assets/brand/mark.svg': '<svg viewBox="0 0 8 8"><rect/></svg>' })
+    await build({ root, plugins: [icons({ dirs: { brand: 'assets/brand' } })], static: true })
+
+    expect(html(root)).toContain('<rect/>')
+    expect(html(root)).toContain('M0 0h32')
+  })
+
+  it('renames local when dirs names src/icons', async () => {
+    const root = linkedApp({ ...page('~icons/local/logo'), 'src/icons/logo.svg': LOGO })
+
+    await expect(build({ root, plugins: [icons({ dirs: { app: 'src/icons' } })], static: true })).rejects.toThrow('no icon set "local" is installed')
+  })
+
+  it('leaves local to icons({ sets }) when it holds a set of that name', async () => {
+    const root = linkedApp({ ...page('~icons/local/arrow'), 'src/icons/logo.svg': LOGO })
+    await build({ root, plugins: [icons({ sets: { local: { ...DEMO, prefix: 'local' } } })], static: true })
+
+    expect(html(root)).toContain('M5 12h14')
+  })
+
+  it('reads a file edited since the last build, as kay dev rebuilds', async () => {
+    const root = linkedApp({ ...page('~icons/local/logo'), 'src/icons/logo.svg': LOGO })
+    const plugin = icons()
+    await build({ root, plugins: [plugin], static: true })
+    writeFileSync(join(root, 'src/icons/logo.svg'), '<svg viewBox="0 0 16 16"><circle r="2"/></svg>')
+    await build({ root, plugins: [plugin], static: true })
+
+    expect(html(root)).toContain('<circle r="2"/>')
+    expect(plugin.watchPaths).toBeFunction()
+    expect((plugin.watchPaths as (root: string) => string[])(root)).toEqual([join(root, 'src/icons')])
+  })
+
+  it('fails the build on an unusable file, naming it and its importer', async () => {
+    const root = linkedApp({ ...page('~icons/local/logo'), 'src/icons/logo.svg': '<svg><path d="M0 0h32"/></svg>' })
+
+    await expect(build({ root, plugins: [icons()], static: true }))
+      .rejects.toThrow('@kayjs/icons: src/icons/logo.svg, imported by src/routes/index.tsx, has no viewBox, nor a width and height, to size it: add viewBox="0 0 <width> <height>" to its <svg>.')
+  })
+
+  it('fails kay check once on an unusable file, at the file rather than its imports', async () => {
+    const root = linkedApp({
+      ...page('~icons/local/logo'),
+      'src/icons/logo.svg': '<svg><path d="M0 0h32"/></svg>',
+      'kay.config.ts': `import { icons } from '@kayjs/icons/plugin'\nexport default { plugins: [icons()] }\n`,
+    })
+
+    expect((await checkProject(root, { skipTypecheck: true })).errors.filter(error => error.includes('@kayjs/icons')))
+      .toEqual(['src/icons/logo.svg:1:1: error: @kayjs/icons: this file has no viewBox, nor a width and height, to size it: add viewBox="0 0 <width> <height>" to its <svg>.'])
+  })
+
+  it('fails kay check on a dirs folder that does not exist or a prefix that is no set name', async () => {
+    const root = linkedApp({ 'kay.config.ts': `import { icons } from '@kayjs/icons/plugin'\nexport default { plugins: [icons({ dirs: { brand: 'assets/brand', Logos: 'src/icons' } })] }\n`, 'src/icons/logo.svg': LOGO })
+
+    expect((await checkProject(root, { skipTypecheck: true })).errors.filter(error => error.includes('@kayjs/icons'))).toEqual([
+      'kay.config.ts:1:1: error: @kayjs/icons: icons({ dirs }) reads the set "brand" from assets/brand, which does not exist.',
+      'kay.config.ts:1:1: error: @kayjs/icons: "Logos" in icons({ dirs }) is not an icon set name: name it in lowercase words joined by dashes, such as brand.',
+    ])
+  })
+})
+
 describe('an icon or set that does not exist', () => {
   const page = (specifier: string): Record<string, string> => ({
     'src/routes/index.tsx': `import { Icon } from '@kayjs/icons'\nimport arrow from '${specifier}'\nexport default function Home() { return <main><Icon icon={arrow} /></main> }\n`,
@@ -284,7 +401,7 @@ describe('an icon or set that does not exist', () => {
     })
 
     expect((await checkProject(root, { skipTypecheck: true })).errors)
-      .toContain('src/routes/index.tsx:2:19: error: @kayjs/icons: no icon set "dmeo" is installed. Did you mean ~icons/demo/arrow? Otherwise install @iconify-json/dmeo, or pass it in icons({ sets }).')
+      .toContain('src/routes/index.tsx:2:19: error: @kayjs/icons: no icon set "dmeo" is installed. Did you mean ~icons/demo/arrow? Otherwise install @iconify-json/dmeo, or add it to icons({ sets }) or icons({ dirs }).')
   })
 
   it('suggests no other set when the closest one lacks the icon', async () => {
@@ -294,7 +411,7 @@ describe('an icon or set that does not exist', () => {
     })
 
     expect((await checkProject(root, { skipTypecheck: true })).errors)
-      .toContain('src/routes/index.tsx:2:19: error: @kayjs/icons: no icon set "dmeo" is installed. Otherwise install @iconify-json/dmeo, or pass it in icons({ sets }).')
+      .toContain('src/routes/index.tsx:2:19: error: @kayjs/icons: no icon set "dmeo" is installed. Otherwise install @iconify-json/dmeo, or add it to icons({ sets }) or icons({ dirs }).')
   })
 
   it('explains the specifier shape when the set part is not a set name', async () => {

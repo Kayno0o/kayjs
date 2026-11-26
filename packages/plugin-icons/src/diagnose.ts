@@ -40,5 +40,5 @@ export async function iconProblem(prefix: string, name: string, where: string, l
     if (otherSet !== undefined && iconData(otherSet, name) !== undefined)
       closest.push(`~icons/${other}/${name}`)
   }
-  return `no icon set "${prefix}" is installed${where}. ${didYouMean(closest)}Otherwise install @iconify-json/${prefix}, or pass it in icons({ sets }).`
+  return `no icon set "${prefix}" is installed${where}. ${didYouMean(closest)}Otherwise install @iconify-json/${prefix}, or add it to icons({ sets }) or icons({ dirs }).`
 }

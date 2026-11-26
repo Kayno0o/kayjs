@@ -63,11 +63,13 @@ import arrowRight from '~icons/tabler/arrow-right'
 
 Registering `icons()` also types the `~icons/*` imports. A tsconfig that leaves `kay.config.ts` out gets them from `/// <reference types="@kayjs/icons/ambient" />` in a `.d.ts` file.
 
+Your own icons go in `src/icons` as `.svg` files: `src/icons/logo.svg` imports as `~icons/local/logo`. Each file needs a `viewBox`, or a `width` and `height`. Name other folders with `icons({ dirs: { brand: 'assets/brand' } })`, or give `src/icons` another prefix with `dirs: { app: 'src/icons' }`. `kay dev` reloads an edited file.
+
 `<Icon>` takes any SVG attribute. Your `width`, `height` and `viewBox` replace the icon's own. An icon given a non-blank `aria-label` or `aria-labelledby` gets `role="img"`; any other is `aria-hidden`.
 
 An import of an icon or set that does not exist fails `kay check` and the build, naming the file and the closest icons that do.
 
-`kay icons-find garbage` prints the icons of the installed sets that match, such as `~icons/tabler/trash`, so an agent imports a name that exists. It searches `@iconify-json/*` packages, `@iconify/json` and the sets passed to `icons({ sets })`, ten icons per set unless `--limit` says otherwise; `--set tabler` searches one. It also matches related words, typos and half-typed words. An app's own icon picker gets the same search from `findIcons(set, query, { limit, offset })` in `@kayjs/icons/search`. Call it on the server: it reads a 2 MB word table on first use, and `kay build` warns when an island imports it.
+`kay icons-find garbage` prints the icons of the installed sets that match, such as `~icons/tabler/trash`, so an agent imports a name that exists. It searches `@iconify-json/*` packages, `@iconify/json`, your `.svg` folders and the sets passed to `icons({ sets })`, ten icons per set unless `--limit` says otherwise; `--set tabler` searches one. It also matches related words, typos and half-typed words. An app's own icon picker gets the same search from `findIcons(set, query, { limit, offset })` in `@kayjs/icons/search`. Call it on the server: it reads a 2 MB word table on first use, and `kay build` warns when an island imports it.
 
 ## `@kayjs/tailwind`
 

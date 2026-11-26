@@ -165,6 +165,14 @@ describe('kay icons-find', () => {
     expect(await run(root, ['home'], { sets: { brand: { prefix: 'brand', icons: { 'home-logo': { body: '' } } } } })).toEqual(['~icons/brand/home-logo', '~icons/tabler/home'])
   })
 
+  it('searches the app\'s folder of .svg files, as the set local', async () => {
+    const root = appWith({ tabler: ['home'] })
+    mkdirSync(join(root, 'src/icons'), { recursive: true })
+    writeFileSync(join(root, 'src/icons/home-logo.svg'), '<svg viewBox="0 0 8 8"><rect/></svg>')
+
+    expect(await run(root, ['home'])).toEqual(['~icons/local/home-logo', '~icons/tabler/home'])
+  })
+
   it('searches only the set --set names, as many as --limit says', async () => {
     const root = appWith({ tabler: ['home', 'home-2', 'home-3'], lucide: ['home'] })
 
