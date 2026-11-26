@@ -108,7 +108,7 @@ it('counts clicks', async () => {
 ```
 
 - `browser.open(path)`: Opens a page in its own context and resolves when it has loaded.
-- `page.click(selector)`, `page.fill(selector, value)`, `page.text(selector)`: Drive and read the page.
+- `page.click(selector)`, `page.hover(selector)`, `page.fill(selector, value)`, `page.text(selector)`: Drive and read the page. `b.open(path, { reducedMotion: true })` opens the page for a visitor who asks for less motion.
 - `page.waitFor(selector | fn)`: Waits for a selector to match, or for a function run in the page to return a truthy value.
 - `page.evaluate(fn | expression)`: Runs code in the page and returns its result.
 - `page.errors`: Page errors, `console.error` messages and failed requests collected since the page opened.

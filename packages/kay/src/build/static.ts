@@ -8,6 +8,7 @@ import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync 
 import { basename, dirname, join, relative } from 'node:path'
 import { resolvePlugins } from '../plugins/index'
 import { createDocumentHooks, createHtmlHeaders } from '../server/document'
+import { createNavigation } from '../ssr/navigation'
 import { createFallbackPages } from '../server/errors'
 import { precompressFile, walkAllFiles } from './files'
 import { prerenderOrigin } from './prerender'
@@ -52,12 +53,14 @@ async function renderStaticNotFound(options: StaticExportOptions): Promise<strin
       renderError ??= err
     }
     const document = createDocumentHooks({ plugins, lang, trustProxy, notifyError })
-    const htmlHeaders = createHtmlHeaders(options.entry.kayConfig.security, {})
+    const navigation = createNavigation(options.entry.kayConfig.navigation)
+    const htmlHeaders = createHtmlHeaders(options.entry.kayConfig.security, {}, navigation)
     const { buildNotFoundResponse } = createFallbackPages({
       manifest: options.manifest,
       modules: options.entry.modules,
       lang,
       alwaysLoadRuntime: plugins.some(p => Boolean(p.clientEntry)),
+      navigation: navigation.html,
       dev: options.isDev === true,
       document,
       htmlHeaders,

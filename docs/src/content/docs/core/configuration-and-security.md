@@ -37,6 +37,7 @@ export default defineConfig({
 | `trustedOrigins` | `undefined` | Extra origins allowed by CSRF checks (for example, `['https://app.example.com']`). |
 | `trustProxy` | `false` | Reverse proxies in front of Kay: `true` for 1 hop, a number for `N` hops (e.g. `2` for CDN + nginx). |
 | `maxRequestBodySize` | `1048576` (1 MiB) | Maximum request body size before returning `413 Payload Too Large`. |
+| `navigation` | `{ viewTransitions: true, prefetch: 'moderate', prerender: false }` | How a change from one page to the next feels, with no client JS: see [Page changes](/core/routing-and-layouts#page-changes). |
 | `streamTimeout` | `30000` | Milliseconds a `<Suspense>` boundary may wait before failing. |
 | `compress` | `true` in prod, `false` in dev | On-the-fly and sidecar Brotli/Gzip response compression. |
 | `onError` | `undefined` | Hook called on unhandled errors in routes, actions, or plugins (`source: 'route' \| 'action' \| 'plugin'`). A hook that throws is logged with its owner, and the other hooks still run. |

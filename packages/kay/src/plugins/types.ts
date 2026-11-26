@@ -4,6 +4,7 @@ import type { BunPlugin } from 'bun'
 import type { RouteManifestEntry } from '../build/index'
 import type { Middleware, RequestContext } from '../server/index'
 import type { SecurityHeadersOptions, TrustProxy } from '../server/security'
+import type { NavigationConfig } from '../ssr/navigation'
 import type { ServiceKey } from './services'
 
 export type BuildPluginTarget = 'client' | 'server' | 'compile'
@@ -180,6 +181,8 @@ export interface ServerRuntimeConfig {
   trustedOrigins?: string[] | undefined
   trustProxy?: TrustProxy | undefined
   maxRequestBodySize?: number | undefined
+  /** How plain page changes feel without client JS: view transitions between pages, Speculation Rules prefetch on hover, opt-in prerender. */
+  navigation?: NavigationConfig | undefined
   /** Milliseconds a streamed `<Suspense>` boundary may take before it renders its error and the response ends (default 30000). */
   streamTimeout?: number | undefined
   compress?: boolean | undefined

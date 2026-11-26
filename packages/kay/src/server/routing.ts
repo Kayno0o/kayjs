@@ -15,6 +15,7 @@ import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } fro
 import type { TrustProxy } from './security'
 import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
+import { keepScrollTag } from '../ssr/navigation'
 import { compressedHtmlResponse, maybeCompressResponse } from './compress'
 import { headTagStyleHashes, mergeStyleHashes } from './document'
 import { isNotFound, makeRequestContext } from './http'
@@ -256,7 +257,7 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
     return renderError(error, cookieStore, url, request, ctx)
   }
   const respondHtml = (body: string, request: Request, rctx: RenderContext, cookieStore?: CookieStore): Response => {
-    const html = docPrefix + body + docSuffix
+    const html = docPrefix + body + keepScrollTag(body) + docSuffix
     const styleHashes = mergeStyleHashes(headStyleHashes, styleHashesOf(rctx.inlineStyles))
     const headers = withRegionVary(htmlHeaders(hasIslands, false, true, styleHashes), rctx.regionNames.size > 0)
     const res = compressedHtmlResponse(html, 200, headers, request, compressCache, !hasLoad)

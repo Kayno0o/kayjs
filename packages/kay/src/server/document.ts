@@ -2,6 +2,7 @@
 
 import type { DocumentHeadContext, KayPlugin, ServerErrorInfo } from '../plugins/index'
 import type { RenderContext } from '../ssr/context'
+import type { Navigation } from '../ssr/navigation'
 import type { RequestContext } from './http'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
 import { readBufferedOrPassThrough } from './compress'
@@ -16,10 +17,13 @@ export type HtmlHeaders = (hasIslands: boolean, hasSuspense: boolean, isDynamic:
 const STYLED_HEADER_CACHE_SIZE = 256
 
 // HTML headers, one set per (dynamic, islands, suspense) combination: the CSP only gains the hashes a page needs.
-export function createHtmlHeaders(security: SecurityHeadersOptions | false | undefined, securityRecord: Record<string, string>): HtmlHeaders {
+export function createHtmlHeaders(security: SecurityHeadersOptions | false | undefined, securityRecord: Record<string, string>, navigation?: Navigation): HtmlHeaders {
   const baseCsp = resolveCspPolicy(security)
+  const navStyles = navigation?.styleHashes ?? []
+  const navScripts = navigation?.scriptHashes ?? []
   const htmlHeaderSets: Record<string, string>[] = []
   const kayStyleHashes: string[][] = []
+  const kayScriptHashes: string[][] = []
   for (let i = 0; i < 8; i++) {
     const isDynamic = (i & 4) !== 0
     const hasIslands = (i & 2) !== 0
@@ -27,14 +31,12 @@ export function createHtmlHeaders(security: SecurityHeadersOptions | false | und
     const headers: Record<string, string> = { 'content-type': 'text/html; charset=utf-8', ...securityRecord }
     if (isDynamic)
       headers['cache-control'] = 'private'
-    const styleHashes = [...(hasIslands ? [KAY_ISLAND_STYLE_HASH] : []), ...(hasSuspense ? [KAY_SUSPENSE_STYLE_HASH] : [])]
+    const styleHashes = [...navStyles, ...(hasIslands ? [KAY_ISLAND_STYLE_HASH] : []), ...(hasSuspense ? [KAY_SUSPENSE_STYLE_HASH] : [])]
+    const scriptHashes = [...navScripts, ...(hasSuspense ? [KAY_STREAM_SCRIPT_HASH] : [])]
     kayStyleHashes.push(styleHashes)
-    if (baseCsp !== undefined && (hasIslands || hasSuspense)) {
-      headers['content-security-policy'] = withCspHashes(baseCsp, {
-        styleHashes,
-        scriptHashes: hasSuspense ? [KAY_STREAM_SCRIPT_HASH] : [],
-      })
-    }
+    kayScriptHashes.push(scriptHashes)
+    if (baseCsp !== undefined)
+      headers['content-security-policy'] = withCspHashes(baseCsp, { styleHashes, scriptHashes })
     htmlHeaderSets.push(headers)
   }
 
@@ -56,7 +58,7 @@ export function createHtmlHeaders(security: SecurityHeadersOptions | false | und
       ...base,
       'content-security-policy': withCspHashes(baseCsp, {
         styleHashes: [...kayStyleHashes[index]!, ...styleHashes],
-        scriptHashes: hasSuspense ? [KAY_STREAM_SCRIPT_HASH] : [],
+        scriptHashes: kayScriptHashes[index]!,
       }),
     }
     if (styledSets.size >= STYLED_HEADER_CACHE_SIZE)

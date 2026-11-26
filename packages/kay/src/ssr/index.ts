@@ -6,6 +6,7 @@ import { renderOnServer } from '../reactivity/index'
 import { styleText } from '../style'
 import { assertRenderable } from '../unrenderable'
 import { currentRenderContext, KAY_STREAM_SCRIPT, renderIsland } from './context'
+import { keepScrollTag } from './navigation'
 export { ssrStyleBlock } from './context'
 
 export const KAY_ISLAND_STYLE = 'kay-island,kay-slot{display:contents}'
@@ -404,10 +405,12 @@ export interface DocumentOptions {
   styles?: Iterable<string> | undefined
   hasIslands?: boolean | undefined
   hasSuspense?: boolean | undefined
+  // The head markup every page shares for the `navigation` settings: see `createNavigation`.
+  navigation?: string | undefined
 }
 
 export function renderDocument(options: DocumentOptions): string {
-  const { body, head = '', headTags, lang = 'en', htmlAttrs, runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands, hasSuspense } = options
+  const { body, head = '', headTags, lang = 'en', htmlAttrs, runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands, hasSuspense, navigation } = options
   let headExtra = head
 
   if (headTags !== undefined) {
@@ -419,6 +422,9 @@ export function renderDocument(options: DocumentOptions): string {
     for (const href of styles)
       headExtra += `<link rel="stylesheet" href="${escAttr(href)}">`
   }
+
+  if (navigation !== undefined)
+    headExtra += navigation
 
   if (hasIslands) {
     headExtra += `<style>${KAY_ISLAND_STYLE}</style>`
@@ -444,5 +450,5 @@ export function renderDocument(options: DocumentOptions): string {
     }
   }
 
-  return `<!DOCTYPE html><html${attrStr}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${headExtra}</head><body>${body}</body></html>`
+  return `<!DOCTYPE html><html${attrStr}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${headExtra}</head><body>${body}${keepScrollTag(body)}</body></html>`
 }

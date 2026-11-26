@@ -318,3 +318,19 @@ describe('kay refuses route exports it never reads', () => {
     expect(() => assertPathUrls(['/posts/a'], 'routes/[slug].tsx')).not.toThrow()
   })
 })
+
+describe('data-kay-keep-scroll names a panel the page can be read for (#3639)', () => {
+  test('a key that is not a literal string, or is empty', () => {
+    refuses('<ul data-kay-keep-scroll={fn}>x</ul>', /data-kay-keep-scroll without a literal key in Page\.tsx: write data-kay-keep-scroll="side"/)
+    refuses('<ul data-kay-keep-scroll="">x</ul>', /without a literal key/)
+    refuses('<ul data-kay-keep-scroll>x</ul>', /without a literal key/)
+    accepts('<ul data-kay-keep-scroll="side">x</ul>')
+    accepts('<ul data-kay-keep-scroll={\'side\'}>x</ul>')
+    refuses('<ul data-kay-keep-scroll={\'a"b\'}>x</ul>', /without a literal key/)
+  })
+
+  test('a panel inside a panel of the same key, which the page could keep one offset for', () => {
+    refuses('<ul data-kay-keep-scroll="side"><li><div data-kay-keep-scroll="side">x</div></li></ul>', /data-kay-keep-scroll="side" inside data-kay-keep-scroll="side" in Page\.tsx: give each panel its own key/)
+    accepts('<ul data-kay-keep-scroll="side"><li><div data-kay-keep-scroll="inner">x</div></li></ul>')
+  })
+})

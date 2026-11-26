@@ -79,6 +79,9 @@ export const createPost = action(
 )
 ```
 
+### Smooth page changes, `0 KB` JS
+Every page fades into the next with a cross-document view transition (off under reduced motion), and same-origin links are prefetched on hover through Speculation Rules (`navigation: { prerender: true }` opts into prerender; `data-kay-no-prefetch` opts a link out). Both are inline, hashed in the CSP and turned off in `kay.config.ts` with `navigation: { viewTransitions: false, prefetch: false }`. `data-kay-keep-scroll="side"` on a scrolling panel keeps its offset across plain page loads and on back/forward, with one small inline script only on pages that use it.
+
 ---
 
 ## Modular Ecosystem (`KayPlugin`)

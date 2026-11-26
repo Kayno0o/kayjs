@@ -22,6 +22,7 @@ const RUNTIME_CONFIG_KEYS: readonly (keyof ServerRuntimeConfig)[] = [
   'trustedOrigins',
   'trustProxy',
   'maxRequestBodySize',
+  'navigation',
   'streamTimeout',
   'compress',
   'onError',

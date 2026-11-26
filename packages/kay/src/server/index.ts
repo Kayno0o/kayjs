@@ -18,6 +18,7 @@ import type { TrustProxy } from './security'
 import { join } from 'node:path'
 import { createAppContext, getAppContext, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { createRenderContext, runWithRenderContext } from '../ssr/context'
+import { createNavigation } from '../ssr/navigation'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
 import { ACTION_ERROR_COOKIE, executeAction, finishActionRedirect, hydrateActionErrorFlash, isServerAction } from './action'
 import { createActionRegistry } from './action-registry'
@@ -163,6 +164,29 @@ function createActionDispatcher(deps: ActionDispatcherDeps) {
   }
 }
 
+interface ManifestActions {
+  manifest: EmbeddedServerConfig['manifest']
+  modules: EmbeddedServerConfig['modules']
+  actions: ReturnType<typeof createActionRegistry>
+  routesPrefix: ReturnType<typeof inferRoutesServerPrefix>
+  routePathByFile: Map<string, string>
+  middlewaresFor: (path: string, staticOnly?: boolean) => readonly Middleware[]
+  middlewaresForPaths: (paths: string[]) => readonly Middleware[]
+}
+
+// Server actions and their live URLs.
+function registerManifestActions({ manifest, modules, actions, routesPrefix, routePathByFile, middlewaresFor, middlewaresForPaths }: ManifestActions): void {
+  for (const entry of manifest.actions) {
+    const mod = modules[entry.file] as Record<string, unknown> | undefined
+    const act = mod?.[entry.exportName]
+    if (isServerAction(act)) {
+      const routePrefix = actionRoutePrefix(entry, routesPrefix, routePathByFile)
+      const pluginMws = routePrefix !== undefined ? middlewaresForPaths([entry.url, routePrefix]) : middlewaresFor(entry.url)
+      actions.register(act, entry.exportName, entry.url, entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default), pluginMws)
+    }
+  }
+}
+
 export async function createServerFromEmbedded(config: EmbeddedServerConfig): Promise<KayApp> {
   const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered = {}, prerenderedFiles = {}, lang = 'en', security } = config
   const plugins = resolvePlugins(config.plugins)
@@ -192,7 +216,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   // The one way out of every response not built with the security headers already in place.
   const finish = (res: Response, request: Request, cookieStore?: CookieStore): Response => withHsts(finalizeResponse(res, cookieStore, securityEntries), request)
   const serverError = makeServerError(securityRecord)
-  const htmlHeaders = createHtmlHeaders(security, securityRecord)
+  const navigation = createNavigation(config.navigation)
+  const htmlHeaders = createHtmlHeaders(security, securityRecord, navigation)
   const streams = createStreamTracker()
 
   const compressEnabled = config.compress ?? !isDev
@@ -241,16 +266,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       ? middlewaresFor(effectiveScopedPath)
       : middlewaresForPaths([effectiveScopedPath, rawScopedPath])
 
-  // Server actions and their live URLs
-  for (const entry of manifest.actions) {
-    const mod = modules[entry.file] as Record<string, unknown> | undefined
-    const act = mod?.[entry.exportName]
-    if (isServerAction(act)) {
-      const routePrefix = actionRoutePrefix(entry, routesPrefix, routePathByFile)
-      const pluginMws = routePrefix !== undefined ? middlewaresForPaths([entry.url, routePrefix]) : middlewaresFor(entry.url)
-      actions.register(act, entry.exportName, entry.url, entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default), pluginMws)
-    }
-  }
+  registerManifestActions({ manifest, modules, actions, routesPrefix, routePathByFile, middlewaresFor, middlewaresForPaths })
 
   const { all: prerenderedMap, fast: fastPrerenderedMap } = files.collectPrerendered(manifest.routes, {
     prerendered,
@@ -263,7 +279,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const router = new Router<CompiledRoute>()
   const fastStaticPages = new Map<string, FastHandler>()
 
-  const { buildNotFoundResponse, renderError } = createFallbackPages({ manifest, modules, lang, alwaysLoadRuntime, dev: isDev, document, htmlHeaders, notifyError, finish })
+  const { buildNotFoundResponse, renderError } = createFallbackPages({ manifest, modules, lang, alwaysLoadRuntime, navigation: navigation.html, dev: isDev, document, htmlHeaders, notifyError, finish })
 
   async function renderNotFound(
     cookieStore: CookieStore,
@@ -318,6 +334,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       lang,
       runtimeScript: manifest.runtimeScript,
       alwaysLoadRuntime,
+      navigation: navigation.html,
       styles: entry.styles ?? manifest.styles,
     }
     const headStyleHashes = headTagStyleHashes(doc.headTags)

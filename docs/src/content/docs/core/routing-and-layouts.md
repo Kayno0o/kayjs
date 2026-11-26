@@ -98,6 +98,52 @@ const middleware: Middleware = async (ctx, next) => {
 export default middleware
 ```
 
+## Page changes
+
+A plain link loads the next page, and kay makes that load smoother without shipping any JavaScript. Three things happen on every page, and each can be turned off.
+
+**Pages fade into each other.** Every page carries `@view-transition { navigation: auto }`, so browsers that support cross-document view transitions fade from one page to the next. A visitor who asks for less motion gets the plain repaint. Other browsers get a normal page load.
+
+To keep a part of the page still while the rest fades, give it a name in your CSS. There is no new syntax:
+
+```css
+header { view-transition-name: site-header; }
+.side { view-transition-name: side; }
+```
+
+**Links are fetched when the pointer reaches them.** Kay adds Speculation Rules that prefetch a same-origin link on hover, so the page is often there by the time of the click. Browsers without Speculation Rules ignore them. Kay never prefetches:
+
+- a link to another origin,
+- a link with `data-kay-no-prefetch`, or inside an element that has it (use it on sign-out and other links that change something),
+- a link with `download` or `rel="nofollow"`,
+- a kay route such as an action's URL.
+
+**Prerender is opt-in.** It renders the page before the click, so it runs that page's `load()` for pages nobody opens. Turn it on only when that cost is fine.
+
+```ts
+export default defineConfig({
+  navigation: {
+    viewTransitions: true,    // false: the browser's plain repaint
+    prefetch: 'moderate',     // 'conservative' (on press), 'eager', or false
+    prerender: false,         // true is 'moderate'; also 'conservative' or 'eager'
+  },
+})
+```
+
+The style and the rules are inline, and the page's CSP carries their hashes, so the strict policy stays strict.
+
+### Keeping a panel's scroll
+
+The browser restores the window's scroll when you go back, but not the scroll of a panel inside the page. A sidebar list that scrolls would jump to the top on every page change. Mark it with a key:
+
+```tsx
+<ul class="side" data-kay-keep-scroll="side">...</ul>
+```
+
+When the next page has an element with the same key, its scroll offset is set again before the first paint. Back and forward restore the offset that history entry had. A page that has no marked element ships nothing for this. A marked page gets one small inline script, hashed in its CSP. If `sessionStorage` is blocked, the page renders as usual.
+
+The key must be a plain string, and one page can use each key once. A key that is not a literal, or a panel inside a panel with the same key, fails the compile. Two elements with the same key on one rendered page (one in a layout, one in the page) throw when the page renders.
+
 ## Hybrid prerendering
 
 Mark any static or dynamic route with `export const prerender = true`:

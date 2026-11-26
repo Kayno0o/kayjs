@@ -72,7 +72,8 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
 
     const app = await testApp({ root: dir, plugins, prebuilt: true })
     const html = await (await app.get('/')).text()
-    expect(html).not.toContain('<script')
+    // The speculation rules are data, not JS.
+    expect(html.replace(/<script type="speculationrules">[\s\S]*?<\/script>/, '')).not.toContain('<script')
     // Zero inline style="..." attributes — 100% compatible with strict zero-'unsafe-inline' CSP
     expect(html).not.toContain(' style=')
     expect(html).toContain('data-ui="button"')

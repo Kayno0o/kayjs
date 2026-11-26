@@ -20,6 +20,8 @@ export interface BrowserPage {
   /** Waits for a CSS selector to match, or for `fn` to return a truthy value in the page. */
   waitFor(selectorOrFn: string | (() => unknown)): Promise<void>
   click(selector: string): Promise<void>
+  /** Moves the pointer over the first element matching `selector`, as a visitor hovering a link does. */
+  hover(selector: string): Promise<void>
   fill(selector: string, value: string): Promise<void>
   /** The text content of the first element matching `selector`. */
   text(selector: string): Promise<string>
@@ -31,8 +33,8 @@ export interface BrowserTest {
   readonly app: TestApp
   /** `http://127.0.0.1:<port>`, a port the test owns. */
   readonly origin: string
-  /** Opens `path` and resolves once the page has loaded and the islands that hydrate on load have hydrated. */
-  open(path: string): Promise<BrowserPage>
+  /** Opens `path` and resolves once the page has loaded and the islands that hydrate on load have hydrated; `reducedMotion` opens it for a visitor asking for less motion. */
+  open(path: string, options?: { reducedMotion?: boolean | undefined }): Promise<BrowserPage>
   /** Closes the browser and the server. */
   close(): Promise<void>
 }
@@ -49,6 +51,7 @@ interface Page {
   waitForSelector(selector: string, options: { timeout: number }): Promise<unknown>
   waitForFunction(fn: string | (() => unknown), arg: undefined, options: { timeout: number }): Promise<unknown>
   click(selector: string, options: { timeout: number }): Promise<void>
+  hover(selector: string, options: { timeout: number }): Promise<void>
   fill(selector: string, value: string, options: { timeout: number }): Promise<void>
   locator(selector: string): { first: () => { innerText: (options: { timeout: number }) => Promise<string> } }
 }
@@ -57,7 +60,7 @@ interface BrowserContext {
   close(): Promise<void>
 }
 interface Browser {
-  newContext(): Promise<BrowserContext>
+  newContext(options?: { reducedMotion: 'reduce' }): Promise<BrowserContext>
   close(): Promise<void>
 }
 
@@ -117,6 +120,9 @@ function wrapPage(page: Page, context: BrowserContext, timeout: number, url: str
     async click(selector) {
       await page.click(selector, { timeout })
     },
+    async hover(selector) {
+      await page.hover(selector, { timeout })
+    },
     async fill(selector, value) {
       await page.fill(selector, value, { timeout })
     },
@@ -152,8 +158,8 @@ export async function testBrowser(options: BrowserTestOptions): Promise<BrowserT
   return {
     app,
     origin,
-    async open(path) {
-      const context = await browser.newContext()
+    async open(path, openOptions) {
+      const context = await browser.newContext(openOptions?.reducedMotion === true ? { reducedMotion: 'reduce' } : undefined)
       const page = await context.newPage()
       const url = new URL(path, origin).href
       const wrapped = wrapPage(page, context, timeout, url)

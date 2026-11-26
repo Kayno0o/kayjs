@@ -8,6 +8,9 @@ import { createServer, definePlugin, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HA
 import { createHtmlHeaders } from '../src/server/document'
 import { inlineStyleHashes } from '../src/server/security'
 import { KAY_STREAM_SCRIPT } from '../src/ssr/context'
+import { createNavigation } from '../src/ssr/navigation'
+
+const NAVIGATION_HASHES = createNavigation(undefined)
 
 const tempDirs: string[] = []
 function makeTemp(prefix: string): string {
@@ -127,7 +130,8 @@ describe('Per-route CSS scoping, strict CSP hashes, and bundle weight report (#3
     expect(aboutCss).toContain('.about-only')
     expect(aboutCss).not.toContain('.home-only')
     expect(aboutCss).not.toContain('.widget-only')
-    expect(aboutHtml).not.toContain('<script')
+    // The speculation rules are data, not JS.
+    expect(aboutHtml.replace(/<script type="speculationrules">[\s\S]*?<\/script>/, '')).not.toContain('<script')
 
     // 3. 404 page gets plugin + root layout CSS only (no home/about/widget CSS)
     const notFoundRes = await app.handle(new Request('http://localhost/nope'))
@@ -190,9 +194,9 @@ describe('Per-route CSS scoping, strict CSP hashes, and bundle weight report (#3
     const strictCsp = "default-src 'self'; script-src 'self'; style-src 'self'"
     const app = await createServer({ root: dir, security: { csp: strictCsp } })
 
-    // Static page needs no extra CSP hashes
+    // A static page needs only the hashes of what every page carries: the view transition, the speculation rules and the scroll script.
     const staticRes = await app.handle(new Request('http://localhost/static'))
-    expect(staticRes.headers.get('content-security-policy')).toBe(strictCsp)
+    expect(staticRes.headers.get('content-security-policy')).toBe(withCspHashes(strictCsp, NAVIGATION_HASHES))
 
     // Island page automatically gets KAY_ISLAND_STYLE_HASH in style-src (no unsafe-inline)
     const islandRes = await app.handle(new Request('http://localhost/island'))
@@ -304,7 +308,7 @@ describe('the default CSP lets an app style its pages (#3582)', () => {
     const strict = "default-src 'self'; script-src 'self'; style-src 'self'"
     const app = await styledApp(strict)
     const res = await app.handle(new Request('http://localhost/'))
-    expect(res.headers.get('content-security-policy')).toBe(`default-src 'self'; script-src 'self'; style-src 'self' ${LAYOUT_STYLE_HASH}`)
+    expect(res.headers.get('content-security-policy')).toBe(withCspHashes(strict, { styleHashes: [...NAVIGATION_HASHES.styleHashes, LAYOUT_STYLE_HASH], scriptHashes: NAVIGATION_HASHES.scriptHashes }))
   })
 
   it('never hashes attacker-injected <style> tags from raw() or innerHTML while still hashing compiler & plugin styles (#3625)', async () => {

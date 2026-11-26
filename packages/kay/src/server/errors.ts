@@ -74,6 +74,7 @@ export interface FallbackPagesOptions {
   modules: Record<string, unknown>
   lang: string
   alwaysLoadRuntime: boolean
+  navigation?: string | undefined
   dev: boolean
   document: DocumentHooks
   htmlHeaders: HtmlHeaders
@@ -95,6 +96,7 @@ export function createFallbackPages(options: FallbackPagesOptions) {
     styles: manifest.globalStyles ?? manifest.styles,
     runtimeScript: manifest.runtimeScript,
     alwaysLoadRuntime: options.alwaysLoadRuntime,
+    navigation: options.navigation,
     lang: options.lang,
   }
   const fallbackHeadStyleHashes = headTagStyleHashes(fallbackDoc.headTags)

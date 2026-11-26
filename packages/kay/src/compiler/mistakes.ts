@@ -376,6 +376,8 @@ export function checkMistakes(
   }
   const attributes = element.openingElement.attributes
   guarded(element.start, () => checkRegionMarkup(tag, canonical, isElement, attributes, filename, element, resolveTag))
+  if (isElement)
+    guarded(element.start, () => checkKeepScroll(element, attributes, filename))
   if (isElement && VOID_ELEMENTS.has(tag) && (filterMeaningfulChildren(element.children).length > 0 || staticAttr(attributes, 'children') !== undefined))
     guarded(element.start, () => { throw mistake(`<${tag}> with children`, filename, `a void element has no content; write <${tag} />`) })
   const className = isElement && staticAttr(attributes, 'class') !== undefined ? staticAttr(attributes, 'className') : undefined
@@ -452,6 +454,24 @@ function checkRegionMarkup(
     throw mistake('data-kay-append without data-kay-target', filename, 'name the region the next page is appended to: data-kay-target="results"')
   if (staticAttr(attributes, 'data-kay-live') !== undefined && (tag !== 'form' || target === undefined))
     throw mistake('data-kay-live', filename, 'it belongs on a <form method="get" data-kay-target="..."> that swaps while typing')
+}
+
+// data-kay-keep-scroll names a panel for the script keeping its scroll offset across page loads, so its key is a literal the page can be read for, and an element inside the panel cannot take the same key.
+function checkKeepScroll(element: JSXElement, attributes: readonly JSXAttributeItem[], filename: string): void {
+  const attr = staticAttr(attributes, 'data-kay-keep-scroll')
+  if (attr === undefined)
+    return
+  const keyOf = (a: JSXAttribute) => a.value?.type === 'JSXExpressionContainer' ? staticStringValue(a.value.expression as Node) : literalText(a)
+  const key = keyOf(attr)
+  if (key === undefined || key.trim() === '' || /["<>&]/.test(key))
+    throw mistake('data-kay-keep-scroll without a literal key', filename, 'write data-kay-keep-scroll="side": a plain string naming the panel, with no quote, < > or &')
+  walk(element.children, (node) => {
+    if (node.type !== 'JSXElement')
+      return
+    const inner = staticAttr(node.openingElement.attributes, 'data-kay-keep-scroll')
+    if (inner !== undefined && keyOf(inner) === key)
+      throw mistake(`data-kay-keep-scroll="${key}" inside data-kay-keep-scroll="${key}"`, filename, 'give each panel its own key')
+  })
 }
 
 const DIRECTIVE_FIXES: Record<string, string> = {

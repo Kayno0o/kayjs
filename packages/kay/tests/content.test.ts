@@ -192,7 +192,8 @@ Hidden from production.
     const res = await app.get('/blog/second')
     expect(res.status).toBe(200)
     const html = await res.text()
-    expect(html).not.toContain('<script')
+    // The speculation rules are data, not JS.
+    expect(html.replace(/<script type="speculationrules">[\s\S]*?<\/script>/, '')).not.toContain('<script')
     expect(html).toContain('<h2 id="numbers">Numbers</h2>')
 
     const rssRes = await app.get('/rss.xml')

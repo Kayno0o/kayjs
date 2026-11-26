@@ -215,7 +215,8 @@ describe('Milestone 4: CSS Modules, public/ static files, and plugins in --compi
     const app = await testApp({ root: dir, prebuilt: true })
     const pageRes = await app.get('/')
     const html = await pageRes.text()
-    expect(html).not.toContain('<script')
+    // The speculation rules are data, not JS.
+    expect(html.replace(/<script type="speculationrules">[\s\S]*?<\/script>/, '')).not.toContain('<script')
     expect(html).toContain('<link rel="stylesheet" href="/_kay/')
 
     // Extract scoped class name from HTML and verify matching rule exists in bundled CSS!
