@@ -71,7 +71,8 @@ describe('app routes', () => {
 - `app.fetch(pathOrRequest, init?)`: Low-level request helper with cookie jar persistence.
 - `app.cookies` / `app.clearCookies()`: Inspect or reset cookies between test cases.
 - `app.errors`: The route, action and plugin errors the app did not handle, one line each (`route GET /boom: the message`). A request that came back as a 500 left one here, so a test can read what failed instead of an opaque `Internal Server Error`.
-- Pass `prebuilt: true` to `testApp({ root, prebuilt: true })` to reuse an existing `dist/` build across tests.
+- `testApp()` builds into a folder of its own under `.kay-cache/`, removed when the test process exits, so running the tests never replaces the app's `dist/`. Pass `outDir` to build somewhere else, such as a test that reads the built files.
+- Pass `prebuilt: true` to reuse a build instead of making one: the latest `testApp()` build of the same app in this test process, or else the app's `dist/`.
 - Pass `dev: true` to see the failure in the response too, as `kay dev` does (see below).
 
 ### Unhandled errors in dev

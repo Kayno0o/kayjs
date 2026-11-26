@@ -266,7 +266,7 @@ afterAll(() => {
 
 describe('Kay v2 Milestone 2 full-stack features', () => {
   test('routing, nested layouts, middleware, cookies, Head, Suspense, actions, CSRF, prerender, and client stub stripping', async () => {
-    const app = await testApp({ root: fixtureDir })
+    const app = await testApp({ root: fixtureDir, outDir: 'dist' })
 
     // 1. Home page: root middleware locals + <Head> title deduplication + security headers
     const homeRes = await app.get('/')

@@ -65,6 +65,11 @@ export function walkRoutes(dir: string): string[] {
   })
 }
 
+/** Folders that never hold an app's own source: its dependencies, its build, and dot folders such as `.git` and `.kay-cache`. */
+export function isNotSourceDir(name: string): boolean {
+  return name === 'node_modules' || name === 'dist' || name.startsWith('.')
+}
+
 export function walkAllFiles(dir: string): string[] {
   return walkFiles(dir, { keep: entry => entry.isFile() })
 }
@@ -74,7 +79,7 @@ function isOutside(base: string, target: string): boolean {
   return rel === '..' || rel.startsWith('../') || rel.startsWith('..\\') || isAbsolute(rel)
 }
 
-function isStrictDescendant(base: string, target: string): boolean {
+export function isStrictDescendant(base: string, target: string): boolean {
   return relative(base, target) !== '' && !isOutside(base, target)
 }
 

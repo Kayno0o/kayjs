@@ -2,7 +2,7 @@
   "files": {},
   "functionLines": {
     "packages/kay/src/build/bundle.ts::buildClient": 190,
-    "packages/kay/src/build/index.ts::runBuild": 243,
+    "packages/kay/src/build/index.ts::runBuild": 212,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys": 192,
     "packages/kay/src/compiler/dom.ts::compileDom": 454,
     "packages/kay/src/compiler/dom.ts::compileDom.compileElementTree": 204,
@@ -33,7 +33,7 @@
   },
   "functionComplexity": {
     "packages/kay/src/build/bundle.ts::buildClient": 66,
-    "packages/kay/src/build/index.ts::runBuild": 62,
+    "packages/kay/src/build/index.ts::runBuild": 50,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys.walkWithParents": 72,
     "packages/kay/src/compiler/dom-attrs.ts::compileElementAttributes": 59,
     "packages/kay/src/compiler/scope.ts::isSafeLazyJsxRef.visit": 48,

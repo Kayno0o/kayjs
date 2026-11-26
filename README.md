@@ -132,4 +132,4 @@ kay mcp-footprint                      # Inspect @kayjs/mcp tool byte & token bu
 kay --completions fish                 # Shell completion script (also bash, zsh)
 ```
 
-Every command answers `--help`. Exit codes: 0 done, 1 a finding or failure (`kay check` found an error), 2 a usage error. `kay build` refuses the same mistakes as `kay check`, at the same `file:line:col`, and only skips the typecheck; `kay check` says when it skipped one and why.
+Every command answers `--help`. Exit codes: 0 done, 1 a finding or failure (`kay check` found an error), 2 a usage error. `kay build` refuses the same mistakes as `kay check`, at the same `file:line:col`, and only skips the typecheck; `kay check` says when it skipped one and why. A build replaces `dist/` only once every step has passed, so a failed one leaves the last build in place, and `testApp()` builds into a folder of its own.

@@ -3,7 +3,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import pkg from '../../package.json' with { type: 'json' }
-import { relPosix, walkAllFiles } from '../build/files'
+import { isNotSourceDir, relPosix, walkFiles } from '../build/files'
 
 export type ScaffoldTemplate = 'minimal' | 'fullstack' | 'blog' | 'app'
 
@@ -26,7 +26,7 @@ export function scaffoldProject(targetDir: string, options: ScaffoldOptions = {}
 
   const written: string[] = []
   for (const dir of [join(TEMPLATES_DIR, '_shared'), join(TEMPLATES_DIR, template)]) {
-    for (const abs of walkAllFiles(dir)) {
+    for (const abs of walkFiles(dir, { skipDir: isNotSourceDir, keep: entry => entry.isFile() })) {
       const rel = relPosix(dir, abs)
       const text = readFileSync(abs, 'utf8').replaceAll('__APP_NAME__', name).replaceAll('__KAY_VERSION__', kayVersion)
       mkdirSync(dirname(join(root, rel)), { recursive: true })

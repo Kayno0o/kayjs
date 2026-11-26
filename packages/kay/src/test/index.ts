@@ -2,11 +2,15 @@
 
 import type { BuildManifest, BuildOptions } from '../build/index'
 import type { KayApp, ServerAction, ServerRuntimeConfig } from '../server/index'
-import { resolve } from 'node:path'
+import { readdirSync, rmSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { build } from '../build/index'
 import { relPosix } from '../build/files'
+import { processSuffix, removeDeadProcessDirs } from '../build/output'
 import { resolveServerConfig } from '../server/index'
 import { startBuiltApp } from '../server/loader'
+
+const TEST_DIR_PREFIX = 'test-'
 
 export interface TestAppOptions extends Omit<BuildOptions, 'compile' | 'static'>, Partial<ServerRuntimeConfig> {
   prebuilt?: boolean | undefined
@@ -28,11 +32,36 @@ export interface TestApp {
   clearCookies(): void
 }
 
+/** The folder of the latest testApp() build of each app root in this process, which `prebuilt: true` reuses. */
+const latestOutDirs = new Map<string, string>()
+const ownOutDirs: string[] = []
+
+/** A folder under `.kay-cache/` for one testApp() build, removed when the process exits, so tests never replace the app's deployable dist/. */
+function ownOutDir(root: string): string {
+  const cacheDir = join(root, '.kay-cache')
+  removeDeadProcessDirs(cacheDir, TEST_DIR_PREFIX)
+  if (ownOutDirs.length === 0) {
+    process.once('exit', () => {
+      for (const dir of ownOutDirs) {
+        rmSync(dir, { recursive: true, force: true })
+        if (readdirSync(dirname(dir)).length === 0)
+          rmSync(dirname(dir), { recursive: true, force: true })
+      }
+    })
+  }
+  const dir = join(cacheDir, `${TEST_DIR_PREFIX}${processSuffix()}`)
+  ownOutDirs.push(dir)
+  latestOutDirs.set(root, dir)
+  return dir
+}
+
 export async function testApp(options: TestAppOptions): Promise<TestApp> {
+  const root = resolve(options.root)
+  const outDir = options.outDir ?? (options.prebuilt ? latestOutDirs.get(root) : ownOutDir(root))
   const manifest = options.prebuilt ? undefined : await build({
     root: options.root,
     routesDir: options.routesDir,
-    outDir: options.outDir,
+    outDir,
     minify: options.minify ?? false,
     assetPrefix: options.assetPrefix,
     site: options.site,
@@ -44,7 +73,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
   const errors: string[] = []
   const { app, entry } = await startBuiltApp({
     root: options.root,
-    outDir: options.outDir,
+    outDir,
     dev: options.dev,
     nodeEnv: options.nodeEnv,
     ...resolveServerConfig(undefined, options),

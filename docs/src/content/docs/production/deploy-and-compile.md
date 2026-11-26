@@ -33,6 +33,12 @@ kay build --compile ./server
 
 `kay start` and a compiled binary stop gracefully on `SIGTERM`, `SIGINT` or `SIGHUP`, so a rolling deploy drops no request. The server stops taking connections, `@kayjs/live` ends its open streams, and each plugin's `api.onShutdown()` hook runs. The process exits 0 once the requests already in flight have answered. A request still open after 10 seconds is cut, and the process exits 1.
 
+## How a build replaces `dist/`
+
+`kay build` writes into a folder beside `dist/` and renames it to `dist/` only once every step has passed: bundling, plugin hooks, prerendering and `--compile`. A build that fails leaves the previous `dist/` byte for byte, and a running `kay start` keeps serving it until the new one lands. Restart `kay start` after the build so it serves the new pages and assets.
+
+kay marks each folder it builds with a `.kay-output` file. It refuses to replace an `outDir` holding files it did not build, and names the folder, so a mistyped `outDir` never deletes your files. An empty folder, or a build from an older kay, is replaced as usual.
+
 ## 3. Static HTML Export (`kay build --static`)
 
 ```bash

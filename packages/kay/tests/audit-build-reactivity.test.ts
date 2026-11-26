@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
@@ -152,28 +152,7 @@ describe('audit #3526 — Box 32: --static staging, non-200 failure, dynamic ski
     expect(readFileSync(join(dir, 'dist/sentinel.txt'), 'utf8')).toBe('untouched')
   })
 
-  test('fails --static on non-200 status and preserves previous dist atomically', async () => {
-    const dir = makeTempProject('kay-audit-box32-fail-')
-    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>ok</p> }')
-    writeFileSync(join(dir, 'src/routes/broken.tsx'), `
-      export default function Broken() {
-        throw new Error('render failure')
-      }
-    `)
-    mkdirSync(join(dir, 'dist'), { recursive: true })
-    writeFileSync(join(dir, 'dist/previous.html'), '<h1>previous build</h1>')
-
-    await expect(build({ root: dir, static: true })).rejects.toThrow(/500|broken/i)
-
-    // Previous dist must still be intact!
-    expect(existsSync(join(dir, 'dist/previous.html'))).toBe(true)
-    expect(readFileSync(join(dir, 'dist/previous.html'), 'utf8')).toBe('<h1>previous build</h1>')
-
-    // No leftover staging directories in root
-    const leftovers = readdirSync(dir).filter(name => name.includes('stage') || name.includes('prev'))
-    expect(leftovers).toEqual([])
-  })
-
+  // A failed --static export keeping the previous one: build-swap.test.ts (#3658).
   test.each([true, false])('a prerender failure (static %p) names the route and carries the page error and its stack behind one prefix (#3650)', async (isStatic) => {
     const dir = makeTempProject('kay-prerender-cause-')
     writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>ok</p> }')

@@ -18,12 +18,13 @@ import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from 
 import { actionHash } from '../server/action'
 import { buildClient, buildServer, linkOrCopyFile, pluginBunPlugins, standaloneCssFiles } from './bundle'
 import { compileExecutable } from './compile'
-import { assertSafeOutDir, fileSize, isInNodeModules, relPosix, walkAllFiles, walkRoutes } from './files'
+import { assertSafeOutDir, fileSize, isInNodeModules, isStrictDescendant, relPosix, walkAllFiles, walkRoutes } from './files'
 import { ModuleGraph } from './graph'
 import { renderProblems } from './render-rules'
 import { planIslands } from './islands'
 import { buildActionEntries, buildRouteEntries } from './manifest'
 import { createPluginHost, createPublicFiles } from './plugin-host'
+import { assertOwnOutDir, processSuffix, removeStaleStages, stageDirFor, swapStage } from './output'
 import { prerender } from './prerender'
 import { analyzeBundleWeights, checkJsBudget, formatBundleReport, formatBundleReportJson, islandOrigins } from './report'
 import { SERVER_ENTRY_FILE, serverEntrySource } from './server-entry'
@@ -108,9 +109,10 @@ interface BuildRun {
   routesDir: string
   publicDir: string
   finalOutDir: string
-  /** Where the build writes: `finalOutDir`, or a stage folder for a static export. */
+  /** The folder swapped in as `finalOutDir` once every step passed. */
+  stageDir: string
+  /** Where the build writes: `stageDir`, or for a static export a server build in `.kay-cache/` that `stageDir` takes pages from. */
   outDir: string
-  staticStageDir: string | undefined
   stageSuffix: string
   assetPrefix: string
   site: string | undefined
@@ -139,10 +141,12 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
   const cacheBaseDir = join(root, '.kay-cache')
   const cacheExisted = existsSync(cacheBaseDir)
-  const stageSuffix = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const outDir = options.static ? join(cacheBaseDir, `.static-stage-${stageSuffix}`) : finalOutDir
-  const staticStageDir = options.static ? join(dirname(finalOutDir), `.${basename(finalOutDir)}.stage-${stageSuffix}`) : undefined
+  const stageSuffix = processSuffix()
+  const stageDir = stageDirFor(finalOutDir, stageSuffix)
+  const outDir = options.static ? join(cacheBaseDir, `.static-stage-${stageSuffix}`) : stageDir
   const assetPrefix = (options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay').replace(/\/$/, '')
+  assertOwnOutDir(root, finalOutDir, assetPrefix)
+  removeStaleStages(finalOutDir)
   const site = (options.site ?? fileConfig.site)?.replace(/\/$/, '') || undefined
   const publicFiles = createPublicFiles()
   const appCtx = createAppContext({
@@ -164,8 +168,8 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       routesDir,
       publicDir,
       finalOutDir,
+      stageDir,
       outDir,
-      staticStageDir,
       stageSuffix,
       assetPrefix,
       site,
@@ -178,9 +182,8 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     }))
   }
   finally {
+    rmSync(stageDir, { recursive: true, force: true })
     if (options.static) {
-      if (staticStageDir !== undefined)
-        rmSync(staticStageDir, { recursive: true, force: true })
       rmSync(outDir, { recursive: true, force: true })
       if (!cacheExisted && existsSync(cacheBaseDir) && readdirSync(cacheBaseDir).length === 0)
         rmSync(cacheBaseDir, { recursive: true, force: true })
@@ -238,6 +241,36 @@ function planCheckedIslands(root: string, routesDir: string, graph: ModuleGraph,
   return islands
 }
 
+/** Lists the files `kay dev` watches for the next rebuild, and drops the cached compiles of deleted files so a long session stays flat in memory. */
+function refreshCacheWatches(cache: BuildCache, graph: ModuleGraph, extraFiles: readonly string[]): void {
+  const watched = cache.watchedFiles
+  watched.clear()
+  const recordWatched = (file: string) => {
+    if (!existsSync(file))
+      return
+    let real = file
+    try {
+      real = realpathSync(file)
+    }
+    catch {}
+    watched.add(real)
+  }
+  for (const f of graph.analyses.keys())
+    recordWatched(f)
+  for (const f of cache.lastClient?.inputStamps.keys() ?? [])
+    recordWatched(f)
+  for (const f of cache.lastServer?.inputStamps.keys() ?? [])
+    recordWatched(f)
+  for (const f of extraFiles)
+    recordWatched(f)
+  for (const compiled of [cache.analyses, cache.domCompiled, cache.ssrCompiled]) {
+    for (const f of [...compiled.keys()]) {
+      if (!existsSync(f))
+        compiled.delete(f)
+    }
+  }
+}
+
 async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const { options, root, plugins, routesDir, outDir, assetPrefix, isDev, publicFiles } = run
   const clientDir = join(outDir, 'client')
@@ -288,7 +321,6 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
 
   const islands = planCheckedIslands(root, routesDir, graph, pageFiles, specialFiles, isStatic)
 
-  rmSync(outDir, { recursive: true, force: true })
   mkdirSync(clientDir, { recursive: true })
   mkdirSync(serverDir, { recursive: true })
   const pluginCssFiles = plugins
@@ -331,43 +363,8 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const anyPassSkipped = options.cache !== undefined
     && (options.cache.stats.clientSkips > clientSkipsBefore || options.cache.stats.serverSkips > serverSkipsBefore)
 
-  if (options.cache !== undefined) {
-    const watched = options.cache.watchedFiles
-    watched.clear()
-    const recordWatched = (file: string) => {
-      if (!existsSync(file))
-        return
-      let real = file
-      try {
-        real = realpathSync(file)
-      }
-      catch {}
-      watched.add(real)
-    }
-    for (const f of graph.analyses.keys())
-      recordWatched(f)
-    for (const f of options.cache.lastClient?.inputStamps.keys() ?? [])
-      recordWatched(f)
-    for (const f of options.cache.lastServer?.inputStamps.keys() ?? [])
-      recordWatched(f)
-    for (const f of pluginCssFiles)
-      recordWatched(f)
-    if (hasConfigFile)
-      recordWatched(configSrc)
-    // Prune deleted files from caches so long-lived dev sessions stay flat in memory.
-    for (const f of [...options.cache.analyses.keys()]) {
-      if (!existsSync(f))
-        options.cache.analyses.delete(f)
-    }
-    for (const f of [...options.cache.domCompiled.keys()]) {
-      if (!existsSync(f))
-        options.cache.domCompiled.delete(f)
-    }
-    for (const f of [...options.cache.ssrCompiled.keys()]) {
-      if (!existsSync(f))
-        options.cache.ssrCompiled.delete(f)
-    }
-  }
+  if (options.cache !== undefined)
+    refreshCacheWatches(options.cache, graph, [...pluginCssFiles, ...(hasConfigFile ? [configSrc] : [])])
 
   const assets: string[] = []
   for (const rel of client.assetFiles) {
@@ -455,7 +452,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
 
   // Hybrid prerendering / static export (skipped in `kay dev`, where routes render on-demand)
   const prerenderRoutes = options.prerender !== false || isStatic ? routes.filter(r => r.prerender) : []
-  const prerenderDir = isStatic ? run.staticStageDir! : join(outDir, 'prerendered')
+  const prerenderDir = isStatic ? run.stageDir : join(outDir, 'prerendered')
   const prerendered = prerenderRoutes.length > 0 || isStatic
     ? await prerender({ root, outDir, assetPrefix, site: run.site, plugins, pluginOverride: options.plugins, isDev, nodeEnv: run.nodeEnv, isStatic, prerenderDir, routes: prerenderRoutes })
     : undefined
@@ -502,12 +499,38 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
       manifest,
       assetPrefix,
       site: options.site !== undefined ? run.site : undefined,
-      outfile: typeof options.compile === 'string' ? resolve(root, options.compile) : join(outDir, 'server-bin'),
+      outfile: compileOutfile(options.compile, root, outDir, run.finalOutDir),
 
       resolveKaySpecifier,
       bunPlugins: pluginBunPlugins(env, 'compile'),
     })
   }
 
+  if (!isStatic) {
+    swapStage(outDir, run.finalOutDir, run.stageSuffix)
+    relocateCache(options.cache, outDir, run.finalOutDir)
+  }
   return manifest
+}
+
+/** Where `--compile` writes the binary: a path inside the output folder goes into the stage, so the swap keeps it. */
+function compileOutfile(compile: string | true, root: string, stageDir: string, finalOutDir: string): string {
+  if (compile === true)
+    return join(stageDir, 'server-bin')
+  const outfile = resolve(root, compile)
+  return isStrictDescendant(finalOutDir, outfile) ? join(stageDir, relative(finalOutDir, outfile)) : outfile
+}
+
+/** Points the cache's reusable folders at where the swap moved them, so the next build links from there. */
+function relocateCache(cache: BuildCache | undefined, from: string, to: string): void {
+  if (cache === undefined)
+    return
+  const moved = (dir: string): string => dir.startsWith(from) ? to + dir.slice(from.length) : dir
+  if (cache.lastClient !== undefined)
+    cache.lastClient.clientDir = moved(cache.lastClient.clientDir)
+  if (cache.lastServer !== undefined)
+    cache.lastServer.serverDir = moved(cache.lastServer.serverDir)
+  const assets = cachedPluginAssets.get(cache)
+  if (assets !== undefined)
+    assets.clientDir = moved(assets.clientDir)
 }

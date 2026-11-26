@@ -6,7 +6,7 @@ import type { ComplianceConfig } from '../compiler/compliance'
 import type { CheckPluginContext, KayPlugin } from '../plugins/index'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
-import { isInNodeModules, isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
+import { isInNodeModules, isNotSourceDir, isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
 import { renderProblems } from '../build/render-rules'
 import { analyzeIslands } from '../build/islands'
@@ -71,7 +71,7 @@ export function diagnosticData(text: string, severity: 'error' | 'warning'): Che
 
 function walkTsFiles(dir: string): string[] {
   return walkFiles(dir, {
-    skipDir: name => name === 'node_modules' || name === 'dist' || name.startsWith('.'),
+    skipDir: isNotSourceDir,
     keep: entry => isTsFile(entry.name),
   })
 }

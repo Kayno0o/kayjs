@@ -4,13 +4,14 @@ import type { KayPlugin } from '../plugins/index'
 import type { ServerEntry } from '../server/app-entry'
 import type { KayApp } from '../server/index'
 import type { BuildManifest } from './manifest'
-import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join, relative } from 'node:path'
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
 import { resolvePlugins } from '../plugins/index'
 import { createDocumentHooks, createHtmlHeaders } from '../server/document'
 import { createNavigation } from '../ssr/navigation'
 import { createFallbackPages } from '../server/errors'
 import { precompressFile, walkAllFiles } from './files'
+import { swapStage } from './output'
 import { pageFailure, prerenderOrigin } from './prerender'
 
 const LEADING_SLASH_RE = /^\//
@@ -98,22 +99,5 @@ export async function exportStatic(options: StaticExportOptions): Promise<void> 
     precompressFile(abs, 128)
 
   // Swap the stage in only after every page and asset succeeded.
-  if (!existsSync(finalOutDir)) {
-    mkdirSync(dirname(finalOutDir), { recursive: true })
-    renameSync(stageDir, finalOutDir)
-    return
-  }
-  const backupDir = join(dirname(finalOutDir), `.${basename(finalOutDir)}.prev-${options.stageSuffix}`)
-  renameSync(finalOutDir, backupDir)
-  try {
-    renameSync(stageDir, finalOutDir)
-  }
-  catch (err) {
-    try {
-      renameSync(backupDir, finalOutDir)
-    }
-    catch {}
-    throw err
-  }
-  rmSync(backupDir, { recursive: true, force: true })
+  swapStage(stageDir, finalOutDir, options.stageSuffix)
 }

@@ -4,7 +4,6 @@
     "packages/kay/src/build/graph.ts": 1,
     "packages/kay/src/build/index.ts": 1,
     "packages/kay/src/build/prerender.ts": 1,
-    "packages/kay/src/build/static.ts": 1,
     "packages/kay/src/cli/inspect.ts": 2,
     "packages/kay/src/dev/index.ts": 5,
     "packages/kay/src/dom/action.ts": 1,

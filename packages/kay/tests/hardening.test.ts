@@ -126,7 +126,7 @@ describe('Milestone 4: Compiler hardening (spreads, SVG, destructured .map, kay-
       }
     `)
 
-    const app = await testApp({ root: dir })
+    const app = await testApp({ root: dir, outDir: 'dist' })
     const res = await app.get('/')
     expect(res.status).toBe(200)
     const html = await res.text()
@@ -326,6 +326,25 @@ describe('Milestone 4: CSS Modules, public/ static files, and plugins in --compi
 })
 
 describe('Milestone 4: kay new scaffolder & kay check validator', () => {
+  it('leaves out the build and test folders a template\'s own runs left in it (#3658)', () => {
+    const templateDir = join(KAY_PKG_DIR, 'templates/minimal')
+    const leftovers = ['dist/server/_entry.js', '.kay-cache/test-1-1-a/manifest.json', 'src/.kay-dev/b1/x.js']
+    for (const file of leftovers) {
+      mkdirSync(join(templateDir, file, '..'), { recursive: true })
+      writeFileSync(join(templateDir, file), '')
+    }
+    try {
+      const { files } = scaffoldProject(join(makeTemp('kay-3658-'), 'my-app'), { template: 'minimal' })
+
+      expect(files.filter(file => file.includes('dist/') || file.includes('.kay-'))).toEqual([])
+      expect(files).toContain('src/routes/index.tsx')
+    }
+    finally {
+      for (const folder of ['dist', '.kay-cache', 'src/.kay-dev'])
+        rmSync(join(templateDir, folder), { recursive: true, force: true })
+    }
+  })
+
   // Their types are checked by the repo's tsconfig, which includes packages/kay/templates.
   for (const template of ['minimal', 'fullstack', 'blog', 'app'] as const) {
     it(`scaffolds the ${template} template on kay's version and the repo's TypeScript, passing kay check and kay build (#3586)`, async () => {

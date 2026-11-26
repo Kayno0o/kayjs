@@ -4,7 +4,7 @@ import type { Program } from 'oxc-parser'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import pkg from '../../package.json' with { type: 'json' }
-import { relPosix } from '../build/files'
+import { isNotSourceDir, relPosix } from '../build/files'
 import { resolveKaySpecifier } from '../build/resolve'
 import { parseTsx } from '../compiler/analyze'
 import { SourceEditor } from '../compiler/patch'
@@ -24,7 +24,6 @@ const JSX_PRAGMA_RE = /@jsxImportSource\s+kay\b(?!\/)/g
 const TSCONFIG_JSX_RE = /("jsxImportSource"\s*:\s*)"kay"/g
 const SOURCE_FILE_RE = /\.(?:tsx?|mts)$/
 const TSCONFIG_FILE_RE = /^tsconfig(?:\.[\w-]+)?\.json$/
-const SKIPPED_DIRS = new Set(['node_modules', 'dist'])
 const PUBLIC_ENTRIES = new Set(['', '/server', '/config', '/test', '/build', '/jsx-runtime', '/jsx-dev-runtime'])
 // kay v1 served `raw`, `esc` and `escAttr` from `kay/ssr`; v2 exports them from `/server`.
 const RENAMED_ENTRIES = new Map([['/ssr', '/server']])
@@ -65,7 +64,7 @@ function sourceFiles(root: string, dir = root, out: string[] = []): string[] {
   if (dir !== root && existsSync(join(dir, 'package.json')))
     return out
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.') || SKIPPED_DIRS.has(entry.name))
+    if (isNotSourceDir(entry.name))
       continue
     const path = join(dir, entry.name)
     if (entry.isDirectory())

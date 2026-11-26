@@ -115,7 +115,7 @@ describe('KayPlugin API (tailwind + i18n + spa + custom transform)', () => {
       customBannerPlugin,
     ]
 
-    const app = await testApp({ root: fixtureDir, plugins })
+    const app = await testApp({ root: fixtureDir, outDir: 'dist', plugins })
 
     // 1. Default English route: CSS stylesheet linked, global middleware active, runtime script loaded
     const enRes = await app.get('/')
