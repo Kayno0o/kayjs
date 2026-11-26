@@ -80,12 +80,38 @@ function keepEnds<T>(rows: Row<T>[], start: number, oldEnd: number, newEnd: numb
   return result
 }
 
+type RenderRow<T> = (item: Signal<T>, index?: Signal<number>) => Node | DocumentFragment | null | undefined | boolean | string | number
+
+
+// While hydrating, a row that rendered no node of its own takes the server nodes the cursor moved over since `before`.
+function adoptRowNodes<T>(parent: Node, marker: Node | null, row: Row<T>, before: Node | null): void {
+  const afterCursor = hydrateCursor()
+  if (row.node === null && before !== null && before !== afterCursor) {
+    const claimed: Node[] = []
+    for (let n: Node | null = before; n !== null && n !== afterCursor; n = n.nextSibling) {
+      if (n.nodeType === 8 && (n as Comment).data === 'k]')
+        break
+      claimed.push(n)
+    }
+    if (claimed.length === 1) {
+      row.node = claimed[0]!
+    }
+    else if (claimed.length > 1) {
+      row.node = claimed[0]!
+      row.nodes = claimed
+    }
+  }
+  else if (row.node !== null && row.node.parentNode !== parent) {
+    insertRow(parent, row, marker)
+  }
+}
+
 export function loop<T>(
   parent: Node,
   marker: Node | null,
   each: () => readonly T[] | null | undefined | false,
   keyFn: (item: T, index: number) => unknown,
-  renderRow: (item: Signal<T>, index?: Signal<number>) => Node | DocumentFragment | null | undefined | boolean | string | number,
+  renderRow: RenderRow<T>,
   skip = 0,
 ): void {
   const parentOwner = getOwner()
@@ -98,11 +124,25 @@ export function loop<T>(
     })
   }
 
+  // A row that throws is disposed and left empty under a key no item matches, so the next update renders it again; its error is rethrown once the loop's rows match the DOM.
+  let failed = false
+  let error: unknown
   const makeRow = (itemVal: T, idx: number, key: unknown): Row<T> => {
     const owner = createOwner(parentOwner)
     const item = signal(itemVal)
     const index = needsIndex ? signal(idx) : undefined
-    const raw = runWithOwner(owner, () => renderRow(item, index))
+    let raw: ReturnType<RenderRow<T>>
+    try {
+      raw = runWithOwner(owner, () => renderRow(item, index))
+    }
+    catch (err) {
+      disposeOwner(owner)
+      if (!failed) {
+        failed = true
+        error = err
+      }
+      return { key: Symbol(), node: null, item, index, owner }
+    }
     let node: Node | null = null
     let nodes: Node[] | undefined
     if (raw instanceof Node) {
@@ -172,25 +212,7 @@ export function loop<T>(
             const item = next[i]!
             const before = hydrateCursor()
             const row = makeRow(item, i, keyFn(item, i))
-            const afterCursor = hydrateCursor()
-            if (row.node === null && before !== null && before !== afterCursor) {
-              const claimed: Node[] = []
-              for (let n: Node | null = before; n !== null && n !== afterCursor; n = n.nextSibling) {
-                if (n.nodeType === 8 && (n as Comment).data === 'k]')
-                  break
-                claimed.push(n)
-              }
-              if (claimed.length === 1) {
-                row.node = claimed[0]!
-              }
-              else if (claimed.length > 1) {
-                row.node = claimed[0]!
-                row.nodes = claimed
-              }
-            }
-            else if (row.node !== null && row.node.parentNode !== parent) {
-              insertRow(parent, row, marker)
-            }
+            adoptRowNodes(parent, marker, row, before)
             created[i] = row
           }
         }, skip, startMarker)) {
@@ -357,6 +379,10 @@ export function loop<T>(
 
       rows = result
     })
+    if (failed) {
+      failed = false
+      throw error
+    }
   })
 }
 

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import { build } from '../src/build/index'
 import { loop } from '../src/dom/loop'
-import { computed, effect, root, signal, store } from '../src/index'
+import { computed, effect, onCleanup, root, signal, store } from '../src/index'
 import { createOwner, disposeOwner, getOwner } from '../src/reactivity/index'
 import { createServer } from '../src/server/index'
 
@@ -488,6 +488,52 @@ describe('audit #3526 — Box 36: disposed row owners & computeds unlink from pa
 
       dispose()
       expect(rootOwner!.fs).toBeUndefined()
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+    }
+  })
+
+  test('a row that throws leaves the list in step with the DOM and renders again on the next update (#3647)', async () => {
+    GlobalRegistrator.register()
+    try {
+      const ul = document.createElement('ul')
+      const list = signal(['a', 'b', 'c', 'd'])
+      let flakyThrows = true
+      let badCleanups = 0
+      root(() => {
+        loop(ul, null, () => list.value, x => x, (item) => {
+          if (item.peek() === 'bad') {
+            onCleanup(() => badCleanups++)
+            throw new Error('row bad threw')
+          }
+          if (item.peek() === 'flaky' && flakyThrows) {
+            flakyThrows = false
+            throw new Error('row flaky threw')
+          }
+          const li = document.createElement('li')
+          li.textContent = item.peek()
+          return li
+        })
+      })
+      const text = (): string => [...ul.children].map(li => li.textContent).join(',')
+
+      expect(() => {
+        list.value = ['a', 'bad', 'd', 'c']
+      }).toThrow('row bad threw')
+      expect(badCleanups).toBe(1)
+      expect(text()).toBe('a,d,c')
+      list.value = ['a', 'd', 'c']
+      expect(text()).toBe('a,d,c')
+      list.value = ['a', 'b', 'c', 'e']
+      expect(text()).toBe('a,b,c,e')
+
+      expect(() => {
+        list.value = ['a', 'b', 'c', 'e', 'flaky']
+      }).toThrow('row flaky threw')
+      expect(text()).toBe('a,b,c,e')
+      list.value = ['a', 'b', 'c', 'e', 'flaky']
+      expect(text()).toBe('a,b,c,e,flaky')
     }
     finally {
       await GlobalRegistrator.unregister()
