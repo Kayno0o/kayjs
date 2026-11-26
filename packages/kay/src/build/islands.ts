@@ -3,6 +3,7 @@
 import type { ModuleGraph } from './graph'
 import { basename, extname } from 'node:path'
 import { asyncInteractiveError } from '../compiler/analyze'
+import { serverOnlyTagError } from '../compiler/mistakes'
 import { isTsFile, relPosix } from './files'
 
 export interface IslandTarget {
@@ -73,6 +74,8 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
         const reason = `reads ${state.local} from '${imp.source}'`
         if (analysis.hasAsyncDefault)
           throw asyncInteractiveError(file, reason)
+        if (analysis.serverOnlyTag !== undefined)
+          throw serverOnlyTagError(relPosix(root, file), analysis.serverOnlyTag, reason)
         analyses.set(file, { ...analysis, isInteractive: true, interactiveReason: reason })
         break
       }

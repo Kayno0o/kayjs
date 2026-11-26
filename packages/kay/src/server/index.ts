@@ -272,7 +272,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
             () => ssrChild(mod.default!(pageProps) as Html),
             pickPageIslandProps(data, entry, mod),
             entry.islandHydrate as HydrateStrategy | undefined,
-            true,
+            true, mod.default!.name,
           ), request, url, locals, cookieStore, ctx)
         }
         const rendered = mod.default!(pageProps)
@@ -390,7 +390,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           () => ssrChild(mod.default!(pageProps) as Html),
           pickPageIslandProps(data, entry, mod),
           entry.islandHydrate as HydrateStrategy | undefined,
-          true,
+          true, mod.default!.name,
         )
       }
       else {

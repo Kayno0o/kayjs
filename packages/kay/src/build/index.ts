@@ -24,7 +24,7 @@ import { prerender } from './prerender'
 import { formatBundleReport } from './report'
 import { SERVER_ENTRY_FILE, serverEntrySource } from './server-entry'
 import { KAY_SRC_ROOT, resolveKaySpecifier } from './resolve'
-import { assertNoRouteConflicts, hasRouteHandlerExport, routeExportProblem, SPECIAL_ROUTE_FILES } from './routes'
+import { assertNoRouteConflicts, hasRouteHandlerExport, routeExportProblem, routeFileProblem, SPECIAL_ROUTE_FILES } from './routes'
 import { exportStatic } from './static'
 
 export type { BuildCache } from './graph'
@@ -159,7 +159,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
 
   const allRouteFiles = walkRoutes(routesDir).sort()
   const specialFiles = allRouteFiles.filter(f => SPECIAL_ROUTE_FILES.has(basename(f)))
-  const candidatePageFiles = allRouteFiles.filter(f => !basename(f).startsWith('_'))
+  const candidateFiles = allRouteFiles.filter(f => !basename(f).startsWith('_'))
   const rootLayoutSrc = join(routesDir, '_layout.tsx')
   const errorSrc = join(routesDir, '_error.tsx')
   const notFoundSrc = join(routesDir, '_404.tsx')
@@ -172,20 +172,22 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const configSrc = join(root, 'kay.config.ts')
   const hasConfigFile = existsSync(configSrc)
   const graph = new ModuleGraph(root, options.cache)
-  for (const f of [...specialFiles, ...candidatePageFiles, ...(hasConfigFile ? [configSrc] : [])])
+  for (const f of [...specialFiles, ...candidateFiles, ...(hasConfigFile ? [configSrc] : [])])
     graph.load(f)
   for (const analysis of graph.analyses.values()) {
     for (const warning of analysis.warnings)
       console.warn(warning)
   }
 
-  // Skip helper files inside routes/ that export neither a default component nor an HTTP method handler
-  for (const f of candidatePageFiles) {
-    const problem = routeExportProblem(graph.analyses.get(f)!, relPosix(root, f))
+  const routesRel = relPosix(root, routesDir)
+  for (const f of [...specialFiles, ...candidateFiles]) {
+    const analysis = graph.analyses.get(f)!
+    const problem = routeFileProblem(analysis, relPosix(root, f), routesRel) ?? routeExportProblem(analysis, relPosix(root, f))
     if (problem !== undefined)
       throw new Error(`kay build: ${problem}`)
   }
-  const pageFiles = candidatePageFiles.filter(f => hasRouteHandlerExport(graph.analyses.get(f)!))
+  // A file exporting only actions stays in routes/ for its folder's middleware.
+  const pageFiles = candidateFiles.filter(f => hasRouteHandlerExport(graph.analyses.get(f)!))
   assertNoRouteConflicts(root, routesDir, pageFiles)
 
   // Server actions, keyed by source file

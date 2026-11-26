@@ -50,6 +50,15 @@ export function mistake(what: string, filename: string, fix: string): Error {
   return new Error(`kay compiler: ${what} in ${filename}: ${fix}.`)
 }
 
+export function islandRemoved(filename: string): Error {
+  return mistake('island()', filename, 'it is gone; write export const hydrate = \'visible\' in the component\'s file, or set $hydrate where it renders')
+}
+
+// `<Head>` and `<Suspense>` run during server rendering only, so in an island they never update.
+export function serverOnlyTagError(filename: string, tag: string, reason: string | undefined): Error {
+  return mistake(`<${tag}> in an island`, filename, `the module is an island because it ${reason ?? 'is interactive'}; move <${tag}> to the page or a layout, outside any component with state or handlers`)
+}
+
 const BARE_KAY_RE = /^kay(?:\/|$)/
 
 /** Refuses the bare `kay` spelling kay v1 used: v2 is imported as `@kayjs/kay`. */

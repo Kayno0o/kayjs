@@ -14,7 +14,6 @@ You never write `'use client'` or `client:load`. A component becomes an island a
 - Reactive primitives: `signal`, `computed`, `effect`, `onMount`, `store`, `selector`
 - DOM interactivity: `on*` event handlers (`onClick`, `onInput`, etc.) or `ref` on an HTML or SVG element (on a component tag they are plain props)
 - Reactive state imported from another module, such as `export const cart = store([])` in `src/state.ts`
-- Explicit wrapper: `island(Component, { hydrate: 'visible' })`
 
 <Callout title="Zero-JS guarantee" tone="tip">
 When a route renders only static components and native HTML forms, Kay omits the client runtime completely. Zero `<script>` tags are emitted in the HTML.
@@ -36,7 +35,7 @@ export function Counter({ initial = 0 }: { initial?: number }) {
 
 ## Hydration strategies (`$hydrate`)
 
-Control when an island downloads and hydrates using `$hydrate` at the call site. Unknown modes and `$hydrate` on non-islands fail compilation.
+Control when an island downloads and hydrates using `$hydrate` at the call site, or set the default for every call site with `export const hydrate = 'visible'` in the component's file. Unknown modes and `$hydrate` on non-islands fail compilation.
 
 | Strategy | When it hydrates | Best for |
 | :--- | :--- | :--- |
@@ -56,7 +55,14 @@ Props passed from server code into an island are serialized into HTML and restor
 
 ## Static children inside islands (`<kay-slot>`)
 
-When you pass server-rendered JSX children into an island (`<Modal><ServerMarkdown /></Modal>`), Kay renders those children on the server inside `<kay-slot>`. Hydration preserves the slot untouched and ships **0 bytes** of client JS for its content.
+When you pass server-rendered JSX children into an island (`<Modal><ServerMarkdown /></Modal>`), Kay renders those children on the server inside `<kay-slot>`. Hydration preserves the slot untouched and ships **0 bytes** of client JS for its content. The children render before the island, in the page's scope: they read the page's contexts, and an island among them hydrates on its own.
+
+## What an island cannot use
+
+The browser renders an island without the page around it, so kay refuses what would differ there:
+
+- `<Head>` and `<Suspense>` run during server rendering only. In an island they fail compilation: render them in the page or a layout.
+- A context provided outside the island reaches it on the server only. Reading one throws `kay: <Counter> reads a context provided outside the island`: pass the value as a prop. A context the island provides itself works on both sides.
 
 ## Server-only `async` routes and layouts
 

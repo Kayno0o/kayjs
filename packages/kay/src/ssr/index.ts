@@ -4,7 +4,7 @@ import type { Html, HydrateStrategy, KayChild } from '../jsx-runtime'
 import { isBlockedAttr, isStringBoolAttr, isUnsafeUrlAttr } from '../attrs'
 import { styleText } from '../style'
 import { assertRenderable } from '../unrenderable'
-import { currentRenderContext, KAY_STREAM_SCRIPT } from './context'
+import { currentRenderContext, KAY_STREAM_SCRIPT, renderIsland } from './context'
 
 export const KAY_ISLAND_STYLE = 'kay-island,kay-slot{display:contents}'
 export const KAY_SUSPENSE_STYLE = 'kay-s{display:contents}'
@@ -213,14 +213,14 @@ export function recordRenderedIsland(chunk: string, hydrate?: HydrateStrategy): 
     ctx.renderedIslands.set(chunk, false)
 }
 
-export function ssrInIsland(render: () => string, chunk?: string, hydrate?: HydrateStrategy): string {
+export function ssrInIsland(render: () => string, chunk?: string, hydrate?: HydrateStrategy, name = 'island'): string {
   const ctx = currentRenderContext()
   if (ctx !== undefined) {
     if (chunk !== undefined && ctx.islandDepth === 0)
       recordRenderedIsland(chunk, hydrate)
     ctx.islandDepth++
     try {
-      return render()
+      return ctx.islandDepth === 1 ? renderIsland(ctx, name, render) : render()
     }
     finally {
       ctx.islandDepth--
@@ -234,6 +234,7 @@ export function ssrInIsland(render: () => string, chunk?: string, hydrate?: Hydr
     fallbackIslandDepth--
   }
 }
+
 
 /** Lazily evaluates non-async component children on first read inside the component's dynamic context, memoizing the result. */
 export function ssrChildProp<P extends Record<string, unknown>>(props: P, fn: () => Html): P {
@@ -257,6 +258,7 @@ export function ssrIslandStatic(
   openTag: string,
   render: (() => string) | undefined,
   hydrate?: HydrateStrategy,
+  name?: string,
 ): string {
   if (getIslandDepth() > 0)
     return render !== undefined ? render() : ''
@@ -275,7 +277,7 @@ export function ssrIslandStatic(
       ctx.idPrefix = islandPrefix
       ctx.idSeq = 0
       try {
-        inner = ssrInIsland(render)
+        inner = ssrInIsland(render, undefined, undefined, name)
         if (ctx.idSeq > 0)
           idAttr = ` i="${islandPrefix}"`
       }
@@ -285,7 +287,7 @@ export function ssrIslandStatic(
       }
     }
     else {
-      inner = ssrInIsland(render)
+      inner = ssrInIsland(render, undefined, undefined, name)
     }
   }
 
@@ -303,6 +305,7 @@ export function ssrIsland(
   props: Record<string, unknown>,
   hydrate?: HydrateStrategy,
   scriptProps = false,
+  name?: string,
 ): string {
   if (getIslandDepth() > 0)
     return render()
@@ -334,7 +337,7 @@ export function ssrIsland(
       ctx.idPrefix = islandPrefix
       ctx.idSeq = 0
       try {
-        inner = ssrInIsland(render)
+        inner = ssrInIsland(render, undefined, undefined, name)
         if (ctx.idSeq > 0)
           idAttr = ` i="${islandPrefix}"`
       }
@@ -344,7 +347,7 @@ export function ssrIsland(
       }
     }
     else {
-      inner = ssrInIsland(render)
+      inner = ssrInIsland(render, undefined, undefined, name)
     }
   }
 

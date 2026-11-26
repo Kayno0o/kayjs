@@ -5,8 +5,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
 import { isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
-import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblemLocation, SPECIAL_ROUTE_FILES } from '../build/routes'
+import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblemLocation, routeFileProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
 import { analyzeModule, walk } from '../compiler/analyze'
+import { serverOnlyTagError } from '../compiler/mistakes'
 import { findPrivateEnvOffset, SERVER_ONLY_MODULES } from '../compiler/server-only'
 import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, jsxTagName } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
@@ -224,6 +225,8 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
         const reason = `reads ${state.local} from '${imp.source}'`
         if (analysis.hasAsyncDefault)
           errors.push(formatDiagnostic(locOf(root, file, sources, imp.start), `kay check: async route component cannot use browser interactivity (${reason}).`))
+        else if (analysis.serverOnlyTag !== undefined)
+          errors.push(formatDiagnostic(locOf(root, file, sources, imp.start), serverOnlyTagError(relPosix(root, file), analysis.serverOnlyTag, reason).message))
         else
           analyses.set(file, { ...analysis, isInteractive: true, interactiveReason: reason, interactiveOffset: imp.start })
         break
@@ -326,12 +329,15 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       }
     }
 
-    // Route-specific guardrails (only real route files matching `kay build`)
-    if (routeFileSet.has(file) && !basename(file).startsWith('_')) {
-      const problem = routeExportProblemLocation(analysis, rel)
+    // Route-specific guardrails, on the files `kay build` reads as routes
+    const isSpecial = SPECIAL_ROUTE_FILES.has(basename(file))
+    if (routeFileSet.has(file) && (isSpecial || !basename(file).startsWith('_'))) {
+      const fileProblem = routeFileProblem(analysis, rel, relPosix(root, routesDir))
+      const problem = fileProblem === undefined ? routeExportProblemLocation(analysis, rel) : { message: fileProblem, offset: 0 }
       if (problem !== undefined)
         errors.push(formatDiagnostic(locOf(root, file, sources, problem.offset), `kay check: ${problem.message}`))
-
+    }
+    if (routeFileSet.has(file) && !basename(file).startsWith('_')) {
       if (hasRouteHandlerExport(analysis)) {
         const conflictKey = normalizeRoutePattern(fileToRoutePath(routesDir, file))
         const prev = seenRoutes.get(conflictKey)

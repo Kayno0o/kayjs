@@ -28,6 +28,10 @@ export interface RenderContext {
   idPrefix: string
   idSeq: number
   contexts: Map<symbol, unknown>
+  /** While an island renders, the contexts provided outside it, which the browser never sees. */
+  outerContexts: Map<symbol, unknown> | undefined
+  /** The island rendering, as its tag. */
+  island: string | undefined
   /** Maps island chunk URL -> eager (true if hydrate is undefined/'load'). */
   renderedIslands: Map<string, boolean>
   hasIslands: boolean
@@ -42,6 +46,8 @@ registerServerContextBridge({
     const ctx = renderStorage.getStore()
     if (ctx !== undefined && ctx.contexts.has(key))
       return { found: true, value: ctx.contexts.get(key) }
+    if (ctx?.outerContexts?.has(key) === true)
+      throw new Error(`kay: <${ctx.island}> reads a context provided outside the island, which the browser never sees; pass its value as a prop.`)
     return undefined
   },
   runWithContext<T>(key: symbol, value: unknown, fn: () => T): T {
@@ -86,11 +92,30 @@ export function createRenderContext(): RenderContext {
     idPrefix: '',
     idSeq: 0,
     contexts: new Map(),
+    outerContexts: undefined,
+    island: undefined,
     renderedIslands: new Map(),
     hasIslands: false,
     htmlAttrs: {},
   }
 }
+
+// An island sees only the contexts provided inside it, as in the browser.
+export function renderIsland(ctx: RenderContext, name: string, render: () => string): string {
+  const outer = ctx.contexts
+  ctx.contexts = new Map()
+  ctx.outerContexts = outer
+  ctx.island = name
+  try {
+    return render()
+  }
+  finally {
+    ctx.contexts = outer
+    ctx.outerContexts = undefined
+    ctx.island = undefined
+  }
+}
+
 
 export function runWithRenderContext<T>(ctx: RenderContext, fn: () => T): T {
   return renderStorage.run(ctx, fn)

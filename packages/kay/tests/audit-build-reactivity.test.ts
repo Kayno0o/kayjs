@@ -204,7 +204,7 @@ describe('audit #3526 — Box 32: --static staging, non-200 failure, dynamic ski
 })
 
 describe('audit #3526 — Box 33: strict route file discovery & build-time route conflicts', () => {
-  test('skips _dirs, .d.ts, test/spec files, and helper files without route exports', async () => {
+  test('skips _dirs, .d.ts, test/spec files, and _-prefixed helper files', async () => {
     const dir = makeTempProject('kay-audit-box33-skip-')
     mkdirSync(join(dir, 'src/routes/_components'), { recursive: true })
     mkdirSync(join(dir, 'src/routes/api'), { recursive: true })
@@ -213,11 +213,11 @@ describe('audit #3526 — Box 33: strict route file discovery & build-time route
     writeFileSync(join(dir, 'src/routes/types.d.ts'), 'export interface Foo { bar: string }')
     writeFileSync(join(dir, 'src/routes/index.test.tsx'), 'export default function FakeTestRoute() { return <div /> }')
     writeFileSync(join(dir, 'src/routes/about.spec.ts'), 'export function GET() { return new Response("spec") }')
-    writeFileSync(join(dir, 'src/routes/utils.ts'), 'export function format(s: string) { return s.toUpperCase() }')
+    writeFileSync(join(dir, 'src/routes/_utils.ts'), 'export function format(s: string) { return s.toUpperCase() }')
     writeFileSync(join(dir, 'src/routes/api/ping.ts'), 'export function GET() { return new Response("pong") }')
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
       import Badge from './_components/Badge'
-      import { format } from './utils'
+      import { format } from './_utils'
       export default function Home() { return <main>{format('hello')}<Badge /></main> }
     `)
 

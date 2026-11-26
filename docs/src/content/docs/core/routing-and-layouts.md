@@ -23,6 +23,8 @@ Every file in `src/routes/` maps directly to a URL path on `Bun.serve()`.
 
 `_404.tsx` and `_error.tsx` automatically render inside your root `_layout.tsx` with global styles.
 
+Every other file under `src/routes/` must export a page, a method handler or an action, since an action placed there is guarded by its folder's `_middleware.ts`. A helper with none of these fails `kay build` and `kay check`: move it elsewhere, or prefix its name or folder with `_`, as in `_format.ts` or `_components/`. The four special files fail the same way without a default export.
+
 ## Data loading (`load` vs `async` page)
 
 Use either an `async` route component (strictly server-only) or a sync route with `export async function load(ctx)`. `load()` can return data props or a `Response` (such as a `404` or redirect):

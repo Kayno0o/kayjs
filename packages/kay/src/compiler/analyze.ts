@@ -11,7 +11,7 @@ import type {
   VariableDeclaration,
 } from 'oxc-parser'
 import { parseSync, visitorKeys } from 'oxc-parser'
-import { assertScopedKayImport, checkBareSignals, checkHydrateMode, checkMistakes, mistake } from './mistakes'
+import { assertScopedKayImport, checkBareSignals, checkHydrateMode, checkMistakes, islandRemoved, mistake, serverOnlyTagError } from './mistakes'
 import { EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from './shared'
 
 export type AstNode = Node
@@ -24,7 +24,6 @@ const REACTIVE_IMPORTS = new Set([
   'onCleanup',
   'selector',
   'store',
-  'island',
   'useAction',
 ])
 
@@ -34,6 +33,7 @@ const KAY_SOURCES = new Set(['@kayjs/kay'])
 const KAY_SSR_SOURCES = new Set(['@kayjs/kay', '@kayjs/kay/internal/ssr'])
 const KAY_SERVER_SOURCES = new Set(['@kayjs/kay/server'])
 const RENDER_CONTEXT_IMPORTS = new Set(['Head', 'Suspense', 'createContext', 'provideContext', 'useContext', 'useId'])
+const SERVER_ONLY_TAGS = new Set(['Head', 'Suspense'])
 
 export interface ImportInfo {
   source: string
@@ -63,6 +63,8 @@ export interface ModuleAnalysis {
   hasPrerender: boolean
   hasPaths: boolean
   usesRenderContext: boolean
+  /** The first `<Head>` or `<Suspense>` the module renders, which an island cannot. */
+  serverOnlyTag: string | undefined
   defaultHydrate: string | undefined
   deferredIslandTags: Set<string>
   /** `$hydrate` modes the module writes; `*` stands for one computed at runtime. */
@@ -239,8 +241,6 @@ function resolveDefaultFunction(
   program: Program,
   defaultLocal: string | undefined,
   localInits: ReadonlyMap<string, Node>,
-  islandLocalName: string | undefined,
-  kayNamespaces: ReadonlySet<string>,
 ): OxcFunction | ArrowFunctionExpression | undefined {
   const localFns = new Map<string, OxcFunction>()
   for (const stmt of program.body) {
@@ -256,8 +256,6 @@ function resolveDefaultFunction(
     const inner = unwrapTsExpr(node)
     if (inner.type === 'FunctionDeclaration' || inner.type === 'FunctionExpression' || inner.type === 'ArrowFunctionExpression')
       return inner
-    if (isIslandCall(inner, islandLocalName, kayNamespaces))
-      return unwrapTarget(inner.arguments[0], depth + 1)
     if (inner.type === 'Identifier')
       return localFns.get(inner.name) ?? unwrapTarget(localInits.get(inner.name), depth + 1)
     return undefined
@@ -277,10 +275,8 @@ function analyzeDefaultDataKeys(
   program: Program,
   defaultLocal: string | undefined,
   localInits: ReadonlyMap<string, Node>,
-  islandLocalName: string | undefined,
-  kayNamespaces: ReadonlySet<string>,
 ): string[] | undefined {
-  const fn = resolveDefaultFunction(program, defaultLocal, localInits, islandLocalName, kayNamespaces)
+  const fn = resolveDefaultFunction(program, defaultLocal, localInits)
   if (fn === undefined || fn.body === null)
     return undefined
   if (fn.params.length === 0)
@@ -498,23 +494,6 @@ function isActionCall(node: Node, actionLocalName: string | undefined, serverNam
   return false
 }
 
-function isIslandCall(node: Node, islandLocalName: string | undefined, kayNamespaces: ReadonlySet<string>): node is CallExpression {
-  if (node.type !== 'CallExpression')
-    return false
-  if (islandLocalName !== undefined && node.callee.type === 'Identifier' && node.callee.name === islandLocalName)
-    return true
-  if (
-    node.callee.type === 'MemberExpression'
-    && !node.callee.computed
-    && node.callee.object.type === 'Identifier'
-    && kayNamespaces.has(node.callee.object.name)
-    && node.callee.property.type === 'Identifier'
-    && node.callee.property.name === 'island'
-  ) {
-    return true
-  }
-  return false
-}
 
 export function analyzeModule(filename: string, code: string, program: Program = parseTsx(filename, code)): ModuleAnalysis {
   let isInteractive = false
@@ -526,6 +505,8 @@ export function analyzeModule(filename: string, code: string, program: Program =
   let hasPrerender = false
   let hasPaths = false
   let usesRenderContext = false
+  let serverOnlyTag: string | undefined
+  const serverOnlyLocals = new Map<string, string>()
   let defaultHydrate: string | undefined
   const deferredIslandTags = new Set<string>()
   const jsxTags = new Set<string>()
@@ -544,7 +525,6 @@ export function analyzeModule(filename: string, code: string, program: Program =
   const reexports: ReexportInfo[] = []
   const exportedNames: string[] = []
   let actionLocalName: string | undefined
-  let islandLocalName: string | undefined
   // The action() calls kay gives a URL to: the initialisers of top-level `export const`s.
   const registeredActions = new Set<Node>()
 
@@ -588,13 +568,15 @@ export function analyzeModule(filename: string, code: string, program: Program =
         if (KAY_SOURCES.has(source) && REACTIVE_IMPORTS.has(imported))
           markInteractive(`imports ${imported} from '${source}'`, spec.start)
         if (KAY_SOURCES.has(source) && imported === 'island')
-          islandLocalName = local
+          throw islandRemoved(filename)
         if (KAY_SOURCES.has(source) && STATE_PRIMITIVES.has(imported))
           stateCallees.add(local)
         if (KAY_SOURCES.has(source) && (imported === 'signal' || imported === 'computed'))
           signalCallees.add(local)
         if (KAY_SSR_SOURCES.has(source) && RENDER_CONTEXT_IMPORTS.has(imported))
           usesRenderContext = true
+        if (KAY_SOURCES.has(source) && SERVER_ONLY_TAGS.has(imported))
+          serverOnlyLocals.set(local, imported)
         if (KAY_SERVER_SOURCES.has(source) && imported === 'action')
           actionLocalName = local
       }
@@ -613,25 +595,6 @@ export function analyzeModule(filename: string, code: string, program: Program =
     imports.push({ source, specifiers, start: stmt.start, end: stmt.end })
   }
 
-  const readIslandHydrate = (call: CallExpression): void => {
-    markInteractive('island() wrapper', call.start)
-    const opts = call.arguments[1]
-    if (opts !== undefined && opts.type === 'ObjectExpression') {
-      for (const prop of opts.properties) {
-        if (
-          prop.type === 'Property'
-          && !prop.computed
-          && prop.key.type === 'Identifier'
-          && prop.key.name === 'hydrate'
-          && prop.value.type === 'Literal'
-          && typeof prop.value.value === 'string'
-        ) {
-          checkHydrateMode(prop.value.value, `island() hydrate: "${prop.value.value}"`, filename)
-          defaultHydrate = prop.value.value
-        }
-      }
-    }
-  }
 
   // Pass 2: collect top-level declarations, exports, re-exports, actions, and metadata.
   for (const stmt of program.body) {
@@ -655,13 +618,6 @@ export function analyzeModule(filename: string, code: string, program: Program =
         defaultLocal = decl.name
       else
         localInits.set('default', decl)
-
-      if (isIslandCall(decl, islandLocalName, kayNamespaces)) {
-        readIslandHydrate(decl)
-        const target = decl.arguments[0]
-        if (target !== undefined && isAsyncFunction(target))
-          hasAsyncDefault = true
-      }
     }
     else if (stmt.type === 'ExportNamedDeclaration') {
       if (stmt.exportKind === 'type')
@@ -731,8 +687,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
             checkHydrateMode(d.init.value, `hydrate = "${d.init.value}"`, filename)
             defaultHydrate = d.init.value
           }
-          if (d.init !== null && isIslandCall(d.init, islandLocalName, kayNamespaces) && d.init.arguments.length > 1)
-            throw mistake(`island() options on export ${name}`, filename, 'only the default export\'s island() options apply; export the island as default, or set $hydrate where it renders')
+
           if (d.init !== null && isActionCall(d.init, actionLocalName, serverNamespaces)) {
             exportedActions.push(name)
             registeredActions.add(d.init)
@@ -745,16 +700,6 @@ export function analyzeModule(filename: string, code: string, program: Program =
     }
   }
 
-  // Handle indirect `const C = island(Comp, { hydrate: 'visible' }); export default C`
-  if (defaultLocal !== undefined) {
-    const defInit = localInits.get(defaultLocal)
-    if (defInit !== undefined && isIslandCall(defInit, islandLocalName, kayNamespaces)) {
-      readIslandHydrate(defInit)
-      const target = defInit.arguments[0]
-      if (target !== undefined && isAsyncFunction(target))
-        hasAsyncDefault = true
-    }
-  }
 
   // Pass 3: walk AST for JSX, mistakes, interactive handlers/refs, action() placement, namespace accesses.
   walk(program, (node) => {
@@ -769,10 +714,14 @@ export function analyzeModule(filename: string, code: string, program: Program =
       const isComponent = isComponentTag(tag)
       if (isComponent) {
         jsxTags.add(tag)
+        serverOnlyTag ??= serverOnlyLocals.get(tag)
         if (tag.includes('.')) {
           const [ns, member] = tag.split('.')
-          if (ns !== undefined && kayNamespaces.has(ns) && member !== undefined && RENDER_CONTEXT_IMPORTS.has(member))
+          if (ns !== undefined && kayNamespaces.has(ns) && member !== undefined && RENDER_CONTEXT_IMPORTS.has(member)) {
             usesRenderContext = true
+            if (SERVER_ONLY_TAGS.has(member))
+              serverOnlyTag ??= member
+          }
         }
       }
       for (const attr of node.attributes) {
@@ -793,6 +742,8 @@ export function analyzeModule(filename: string, code: string, program: Program =
     }
     if (node.type === 'MemberExpression' && !node.computed && node.object.type === 'Identifier' && kayNamespaces.has(node.object.name) && node.property.type === 'Identifier') {
       const member = node.property.name
+      if (member === 'island')
+        throw islandRemoved(filename)
       if (REACTIVE_IMPORTS.has(member))
         markInteractive(`calls ${node.object.name}.${member}`, node.start)
       if (STATE_PRIMITIVES.has(member))
@@ -840,9 +791,11 @@ export function analyzeModule(filename: string, code: string, program: Program =
 
   if (hasAsyncDefault && isInteractive)
     throw asyncInteractiveError(filename, interactiveReason)
+  if (serverOnlyTag !== undefined && isInteractive)
+    throw serverOnlyTagError(filename, serverOnlyTag, interactiveReason)
 
   const defaultDataKeys = isInteractive
-    ? analyzeDefaultDataKeys(program, defaultLocal, localInits, islandLocalName, kayNamespaces)
+    ? analyzeDefaultDataKeys(program, defaultLocal, localInits)
     : undefined
 
   return {
@@ -859,6 +812,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
     hasPrerender,
     hasPaths,
     usesRenderContext,
+    serverOnlyTag,
     defaultHydrate,
     deferredIslandTags,
     hydrateModes,
