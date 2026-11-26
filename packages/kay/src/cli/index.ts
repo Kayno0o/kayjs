@@ -9,13 +9,14 @@ import { loadConfig } from '../plugins/index'
 import { createServer } from '../server/index'
 import { checkProject } from './check'
 import { scaffoldProject } from './new'
+import { upgradeProject } from './upgrade'
 
-const BUILTIN_COMMANDS = new Set(['new', 'check', 'build', 'start', 'dev'])
+const BUILTIN_COMMANDS = new Set(['new', 'check', 'build', 'start', 'dev', 'upgrade'])
 const VALID_TEMPLATES = new Set(['minimal', 'fullstack', 'blog', 'app'])
 
 const VALUE_FLAGS = new Set(['--port', '--host', '--template', '--root'])
 const OPTIONAL_VALUE_FLAGS = new Set(['--compile'])
-const BOOLEAN_FLAGS = new Set(['--static', '--analyze', '--force', '--no-typecheck', '--help', '-h'])
+const BOOLEAN_FLAGS = new Set(['--static', '--analyze', '--force', '--no-typecheck', '--no-install', '--help', '-h'])
 
 const ALLOWED_FLAGS_BY_CMD: Record<string, ReadonlySet<string>> = {
   new: new Set(['--template', '--force', '--root', '--help', '-h']),
@@ -23,6 +24,7 @@ const ALLOWED_FLAGS_BY_CMD: Record<string, ReadonlySet<string>> = {
   build: new Set(['--static', '--analyze', '--compile', '--root', '--help', '-h']),
   start: new Set(['--port', '--host', '--root', '--help', '-h']),
   dev: new Set(['--port', '--host', '--root', '--help', '-h']),
+  upgrade: new Set(['--no-install', '--root', '--help', '-h']),
 }
 
 export interface ParsedCliArgs {
@@ -211,7 +213,8 @@ const USAGE_TEXT = `Usage:
   kay check [dir] [--no-typecheck]
   kay dev [dir] [--port 3000] [--host [addr]]
   kay build [dir] [--static] [--compile [out]] [--analyze]
-  kay start [dir] [--port 3000] [--host [addr]]`
+  kay start [dir] [--port 3000] [--host [addr]]
+  kay upgrade [dir] [--no-install]`
 
 export async function runCli(argv: readonly string[], options: RunCliOptions = {}): Promise<number> {
   const cwd = options.cwd ?? process.cwd()
@@ -261,6 +264,24 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
     for (const e of res.errors)
       err(e)
     return 1
+  }
+
+  if (cmd === 'upgrade') {
+    const res = upgradeProject(root)
+    for (const file of res.changed)
+      out(`  ${file}`)
+    out(`kay upgrade rewrote ${res.changed.length} files`)
+    if (res.changed.includes('package.json') && !flags.has('--no-install')) {
+      const install = Bun.spawnSync(['bun', 'install'], { cwd: root, stdout: 'inherit', stderr: 'inherit' })
+      if (install.exitCode !== 0)
+        return 1
+    }
+    for (const line of res.manual)
+      err(line)
+    if (res.manual.length > 0)
+      return 1
+    out('Next: kay check')
+    return 0
   }
 
   if (cmd === 'build') {

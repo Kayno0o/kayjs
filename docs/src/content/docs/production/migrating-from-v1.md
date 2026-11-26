@@ -47,7 +47,7 @@ Kay v2 replaces v1's `.kay` single-file format and Elysia runtime with standard 
 
 ## Changes during the v2 beta
 
-- **2.0.0-beta.4**: kay is imported as `@kayjs/kay` only. Depend on `"@kayjs/kay"`, set `"jsxImportSource": "@kayjs/kay"`, and replace `from 'kay…'` with `from '@kayjs/kay…'`: a bare `kay` import now fails the compile. `defineConfig`, `definePlugin` and the plugin types move from `@kayjs/kay/server` to `@kayjs/kay/config`. `@kayjs/kay/server` no longer exports kay's internals (`createServer`, `loadConfig`, `DEFAULT_CSP`, `withCspHashes`, compression and app-context helpers). A plugin HTML route gets the app's CSP with its `<style>` blocks hashed, so it no longer builds its own.
+- **2.0.0-beta.4**: kay is imported as `@kayjs/kay` only, and a bare `kay` import now fails the compile. Run `bunx @kayjs/kay@beta upgrade` in the app: it depends on `"@kayjs/kay"`, sets `"jsxImportSource": "@kayjs/kay"` and rewrites every import, then prints any it could not move. `defineConfig`, `definePlugin` and the plugin types move from `@kayjs/kay/server` to `@kayjs/kay/config`. `@kayjs/kay/server` no longer exports kay's internals (`loadConfig`, `DEFAULT_CSP`, `withCspHashes`, compression and app-context helpers). A plugin HTML route gets the app's CSP with its `<style>` blocks hashed, so it no longer builds its own.
 
 <Callout title="Verify after porting" tone="tip">
 Run `kay check` and `kay build --analyze` after migrating a route or app. `kay check` catches server-only imports in islands, non-serializable island props, missing `paths()`, and invalid JSX before runtime.
