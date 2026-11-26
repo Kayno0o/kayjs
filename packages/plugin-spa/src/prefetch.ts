@@ -6,6 +6,8 @@ export interface PrefetchEntry {
   ts: number
   /** The `x-kay-region` the server answered with: the region's HTML alone, not a whole page. */
   region: string | null
+  /** The percent-encoded `x-kay-title` of a region answer: the title the page has at this URL. */
+  title: string | null
 }
 
 const PREFETCH_TTL = 15_000
@@ -55,7 +57,7 @@ export async function prefetch(url: string, region?: string): Promise<void> {
       const res = await fetch(clean.href, { headers: region === undefined ? { 'x-kay-spa': '1' } : { 'x-kay-region': region } })
       if (!res.ok || !(res.headers.get('content-type') ?? '').includes('text/html'))
         return undefined
-      const entry: PrefetchEntry = { html: await res.text(), url: res.url || clean.href, ts: Date.now(), region: res.headers.get('x-kay-region') }
+      const entry: PrefetchEntry = { html: await res.text(), url: res.url || clean.href, ts: Date.now(), region: res.headers.get('x-kay-region'), title: res.headers.get('x-kay-title') }
       putCachedHtml(key, entry)
       return entry
     }

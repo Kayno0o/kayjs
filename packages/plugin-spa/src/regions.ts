@@ -59,21 +59,25 @@ async function load(url: URL, region: string, signal: AbortSignal): Promise<Pref
   const res = await fetch(fetchKeyOf(url), { headers: { 'x-kay-region': region }, signal })
   if (!res.ok || !(res.headers.get('content-type') ?? '').includes('text/html'))
     return undefined
-  return { html: await res.text(), url: res.url, ts: Date.now(), region: res.headers.get('x-kay-region') }
+  return { html: await res.text(), url: res.url, ts: Date.now(), region: res.headers.get('x-kay-region'), title: res.headers.get('x-kay-title') }
 }
 
-// The region's inner HTML: the answer itself when the server sent the region alone, else the region cut out of a full page (a prerendered page, a proxy that dropped the header).
-function contentOf(entry: PrefetchEntry, path: string): DocumentFragment | undefined {
+// The region's inner HTML and the page title: the answer itself when the server sent the region alone, else the region cut out of a full page (a prerendered page, a proxy that dropped the header).
+function contentOf(entry: PrefetchEntry, path: string): { content: DocumentFragment, title: string | undefined } | undefined {
   const template = document.createElement('template')
   if (entry.region === path) {
     template.innerHTML = entry.html
-    return template.content
+    // The title is HTML text, percent-encoded in the header: a textarea unescapes it.
+    const unescape = document.createElement('textarea')
+    unescape.innerHTML = entry.title === null ? '' : decodeURIComponent(entry.title)
+    return { content: template.content, title: entry.title === null ? undefined : unescape.value }
   }
-  const found = new DOMParser().parseFromString(entry.html, 'text/html').querySelector(`[data-kay-region="${path.split('/').at(-1)!.replace(/["\\]/g, '\\$&')}"]`)
+  const page = new DOMParser().parseFromString(entry.html, 'text/html')
+  const found = page.querySelector(`[data-kay-region="${path.split('/').at(-1)!.replace(/["\\]/g, '\\$&')}"]`)
   if (found === null)
     return undefined
   template.innerHTML = found.innerHTML
-  return template.content
+  return { content: template.content, title: page.title === '' ? undefined : page.title }
 }
 
 function record(url: URL, name: string, mode: 'push' | 'replace' | 'burst'): void {
@@ -134,7 +138,8 @@ function syncParams(): void {
   }
 }
 
-function apply(region: HTMLElement, content: DocumentFragment, swap: Swap): void {
+function apply(region: HTMLElement, found: { content: DocumentFragment, title: string | undefined }, swap: Swap): void {
+  const { content, title } = found
   if (swap.history !== 'none')
     record(swap.url, swap.region, swap.history)
   const first = content.firstElementChild
@@ -149,6 +154,8 @@ function apply(region: HTMLElement, content: DocumentFragment, swap: Swap): void
       controllers.get(inner.getAttribute('data-kay-region')!)?.abort()
     region.replaceChildren(content)
   }
+  if (title !== undefined)
+    document.title = title
   syncParams()
   if (swap.focus === true)
     focusNode(swap.append ? first : region)

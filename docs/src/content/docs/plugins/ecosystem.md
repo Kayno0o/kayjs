@@ -136,6 +136,7 @@ The browser asks for `x-kay-region: pane`. The server skips the layouts and ever
 - **Keep links in step**: `data-kay-sync="q icon"` on a link copies those query params from the current URL after each swap. On an input or select it keeps the field equal to the param of its name.
 - **Prefetch**: put the link inside `data-kay-prefetch` and its region is fetched on hover or focus, with the same cache as `spa()`.
 - **Nesting**: a region can sit inside another, as long as each has its own name. A "Load more" link can then append to an inner list while a live search swaps the outer region. Asking for the inner region renders it alone, and the outer one is never sent. Asking for the outer region renders it with a fresh inner region, and any fetch still running for the old inner one is dropped. Back and forward work across both. The server still builds the other children of an outer region when only the inner one is asked for, but does not send them.
+- **Title**: a swap sets `document.title` to what the whole page would have, `<Head>` title template included, and back and forward restore it. The server sends it in an `x-kay-title` header, so the response stays small.
 - **Loading and focus**: the region gets `aria-busy="true"` when a fetch takes more than 150 ms, so you can style it. A link moves focus to the region. A region with an `aria-label` announces it. Give the region an `aria-label` that says what changed.
 - **Islands** inside the new HTML hydrate as usual.
 

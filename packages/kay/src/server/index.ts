@@ -383,7 +383,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     }
 
     if (requestedRegion(ctx.request) !== undefined)
-      return respondRegion(ctx.request, mod, pageProps, entry.path, htmlHeaders)
+      return respondRegion(ctx.request, mod, pageProps, entry.path, htmlHeaders, rctx => resolveDocumentHead(rctx, doc.headTags as readonly string[] | undefined, ctx.url, ctx.request, ctx))
 
     const rctx = createRenderContext()
     const renderBody = async (): Promise<string> => {

@@ -159,3 +159,27 @@ describe('a region inside another (#3621)', () => {
     expect(full).toContain('<div data-kay-region="results"><aside>SIDEBAR</aside><div data-kay-region="sets" class="inner">')
   })
 })
+
+describe('a region response carries the page title (#3622)', () => {
+  it('sends the title the page renders at that URL, through plugins that template it', async () => {
+    const dir = appWith({
+      'src/routes/index.tsx': `
+        import { Head, Region } from '@kayjs/kay'
+        import type { RequestContext } from '@kayjs/kay/server'
+        export function load(ctx: RequestContext) { return { q: ctx.url.searchParams.get('q') ?? '' } }
+        export default function Home({ data }: { data: { q: string } }) {
+          return <main><Head><title>{data.q} & co</title></Head><Region name="pane"><p>{data.q}</p></Region></main>
+        }
+      `,
+      'src/routes/plain.tsx': `
+        import { Region } from '@kayjs/kay'
+        export default function Plain() { return <main><Region name="pane"><p>x</p></Region></main> }
+      `,
+    })
+    const templated = { name: 'title-template', head: (head: { title: string | undefined }) => { if (head.title !== undefined) head.title = `${head.title} | site` } }
+    const app = await testApp({ root: dir, plugins: [templated] })
+    const res = await app.get('/?q=moon', REGION)
+    expect(decodeURIComponent(res.headers.get('x-kay-title')!)).toBe('moon &amp; co | site')
+    expect((await app.get('/plain', REGION)).headers.has('x-kay-title')).toBe(false)
+  })
+})

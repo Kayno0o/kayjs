@@ -276,4 +276,17 @@ describe('regions() swaps one region of a page (#3597)', () => {
       expect(await items(page)).toBe('banana,blueberry')
     }, 30_000)
   })
+
+  describe('a region swap retitles the page (#3622)', () => {
+    it('sets the title the page renders at the new URL, and restores it on back and forward', async () => {
+      const page = await open('/sets')
+      expect(await page.evaluate('document.title')).toBe('Sets:')
+      await page.evaluate(`(() => { const q = document.getElementById('q'); q.value = 'b'; q.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+      await page.waitFor(() => document.title === 'Sets: b')
+      await page.evaluate('history.back()')
+      await page.waitFor(() => document.title === 'Sets:')
+      await page.evaluate('history.forward()')
+      await page.waitFor(() => document.title === 'Sets: b')
+    }, 30_000)
+  })
 })
