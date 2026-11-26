@@ -65,6 +65,31 @@ describe('#3568 CLI argument parsing, plugin commands & dev config fidelity', ()
       expect(JSON.parse(res.out)).toEqual({ args: ['a', '-x'], root: join(dir, 'app') })
       expect((await kay(['--help'], join(dir, 'app'))).out).toContain('hello')
       expect((await kay(['helo'], join(dir, 'app'))).err).toContain('did you mean hello?')
+      const help = await kay(['hello', '--help'], join(dir, 'app'))
+      expect(help.code).toBe(0)
+      expect(help.out).toContain('hello plugin')
+      expect(help.out).not.toContain('"args"')
+      const noRoot = await kay(['hello', '--root'], join(dir, 'app'))
+      expect(noRoot.code).toBe(2)
+      expect(noRoot.err).toContain('--root')
+      expect(noRoot.err).not.toContain(' at ')
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a kay.config.ts that fails to load leaves --help and the built-ins working, and a plugin command names the error', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3593-'))
+    try {
+      writeFileSync(join(dir, 'kay.config.ts'), 'export default { plugins: [ }\n')
+      const help = await kay(['--help'], dir)
+      expect(help.code).toBe(0)
+      expect(help.out).toContain('check')
+      const plugin = await kay(['ui-eject'], dir)
+      expect(plugin.code).toBe(1)
+      expect(plugin.err).toContain('kay.config.ts')
+      expect(plugin.err).not.toMatch(/^\s+at /m)
     }
     finally {
       rmSync(dir, { recursive: true, force: true })
