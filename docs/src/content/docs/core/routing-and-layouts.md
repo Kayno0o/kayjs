@@ -21,6 +21,8 @@ Every file in `src/routes/` maps directly to a URL path on `Bun.serve()`.
 | `src/routes/_404.tsx` | Unmatched routes | 404 page (also `404.html` in `--static`) |
 | `src/routes/_error.tsx` | Uncaught route errors | Error page (receives `{ error }`) |
 
+Params arrive percent-decoded, so `/posts/caf%C3%A9` gives `params.slug === "café"`. A dynamic route never matches a segment holding an encoded `/`, `\` or NUL, or a `.` or `..` segment: the request gets a 404, so you can join a param into a file path without checking it for traversal.
+
 `_404.tsx` and `_error.tsx` automatically render inside your root `_layout.tsx` with global styles.
 
 Every other file under `src/routes/` must export a page, a method handler or an action, since an action placed there is guarded by its folder's `_middleware.ts`. A helper with none of these fails `kay build` and `kay check`: move it elsewhere, or prefix its name or folder with `_`, as in `_format.ts` or `_components/`. The four special files fail the same way without a default export.

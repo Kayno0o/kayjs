@@ -627,13 +627,24 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
   })
 
   describe('Box 10: Prerendered dynamic route 404 for unlisted param & refuse encoded / in :param', () => {
-    it('rejects %2f / %2F in :param segments in Router', () => {
+    it.each([
+      '/a%2Fb', '/a%2fb', '/..%2F..%2Fetc', '/a%5cb', '/a%00b', '/..', '/.', '/%2e%2e', '/%2E',
+    ])('neither a :param nor a catch-all matches %s (#3649)', (tail) => {
       const r = new Router<string>()
       r.add('/posts/:slug', 'post')
-      expect(r.match('/posts/hello-world')?.params).toEqual({ slug: 'hello-world' })
-      expect(r.match('/posts/a%2Fb')).toBeUndefined()
-      expect(r.match('/posts/a%2fb')).toBeUndefined()
-      expect(r.match('/posts/..%2F..%2Fetc')).toBeUndefined()
+      r.add('/files/*rest', 'files')
+      expect(r.match(`/posts${tail}`)).toBeUndefined()
+      expect(r.match(`/files${tail}`)).toBeUndefined()
+      expect(r.match(`/files/docs${tail}/end`)).toBeUndefined()
+    })
+
+    it('decodes plain encoded characters in a :param and a catch-all (#3649)', () => {
+      const r = new Router<string>()
+      r.add('/posts/:slug', 'post')
+      r.add('/files/*rest', 'files')
+      expect(r.match('/posts/caf%C3%A9%20noir')?.params).toEqual({ slug: 'café noir' })
+      expect(r.match('/files/a%20b/caf%C3%A9')?.params).toEqual({ rest: 'a b/café' })
+      expect(r.match('/files/a.b/..c')?.params).toEqual({ rest: 'a.b/..c' })
     })
 
     it('returns 404 for unlisted params on prerendered dynamic routes instead of SSR fallback', async () => {

@@ -1,7 +1,8 @@
 // File-based route matcher: static > [param] > [...catchall] priority sorting + param extraction.
 
-const ENCODED_SLASH_RE = /%2f/i
+
 const UNSAFE_ENCODED_RE = /%(?:2f|5c|00)/i
+const ENCODED_DOT_SEGMENT_RE = /^(?:\.|%2e){1,2}$/i
 
 const enum SegmentKind {
   Static = 0,
@@ -149,10 +150,15 @@ export class Router<T> {
       let matched = true
       for (let j = 0; j < segs.length; j++) {
         const seg = segs[j]!
-        if (seg.kind === SegmentKind.CatchAll)
+        if (seg.kind === SegmentKind.CatchAll) {
+          for (let k = j; k < parts.length; k++) {
+            if (isUnsafeParam(parts[k]!))
+              matched = false
+          }
           break
+        }
         if (seg.kind === SegmentKind.Param) {
-          if (ENCODED_SLASH_RE.test(parts[j]!)) {
+          if (isUnsafeParam(parts[j]!)) {
             matched = false
             break
           }
@@ -185,6 +191,11 @@ export class Router<T> {
 
     return undefined
   }
+}
+
+// A param never receives a separator, a NUL or a dot segment, whether it came encoded or not: joined into a path, it would walk out of the folder it names.
+function isUnsafeParam(part: string): boolean {
+  return part.includes('%') ? UNSAFE_ENCODED_RE.test(part) || ENCODED_DOT_SEGMENT_RE.test(part) : part === '.' || part === '..'
 }
 
 function tryDecodeStatic(str: string): string | undefined {
