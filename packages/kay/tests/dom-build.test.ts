@@ -382,7 +382,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     }
   })
 
-  test('a page whose island binds no attribute, list or insert loads none of their runtime, beside an island that does (#3662)', async () => {
+  test('a page whose island binds no attribute, list or insert loads none of their runtime, beside an island that does, and preloads every chunk it imports (#3662)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-dom-split-'))
     tempDirs.push(dir)
     mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
@@ -403,6 +403,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
         }`,
       'src/routes/index.tsx': `import { Counter } from '../components/Counter'\nexport default function Home() { return <main><Counter /></main> }`,
       'src/routes/rich.tsx': `import { Rich } from '../components/Rich'\nexport default function R() { return <main><Rich extra={{ title: 't' }} /></main> }`,
+      'src/routes/later.tsx': `import { Counter } from '../components/Counter'\nexport default function Later() { return <main><Counter $hydrate="visible" /></main> }`,
     }
     for (const [file, text] of Object.entries(files)) {
       mkdirSync(join(dir, file, '..'), { recursive: true })
@@ -411,10 +412,10 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     const manifest = await build({ root: dir, minify: true, prerender: false })
     const clientDir = join(dir, 'dist/client')
     // A page's scripts: the runtime and its island chunks, then every chunk they import.
-    const scriptsOf = (path: string): string => {
+    const filesOf = (path: string, eagerOnly = false): Set<string> => {
       const route = manifest.routes.find(r => r.path === path)!
       const seen = new Set<string>()
-      const queue = [manifest.runtimeScript!, ...route.islandChunks].map(url => url.replace(/^\/_kay\//, ''))
+      const queue = [manifest.runtimeScript!, ...eagerOnly ? route.eagerIslandChunks! : route.islandChunks].map(url => url.replace(/^\/_kay\//, ''))
       for (const file of queue) {
         if (seen.has(file))
           continue
@@ -422,14 +423,30 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
         for (const [, dep] of readFileSync(join(clientDir, file), 'utf8').matchAll(/(?:from|import)\s*"\.\/([^"]+\.js)"/g))
           queue.push(dep!)
       }
-      return [...seen].map(file => readFileSync(join(clientDir, file), 'utf8')).join('\n')
+      return seen
     }
+    const scriptsOf = (path: string): string => [...filesOf(path)].map(file => readFileSync(join(clientDir, file), 'utf8')).join('\n')
 
     const counterPage = scriptsOf('/')
     const richPage = scriptsOf('/rich')
 
     for (const marker of ['cssText', 'removeAttribute("class")', '__kayAnchor', 'createDocumentFragment', 'data:'])
       expect([marker, richPage.includes(marker), counterPage.includes(marker)]).toEqual([marker, true, false])
+
+    const app = await createServer({ root: dir })
+    try {
+      // `/later` hydrates its one island lazily: what it preloads comes from the runtime's own imports.
+      for (const path of ['/', '/rich', '/later']) {
+        const html = await (await app.handle(new Request(`http://localhost${path}`))).text()
+        const preloaded = [...html.matchAll(/<link rel="modulepreload" href="\/_kay\/([^"]+)">/g)].map(m => m[1]!).sort()
+        const runtime = manifest.runtimeScript!.replace(/^\/_kay\//, '')
+        expect(preloaded).toEqual([...filesOf(path, true)].filter(file => file !== runtime).sort())
+        expect(preloaded.length).toBeGreaterThan(0)
+      }
+    }
+    finally {
+      await app.dispose?.()
+    }
   })
 
   test('a streamed page preloads its eager islands only, as a buffered page does (#3662)', async () => {
@@ -462,7 +479,8 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
 
       expect(html).toContain('<p>slow</p>')
       expect(route.islandChunks.length).toBe(2)
-      expect(preloaded).toEqual(route.eagerIslandChunks!)
+      const lazy = route.islandChunks.filter(chunk => !route.eagerIslandChunks!.includes(chunk))
+      expect({ eager: route.eagerIslandChunks!.every(chunk => preloaded.includes(chunk)), lazy: lazy.some(chunk => preloaded.includes(chunk)) }).toEqual({ eager: true, lazy: false })
     }
     finally {
       await app.dispose?.()

@@ -25,6 +25,7 @@ export interface CachedClientBuild {
   runtimeScript: string | undefined
   regionScript: string | undefined
   reviveScript: string | undefined
+  chunkImports: Record<string, string[]>
 }
 
 export interface CachedServerBuild {

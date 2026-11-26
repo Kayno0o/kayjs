@@ -406,6 +406,8 @@ export interface DocumentOptions {
   /** Set on a route that renders a `<Region>`: the plugins' `regionClientEntry` bundle. */
   regionScript?: string | undefined
   preloadChunks?: Iterable<string> | undefined
+  /** Script URL to the chunks it imports statically, preloaded with it: the browser then fetches them all at once. */
+  chunkImports?: Readonly<Record<string, readonly string[]>> | undefined
   styles?: Iterable<string> | undefined
   hasIslands?: boolean | undefined
   hasSuspense?: boolean | undefined
@@ -414,7 +416,7 @@ export interface DocumentOptions {
 }
 
 export function renderDocument(options: DocumentOptions): string {
-  const { body, head = '', headTags, lang = 'en', htmlAttrs, runtimeScript, alwaysLoadRuntime, regionScript, preloadChunks, styles, hasIslands, hasSuspense, navigation } = options
+  const { body, head = '', headTags, lang = 'en', htmlAttrs, runtimeScript, alwaysLoadRuntime, regionScript, preloadChunks, chunkImports, styles, hasIslands, hasSuspense, navigation } = options
   let headExtra = head
 
   if (headTags !== undefined) {
@@ -430,18 +432,28 @@ export function renderDocument(options: DocumentOptions): string {
   if (navigation !== undefined)
     headExtra += navigation
 
+  const loadsRuntime = runtimeScript !== undefined && (hasIslands || alwaysLoadRuntime)
+  const preloads = new Set<string>()
+  const preload = (script: string, self: boolean): void => {
+    if (self)
+      preloads.add(script)
+    for (const dep of chunkImports?.[script] ?? [])
+      preloads.add(dep)
+  }
   if (hasIslands) {
     headExtra += `<style>${KAY_ISLAND_STYLE}</style>`
-    if (preloadChunks !== undefined) {
-      for (const href of preloadChunks)
-        headExtra += `<link rel="modulepreload" href="${escAttr(href)}">`
-    }
+    for (const chunk of preloadChunks ?? [])
+      preload(chunk, true)
   }
+  if (loadsRuntime)
+    preload(runtimeScript, false)
+  for (const href of preloads)
+    headExtra += `<link rel="modulepreload" href="${escAttr(href)}">`
 
   if (hasSuspense)
     headExtra += `<style>${KAY_SUSPENSE_STYLE}</style><script>${KAY_STREAM_SCRIPT}</script>`
 
-  if (runtimeScript !== undefined && (hasIslands || alwaysLoadRuntime))
+  if (loadsRuntime)
     headExtra += `<script type="module" src="${escAttr(runtimeScript)}"></script>`
   if (regionScript !== undefined)
     headExtra += `<script type="module" src="${escAttr(regionScript)}"></script>`

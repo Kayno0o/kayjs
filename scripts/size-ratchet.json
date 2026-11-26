@@ -1,7 +1,7 @@
 {
   "files": {},
   "functionLines": {
-    "packages/kay/src/build/bundle.ts::buildClient": 171,
+    "packages/kay/src/build/bundle.ts::buildClient": 164,
     "packages/kay/src/build/index.ts::runBuild": 212,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys": 192,
     "packages/kay/src/compiler/dom.ts::compileDom": 454,
@@ -32,7 +32,7 @@
     "packages/ui/src/CommandPalette.tsx::CommandPalette": 163
   },
   "functionComplexity": {
-    "packages/kay/src/build/bundle.ts::buildClient": 57,
+    "packages/kay/src/build/bundle.ts::buildClient": 54,
     "packages/kay/src/build/index.ts::runBuild": 50,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys.walkWithParents": 72,
     "packages/kay/src/compiler/dom-attrs.ts::compileElementAttributes": 59,

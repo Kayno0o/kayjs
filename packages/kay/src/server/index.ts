@@ -116,6 +116,7 @@ function routeDocument(manifest: BuildManifest, entry: RouteManifestEntry, lang:
     headTags: mergedHeadTags(manifest, entry),
     lang,
     runtimeScript: manifest.runtimeScript,
+    chunkImports: manifest.chunkImports,
     alwaysLoadRuntime,
     navigation,
     regionScript: entry.usesRegion === true ? manifest.regionScript : undefined,

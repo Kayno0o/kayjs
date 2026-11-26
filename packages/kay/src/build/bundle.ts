@@ -13,7 +13,7 @@ import { readsPrivateEnv } from '../compiler/server-only'
 import { clientPlugin, KAY_SPECIFIER_FILTER, localIslandExports, TS_FILTER } from './client-plugin'
 import { formatBunBuildLogs, isInNodeModules, isOutsideRoot, isTsFile, relPosix } from './files'
 import { stampFiles, stampsMatch } from './graph'
-import { hydrateStrategies, writeClientEntries } from './client-entries'
+import { entryStaticImports, hydrateStrategies, writeClientEntries } from './client-entries'
 import { clientLeakError, islandKey } from './islands'
 import { pluginHookError } from './plugin-host'
 import { KAY_SRC_ROOT, resolveKaySpecifier } from './resolve'
@@ -152,6 +152,8 @@ export interface ClientBuild {
   regionScript: string | undefined
   /** The prop revivers, which the loader imports for an island whose props hold a Date, Map, Set or another tagged value. */
   reviveScript: string | undefined
+  /** Entry URL to the chunks it imports statically, transitively, for the page's preloads. */
+  chunkImports: Record<string, string[]>
   metafile: Bun.BuildOutput['metafile']
 }
 
@@ -190,6 +192,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     runtimeScript: undefined,
     regionScript: undefined,
     reviveScript: undefined,
+    chunkImports: {},
     metafile: undefined,
   }
   const pluginClientEntries = env.plugins.map(p => p.clientEntry).filter((e): e is string => Boolean(e))
@@ -245,6 +248,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
       runtimeScript: cache.lastClient.runtimeScript,
       regionScript: cache.lastClient.regionScript,
       reviveScript: cache.lastClient.reviveScript,
+      chunkImports: cache.lastClient.chunkImports,
       metafile: undefined,
     }
   }
@@ -348,20 +352,26 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
       result.islandCssUrl.set(entryKey, `${assetPrefix}/${cssBundle.replace(LEADING_DOT_SLASH_RE, '')}`)
   }
 
-  for (const output of clientResult.outputs) {
-    const relFile = relPosix(clientDir, output.path)
-    result.assetFiles.push(relFile)
-    if (relFile.endsWith('.css'))
-      result.styleUrls.push(`${assetPrefix}/${relFile}`)
-  }
-  if (reviver !== undefined) {
-    result.reviveScript = reviver.url
-    result.assetFiles.push(reviver.file)
-  }
+  recordClientFiles(result, clientResult.outputs, env, reviver)
 
   if (cache !== undefined)
     rememberClientBuild(cache, result, { signature: clientSignature, clientDir, inputFiles: [...standaloneCss, ...pluginClientEntries, ...regionClientEntries], entriesDir, actionsByFile, graph, resolveMetaPath })
   return result
+}
+
+/** The emitted files, the stylesheets, each entry's static imports and the revivers, into the client build's result. */
+function recordClientFiles(result: ClientBuild, outputs: readonly Bun.BuildArtifact[], env: BundleEnv, reviver: { url: string, file: string } | undefined): void {
+  for (const output of outputs) {
+    const relFile = relPosix(env.clientDir, output.path)
+    result.assetFiles.push(relFile)
+    if (relFile.endsWith('.css'))
+      result.styleUrls.push(`${env.assetPrefix}/${relFile}`)
+  }
+  result.chunkImports = entryStaticImports(result.metafile, env.assetPrefix)
+  if (reviver !== undefined) {
+    result.reviveScript = reviver.url
+    result.assetFiles.push(reviver.file)
+  }
 }
 
 /** Keeps what a client build produced, so the next build with the same signature and unchanged inputs reuses its files. */
@@ -394,6 +404,7 @@ function rememberClientBuild(
     runtimeScript: result.runtimeScript,
     regionScript: result.regionScript,
     reviveScript: result.reviveScript,
+    chunkImports: result.chunkImports,
   }
 }
 

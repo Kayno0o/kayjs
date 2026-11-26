@@ -4,6 +4,8 @@ import type { BundleEnv } from './bundle'
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+const LEADING_DOT_SLASH_RE = /^\.\//
+
 /** The lazy strategies some island of the app hydrates with, so the loader keeps only theirs. A mode computed at runtime (`*`) may be any of them. */
 export function hydrateStrategies(analyses: Iterable<{ defaultHydrate?: string | undefined, hydrateModes: Set<string> }>): { strategies: Record<'visible' | 'idle' | 'interaction' | 'media', boolean>, hasClientOnlyHydrate: boolean } {
   const strategies = { visible: false, idle: false, interaction: false, media: false }
@@ -70,6 +72,35 @@ export function writeClientEntries(env: BundleEnv, entriesDir: string, options: 
     writeEntry(entryPath, exportStmt)
     out.entryPoints.push(entryPath)
     out.islandEntryToKey.set(entryPath, key)
+  }
+  return out
+}
+
+/** For each JS entry of the client build with static imports, every chunk it imports, transitively: the page preloads them beside the entry, so the browser fetches them at once rather than one level at a time. */
+export function entryStaticImports(metafile: Bun.BuildOutput['metafile'], assetPrefix: string): Record<string, string[]> {
+  const deps = new Map<string, string[]>()
+  const entries: string[] = []
+  for (const [outKey, info] of Object.entries(metafile?.outputs ?? {})) {
+    const rel = outKey.replace(LEADING_DOT_SLASH_RE, '')
+    if (!rel.endsWith('.js'))
+      continue
+    deps.set(rel, (info.imports ?? []).filter(imp => imp.kind === 'import-statement').map(imp => imp.path.replace(LEADING_DOT_SLASH_RE, '')))
+    if (info.entryPoint !== undefined)
+      entries.push(rel)
+  }
+  const out: Record<string, string[]> = {}
+  for (const entry of entries) {
+    const seen = new Set<string>()
+    const stack = [...deps.get(entry)!]
+    while (stack.length > 0) {
+      const cur = stack.pop()!
+      if (seen.has(cur) || cur === entry)
+        continue
+      seen.add(cur)
+      stack.push(...deps.get(cur) ?? [])
+    }
+    if (seen.size > 0)
+      out[`${assetPrefix}/${entry}`] = [...seen].sort().map(rel => `${assetPrefix}/${rel}`)
   }
   return out
 }

@@ -95,6 +95,7 @@ export function createFallbackPages(options: FallbackPagesOptions) {
     headTags: manifest.headTags,
     styles: manifest.globalStyles ?? manifest.styles,
     runtimeScript: manifest.runtimeScript,
+    chunkImports: manifest.chunkImports,
     alwaysLoadRuntime: options.alwaysLoadRuntime,
     navigation: options.navigation,
     lang: options.lang,
