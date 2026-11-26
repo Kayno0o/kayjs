@@ -117,7 +117,7 @@ export default function Page({ [KEY]: d }: Record<string, any>) {
     )
     expect(html).not.toContain(' p="')
     expect(html).not.toContain('&quot;')
-    expect(html).toContain('<script type="application/json">{"data":{"title":"Hello \\u003c/script> \\"world\\"","count":3}}</script></kay-island>')
+    expect(html).toContain('<script type="application/json" data-kay-props>{"data":{"title":"Hello \\u003c/script> \\"world\\"","count":3}}</script></kay-island>')
   })
 
   test('page island strips server-only load fields, supports explicit clientData, and hydrates from <script type="application/json">', async () => {
@@ -161,14 +161,14 @@ export default function ExplicitPage({ data }: { data: { count: number, note?: s
       const homeHtml = await (await app.handle(new Request('http://localhost/'))).text()
       expect(homeHtml).toContain('Counter')
       expect(homeHtml).toContain('7</button>')
-      expect(homeHtml).toContain('<script type="application/json">')
+      expect(homeHtml).toContain('<script type="application/json" data-kay-props>')
       expect(homeHtml).not.toContain('&quot;initial&quot;')
       expect(homeHtml).not.toContain('SUPER_SECRET_SHOULD_NEVER_LEAK')
       expect(homeHtml).not.toContain('hugeServerBlob')
       expect(homeHtml).not.toContain('X'.repeat(100))
 
       const expHtml = await (await app.handle(new Request('http://localhost/explicit'))).text()
-      expect(expHtml).toContain('<script type="application/json">{"data":{"count":2}}</script>')
+      expect(expHtml).toContain('<script type="application/json" data-kay-props>{"data":{"count":2}}</script>')
       expect(expHtml).not.toContain('SECRET_ID_999')
       expect(expHtml).not.toContain('internalId')
 
