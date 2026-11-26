@@ -2,13 +2,17 @@
 
 import type { BunPlugin } from 'bun'
 import type { KayPlugin } from '@kayjs/kay/config'
+import type { IconLookup } from './diagnose'
 import type { IconSet } from './types'
+import { join, relative } from 'node:path'
 import { definePlugin } from '@kayjs/kay/config'
 import { iconData } from './icon-data'
-import { installedSets, isSetPrefix, setFile } from './sets'
+import { iconProblem } from './diagnose'
+import { installedSets, setFile } from './sets'
 
 const FOUND_PER_SET = 10
 const ICON_SPEC_RE = /^~icons\/([^/]+)\/(.+)$/
+const ICON_IMPORT_RE = /\b(?:from|import)\s*\(?\s*(['"])(~icons\/[^/'"]+\/[^'"]+)\1/g
 const SELF_CLOSING_RE = /<([a-z][\w:-]*)([^<>]*?)\s*\/>/gi
 
 // Spells `<path d="…"/>` as `<path d="…"></path>`, the way a browser serializes SVG, so hydrating an island finds the server's body unchanged and keeps its nodes.
@@ -16,58 +20,66 @@ function withEndTags(body: string): string {
   return body.replace(SELF_CLOSING_RE, '<$1$2></$1>')
 }
 
-async function readSet(prefix: string, root: string): Promise<IconSet> {
-  const file = setFile(prefix, root)
-  if (file === undefined) {
-    throw new Error(isSetPrefix(prefix)
-      ? `@kayjs/icons: no icon set "${prefix}" is installed: install @iconify-json/${prefix}, or pass it in icons({ sets }).`
-      : `@kayjs/icons: "${prefix}" is not an icon set name: write ~icons/<set>/<name>, such as ~icons/tabler/home.`)
-  }
-  return await Bun.file(file).json() as IconSet
-}
-
 export interface IconsPluginOptions {
   /** Optional preloaded custom icon sets keyed by prefix (e.g. `{ custom: mySet }`). */
   sets?: Record<string, IconSet> | undefined
 }
 
+function lineAndColumn(code: string, offset: number): string {
+  const before = code.slice(0, offset).split('\n')
+  return `${before.length}:${before.at(-1)!.length + 1}`
+}
+
 export function icons(options: IconsPluginOptions = {}): KayPlugin {
-  // The in-flight read of each set, so icons loaded in parallel parse their set once.
-  const cache = new Map<string, Promise<IconSet>>(Object.entries(options.sets ?? {}).map(([prefix, set]) => [prefix, Promise.resolve(set)]))
-  const loadSet = (prefix: string, root: string): Promise<IconSet> => {
-    let set = cache.get(prefix)
-    if (set === undefined) {
-      set = (async () => {
-        try {
-          return await readSet(prefix, root)
-        }
-        catch (error) {
-          cache.delete(prefix)
-          throw error
-        }
-      })()
-      cache.set(prefix, set)
-    }
-    return set
-  }
+  // The in-flight read of each set, so icons loaded in parallel parse their set once; a set not installed is looked for again next time.
+  const cache = new Map<string, Promise<IconSet | undefined>>(Object.entries(options.sets ?? {}).map(([prefix, set]) => [prefix, Promise.resolve(set)]))
+  const lookupIn = (root: string): IconLookup => ({
+    set: (prefix) => {
+      let set = cache.get(prefix)
+      if (set === undefined) {
+        const file = setFile(prefix, root)
+        if (file === undefined)
+          return Promise.resolve(undefined)
+        set = Bun.file(file).json() as Promise<IconSet>
+        cache.set(prefix, set)
+      }
+      return set
+    },
+    prefixes: () => [...new Set([...Object.keys(options.sets ?? {}), ...installedSets(root).keys()])],
+  })
 
   return definePlugin({
     name: '@kayjs/icons',
+    async check(ctx) {
+      const lookup = lookupIn(ctx.root)
+      for (const file of new Bun.Glob('src/**/*.{ts,tsx,mts}').scanSync({ cwd: ctx.root })) {
+        const code = await Bun.file(join(ctx.root, file)).text()
+        for (const found of code.matchAll(ICON_IMPORT_RE)) {
+          const [, prefix, name] = ICON_SPEC_RE.exec(found[2]!)!
+          const problem = await iconProblem(prefix!, name!, '', lookup)
+          if (problem !== undefined)
+            ctx.error(`${file}:${lineAndColumn(code, found.index + found[0].length - found[2]!.length - 2)}: error: @kayjs/icons: ${problem}`)
+        }
+      }
+    },
     bunPlugins: ({ root, target }): BunPlugin[] => [{
       name: 'kayjs-icons',
       setup(b) {
-        b.onResolve({ filter: ICON_SPEC_RE }, args => ({ path: args.path, namespace: 'kay-icon' }))
+        const lookup = lookupIn(root)
+        // The first file importing each icon, for an error to name it.
+        const importers = new Map<string, string>()
+        b.onResolve({ filter: ICON_SPEC_RE }, (args) => {
+          if (!importers.has(args.path))
+            importers.set(args.path, relative(root, args.importer))
+          return { path: args.path, namespace: 'kay-icon' }
+        })
 
         b.onLoad({ filter: /.*/, namespace: 'kay-icon' }, async (args) => {
-          const match = ICON_SPEC_RE.exec(args.path)
-          if (match === null)
-            throw new Error(`@kayjs/icons: invalid specifier "${args.path}" (expected ~icons/<prefix>/<name>)`)
-
-          const prefix = match[1]!
-          const name = match[2]!
-          const data = iconData(await loadSet(prefix, root), name)
+          const [, prefix, name] = ICON_SPEC_RE.exec(args.path)!
+          const set = await lookup.set(prefix!)
+          const data = set === undefined ? undefined : iconData(set, name!)
           if (data === undefined)
-            throw new Error(`@kayjs/icons: icon "${name}" not found in set "${prefix}"`)
+            throw new Error(`@kayjs/icons: ${await iconProblem(prefix!, name!, `, imported by ${importers.get(args.path)}`, lookup)}`)
 
           return {
             contents: `export default ${JSON.stringify(target === 'client' ? { ...data, body: withEndTags(data.body) } : data)};\n`,

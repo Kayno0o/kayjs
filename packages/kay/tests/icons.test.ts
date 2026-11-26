@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { iconData } from '../../plugin-icons/src/icon-data'
 import { icons } from '../../plugin-icons/src/plugin'
 import { build } from '../src/build/index'
+import { checkProject } from '../src/cli/check'
 import { createServer } from '../src/server/index'
 
 const DEMO: IconSet = {
@@ -251,5 +252,67 @@ describe('icons() loading an installed set', () => {
     await build({ root, plugins: [plugin], static: true })
 
     expect(readFileSync(join(root, 'dist/index.html'), 'utf8')).toContain('M5 12h14')
+  })
+})
+
+describe('an icon or set that does not exist', () => {
+  const page = (specifier: string): Record<string, string> => ({
+    'src/routes/index.tsx': `import { Icon } from '@kayjs/icons'\nimport arrow from '${specifier}'\nexport default function Home() { return <main><Icon icon={arrow} /></main> }\n`,
+  })
+
+  it('fails the build naming the importing file and the closest icons', async () => {
+    const root = linkedApp(page('~icons/demo/arow'))
+
+    await expect(build({ root, plugins: [icons({ sets: { demo: DEMO } })], static: true }))
+      .rejects.toThrow('@kayjs/icons: no icon "arow" in set "demo", imported by src/routes/index.tsx. Did you mean ~icons/demo/arrow? Search with kay icons-find <words>.')
+  })
+
+  it('fails kay check at the import, naming the closest icons', async () => {
+    const root = linkedApp({
+      ...page('~icons/demo/arow'),
+      'kay.config.ts': `import { icons } from '@kayjs/icons/plugin'\nexport default { plugins: [icons({ sets: { demo: ${JSON.stringify(DEMO)} } })] }\n`,
+    })
+
+    expect((await checkProject(root, { skipTypecheck: true })).errors)
+      .toContain('src/routes/index.tsx:2:19: error: @kayjs/icons: no icon "arow" in set "demo". Did you mean ~icons/demo/arrow? Search with kay icons-find <words>.')
+  })
+
+  it('fails kay check on a set that is not installed, naming the closest installed set', async () => {
+    const root = linkedApp({
+      ...page('~icons/dmeo/arrow'),
+      'kay.config.ts': `import { icons } from '@kayjs/icons/plugin'\nexport default { plugins: [icons({ sets: { demo: ${JSON.stringify(DEMO)} } })] }\n`,
+    })
+
+    expect((await checkProject(root, { skipTypecheck: true })).errors)
+      .toContain('src/routes/index.tsx:2:19: error: @kayjs/icons: no icon set "dmeo" is installed. Did you mean ~icons/demo/arrow? Otherwise install @iconify-json/dmeo, or pass it in icons({ sets }).')
+  })
+
+  it('suggests no other set when the closest one lacks the icon', async () => {
+    const root = linkedApp({
+      ...page('~icons/dmeo/nope'),
+      'kay.config.ts': `import { icons } from '@kayjs/icons/plugin'\nexport default { plugins: [icons({ sets: { demo: ${JSON.stringify(DEMO)} } })] }\n`,
+    })
+
+    expect((await checkProject(root, { skipTypecheck: true })).errors)
+      .toContain('src/routes/index.tsx:2:19: error: @kayjs/icons: no icon set "dmeo" is installed. Otherwise install @iconify-json/dmeo, or pass it in icons({ sets }).')
+  })
+
+  it('explains the specifier shape when the set part is not a set name', async () => {
+    const root = linkedApp({
+      ...page('~icons/Demo/arrow'),
+      'kay.config.ts': `import { icons } from '@kayjs/icons/plugin'\nexport default { plugins: [icons({ sets: { demo: ${JSON.stringify(DEMO)} } })] }\n`,
+    })
+
+    expect((await checkProject(root, { skipTypecheck: true })).errors)
+      .toContain('src/routes/index.tsx:2:19: error: @kayjs/icons: "Demo" is not an icon set name: write ~icons/<set>/<name>, such as ~icons/tabler/home.')
+  })
+
+  it('passes kay check when every imported icon exists', async () => {
+    const root = linkedApp({
+      ...page('~icons/demo/arrow'),
+      'kay.config.ts': `import { icons } from '@kayjs/icons/plugin'\nexport default { plugins: [icons({ sets: { demo: ${JSON.stringify(DEMO)} } })] }\n`,
+    })
+
+    expect((await checkProject(root, { skipTypecheck: true })).errors.filter(error => error.includes('@kayjs/icons'))).toEqual([])
   })
 })
