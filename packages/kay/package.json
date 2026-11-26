@@ -23,6 +23,8 @@
     "./jsx-runtime": "./src/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx-runtime.ts",
     "./internal/dom": "./src/dom/index.ts",
+    "./internal/dom-attrs": "./src/dom/attrs.ts",
+    "./internal/dom-claim": "./src/dom/claim.ts",
     "./internal/dom-extras": "./src/dom/extras.ts",
     "./internal/dom-loop": "./src/dom/loop.ts",
     "./internal/action": "./src/dom/action.ts",

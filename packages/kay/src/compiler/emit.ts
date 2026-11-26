@@ -19,6 +19,15 @@ export const DELEGATED_EVENTS = new Set([
   'pointerdown', 'pointerup', 'touchstart', 'touchend',
 ])
 
+// Helpers kept out of the dom core, which every island loads: a page pays for them only when one of its islands binds them.
+const ATTR_HELPERS = ['setAttr', 'setClass', 'setProp', 'setStyle']
+const CLAIM_HELPERS = ['eachStatic']
+const EXTRA_HELPERS = ['fragInsert', 'insert', 'mergeProps', 'omit', 'propDefault', 'setInnerHtml', 'show', 'spread']
+
+function takeHelpers(used: Set<string>, names: readonly string[]): string[] {
+  return names.filter(name => used.delete(name))
+}
+
 /** The import lines, hoisted templates and delegation call a compiled module starts with. Marks the helpers it needs in `used`. */
 export function moduleHeader(used: Set<string>, templates: readonly { name: string, html: string, isSvg?: boolean }[], delegatedEvents: ReadonlySet<string>): string {
   let header = ''
@@ -29,19 +38,12 @@ export function moduleHeader(used: Set<string>, templates: readonly { name: stri
 
   if (used.size > 0) {
     const hasLoop = used.delete('loop')
-    const EXTRA_HELPERS = ['fragInsert', 'insert', 'mergeProps', 'omit', 'propDefault', 'setInnerHtml', 'show', 'spread']
-    const usedExtras: string[] = []
-    for (const name of EXTRA_HELPERS) {
-      if (used.delete(name))
-        usedExtras.push(name)
-    }
-    if (used.size > 0) {
-      const specifiers = [...used].sort().map(name => `${name} as __${name}`).join(', ')
-      header += `import { ${specifiers} } from '@kayjs/kay/internal/dom';\n`
-    }
-    if (usedExtras.length > 0) {
-      const specifiers = usedExtras.map(name => `${name} as __${name}`).join(', ')
-      header += `import { ${specifiers} } from '@kayjs/kay/internal/dom-extras';\n`
+    const usedAttrs = takeHelpers(used, ATTR_HELPERS)
+    const usedClaims = takeHelpers(used, CLAIM_HELPERS)
+    const usedExtras = takeHelpers(used, EXTRA_HELPERS)
+    for (const [names, module] of [[[...used].sort(), 'dom'], [usedAttrs, 'dom-attrs'], [usedClaims, 'dom-claim'], [usedExtras, 'dom-extras']] as const) {
+      if (names.length > 0)
+        header += `import { ${names.map(name => `${name} as __${name}`).join(', ')} } from '@kayjs/kay/internal/${module}';\n`
     }
     if (hasLoop)
       header += `import { loop as __loop } from '@kayjs/kay/internal/dom-loop';\n`

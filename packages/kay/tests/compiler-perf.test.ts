@@ -2,11 +2,15 @@ import { describe, expect, test } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { compileDom, compileSsr } from '../src/compiler/index'
 import * as domExtras from '../src/dom/extras'
-import * as domCore from '../src/dom/index'
+import * as domAttrs from '../src/dom/attrs'
+import * as domClaim from '../src/dom/claim'
+import * as domIndex from '../src/dom/index'
 import * as domLoop from '../src/dom/loop'
 import { signal, store, useId } from '../src/index'
 import { createRenderContext, runWithRenderContext } from '../src/ssr/context'
 import * as ssrRt from '../src/ssr/index'
+
+const domCore = { ...domIndex, ...domAttrs, ...domClaim }
 
 function evalSsr(src: string, exportName = 'Page'): (...args: unknown[]) => { __html: string } {
   const compiled = compileSsr('Test.tsx', src).code

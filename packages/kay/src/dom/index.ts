@@ -1,18 +1,15 @@
-// Kay v2 minimal DOM & hydration core (loop -> @kayjs/kay/internal/dom-loop, extras -> @kayjs/kay/internal/dom-extras for fine-grained chunk splitting).
+// Kay v2 minimal DOM & hydration core. Every island imports it, so what only some islands need lives apart: attribute bindings in @kayjs/kay/internal/dom-attrs, claiming SSR lists and inserts in dom-claim, lists in dom-loop, inserts and spreads in dom-extras.
 
-import { isBlockedAttr, isStringBoolAttr, isUnsafeUrlAttr } from '../attrs'
 import { batch, createOwner, disposeOwner, getOwner, onCleanup, runWithOwner } from '../reactivity/index'
-import { styleText } from '../style'
 import { assertRenderable } from '../unrenderable'
 
-export { isBlockedAttr } from '../attrs'
 export { effect } from '../reactivity/index'
 
 let hydrating = false
 let hydrateNode: Node | null = null
 let hydrateRoot: Element | null = null
 
-function isRangeEnd(node: Node): boolean {
+export function isRangeEnd(node: Node): boolean {
   return node.nodeType === 8 && (node as Comment).data === 'k]'
 }
 
@@ -20,103 +17,16 @@ export function hydrateCursor(): Node | null {
   return hydrating ? hydrateNode : null
 }
 
-export function claimLoop(parent: Node, fn: () => void, skip = 0, startMarker?: Node | null): boolean {
-  if (!hydrating)
-    return false
-  const prevHydrating = hydrating
-  const prevCursor = hydrateNode
-  let cur: Node | null
-  if (startMarker !== undefined && startMarker !== null) {
-    cur = startMarker.nextSibling
-  }
-  else {
-    cur = parent.firstChild
-    for (let i = 0; i < skip && cur !== null; i++) {
-      cur = cur.nextSibling
-      while (cur !== null && (cur as unknown as { __kayAnchor?: boolean }).__kayAnchor === true)
-        cur = cur.nextSibling
-    }
-  }
-  if (cur === null || isRangeEnd(cur)) {
-    hydrating = false
-    hydrateNode = null
-  }
-  else {
-    hydrateNode = cur
-  }
-  try {
-    fn()
-  }
-  finally {
-    hydrating = prevHydrating
-    hydrateNode = prevCursor
-  }
-  return true
+export function isHydrating(): boolean {
+  return hydrating
 }
 
-// The siblings from `from` up to, not including, `to`; undefined when there are none.
-function between(from: Node | null, to: Node | null): Node[] | undefined {
-  const nodes: Node[] = []
-  for (let n = from; n !== null && n !== to; n = n.nextSibling)
-    nodes.push(n)
-  return nodes.length > 0 ? nodes : undefined
-}
-
-// `nodes` is the SSR range the render claimed through template() (a fragment hydrates to null, so the caller learns its nodes here).
-export function claimInsert<T>(
-  parent: Node,
-  marker: Node | null,
-  fn: () => T,
-  startMarker?: Node | null,
-): { result: T, marker: Node | null, claimed: Node | null, nodes: Node[] | undefined, consumed: boolean } {
-  if (!hydrating)
-    return { result: fn(), marker, claimed: null, nodes: undefined, consumed: false }
-
-  let claimed: Node | null
-  if (startMarker !== undefined) {
-    const first = startMarker === null ? parent.firstChild : startMarker.nextSibling
-    claimed = first === marker || (first !== null && isRangeEnd(first)) ? null : first
-  }
-  else {
-    claimed = marker === null ? parent.lastChild : marker.nodeType === 8 ? null : marker
-  }
-  const prevHydrating = hydrating
-  const prevNode = hydrateNode
-  if (claimed === null) {
-    hydrating = false
-    hydrateNode = null
-  }
-  else {
-    hydrateNode = claimed
-  }
-  let result: T
-  let end: Node | null
-  try {
-    result = fn()
-    end = hydrateNode
-  }
-  finally {
-    hydrating = prevHydrating
-    hydrateNode = prevNode
-  }
-  const consumed = claimed !== null && end !== claimed
-  if (startMarker !== undefined) {
-    const firstNow = startMarker === null ? parent.firstChild : startMarker.nextSibling
-    return { result, marker, claimed, nodes: between(firstNow, marker), consumed }
-  }
-  if (marker === null) {
-    const from = claimed !== null && claimed.parentNode === parent ? claimed : parent.lastChild
-    return { result, marker: null, claimed, nodes: claimed !== null ? between(from, end) : undefined, consumed }
-  }
-  if (claimed === null)
-    return { result, marker, claimed, nodes: undefined, consumed: false }
-
-  // The anchor goes after the claimed range; a text value or a nested insert moves no cursor and claims the one node.
-  const anchor = document.createComment('')
-  ;(anchor as unknown as { __kayAnchor?: boolean }).__kayAnchor = true
-  const from = claimed.parentNode === parent ? claimed : null
-  parent.insertBefore(anchor, consumed ? end : from?.nextSibling ?? null)
-  return { result, marker: anchor, claimed, nodes: consumed && from !== null ? between(from, anchor) : undefined, consumed }
+/** Points the hydration cursor at `node` (claiming SSR nodes when `on`) and returns the cursor it replaced, for the caller to restore. */
+export function moveCursor(on: boolean, node: Node | null): [boolean, Node | null] {
+  const prev: [boolean, Node | null] = [hydrating, hydrateNode]
+  hydrating = on
+  hydrateNode = node
+  return prev
 }
 
 export function hydrate(container: Element, render: () => Node | DocumentFragment | null, idPrefix?: string): () => void {
@@ -264,42 +174,6 @@ export function frag(...nodes: Node[]): Node | null {
   return f
 }
 
-export function eachStatic<T>(
-  parent: Node,
-  marker: Node | null,
-  items: readonly T[] | null | undefined,
-  render: (item: T, index: number) => Node,
-  skip = 0,
-): void {
-  if (!items || items.length === 0)
-    return
-  let startMarker: Node | null | undefined
-  let insertBefore = marker
-  if (marker !== null && marker.nodeType === 8 && (marker as Comment).data === 'k[') {
-    const close = skipRange(marker)
-    if (close !== null) {
-      startMarker = marker
-      insertBefore = close
-    }
-  }
-  if (claimLoop(parent, () => {
-    for (let i = 0; i < items.length; i++) {
-      const node = render(items[i]!, i)
-      if (node != null && node.parentNode !== parent)
-        parent.insertBefore(node, insertBefore)
-    }
-  }, skip, startMarker)) {
-    return
-  }
-  const f = document.createDocumentFragment()
-  for (let i = 0; i < items.length; i++) {
-    const node = render(items[i]!, i)
-    if (node != null)
-      f.appendChild(node)
-  }
-  parent.insertBefore(f, insertBefore)
-}
-
 export function firstText(el: Node): Text {
   const first = el.firstChild
   if (first !== null && first.nodeType === 3)
@@ -350,73 +224,6 @@ export function setText(node: Text, value: unknown): void {
   const str = value == null || typeof value === 'boolean' ? '' : String(value)
   if (node.data !== str)
     node.data = str
-}
-
-export function setClass(el: Element, value: unknown): void {
-  if (process.env.NODE_ENV !== 'production')
-    assertRenderable(value, 'class')
-  const str = value == null || value === false ? '' : String(value)
-  if (typeof el.className === 'string') {
-    if (el.className !== str) {
-      if (str === '')
-        el.removeAttribute('class')
-      else
-        el.className = str
-    }
-  }
-  else if (str === '') {
-    el.removeAttribute('class')
-  }
-  else {
-    el.setAttribute('class', str)
-  }
-}
-
-export function setAttr(el: Element, name: string, value: unknown): void {
-  if (isBlockedAttr(name))
-    return
-  if (process.env.NODE_ENV !== 'production')
-    assertRenderable(value, name)
-  if (value == null) {
-    el.removeAttribute(name)
-  }
-  else if (typeof value === 'boolean') {
-    if (isStringBoolAttr(name))
-      el.setAttribute(name, value ? 'true' : 'false')
-    else if (value)
-      el.setAttribute(name, '')
-    else
-      el.removeAttribute(name)
-  }
-  else if (isUnsafeUrlAttr(name, value, el.tagName)) {
-    if (process.env.NODE_ENV !== 'production')
-      console.warn(`kay: dropped unsafe URL on <${el.tagName.toLowerCase()} ${name}>.`)
-    el.removeAttribute(name)
-  }
-  else {
-    el.setAttribute(name, String(value))
-  }
-}
-
-export function setProp(el: Element, name: string, value: unknown): void {
-  const next = name === 'value'
-    ? (value == null ? '' : String(value))
-    : Boolean(value)
-  const rec = el as unknown as Record<string, unknown>
-  if (rec[name] !== next)
-    rec[name] = next
-}
-
-export function setStyle(el: HTMLElement, value: unknown): void {
-  if (value == null || value === false) {
-    el.removeAttribute('style')
-  }
-  else if (typeof value === 'string') {
-    el.style.cssText = value
-  }
-  else if (typeof value === 'object') {
-    el.style.cssText = styleText(value as Record<string, unknown>)
-  }
 }
 
 // ---- Delegated events

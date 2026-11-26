@@ -381,6 +381,56 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     }
   })
 
+  test('a page whose island binds no attribute, list or insert loads none of their runtime, beside an island that does (#3662)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-dom-split-'))
+    tempDirs.push(dir)
+    mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
+    symlinkSync(resolve(import.meta.dir, '..'), join(dir, 'node_modules/@kayjs/kay'))
+    const files: Record<string, string> = {
+      'src/components/Counter.tsx': `import { signal } from '@kayjs/kay'\nexport function Counter() { const n = signal(0); return <button onClick={() => { n.value++ }}>{n.value}</button> }`,
+      'src/components/Rich.tsx': `
+        import { signal } from '@kayjs/kay'
+        const NAV = ['a', 'b']
+        export function Rich(props: { extra: Record<string, string> }) {
+          const items = signal([1, 2]); const open = signal(false)
+          return <section class={open.value ? 'on' : 'off'} style={{ color: open.value ? 'red' : 'blue' }} {...props.extra}>
+            <button onClick={() => { open.value = !open.value }}>toggle</button>
+            {open.value && <p>open</p>}
+            <nav>{NAV.map(n => <a href={'/' + n}>{n}</a>)}</nav>
+            <ul>{items.value.map(i => <li key={i} data-i={i}>{i}</li>)}</ul>
+          </section>
+        }`,
+      'src/routes/index.tsx': `import { Counter } from '../components/Counter'\nexport default function Home() { return <main><Counter /></main> }`,
+      'src/routes/rich.tsx': `import { Rich } from '../components/Rich'\nexport default function R() { return <main><Rich extra={{ title: 't' }} /></main> }`,
+    }
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(join(dir, file, '..'), { recursive: true })
+      writeFileSync(join(dir, file), text)
+    }
+    const manifest = await build({ root: dir, minify: true, prerender: false })
+    const clientDir = join(dir, 'dist/client')
+    // A page's scripts: the runtime and its island chunks, then every chunk they import.
+    const scriptsOf = (path: string): string => {
+      const route = manifest.routes.find(r => r.path === path)!
+      const seen = new Set<string>()
+      const queue = [manifest.runtimeScript!, ...route.islandChunks].map(url => url.replace(/^\/_kay\//, ''))
+      for (const file of queue) {
+        if (seen.has(file))
+          continue
+        seen.add(file)
+        for (const [, dep] of readFileSync(join(clientDir, file), 'utf8').matchAll(/(?:from|import)\s*"\.\/([^"]+\.js)"/g))
+          queue.push(dep!)
+      }
+      return [...seen].map(file => readFileSync(join(clientDir, file), 'utf8')).join('\n')
+    }
+
+    const counterPage = scriptsOf('/')
+    const richPage = scriptsOf('/rich')
+
+    for (const marker of ['cssText', 'removeAttribute("class")', '__kayAnchor', 'createDocumentFragment', 'data:'])
+      expect([marker, richPage.includes(marker), counterPage.includes(marker)]).toEqual([marker, true, false])
+  })
+
   test('only names rendered as tags become islands, including a namespace member tag', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-island-tags-'))
     try {

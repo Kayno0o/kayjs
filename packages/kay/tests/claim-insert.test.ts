@@ -1,6 +1,7 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { describe, expect, test } from 'bun:test'
-import { claimInsert, hydrate, template } from '../src/dom/index'
+import { claimInsert } from '../src/dom/claim'
+import { hydrate, template } from '../src/dom/index'
 
 // Runs claimInsert inside a hydrate pass over `html` and returns what it reports.
 async function claim(html: string, pick: (parent: Element) => { marker: Node | null, start?: Node | null }, render: () => unknown) {

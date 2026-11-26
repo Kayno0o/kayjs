@@ -3,7 +3,8 @@
 
 import type { Owner, Signal } from '../reactivity/index'
 import { createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, signal, untrack } from '../reactivity/index'
-import { claimLoop, hydrateCursor, skipRange } from './index'
+import { claimLoop } from './claim'
+import { hydrateCursor, skipRange } from './index'
 
 interface Row<T> {
   key: unknown

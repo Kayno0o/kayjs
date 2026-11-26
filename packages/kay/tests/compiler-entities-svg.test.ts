@@ -5,9 +5,13 @@ import { describe, expect, test } from 'bun:test'
 import { Window } from 'happy-dom'
 import { compileDom, compileSsr } from '../src/compiler/index'
 import * as domExtras from '../src/dom/extras'
-import * as domCore from '../src/dom/index'
+import * as domAttrs from '../src/dom/attrs'
+import * as domClaim from '../src/dom/claim'
+import * as domIndex from '../src/dom/index'
 import * as domLoop from '../src/dom/loop'
 import * as ssrMod from '../src/ssr/index'
+
+const domCore = { ...domIndex, ...domAttrs, ...domClaim }
 
 function evalSsr(source: string): Record<string, unknown> {
   const { code } = compileSsr('Test.tsx', source)

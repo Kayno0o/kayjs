@@ -7,13 +7,17 @@ import { parseTsx } from '../src/compiler/analyze'
 import { compileDom, compileSsr } from '../src/compiler/index'
 import { resolveImportPath, resolveKaySpecifier } from '../src/build/resolve'
 import * as domExtras from '../src/dom/extras'
-import * as domCore from '../src/dom/index'
+import * as domAttrs from '../src/dom/attrs'
+import * as domClaim from '../src/dom/claim'
+import * as domIndex from '../src/dom/index'
 import { defineIslandElement } from '../src/dom/island'
 import { loop } from '../src/dom/loop'
 import { onCleanup, onMount, signal } from '../src/reactivity/index'
 import { store } from '../src/reactivity/store'
 import { createRenderContext, runWithRenderContext } from '../src/ssr/context'
 import * as ssrRt from '../src/ssr/index'
+
+const domCore = { ...domIndex, ...domAttrs, ...domClaim }
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (...args: string[]) => (...a: unknown[]) => Promise<unknown>
 

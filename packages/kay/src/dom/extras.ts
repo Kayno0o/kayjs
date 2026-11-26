@@ -5,7 +5,10 @@ import type { Owner } from '../reactivity/index'
 import { DOM_PROPS } from '../attrs'
 import { batch, createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, untrack } from '../reactivity/index'
 import { assertRenderable } from '../unrenderable'
-import { claimInsert, claimRange, delegate, isBlockedAttr, setAttr, setClass, setProp, setStyle, skipRange } from './index'
+import { isBlockedAttr } from '../attrs'
+import { setAttr, setClass, setProp, setStyle } from './attrs'
+import { claimInsert } from './claim'
+import { claimRange, delegate, skipRange } from './index'
 
 const DELEGATED_EVENTS = new Set('beforeinput,click,dblclick,focusin,focusout,input,keydown,keyup,mousedown,mouseup,pointerdown,pointerup,touchstart,touchend'.split(','))
 
