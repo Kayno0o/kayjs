@@ -190,32 +190,15 @@ describe('audit #3526 — Box 32: --static staging, non-200 failure, dynamic ski
     expect(error?.message).toContain('at Broken')
   })
 
-  test('warns when dynamic route without paths() is skipped during --static and allows _404.tsx', async () => {
-    const dir = makeTempProject('kay-audit-box32-warn-')
-    mkdirSync(join(dir, 'src/routes/posts'), { recursive: true })
+  // A dynamic page without paths() now fails --static: check-build-parity.test.ts (#3657).
+  test('exports _404.tsx under --static', async () => {
+    const dir = makeTempProject('kay-audit-box32-404-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
     writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <h1>Home</h1> }')
     writeFileSync(join(dir, 'src/routes/_404.tsx'), 'export default function NotFound() { return <h1>404</h1> }')
-    writeFileSync(join(dir, 'src/routes/posts/[slug].tsx'), `
-      export default function Post({ params }: { params: { slug: string } }) {
-        return <article>{params.slug}</article>
-      }
-    `)
-
-    const warnings: string[] = []
-    const origWarn = console.warn
-    console.warn = (...args: unknown[]) => {
-      warnings.push(args.map(String).join(' '))
-    }
-    try {
-      await build({ root: dir, static: true })
-    }
-    finally {
-      console.warn = origWarn
-    }
-
+    await build({ root: dir, static: true })
     expect(existsSync(join(dir, 'dist/index.html'))).toBe(true)
     expect(existsSync(join(dir, 'dist/404.html'))).toBe(true)
-    expect(warnings.some(w => w.includes('/posts/:slug') && w.includes('paths()'))).toBe(true)
   })
 })
 

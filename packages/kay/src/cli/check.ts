@@ -1,22 +1,20 @@
 // `kay check [dir]`: validates routes, Kay compiler & island rules (unified with `kay build`), config, and TypeScript types.
 
-import type { Node } from 'oxc-parser'
 import type { IslandIssue } from '../build/islands'
 import type { ModuleAnalysis } from '../compiler/analyze'
 import type { ComplianceConfig } from '../compiler/compliance'
 import type { CheckPluginContext, KayPlugin } from '../plugins/index'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
-import { visitorKeys } from 'oxc-parser'
 import { isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
+import { islandPropProblems } from '../build/island-props'
 import { analyzeIslands } from '../build/islands'
-import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblemLocation, routeFileProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
+import { fileToRoutePath, hasRouteHandlerExport, missingPathsProblem, normalizeRoutePattern, routeExportProblemLocation, routeFileProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
 import { analyzeModule } from '../compiler/analyze'
-import { walk } from '../compiler/ast'
 import { collectProjectComplianceWarnings, shouldEmitWarning } from '../compiler/compliance'
-import { collectMistakes, KayMistake, mistake, serverOnlyTagError } from '../compiler/mistakes'
-import { collectPatternNames, DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from '../compiler/shared'
+import { collectMistakes, KayMistake, serverOnlyTagError } from '../compiler/mistakes'
+import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 
 export interface CheckResult {
@@ -44,85 +42,8 @@ export function diagnosticData(text: string, severity: 'error' | 'warning'): Che
   return { file: m[1]!, line: Number(m[2]), col: Number(m[3]), severity: m[4] as 'error' | 'warning', message: m[5]! }
 }
 
-const SERIALIZABLE_NEW_CTORS = new Set(['Date', 'Map', 'Set', 'URL', 'RegExp'])
 const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
 const EMPTY_ISLAND_TAGS = new Map<string, unknown>()
-
-type FnScope = Map<string, boolean>
-
-function bindFnStatements(scope: FnScope, statements: readonly Node[]): void {
-  for (const stmt of statements) {
-    const decl = (stmt.type === 'ExportNamedDeclaration' || stmt.type === 'ExportDefaultDeclaration') ? stmt.declaration : stmt
-    if (decl?.type === 'VariableDeclaration') {
-      for (const d of decl.declarations) {
-        if (d.id.type === 'Identifier') {
-          const init = d.init === null ? undefined : unwrapTsExpr(d.init)
-          scope.set(d.id.name, init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression')
-        }
-        else {
-          const names = new Set<string>()
-          collectPatternNames(d.id, names)
-          for (const n of names)
-            scope.set(n, false)
-        }
-      }
-    }
-    else if (decl?.type === 'FunctionDeclaration' && decl.id !== null) {
-      scope.set(decl.id.name, true)
-    }
-    else if (decl?.type === 'ClassDeclaration' && decl.id !== null) {
-      scope.set(decl.id.name, false)
-    }
-    else if (decl?.type === 'ImportDeclaration') {
-      for (const spec of decl.specifiers)
-        scope.set(spec.local.name, false)
-    }
-  }
-}
-
-function fnScopeOf(node: Node): FnScope | undefined {
-  const scope: FnScope = new Map()
-  switch (node.type) {
-    case 'Program':
-    case 'BlockStatement':
-    case 'StaticBlock':
-      bindFnStatements(scope, node.body)
-      return scope
-    case 'FunctionDeclaration':
-    case 'FunctionExpression':
-    case 'ArrowFunctionExpression': {
-      if (node.type === 'FunctionExpression' && node.id !== null)
-        scope.set(node.id.name, true)
-      const names = new Set<string>()
-      for (const param of node.params)
-        collectPatternNames(param, names)
-      for (const n of names)
-        scope.set(n, false)
-      return scope
-    }
-    case 'ForStatement':
-    case 'ForInStatement':
-    case 'ForOfStatement': {
-      const head = node.type === 'ForStatement' ? node.init : node.left
-      if (head?.type === 'VariableDeclaration')
-        bindFnStatements(scope, [head])
-      return scope
-    }
-    case 'CatchClause': {
-      const names = new Set<string>()
-      collectPatternNames(node.param, names)
-      for (const n of names)
-        scope.set(n, false)
-      return scope
-    }
-    case 'SwitchStatement':
-      for (const c of node.cases)
-        bindFnStatements(scope, c.consequent)
-      return scope
-    default:
-      return undefined
-  }
-}
 
 function walkTsFiles(dir: string): string[] {
   return walkFiles(dir, {
@@ -251,83 +172,6 @@ async function runPluginChecks(plugins: readonly KayPlugin[], paths: { root: str
   }
 }
 
-function findExportedConstOffset(analysis: ModuleAnalysis, name: string): number {
-  for (const stmt of analysis.program.body) {
-    if (stmt.type === 'ExportNamedDeclaration' && stmt.declaration?.type === 'VariableDeclaration') {
-      for (const d of stmt.declaration.declarations) {
-        if (d.id.type === 'Identifier' && d.id.name === name)
-          return d.start
-      }
-    }
-  }
-  return 0
-}
-
-function checkIslandProps(file: string, analysis: ModuleAnalysis, islandTags: ReadonlyMap<string, unknown>, root: string, sources: Map<string, string>, errors: string[]): void {
-  const rel = relPosix(root, file)
-  // JSX inside the module's own islands runs in the browser, where any prop is fine.
-  const inIsland = (offset: number): boolean => analysis.islandSpans.some(([start, end]) => offset >= start && offset < end)
-  const scopes: FnScope[] = []
-  const isLocalFn = (name: string): boolean => {
-    for (let i = scopes.length - 1; i >= 0; i--) {
-      const found = scopes[i]!.get(name)
-      if (found !== undefined)
-        return found
-    }
-    return false
-  }
-  const visit = (node: Node): boolean | void => {
-    if (node.type === 'JSXOpeningElement' && !inIsland(node.start)) {
-      const tag = jsxTagName(node.name)
-      if (isComponentTag(tag)) {
-        if (!islandTags.has(tag)) {
-          const hydrateAttr = node.attributes.find(a => a.type === 'JSXAttribute' && a.name.type === 'JSXIdentifier' && a.name.name === '$hydrate')
-          if (hydrateAttr !== undefined)
-            errors.push(formatDiagnostic(locOf(root, file, sources, hydrateAttr.start), mistake(`$hydrate on <${tag}>`, rel, `${tag} is not an island, so it never hydrates; drop $hydrate, or give ${tag} state or handlers`).message))
-        }
-        else {
-          for (const attr of node.attributes) {
-            if (attr.type !== 'JSXAttribute' || attr.name.type !== 'JSXIdentifier')
-              continue
-            const attrName = attr.name.name
-            if (attrName === 'key' || attrName === '$hydrate')
-              continue
-            if (attr.value?.type !== 'JSXExpressionContainer' || attr.value.expression.type === 'JSXEmptyExpression')
-              continue
-            const expr = unwrapTsExpr(attr.value.expression)
-            if (expr.type === 'ArrowFunctionExpression' || expr.type === 'FunctionExpression' || (expr.type === 'Identifier' && isLocalFn(expr.name))) {
-              errors.push(formatDiagnostic(
-                locOf(root, file, sources, attr.start),
-                `kay check: cannot pass function prop "${attrName}" from a server component into island <${tag}>. Define the handler inside the island or pass serializable data.`,
-              ))
-            }
-            else if (isJsxNode(expr)) {
-              errors.push(formatDiagnostic(
-                locOf(root, file, sources, attr.start),
-                `kay check: cannot pass JSX in prop "${attrName}" from a server component into island <${tag}>; pass it as children, which render on the server, or build it inside the island.`,
-              ))
-            }
-            else if (expr.type === 'NewExpression' && expr.callee.type === 'Identifier' && !SERIALIZABLE_NEW_CTORS.has(expr.callee.name)) {
-              errors.push(formatDiagnostic(
-                locOf(root, file, sources, expr.start),
-                `kay check: cannot pass non-serializable \`new ${expr.callee.name}()\` prop "${attrName}" into island <${tag}>.`,
-              ))
-            }
-          }
-        }
-      }
-    }
-    const scope = fnScopeOf(node)
-    if (scope === undefined)
-      return
-    scopes.push(scope)
-    for (const key of visitorKeys[node.type] ?? [])
-      walk((node as unknown as Record<string, unknown>)[key], visit)
-    scopes.pop()
-    return false
-  }
-  walk(analysis.program, visit)
-}
 
 export async function checkProject(rootDir: string, options: { skipTypecheck?: boolean } = {}): Promise<CheckResult> {
   const root = resolve(rootDir)
@@ -411,8 +255,10 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       continue
     const rel = relPosix(root, file)
 
-    if (file.endsWith('.tsx'))
-      checkIslandProps(file, analysis, islands.pageBindings.get(file) ?? EMPTY_ISLAND_TAGS, root, sources, errors)
+    if (file.endsWith('.tsx')) {
+      for (const problem of islandPropProblems(analysis, islands.pageBindings.get(file) ?? EMPTY_ISLAND_TAGS, rel, 'kay check'))
+        errors.push(formatDiagnostic(locOf(root, file, sources, problem.offset), problem.message))
+    }
 
     // Route-specific guardrails, on the files `kay build` reads as routes
     const isSpecial = SPECIAL_ROUTE_FILES.has(basename(file))
@@ -433,11 +279,9 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
           seenRoutes.set(conflictKey, rel)
         }
 
-        // Dynamic prerender = true route missing paths()
-        if (analysis.hasPrerender && (conflictKey.includes(':') || conflictKey.includes('*')) && !analysis.hasPaths) {
-          const offset = findExportedConstOffset(analysis, 'prerender')
-          errors.push(formatDiagnostic(locOf(root, file, sources, offset), `kay check: dynamic route exports \`prerender = true\` without exporting \`paths()\`.`))
-        }
+        const missing = missingPathsProblem(analysis, conflictKey, false)
+        if (missing !== undefined)
+          errors.push(formatDiagnostic(locOf(root, file, sources, missing.offset), `kay check: ${missing.message}`))
       }
     }
   }

@@ -40,7 +40,7 @@ kay build --static
 ```
 
 Outputs a ready-to-host directory in `dist/` containing:
-- Every route and `paths()` page (expanded across locales if `@kayjs/i18n` is enabled)
+- Every route and `paths()` page (expanded across locales if `@kayjs/i18n` is enabled). A dynamic page with no `paths()` fails the build, because a static host cannot render it. Dynamic API routes are left out.
 - `404.html` (if `src/routes/_404.tsx` exists)
 - Hashed client CSS/JS/font assets under `dist/_kay/`
 - All `public/` files, RSS feeds, `sitemap.xml`, and generated OG `shareCard()` PNGs

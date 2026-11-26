@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { build } from '../src/build/index'
@@ -231,6 +231,44 @@ describe('kay check and kay build decide islands per component (#3587)', () => {
     expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([
       'src/ui/Panel.tsx:3:52: error: kay check: cannot pass function prop "onDone" from a server component into island <Clicker>. Define the handler inside the island or pass serializable data.',
     ])
+    await expect(build({ root: dir, minify: false })).rejects.toThrow('src/ui/Panel.tsx:3:52: error: kay build: cannot pass function prop "onDone" from a server component into island <Clicker>. Define the handler inside the island or pass serializable data.')
+  })
+})
+
+describe('a dynamic route that cannot be prerendered without paths() (#3657)', () => {
+  it('fails kay check and kay build at its `prerender` export, naming the source file', async () => {
+    const dir = appWith('kay-3657-paths-', {
+      'src/routes/post/[id].tsx': 'export const prerender = true\nexport default function Post() { return <main>post</main> }\n',
+    })
+    const error = 'src/routes/post/[id].tsx:1:14: error: kay check: dynamic route exports `prerender = true` without exporting `paths()`: export `paths()` returning the URLs to prerender, or drop `prerender`.'
+    expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([error])
+    await expect(build({ root: dir, minify: false })).rejects.toThrow(error.replace('kay check:', 'kay build:'))
+  })
+
+  it('fails kay build --static on a dynamic page with no paths(), which a server build serves as is', async () => {
+    const dir = appWith('kay-3657-static-paths-', {
+      'src/routes/post/[id].tsx': 'export default function Post() { return <main>post</main> }\n',
+    })
+    await expect(build({ root: dir, minify: false, static: true })).rejects.toThrow('src/routes/post/[id].tsx:1:1: error: kay build: dynamic route has no `paths()`, so `kay build --static` cannot export it: export `paths()` returning its URLs.')
+    expect((await build({ root: dir, minify: false })).routes.map(route => route.path)).toEqual(['/post/:id'])
+  })
+
+  it('leaves a dynamic API route alone under kay build --static', async () => {
+    const dir = appWith('kay-3657-static-api-', {
+      'src/routes/index.tsx': 'export default function Home() { return <main>home</main> }\n',
+      'src/routes/api/[id].ts': 'export function GET() { return new Response(\'ok\') }\n',
+    })
+    await build({ root: dir, minify: false, static: true })
+    expect(existsSync(join(dir, 'dist/index.html'))).toBe(true)
+  })
+
+  it('prerenders a dynamic page that exports both `prerender` and `paths()`', async () => {
+    const dir = appWith('kay-3657-with-paths-', {
+      'src/routes/post/[id].tsx': 'export const prerender = true\nexport function paths() { return [\'/post/1\'] }\nexport default function Post() { return <main>post</main> }\n',
+    })
+    expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([])
+    await build({ root: dir, minify: false, static: true })
+    expect(existsSync(join(dir, 'dist/post/1/index.html'))).toBe(true)
   })
 })
 

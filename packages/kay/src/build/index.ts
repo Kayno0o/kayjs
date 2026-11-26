@@ -13,13 +13,14 @@ import type { PublicFiles } from './plugin-host'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { collectProjectComplianceWarnings, shouldEmitWarning } from '../compiler/compliance'
-import { formatDiagnostic, formatLoc } from '../compiler/shared'
+import { formatCodeFrame, formatDiagnostic, formatLoc } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { actionHash } from '../server/action'
 import { buildClient, buildServer, linkOrCopyFile, pluginBunPlugins, standaloneCssFiles } from './bundle'
 import { compileExecutable } from './compile'
 import { assertSafeOutDir, fileSize, relPosix, walkAllFiles, walkRoutes } from './files'
 import { ModuleGraph } from './graph'
+import { islandPropProblems } from './island-props'
 import { planIslands } from './islands'
 import { buildActionEntries, buildRouteEntries } from './manifest'
 import { createPluginHost, createPublicFiles } from './plugin-host'
@@ -27,7 +28,7 @@ import { prerender } from './prerender'
 import { analyzeBundleWeights, checkJsBudget, formatBundleReport, formatBundleReportJson, islandOrigins } from './report'
 import { SERVER_ENTRY_FILE, serverEntrySource } from './server-entry'
 import { KAY_SRC_ROOT, resolveKaySpecifier } from './resolve'
-import { assertNoRouteConflicts, hasRouteHandlerExport, routeExportProblem, routeFileProblem, SPECIAL_ROUTE_FILES } from './routes'
+import { assertNoRouteConflicts, fileToRoutePath, hasRouteHandlerExport, missingPathsProblem, normalizeRoutePattern, routeExportProblem, routeFileProblem, SPECIAL_ROUTE_FILES } from './routes'
 import { exportStatic } from './static'
 
 export type { BuildCache } from './graph'
@@ -212,6 +213,33 @@ function emitBuildWarnings(run: BuildRun, graph: ModuleGraph, routeFiles: readon
   }
 }
 
+const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
+const NO_ISLAND_TAGS = new Map<string, unknown>()
+
+/** Plans the islands, then runs the rules `kay check` also runs on the whole graph: props an island cannot receive, and dynamic prerendered routes with no `paths()`. Throws them all at once, each placed with a code frame. */
+function planCheckedIslands(root: string, routesDir: string, graph: ModuleGraph, pageFiles: string[], specialFiles: string[], isStatic: boolean): ReturnType<typeof planIslands> {
+  const islands = planIslands(graph, root, pageFiles, specialFiles)
+  const placed: string[] = []
+  const place = (file: string, offset: number, message: string): void => {
+    const source = graph.source(file)
+    placed.push(`${formatDiagnostic(formatLoc(relPosix(root, file), source, offset), message)}\n${formatCodeFrame(source, offset)}`)
+  }
+  for (const [file, analysis] of graph.analyses) {
+    if (!file.endsWith('.tsx') || NODE_MODULES_RE.test(file))
+      continue
+    for (const problem of islandPropProblems(analysis, islands.pageBindings.get(file) ?? NO_ISLAND_TAGS, relPosix(root, file), 'kay build'))
+      place(file, problem.offset, problem.message)
+  }
+  for (const file of pageFiles) {
+    const missing = missingPathsProblem(graph.analyses.get(file)!, normalizeRoutePattern(fileToRoutePath(routesDir, file)), isStatic)
+    if (missing !== undefined)
+      place(file, missing.offset, `kay build: ${missing.message}`)
+  }
+  if (placed.length > 0)
+    throw new Error(placed.join('\n\n'))
+  return islands
+}
+
 async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const { options, root, plugins, routesDir, outDir, assetPrefix, isDev, publicFiles } = run
   const clientDir = join(outDir, 'client')
@@ -260,7 +288,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     }
   }
 
-  const islands = planIslands(graph, root, pageFiles, specialFiles)
+  const islands = planCheckedIslands(root, routesDir, graph, pageFiles, specialFiles, isStatic)
 
   rmSync(outDir, { recursive: true, force: true })
   mkdirSync(clientDir, { recursive: true })

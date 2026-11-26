@@ -158,6 +158,6 @@ export function paths() {
 }
 ```
 
-Dynamic routes with `prerender = true` must export `paths()` — `kay check` enforces this. Any request for a param not returned by `paths()` receives a `404` instead of falling back to SSR.
+Dynamic routes with `prerender = true` must export `paths()`. Without it, `kay check` and `kay build` both fail at the `prerender` export. Any request for a param not returned by `paths()` receives a `404` instead of falling back to SSR.
 
 In `kay dev`, prerendering is skipped so routes render on demand. In `kay build` and `kay build --static`, all paths prerender concurrently.

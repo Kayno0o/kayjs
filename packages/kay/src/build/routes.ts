@@ -97,6 +97,29 @@ export function routeExportProblem(analysis: ModuleAnalysis, file: string): stri
 }
 
 /** Throws unless a route's `paths()` gave an array of URL paths starting with `/`. */
+function exportedConstOffset(analysis: ModuleAnalysis, name: string): number {
+  for (const stmt of analysis.program.body) {
+    if (stmt.type === 'ExportNamedDeclaration' && stmt.declaration?.type === 'VariableDeclaration') {
+      for (const d of stmt.declaration.declarations) {
+        if (d.id.type === 'Identifier' && d.id.name === name)
+          return d.start
+      }
+    }
+  }
+  return 0
+}
+
+/** A dynamic route (`pattern` holds `:` or `*`) that is prerendered, by `prerender = true` or by `--static` for a page, yet exports no `paths()`, so its pages would silently not exist. */
+export function missingPathsProblem(analysis: ModuleAnalysis, pattern: string, isStatic: boolean): { offset: number, message: string } | undefined {
+  if (analysis.hasPaths || (!pattern.includes(':') && !pattern.includes('*')))
+    return undefined
+  if (analysis.hasPrerender)
+    return { offset: exportedConstOffset(analysis, 'prerender'), message: 'dynamic route exports `prerender = true` without exporting `paths()`: export `paths()` returning the URLs to prerender, or drop `prerender`.' }
+  if (isStatic && analysis.exportedNames.includes('default'))
+    return { offset: 0, message: 'dynamic route has no `paths()`, so `kay build --static` cannot export it: export `paths()` returning its URLs.' }
+  return undefined
+}
+
 export function assertPathUrls(urls: unknown, file: string): asserts urls is string[] {
   if (!Array.isArray(urls))
     throw new Error(`kay build: paths() in ${file} returned ${JSON.stringify(urls)}: return an array of URL paths such as ["/posts/a"].`)
