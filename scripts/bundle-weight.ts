@@ -2,13 +2,22 @@
 
 import { existsSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import type { KayPlugin } from '@kayjs/kay'
 import { analyzeBundleWeights, build } from '@kayjs/kay/build'
 import { fail, parse, runMain } from '@kaynooo/cli-kit'
+import { regions, spa } from '../packages/plugin-spa/src/index'
 
 const ROOT = resolve(import.meta.dir, '..')
 const BASELINE = join(import.meta.dir, 'bundle-weight.json')
 const TOLERANCE = 100
-const APPS = ['bench-app', 'examples/noticeboard', 'examples/showcase', 'docs']
+// Each app under its own name; `bench-app (spa)` adds spa(), whose client entry every page loads, islands or not.
+const APPS: { name: string, dir: string, plugins?: () => KayPlugin[] }[] = [
+  { name: 'bench-app', dir: 'bench-app' },
+  { name: 'bench-app (spa)', dir: 'bench-app', plugins: () => [regions(), spa()] },
+  { name: 'examples/noticeboard', dir: 'examples/noticeboard' },
+  { name: 'examples/showcase', dir: 'examples/showcase' },
+  { name: 'docs', dir: 'docs' },
+]
 
 type Weights = Record<string, Record<string, number>>
 
@@ -18,16 +27,16 @@ const USAGE = 'bun run bench:weight [options]: builds the bench and example apps
 async function measure(report: boolean): Promise<Weights> {
   const weights: Weights = {}
   for (const app of APPS) {
-    const dir = join(ROOT, app)
+    const dir = join(ROOT, app.dir)
     if (!existsSync(dir))
       continue
     const outDir = '.kay-weight-tmp'
     if (report)
-      console.log(`\n>>> ${app}`)
+      console.log(`\n>>> ${app.name}`)
     try {
-      const manifest = await build({ root: dir, outDir, minify: true, prerender: false, copyPublic: false, analyze: report })
+      const manifest = await build({ root: dir, outDir, minify: true, prerender: false, copyPublic: false, analyze: report, plugins: app.plugins?.() })
       const routes = analyzeBundleWeights(manifest, join(dir, outDir, 'client')).routes
-      weights[app] = Object.fromEntries(routes.map(r => [r.path, r.jsGzip]))
+      weights[app.name] = Object.fromEntries(routes.map(r => [r.path, r.jsGzip]))
     }
     finally {
       rmSync(join(dir, outDir), { recursive: true, force: true })

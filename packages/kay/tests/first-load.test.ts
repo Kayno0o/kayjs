@@ -6,6 +6,7 @@ import { brotliCompressSync, constants } from 'node:zlib'
 import type { BuildPluginContext } from '../src/plugins/index'
 import { analyzeBundleWeights, build, formatBundleReport } from '../src/build/index'
 import { distLocator, firstLoadUrls, measureFirstLoad } from '../src/build/first-load'
+import { createServer } from '../src/server/index'
 
 const tempDirs: string[] = []
 function makeTemp(prefix: string): string {
@@ -89,5 +90,27 @@ describe('first-load weight (#3644)', () => {
     expect(home.fonts).toBe(6000)
     expect(home.firstLoad).toBeGreaterThan(6000)
     expect(formatBundleReport(report)).toContain('First load')
+  })
+})
+
+describe('the runtime a plugin loads on every page (#3662)', () => {
+  it('counts in the eager JS of a page with no island, as the page loads it', async () => {
+    const dir = makeTemp('kay-client-entry-weight-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `export default function Home() { return <main>static</main> }\n`)
+    writeFileSync(join(dir, 'boot.ts'), `document.documentElement.dataset.boot = String(Date.now())\n`)
+    const manifest = await build({ root: dir, minify: true, prerender: false, plugins: [{ name: 'boot', clientEntry: join(dir, 'boot.ts') }] })
+    const app = await createServer({ root: dir, plugins: [{ name: 'boot', clientEntry: join(dir, 'boot.ts') }] })
+    try {
+      const html = await (await app.handle(new Request('http://localhost/'))).text()
+      const row = analyzeBundleWeights(manifest, join(dir, 'dist/client')).routes.find(r => r.path === '/')!
+
+      expect(firstLoadUrls(html).filter(url => url.endsWith('.js'))).toEqual([manifest.runtimeScript!])
+      expect(row.jsFiles).toBe(1)
+      expect(row.jsGzip).toBeGreaterThan(0)
+    }
+    finally {
+      await app.dispose?.()
+    }
   })
 })

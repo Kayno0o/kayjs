@@ -4,6 +4,11 @@
     "/regions": 3926,
     "/table": 7016
   },
+  "bench-app (spa)": {
+    "/": 7707,
+    "/regions": 10541,
+    "/table": 10765
+  },
   "examples/noticeboard": {
     "/": 16085,
     "/login": 9866,

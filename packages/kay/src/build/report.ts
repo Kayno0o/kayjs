@@ -132,7 +132,7 @@ export function analyzeBundleWeights(
 
   const routes: RouteBundleMetrics[] = manifest.routes.map((r) => {
     const eagerJsRoots: string[] = []
-    if (r.islandChunks.length > 0 && manifest.runtimeScript !== undefined)
+    if ((r.islandChunks.length > 0 || manifest.runtimeOnEveryPage === true) && manifest.runtimeScript !== undefined)
       eagerJsRoots.push(manifest.runtimeScript)
     if (r.usesRegion === true && manifest.regionScript !== undefined)
       eagerJsRoots.push(manifest.regionScript)

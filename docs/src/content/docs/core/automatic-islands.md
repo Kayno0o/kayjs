@@ -53,7 +53,7 @@ export function Counter({ initial = 0 }: { initial?: number }) {
 
 Here `/about` renders `Label`, a static component of `Count.tsx`, and ships no JS.
 
-A deferred island hydrates later (any mode but `load`), so its JS is not counted in the route's eager weight. `kay build --max-js 40kb` fails the build when a route's gzipped eager JS is over 40 KB, and names the route and its eager islands.
+A deferred island hydrates later (any mode but `load`), so its JS is not counted in the route's eager weight. A plugin with a `clientEntry`, such as `spa()`, loads the runtime on every page, so its JS counts on a page with no island too. `kay build --max-js 40kb` fails the build when a route's gzipped eager JS is over 40 KB, and names the route and its eager islands.
 
 ## Hydration strategies (`$hydrate`)
 

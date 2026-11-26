@@ -50,6 +50,8 @@ export interface BuildManifest {
   reviveScript?: string | undefined
   /** Entry URL (runtime, island, region bundle) to the chunks it imports statically, transitively: a page preloads them with the entry. */
   chunkImports?: Record<string, string[]> | undefined
+  /** A plugin's `clientEntry` is in the runtime, so every page loads it, islands or not. */
+  runtimeOnEveryPage?: boolean | undefined
   styles: string[]
   /** Stylesheets applied globally (plugin CSS, ctx.addStyle, and root layout CSS) — used by _error/_404. */
   globalStyles?: string[] | undefined
