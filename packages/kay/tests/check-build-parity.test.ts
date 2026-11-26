@@ -323,6 +323,13 @@ describe('a handler or an async component the server cannot render (#3657)', () 
     }, 'src/routes/index.tsx:3:79: error: kay check: async component <Late> must be the only child of <Suspense>, or the page fails at its first request: render it as <Suspense fallback={...}><Late /></Suspense>.')
   })
 
+  it('places a browser global read while rendering at its file and line', async () => {
+    const dir = appWith('kay-3657-global-', {
+      'src/routes/index.tsx': 'export default function Home() {\n  return <main>{localStorage.getItem(\'t\')}</main>\n}\n',
+    })
+    expect((await checkProject(dir, { skipTypecheck: true })).warnings).toContain('src/routes/index.tsx:2:17: warning: kay compiler: `localStorage` read while <Home> renders in src/routes/index.tsx: the server has no `localStorage`, so it throws; read it in onMount() or an event handler, or check `typeof localStorage !== \'undefined\'` first.')
+  })
+
   it('accepts an async component as the only child of <Suspense>, and an async page', async () => {
     await expectAccepted({
       'src/ui/Late.tsx': late,

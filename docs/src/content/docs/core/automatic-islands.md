@@ -19,6 +19,8 @@ kay decides this for each component, not for each file. A static component expor
 
 A handler passed from server code to a component that is not an island would never reach the browser, so `kay build` and `kay check` refuse `<Button onClick={...}>` there. Write the handler inside `Button`, which makes it an island, or render `Button` from an island.
 
+An island renders on the server first, where `window`, `document` and `localStorage` do not exist. Reading one while a component renders, or when its module loads, throws at the first request, so `kay build` and `kay check` warn with the file and line. Read it in `onMount()`, an effect or an event handler, or check `typeof window !== 'undefined'` first.
+
 <Callout title="Zero-JS guarantee" tone="tip">
 When a route renders only static components and native HTML forms, Kay omits the client runtime completely. Zero `<script>` tags are emitted in the HTML.
 </Callout>

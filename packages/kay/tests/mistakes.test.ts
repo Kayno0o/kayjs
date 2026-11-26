@@ -93,6 +93,26 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     expect(warningsOf('<select aria-label="x" onChange={fn} />')).toEqual([])
   })
 
+  test('a browser global read while a component renders or its module loads warns, since the server has none (#3657)', () => {
+    const warningsOf = (source: string): string[] => analyzeModule('Page.tsx', `import { effect, onMount } from '@kayjs/kay'\n${source}`).warnings.map(w => w.message)
+    const read = (name: string, when: string): string => `kay compiler: \`${name}\` read ${when} in Page.tsx: the server has no \`${name}\`, so it throws; read it in onMount() or an event handler, or check \`typeof ${name} !== 'undefined'\` first.`
+    expect(warningsOf('export default function Page() { return <p>{window.innerWidth}</p> }')).toEqual([read('window', 'while <Page> renders')])
+    expect(warningsOf('export default function Page() { const t = localStorage.getItem(\'t\'); return <p>{t}</p> }')).toEqual([read('localStorage', 'while <Page> renders')])
+    expect(warningsOf('function readTheme() { return localStorage.getItem(\'t\') }\nexport default function Page() { return <p>{readTheme()}</p> }')).toEqual([read('localStorage', 'while <Page> renders')])
+    expect(warningsOf('export default function Page({ items }: { items: string[] }) { return <ul>{items.map(i => <li>{location.href}{i}</li>)}</ul> }')).toEqual([read('location', 'while <Page> renders')])
+    expect(warningsOf('const wide = matchMedia(\'(min-width: 40em)\')\nexport default function Page() { return <p>{String(wide)}</p> }')).toEqual([read('matchMedia', 'when the module loads')])
+    expect(warningsOf('export default function Page({ n }: { n: unknown }) { return <p>{typeof n}{window.name}</p> }')).toEqual([read('window', 'while <Page> renders')])
+    expect(warningsOf('function readTheme() { return localStorage.getItem(\'t\') }\nexport function Badge() { return <b>{readTheme()}</b> }\nexport default function Page() { return <p>{readTheme()}</p> }')).toEqual([read('localStorage', 'while <Badge> renders')])
+
+    expect(warningsOf('export default function Page() { return <button type="button" onClick={() => localStorage.clear()}>x</button> }')).toEqual([])
+    expect(warningsOf('export default function Page() { onMount(() => document.title); effect(() => window.scrollTo(0, 0)); return <p>x</p> }')).toEqual([])
+    expect(warningsOf('function readTheme() { return localStorage.getItem(\'t\') }\nexport default function Page() { return <button type="button" onClick={readTheme}>x</button> }')).toEqual([])
+    expect(warningsOf('export default function Page() { return <p>{typeof window !== \'undefined\' ? window.innerWidth : 0}</p> }')).toEqual([])
+    expect(warningsOf('export default function Page({ location }: { location: string }) { return <p>{location}</p> }')).toEqual([])
+    expect(warningsOf('import { history } from \'./router\'\nexport default function Page() { return <p>{history.length}</p> }')).toEqual([])
+    expect(warningsOf('const screen = { width: 1 }\nexport default function Page() { return <p>{screen.width}</p> }')).toEqual([])
+  })
+
   test('React\'s dangerouslySetInnerHTML, which would print [object Object] as an attribute', () => {
     refuses('<div dangerouslySetInnerHTML={{ __html: html }} />', /dangerouslySetInnerHTML in Page\.tsx: write innerHTML=\{html\}/, 'const html = \'<p>x</p>\'')
     const props = { dangerouslySetInnerHTML: { __html: '<p>x</p>' } }

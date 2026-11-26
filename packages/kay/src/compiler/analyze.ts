@@ -5,6 +5,7 @@ import { parseSync } from 'oxc-parser'
 import { computeJsxNodes, walk } from './ast'
 import type { BindingFacts, Interactivity } from './interactivity'
 import type { CompilerWarning } from './mistakes'
+import { checkBrowserGlobals } from './browser-globals'
 import { analyzeDefaultDataKeys } from './data-keys'
 import { checkCompliance } from './compliance'
 import { resolveInteractivity } from './interactivity'
@@ -563,8 +564,10 @@ export function analyzeModule(filename: string, code: string, program: Program =
   const loadNodes = loadDeclarations(program)
   const body = scanBody(program, filename, code, imports, decls, warnings, new Set(loadNodes))
   checkBareSignals(program, imports.signalCallees, filename)
-  if (body.hasJsx)
+  if (body.hasJsx) {
     checkCompliance(program, filename, code, warnings, tag => resolveKayTag(tag, imports.imports))
+    checkBrowserGlobals(program, code, filename, warnings)
+  }
 
   for (const [name, init] of decls.localInits) {
     if (isAsyncFunction(init))
