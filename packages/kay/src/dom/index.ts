@@ -1,7 +1,7 @@
 // Kay v2 minimal DOM & hydration core (loop -> @kayjs/kay/internal/dom-loop, extras -> @kayjs/kay/internal/dom-extras for fine-grained chunk splitting).
 
 import { isBlockedAttr, isStringBoolAttr, isUnsafeUrlAttr } from '../attrs'
-import { batch, createOwner, disposeOwner, runWithOwner } from '../reactivity/index'
+import { batch, createOwner, disposeOwner, getOwner, onCleanup, runWithOwner } from '../reactivity/index'
 import { styleText } from '../style'
 import { assertRenderable } from '../unrenderable'
 
@@ -12,9 +12,18 @@ let hydrating = false
 let hydrateNode: Node | null = null
 let hydrateRoot: Element | null = null
 
+function isRangeEnd(node: Node): boolean {
+  return node.nodeType === 8 && (node as Comment).data === 'k]'
+}
+
+export function hydrateCursor(): Node | null {
+  return hydrating ? hydrateNode : null
+}
+
 export function claimLoop(parent: Node, fn: () => void, skip = 0, startMarker?: Node | null): boolean {
   if (!hydrating)
     return false
+  const prevHydrating = hydrating
   const prevCursor = hydrateNode
   let cur: Node | null
   if (startMarker !== undefined && startMarker !== null) {
@@ -28,11 +37,18 @@ export function claimLoop(parent: Node, fn: () => void, skip = 0, startMarker?: 
         cur = cur.nextSibling
     }
   }
-  hydrateNode = cur
+  if (cur === null || isRangeEnd(cur)) {
+    hydrating = false
+    hydrateNode = null
+  }
+  else {
+    hydrateNode = cur
+  }
   try {
     fn()
   }
   finally {
+    hydrating = prevHydrating
     hydrateNode = prevCursor
   }
   return true
@@ -52,20 +68,27 @@ export function claimInsert<T>(
   marker: Node | null,
   fn: () => T,
   startMarker?: Node | null,
-): { result: T, marker: Node | null, claimed: Node | null, nodes: Node[] | undefined } {
+): { result: T, marker: Node | null, claimed: Node | null, nodes: Node[] | undefined, consumed: boolean } {
   if (!hydrating)
-    return { result: fn(), marker, claimed: null, nodes: undefined }
+    return { result: fn(), marker, claimed: null, nodes: undefined, consumed: false }
 
   let claimed: Node | null
   if (startMarker !== undefined) {
     const first = startMarker === null ? parent.firstChild : startMarker.nextSibling
-    claimed = first === marker ? null : first
+    claimed = first === marker || (first !== null && isRangeEnd(first)) ? null : first
   }
   else {
     claimed = marker === null ? parent.lastChild : marker.nodeType === 8 ? null : marker
   }
+  const prevHydrating = hydrating
   const prevNode = hydrateNode
-  hydrateNode = claimed
+  if (claimed === null) {
+    hydrating = false
+    hydrateNode = null
+  }
+  else {
+    hydrateNode = claimed
+  }
   let result: T
   let end: Node | null
   try {
@@ -73,21 +96,27 @@ export function claimInsert<T>(
     end = hydrateNode
   }
   finally {
+    hydrating = prevHydrating
     hydrateNode = prevNode
   }
-  if (startMarker !== undefined)
-    return { result, marker, claimed, nodes: between(claimed, marker) }
-  if (marker === null)
-    return { result, marker: null, claimed, nodes: between(claimed, end) }
+  const consumed = claimed !== null && end !== claimed
+  if (startMarker !== undefined) {
+    const firstNow = startMarker === null ? parent.firstChild : startMarker.nextSibling
+    return { result, marker, claimed, nodes: between(firstNow, marker), consumed }
+  }
+  if (marker === null) {
+    const from = claimed !== null && claimed.parentNode === parent ? claimed : parent.lastChild
+    return { result, marker: null, claimed, nodes: claimed !== null ? between(from, end) : undefined, consumed }
+  }
   if (claimed === null)
-    return { result, marker, claimed, nodes: undefined }
+    return { result, marker, claimed, nodes: undefined, consumed: false }
 
   // The anchor goes after the claimed range; a text value or a nested insert moves no cursor and claims the one node.
-  const consumed = end !== claimed
   const anchor = document.createComment('')
   ;(anchor as unknown as { __kayAnchor?: boolean }).__kayAnchor = true
-  parent.insertBefore(anchor, consumed ? end : claimed.nextSibling)
-  return { result, marker: anchor, claimed, nodes: consumed ? between(claimed, anchor) : undefined }
+  const from = claimed.parentNode === parent ? claimed : null
+  parent.insertBefore(anchor, consumed ? end : from?.nextSibling ?? null)
+  return { result, marker: anchor, claimed, nodes: consumed && from !== null ? between(from, anchor) : undefined, consumed }
 }
 
 export function hydrate(container: Element, render: () => Node | DocumentFragment | null, idPrefix?: string): () => void {
@@ -171,10 +200,20 @@ export function template(html: string, isSvg?: boolean): () => Node {
   return (): Node => {
     if (hydrating && hydrateNode !== null) {
       const stale = hydrateNode
+      // Stop at a closing range marker so a mismatch inside a branch never steals or replaces nodes outside it.
+      if (isRangeEnd(stale)) {
+        if (process.env.NODE_ENV !== 'production' && expectedTag !== undefined)
+          warnMismatch(stale, expectedTag, false)
+        hydrating = false
+        hydrateNode = null
+        return clone()
+      }
       // A node injected before the markup (an extension, a password manager) is stepped over; no matching node at all means the server rendered something else.
       let node: Node | null = stale
-      while (node !== null && expectedTag !== undefined && node.nodeName.toLowerCase() !== expectedTag)
+      while (node !== null && !isRangeEnd(node) && expectedTag !== undefined && node.nodeName.toLowerCase() !== expectedTag)
         node = node.nextSibling
+      if (node !== null && isRangeEnd(node))
+        node = null
       if (process.env.NODE_ENV !== 'production' && node !== stale)
         warnMismatch(stale, expectedTag!, node !== null)
       if (node === null) {
@@ -244,14 +283,20 @@ export function eachStatic<T>(
     }
   }
   if (claimLoop(parent, () => {
-    for (let i = 0; i < items.length; i++)
-      render(items[i]!, i)
+    for (let i = 0; i < items.length; i++) {
+      const node = render(items[i]!, i)
+      if (node != null && node.parentNode !== parent)
+        parent.insertBefore(node, insertBefore)
+    }
   }, skip, startMarker)) {
     return
   }
   const f = document.createDocumentFragment()
-  for (let i = 0; i < items.length; i++)
-    f.appendChild(render(items[i]!, i))
+  for (let i = 0; i < items.length; i++) {
+    const node = render(items[i]!, i)
+    if (node != null)
+      f.appendChild(node)
+  }
   parent.insertBefore(f, insertBefore)
 }
 
@@ -380,19 +425,31 @@ const delegated = new WeakMap<Document, Set<string>>()
 
 function dispatchEvent(event: Event): void {
   const key = `$$${event.type}`
-  let node = event.target as (Node & Record<string, ((e: Event) => void) | undefined>) | null
-  let current: Node | null = null
+  let current: EventTarget | null = null
+  const prevDesc = Object.getOwnPropertyDescriptor(event, 'currentTarget')
   Object.defineProperty(event, 'currentTarget', { configurable: true, get: () => current })
 
-  while (node !== null) {
-    const handler = node[key]
-    if (typeof handler === 'function') {
-      current = node
-      batch(() => handler(event))
-      if (event.cancelBubble)
-        return
+  try {
+    const path = event.composedPath?.()
+    const usePath = path !== undefined && path.length > 0
+    let i = 0
+    let node = (usePath ? path[0] : event.target) as (EventTarget & Record<string, ((e: Event) => void) | undefined>) | null | undefined
+    while (node != null) {
+      const handler = node[key]
+      if (typeof handler === 'function') {
+        current = node
+        batch(() => handler(event))
+        if (event.cancelBubble)
+          return
+      }
+      node = (usePath ? path[++i] : (node as unknown as Node).parentNode) as (EventTarget & Record<string, ((e: Event) => void) | undefined>) | null | undefined
     }
-    node = node.parentNode as (Node & Record<string, ((e: Event) => void) | undefined>) | null
+  }
+  finally {
+    if (prevDesc !== undefined)
+      Object.defineProperty(event, 'currentTarget', prevDesc)
+    else
+      delete (event as unknown as Record<string, unknown>).currentTarget
   }
 }
 
@@ -416,7 +473,10 @@ export function delegate(events: string[]): void {
 export function on(el: Node, event: string, handler: ((e: Event) => void) | false | null | undefined): void {
   if (typeof handler !== 'function')
     return
-  el.addEventListener(event, (e) => {
+  const fn = (e: Event) => {
     batch(() => handler(e))
-  })
+  }
+  el.addEventListener(event, fn)
+  if (getOwner() !== undefined)
+    onCleanup(() => el.removeEventListener(event, fn))
 }

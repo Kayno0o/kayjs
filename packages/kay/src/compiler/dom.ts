@@ -5,6 +5,7 @@ import type {
   ArrowFunctionExpression,
   BlockStatement,
   Function as OxcFunction,
+  JSXChild,
   JSXElement,
   JSXFragment,
   Node,
@@ -155,16 +156,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         currentObj.push(`get children() { return ${compileExpression(child.expression, scopeRewrites)} }`)
     }
     else if (meaningful.length > 1) {
-      const items = meaningful.map((c) => {
-        if (c.type === 'JSXText')
-          return JSON.stringify(decodeHtmlEntities(cleanJsxText(c.value)))
-        if (isJsxNode(c))
-          return compileRootJsx(c, scopeRewrites)
-        if (c.type === 'JSXExpressionContainer' && c.expression.type !== 'JSXEmptyExpression')
-          return compileExpression(c.expression, scopeRewrites)
-        return 'null'
-      })
-      currentObj.push(`get children() { return [${items.join(', ')}] }`)
+      currentObj.push(`get children() { return ${compileFragmentChildren(node.children, scopeRewrites)} }`)
     }
 
     flushObj()
@@ -466,8 +458,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     return `(() => { const ${rootVar} = ${tmplName}(); ${walkStmts.join(' ')} ${ops.join(' ')} return ${rootVar}; })()`
   }
 
-  function compileFragment(node: JSXFragment, scopeRewrites: ReadonlyMap<string, string>): string {
-    const planned = planChildSlots(node.children, { jsxNodes, exprContext, inFragment: true })
+  function compileFragmentChildren(children: readonly JSXChild[], scopeRewrites: ReadonlyMap<string, string>): string {
+    const planned = planChildSlots(children, { jsxNodes, exprContext, inFragment: true })
     if (planned.length === 0)
       return 'null'
 
@@ -549,7 +541,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   function compileRootJsx(node: JSXElement | JSXFragment, scopeRewrites: ReadonlyMap<string, string>): string {
     if (node.type === 'JSXFragment')
-      return compileFragment(node, scopeRewrites)
+      return compileFragmentChildren(node.children, scopeRewrites)
 
     const tag = jsxTagName(node.openingElement.name)
     if (isComponentTag(tag))

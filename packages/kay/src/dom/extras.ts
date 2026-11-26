@@ -5,7 +5,9 @@ import type { Owner } from '../reactivity/index'
 import { DOM_PROPS } from '../attrs'
 import { batch, createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, untrack } from '../reactivity/index'
 import { assertRenderable } from '../unrenderable'
-import { claimInsert, claimRange, isBlockedAttr, setAttr, setClass, setProp, setStyle, skipRange } from './index'
+import { claimInsert, claimRange, delegate, isBlockedAttr, setAttr, setClass, setProp, setStyle, skipRange } from './index'
+
+const DELEGATED_EVENTS = new Set('beforeinput,click,dblclick,focusin,focusout,input,keydown,keyup,mousedown,mouseup,pointerdown,pointerup,touchstart,touchend'.split(','))
 
 const RAW_HTML = Symbol.for('kay.html')
 
@@ -79,7 +81,10 @@ export function omit(props: Record<string, unknown>, excluded: string[]): Record
 export function spread(el: Element, getProps: () => Record<string, unknown> | null | undefined): void {
   let prevKeys: string[] = []
   let lastRef: unknown
-  // One listener per event type, calling whichever handler the props hold now.
+  const elRec = el as unknown as Record<string, unknown>
+  // Delegated events share document-level dispatch with compiled handlers so stopPropagation() runs child->parent.
+  const delegatedTypes = new Set<string>()
+  // One listener per non-delegated event type, calling whichever handler the props hold now.
   const handlers = new Map<string, (e: Event) => void>()
   const listen = (e: Event): void => {
     const handler = handlers.get(e.type)
@@ -91,6 +96,9 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
     for (const type of handlers.keys())
       el.removeEventListener(type, listen)
     handlers.clear()
+    for (const type of delegatedTypes)
+      delete elRec[`$$${type}`]
+    delegatedTypes.clear()
   })
 
   effect(() => {
@@ -128,7 +136,7 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
       if (k === 'ref') {
         if (typeof v === 'function' && v !== lastRef) {
           lastRef = v
-          ;(v as (node: Element) => void)(el)
+          untrack(() => (v as (node: Element) => void)(el))
         }
         continue
       }
@@ -136,8 +144,18 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
       if (event !== null) {
         const type = event[1]!.toLowerCase()
         types.add(type)
-        el.addEventListener(type, listen)
-        handlers.set(type, v as (e: Event) => void)
+        if (DELEGATED_EVENTS.has(type)) {
+          if (!delegatedTypes.has(type)) {
+            delegatedTypes.add(type)
+            delegate([type])
+          }
+          elRec[`$$${type}`] = v
+        }
+        else {
+          if (!handlers.has(type))
+            el.addEventListener(type, listen)
+          handlers.set(type, v as (e: Event) => void)
+        }
         continue
       }
       const name = k === 'className' ? 'class' : k === 'htmlFor' ? 'for' : k
@@ -153,6 +171,12 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
         setAttr(el, name, v)
     }
 
+    for (const type of delegatedTypes) {
+      if (!types.has(type)) {
+        delegatedTypes.delete(type)
+        delete elRec[`$$${type}`]
+      }
+    }
     for (const type of handlers.keys()) {
       if (!types.has(type)) {
         handlers.delete(type)
@@ -231,7 +255,7 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
   let firstRun = true
 
   effect(() => {
-    let res: { result: unknown, marker: Node | null, claimed: Node | null, nodes: Node[] | undefined }
+    let res: { result: unknown, marker: Node | null, claimed: Node | null, nodes: Node[] | undefined, consumed: boolean }
     if (firstRun) {
       firstRun = false
       let effMarker = marker
@@ -247,14 +271,14 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
       marker = res.marker
     }
     else {
-      res = { result: value(), marker, claimed: null, nodes: undefined }
+      res = { result: value(), marker, claimed: null, nodes: undefined, consumed: false }
     }
     const next = res.result
     const ssrNodes = res.nodes
     // An insert born in a fragment follows its marker into the parent the fragment was appended to.
     const host = marker?.parentNode ?? parent
 
-    if (next == null && ssrNodes !== undefined) {
+    if (next === null && res.consumed && ssrNodes !== undefined) {
       current = ssrNodes
       return
     }
@@ -398,35 +422,65 @@ export function show(
     branch = nextBranch
 
     const fn = cond ? renderTrue : renderFalse
-    if (fn === undefined)
+    if (fn === undefined) {
+      if (startMarker !== undefined && startMarker !== null) {
+        let n = startMarker.nextSibling
+        while (n !== null && n !== marker) {
+          const next = n.nextSibling
+          n.parentNode?.removeChild(n)
+          n = next
+        }
+      }
       return
+    }
 
     owner = createOwner(parentOwner)
     const res = claimInsert(parent, marker, () => untrack(() => runWithOwner(owner, fn)), startMarker)
     marker = res.marker
     const rendered = res.result
+    const clearStale = (keep?: Node) => {
+      if (res.nodes !== undefined)
+        clearInserted(keep === undefined ? res.nodes : res.nodes.filter(n => n !== keep))
+    }
     if (rendered == null || typeof rendered === 'boolean') {
-      nodes = res.nodes ?? []
+      if (rendered === null && res.consumed) {
+        nodes = res.nodes ?? []
+      }
+      else {
+        clearStale()
+        nodes = []
+      }
       return
     }
 
     if (typeof rendered === 'string' || typeof rendered === 'number') {
       const str = String(rendered)
-      if (str === '')
+      if (str === '') {
+        clearStale()
         return
-      const text = claimTextNode(res.claimed, str) ?? document.createTextNode(str)
-      if (text.parentNode !== parent)
+      }
+      const claimedText = claimTextNode(res.claimed, str)
+      if (claimedText !== undefined) {
+        clearStale(claimedText)
+        nodes = [claimedText]
+      }
+      else {
+        clearStale()
+        const text = document.createTextNode(str)
         parent.insertBefore(text, marker)
-      nodes = [text]
+        nodes = [text]
+      }
       return
     }
 
     if (rendered instanceof Node) {
       if (rendered.nodeType === 11) {
+        clearStale()
         nodes = Array.from(rendered.childNodes)
         parent.insertBefore(rendered, marker)
       }
       else {
+        clearStale(rendered)
         nodes = [rendered]
         if (rendered.parentNode !== parent)
           parent.insertBefore(rendered, marker)
@@ -435,6 +489,10 @@ export function show(
     }
 
     if (Array.isArray(rendered)) {
+      if (res.nodes !== undefined) {
+        const kept = new Set(rendered)
+        clearInserted(res.nodes.filter(n => !kept.has(n)))
+      }
       nodes = insertAll(parent, marker, rendered)
     }
   })

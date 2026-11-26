@@ -261,4 +261,175 @@ describe('#3596 fragments nested in ranges', () => {
     expect(log).toEqual(['disposed'])
     dispose()
   })
+
+  test('#3631: loop() supports multi-node JSXFragment rows across mount, hydration, reorder, remove, and clear', () => {
+    const src = `
+      export default function DefList({ items }) {
+        return <dl>{items.value.map(x => <><dt key={x.id}>{x.k}</dt><dd>{x.v}</dd></>)}</dl>
+      }
+    `
+    const domCompiled = compileDom('DefList.tsx', src).code
+    const ssrCompiled = compileSsr('DefList.tsx', src, { isIsland: true }).code
+    expect(domCompiled).toContain('__loop(')
+
+    // 1. Client mount + insert + reorder + remove + clear
+    const items1 = signal([
+      { id: 1, k: 'A', v: '1' },
+      { id: 2, k: 'B', v: '2' },
+      { id: 3, k: 'C', v: '3' },
+    ])
+    const mHost = document.createElement('div')
+    document.body.appendChild(mHost)
+    const d1 = domCore.mount(mHost, () => load(domCompiled)({ items: items1 }) as Node)
+    const dl1 = mHost.querySelector('dl')!
+    expect([...dl1.children].map(e => `${e.tagName}:${e.textContent}`)).toEqual(['DT:A', 'DD:1', 'DT:B', 'DD:2', 'DT:C', 'DD:3'])
+
+    // Reverse reorder (no NotFoundError)
+    items1.value = [
+      { id: 3, k: 'C', v: '30' },
+      { id: 1, k: 'A', v: '10' },
+      { id: 4, k: 'D', v: '40' },
+    ]
+    expect([...dl1.children].map(e => `${e.tagName}:${e.textContent}`)).toEqual(['DT:C', 'DD:30', 'DT:A', 'DD:10', 'DT:D', 'DD:40'])
+
+    // Remove middle row
+    items1.value = [
+      { id: 3, k: 'C', v: '30' },
+      { id: 4, k: 'D', v: '40' },
+    ]
+    expect([...dl1.children].map(e => `${e.tagName}:${e.textContent}`)).toEqual(['DT:C', 'DD:30', 'DT:D', 'DD:40'])
+
+    // Clear all
+    items1.value = []
+    expect(dl1.children.length).toBe(0)
+    d1()
+
+    // 2. SSR + hydration preserves <dt>/<dd> DOM identity across reorder & removal
+    const xItem = { id: 1, k: 'X', v: '1' }
+    const yItem = { id: 2, k: 'Y', v: '2' }
+    const items2 = signal([xItem, yItem])
+    const hHost = document.createElement('kay-island')
+    hHost.innerHTML = (load(ssrCompiled)({ items: items2 }) as { __html: string }).__html
+    document.body.appendChild(hHost)
+    const origDt1 = hHost.querySelectorAll('dt')[0]!
+    const origDd1 = hHost.querySelectorAll('dd')[0]!
+    const origDt2 = hHost.querySelectorAll('dt')[1]!
+    const origDd2 = hHost.querySelectorAll('dd')[1]!
+    const d2 = domCore.hydrate(hHost, () => load(domCompiled)({ items: items2 }) as Node)
+    expect(hHost.querySelectorAll('dt')[0]).toBe(origDt1)
+    expect(hHost.querySelectorAll('dd')[0]).toBe(origDd1)
+
+    // Swap hydrated fragment rows (same item keys -> LIS reorder moves both <dt> and <dd> in place)
+    items2.value = [yItem, xItem]
+    expect([...hHost.querySelector('dl')!.children].map(e => `${e.tagName}:${e.textContent}`)).toEqual(['DT:Y', 'DD:2', 'DT:X', 'DD:1'])
+    expect(hHost.querySelectorAll('dt')[0]).toBe(origDt2)
+    expect(hHost.querySelectorAll('dd')[0]).toBe(origDd2)
+    expect(hHost.querySelectorAll('dt')[1]).toBe(origDt1)
+    expect(hHost.querySelectorAll('dd')[1]).toBe(origDd1)
+
+    // Remove first row
+    items2.value = [xItem]
+    expect([...hHost.querySelector('dl')!.children].map(e => `${e.tagName}:${e.textContent}`)).toEqual(['DT:X', 'DD:1'])
+    expect(hHost.querySelectorAll('dt')[0]).toBe(origDt1)
+    d2()
+  })
+
+  test('#3631: loop() safely handles nullable rows on mount, hydration, reorder, and removal', () => {
+    const src = `
+      export default function Filtered({ items }) {
+        return (
+          <ul>
+            {items.value.map((x) => {
+              if (!x) return null
+              return <li key={x}>{x}</li>
+            })}
+          </ul>
+        )
+      }
+    `
+    const domCompiled = compileDom('Filtered.tsx', src).code
+    const ssrCompiled = compileSsr('Filtered.tsx', src, { isIsland: true }).code
+    expect(domCompiled).toContain('__loop(')
+
+    // Mount + updates with leading/middle/trailing nulls
+    const items = signal<(string | null)[]>([null, 'a', null, 'b', null])
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const d1 = domCore.mount(host, () => load(domCompiled)({ items }) as Node)
+    expect([...host.querySelectorAll('li')].map(e => e.textContent)).toEqual(['a', 'b'])
+
+    items.value = ['b', null, 'c', 'a']
+    expect([...host.querySelectorAll('li')].map(e => e.textContent)).toEqual(['b', 'c', 'a'])
+
+    items.value = [null, null]
+    expect(host.querySelectorAll('li').length).toBe(0)
+
+    items.value = ['z']
+    expect([...host.querySelectorAll('li')].map(e => e.textContent)).toEqual(['z'])
+    d1()
+
+    // SSR + hydration with nullable rows
+    const hItems = signal<(string | null)[]>([null, 'one', null, 'two'])
+    const hHost = document.createElement('kay-island')
+    hHost.innerHTML = (load(ssrCompiled)({ items: hItems }) as { __html: string }).__html
+    document.body.appendChild(hHost)
+    const liOne = hHost.querySelectorAll('li')[0]!
+    const d2 = domCore.hydrate(hHost, () => load(domCompiled)({ items: hItems }) as Node)
+    expect(hHost.querySelectorAll('li')[0]).toBe(liOne)
+    hItems.value = ['two', 'one']
+    expect([...hHost.querySelectorAll('li')].map(e => e.textContent)).toEqual(['two', 'one'])
+    expect(hHost.querySelectorAll('li')[1]).toBe(liOne)
+    d2()
+  })
+
+  test('#3631: component multi-children (<Card>Hello <b>world</b></Card>) hydrate in dev with 0 warnings and without detaching siblings', () => {
+    const src = `
+      function Card({ children }) { return <div class="card">{children}</div> }
+      export default function App({ count }) {
+        return (
+          <section>
+            <Card>Hello <b>world</b></Card>
+            <Card>Count: {count.value} <em>items</em></Card>
+          </section>
+        )
+      }
+    `
+    const count = signal(1)
+    const ssrHtml = (load(compileSsr('App.tsx', src, { isIsland: true }).code)({ count }) as { __html: string }).__html
+    const host = document.createElement('kay-island')
+    host.innerHTML = ssrHtml
+    document.body.appendChild(host)
+
+    const cards = host.querySelectorAll('.card')
+    const origText = cards[0]!.firstChild!
+    const origBold = cards[0]!.querySelector('b')!
+    const origEm = cards[1]!.querySelector('em')!
+
+    const warnings: string[] = []
+    const origWarn = console.warn
+    const prevEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+    console.warn = (...args: unknown[]) => { warnings.push(args.join(' ')) }
+    try {
+      const dispose = domCore.hydrate(host, () => load(compileDom('App.tsx', src).code)({ count }) as Node)
+      expect(warnings).toEqual([])
+      expect(cards[0]!.firstChild).toBe(origText)
+      expect(cards[0]!.querySelector('b')).toBe(origBold)
+      expect(cards[1]!.querySelector('em')).toBe(origEm)
+      expect(cards[0]!.textContent).toBe('Hello world')
+      expect(cards[1]!.textContent).toBe('Count: 1 items')
+
+      count.value = 2
+      expect(cards[1]!.textContent).toBe('Count: 2 items')
+      expect(cards[1]!.querySelector('em')).toBe(origEm)
+      dispose()
+    }
+    finally {
+      console.warn = origWarn
+      if (prevEnv === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = prevEnv
+    }
+  })
 })

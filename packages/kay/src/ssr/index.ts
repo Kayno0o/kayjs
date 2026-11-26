@@ -179,6 +179,15 @@ export function ssrChild(value: KayChild): string {
 function serializeIslandProps(props: Record<string, unknown>): string {
   return JSON.stringify(props, function (this: Record<string, unknown>, key: string, value: unknown) {
     const orig = key !== '' && this != null && typeof this === 'object' ? this[key] : value
+    if (orig === undefined)
+      return Array.isArray(this) ? { __k: 'u', v: 0 } : value
+    if (typeof orig === 'number') {
+      if (!Number.isFinite(orig))
+        return { __k: 'N', v: String(orig) }
+      if (Object.is(orig, -0))
+        return { __k: 'N', v: '-0' }
+      return value
+    }
     if (orig instanceof Date)
       return { __k: 'D', v: Number.isNaN(orig.getTime()) ? 'NaN' : orig.toISOString() }
     if (orig instanceof Set)
@@ -197,6 +206,8 @@ function serializeIslandProps(props: Record<string, unknown>): string {
       throw new TypeError(`kay: island prop "${key}" is a function, which cannot reach the browser; define it inside the island, or import it there.`)
     if (typeof orig === 'object' && orig !== null && 'peek' in orig && 'value' in orig)
       throw new TypeError(`kay: island prop "${key}" is a signal; pass ${key}.value, or import the signal in the island from a shared module.`)
+    if (typeof orig === 'object' && orig !== null && !Array.isArray(orig) && Object.hasOwn(orig, '__k'))
+      return { __k: 'O', v: Object.entries(orig).filter(([, x]) => x !== undefined) }
     return value
   })
 }
@@ -260,12 +271,40 @@ export function ssrChildProp<P extends Record<string, unknown>>(props: P, fn: ()
   })
 }
 
+export interface TrackedSlot {
+  prop: Html
+  html: string
+  used: boolean
+}
+
+/** Wraps server-rendered island children in `<kay-slot>` and tracks whether the island emitted them during SSR. */
+export function ssrSlot(html: string): TrackedSlot {
+  const slot: TrackedSlot = {
+    html,
+    used: false,
+    prop: null as unknown as Html,
+  }
+  slot.prop = Object.defineProperty(
+    { [RAW_HTML]: true },
+    '__html',
+    {
+      enumerable: true,
+      get() {
+        slot.used = true
+        return `<kay-slot>${html}</kay-slot>`
+      },
+    },
+  ) as unknown as Html
+  return slot
+}
+
 export function ssrIslandStatic(
   chunk: string,
   openTag: string,
   render: (() => string) | undefined,
   hydrate?: HydrateStrategy,
   name?: string,
+  slot?: TrackedSlot,
 ): string {
   if (getIslandDepth() > 0)
     return render !== undefined ? render() : ''
@@ -298,8 +337,11 @@ export function ssrIslandStatic(
     }
   }
 
+  const hiddenSlot = slot !== undefined && !slot.used && slot.html !== ''
+    ? `<template data-kay-slot>${slot.html}</template>`
+    : ''
   const tag = idAttr === '' ? openTag : `${openTag.slice(0, -1)}${idAttr}>`
-  return `${tag}${inner}</kay-island>`
+  return `${tag}${inner}${hiddenSlot}</kay-island>`
 }
 
 function safeJsonScript(json: string): string {
@@ -313,6 +355,7 @@ export function ssrIsland(
   hydrate?: HydrateStrategy,
   scriptProps = false,
   name?: string,
+  slot?: TrackedSlot,
 ): string {
   if (getIslandDepth() > 0)
     return render()
@@ -326,7 +369,7 @@ export function ssrIsland(
   if (Object.keys(props).length > 0) {
     const json = serializeIslandProps(props)
     if (scriptProps)
-      propsScript = `<script type="application/json">${safeJsonScript(json)}</script>`
+      propsScript = `<script type="application/json" data-kay-props>${safeJsonScript(json)}</script>`
     else
       propsAttr = ` p="${escAttr(json)}"`
   }
@@ -358,7 +401,10 @@ export function ssrIsland(
     }
   }
 
-  return `<kay-island c="${escAttr(chunk)}"${propsAttr}${hydrateAttr}${idAttr}>${inner}${propsScript}</kay-island>`
+  const hiddenSlot = slot !== undefined && !slot.used && slot.html !== ''
+    ? `<template data-kay-slot>${slot.html}</template>`
+    : ''
+  return `<kay-island c="${escAttr(chunk)}"${propsAttr}${hydrateAttr}${idAttr}>${inner}${hiddenSlot}${propsScript}</kay-island>`
 }
 
 export interface DocumentOptions {

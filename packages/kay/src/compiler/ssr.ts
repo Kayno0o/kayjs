@@ -94,7 +94,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     return sub.toString()
   }
 
-  function compileChildrenListToStringExpr(children: readonly JSXChild[], slotMarkers = emitMarkers, rawTextTag?: 'style' | 'script'): string {
+  function compileChildrenListToStringExpr(children: readonly JSXChild[], slotMarkers = emitMarkers, inFragment = false, rawTextTag?: 'style' | 'script'): string {
     const bufVar = `_o${loopCounter++}`
     const stmts: string[] = []
     const parts = new StringParts()
@@ -104,7 +104,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         parts.clear()
       }
     }
-    emitChildrenIntoBuffer(children, bufVar, parts, flush, s => stmts.push(s), rawTextTag, slotMarkers)
+    emitChildrenIntoBuffer(children, bufVar, parts, flush, s => stmts.push(s), rawTextTag, slotMarkers, inFragment)
     if (stmts.length === 0)
       return parts.toExpr()
     flush()
@@ -161,7 +161,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
           parts.pushExpr(`${use('esc')}(${textareaValue.expr})`)
       }
       else if (tag === 'style') {
-        const styleExpr = compileChildrenListToStringExpr(node.children, false, 'style')
+        const styleExpr = compileChildrenListToStringExpr(node.children, false, false, 'style')
         if (styleExpr !== '""')
           parts.pushExpr(`${use('ssrStyleBlock')}(${styleExpr})`)
       }
@@ -330,25 +330,30 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       return
     }
 
-    const childrenHaveAwait = hasChildren && childNodes.some(c => containsDirectAwait(c))
-    const childExpr = hasChildren ? compileChildrenListToStringExpr(childNodes, false) : '""'
-
     const islandInfo = islands?.get(tag)
     if (islandInfo === undefined && islands !== undefined && hydrateExpr !== undefined)
       throw mistake(`$hydrate on <${tag}>`, filename, `${tag} is not an island, so it never hydrates; drop $hydrate, or give ${tag} state or handlers`)
+
+    const childrenHaveAwait = hasChildren && childNodes.some(c => containsDirectAwait(c))
+    const childMarkers = islandInfo === undefined && emitMarkers
+    const childExpr = hasChildren ? compileChildrenListToStringExpr(childNodes, childMarkers, childMarkers && meaningfulChildren.length > 1) : '""'
 
     if (islandInfo !== undefined) {
       const propsCode = `{ ${propEntries.join(', ')} }`
       // The server children an island is handed render before it, outside its contexts and ids, as the browser never re-renders them.
       const slotVar = hasChildren ? `_c${loopCounter++}` : undefined
-      const slotProp = slotVar === undefined ? '' : `children: ${use('raw')}("<kay-slot>" + ${slotVar} + "</kay-slot>")`
+      const slotProp = slotVar === undefined ? '' : `children: ${slotVar}.prop`
       const callPropsCode = slotVar === undefined ? propsCode : `{ ${[...propEntries, slotProp].join(', ')} }`
-      const withSlot = (expr: string): string => slotVar === undefined ? expr : `((${slotVar}) => ${expr})(${childExpr})`
+      const withSlot = (expr: string): string => slotVar === undefined ? expr : `((${slotVar}) => ${expr})(${use('ssrSlot')}(${childExpr}))`
+      const slotArg = slotVar === undefined ? '' : `, ${slotVar}`
       const resolvedHydrate = staticHydrate ?? (hydrateExpr === undefined ? islandInfo.defaultHydrate : undefined)
+      const safeStaticProps = allStaticProps
+        && !Object.hasOwn(staticPropsObj, '__k')
+        && !Object.values(staticPropsObj).some(v => Object.is(v, -0))
 
       // Compile-time static island props fast path (only when not inside an island-reachable component and children don't contain direct `await`):
       // 0 JSON.stringify / Object.keys / escAttr at runtime, while still recording rendered islands & island ID scope!
-      if (!emitMarkers && !childrenHaveAwait && allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
+      if (!emitMarkers && !childrenHaveAwait && safeStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
         const pAttr = Object.keys(staticPropsObj).length > 0
           ? ` p="${escapeStaticAttr(JSON.stringify(staticPropsObj))}"`
           : ''
@@ -360,14 +365,14 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         const renderArg = resolvedHydrate === 'client'
           ? 'undefined'
           : `() => ${use('ssrChild')}(${tag}(${callPropsCode}))`
-        const expr = `${use('ssrIslandStatic')}(${JSON.stringify(islandInfo.chunk)}, ${JSON.stringify(openTag)}, ${renderArg}, ${hydrateArg}, ${JSON.stringify(tag)})`
-        parts.pushExpr(resolvedHydrate === 'client' ? expr : withSlot(expr))
+        const expr = `${use('ssrIslandStatic')}(${JSON.stringify(islandInfo.chunk)}, ${JSON.stringify(openTag)}, ${renderArg}, ${hydrateArg}, ${JSON.stringify(tag)}${slotArg})`
+        parts.pushExpr(withSlot(expr))
         return
       }
 
       const hydrateArg = hydrateExpr ?? (islandInfo.defaultHydrate !== undefined ? JSON.stringify(islandInfo.defaultHydrate) : 'undefined')
-      if (!childrenHaveAwait && allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
-        parts.pushExpr(withSlot(`${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg}, false, ${JSON.stringify(tag)})`))
+      if (!childrenHaveAwait && safeStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
+        parts.pushExpr(withSlot(`${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg}, false, ${JSON.stringify(tag)}${slotArg})`))
         return
       }
 
@@ -378,7 +383,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       let callArg = pVar
       if (slotVar !== undefined) {
         argNames.push(slotVar)
-        argExprs.push(childExpr)
+        argExprs.push(`${use('ssrSlot')}(${childExpr})`)
         callArg = `{ ...${pVar}, ${slotProp} }`
       }
       let hArg = hydrateArg
@@ -389,7 +394,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         hArg = hVar
       }
       parts.pushExpr(
-        `((${argNames.join(', ')}) => ${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callArg})), ${pVar}, ${hArg}, false, ${JSON.stringify(tag)}))(${argExprs.join(', ')})`,
+        `((${argNames.join(', ')}) => ${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callArg})), ${pVar}, ${hArg}, false, ${JSON.stringify(tag)}${slotArg}))(${argExprs.join(', ')})`,
       )
       return
     }

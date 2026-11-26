@@ -194,7 +194,7 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
       domCore.setAttr(a, '"><script>', 'x')
       expect(a.attributes.length).toBe(0)
 
-      const div = document.createElement('div')
+      const div = document.body.appendChild(document.createElement('div'))
       let clicked = false
       const propsSig = signal<Record<string, unknown>>({
         'id': 'spread-ok',
@@ -221,6 +221,7 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
       el.click()
       expect(clicked).toBe(true)
       dispose()
+      div.remove()
 
       // Explicit compiled onClick handler still works on DOM!
       const btnSrc = `export function Btn({ onHit }: { onHit: () => void }) { return <button onClick={onHit}>Go</button> }`
@@ -233,7 +234,7 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
     await withDom(() => {
       const calls: string[] = []
       const props = signal<Record<string, unknown>>({ onClick: () => calls.push('first'), onKeyDown: () => calls.push('key') })
-      const host = document.createElement('div')
+      const host = document.body.appendChild(document.createElement('div'))
       const dispose = domCore.mount(host, () => {
         const el = document.createElement('button')
         domExtras.spread(el, () => props.value)
@@ -241,14 +242,15 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
       })
       const button = host.firstChild as HTMLButtonElement
       button.click()
-      button.dispatchEvent(new KeyboardEvent('keydown'))
+      button.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }))
       props.value = { onClick: () => calls.push('second') }
       button.click()
-      button.dispatchEvent(new KeyboardEvent('keydown'))
+      button.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }))
       props.value = {}
       button.click()
       expect(calls).toEqual(['first', 'key', 'second'])
       dispose()
+      host.remove()
     })
   })
 
@@ -456,11 +458,11 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
       const ssrHtml = ssrFn(ssrRt.raw, ssrRt.ssrChild, ssrRt.esc) as string
 
       const domBody = domCompiled.code.replace(/^import .*?;\n/gm, '').replace(/export function /, 'function ')
-      const domFn = new Function('__template', '__insert', '__omit', '__skipRange', `${domBody}\nreturn App()`)
+      const domFn = new Function('__template', '__insert', '__omit', '__skipRange', '__frag', '__fragText', `${domBody}\nreturn App()`)
 
       // Client mount
       const mountHost = document.createElement('div')
-      const disposeMount = domCore.mount(mountHost, () => domFn(domCore.template, domExtras.insert, domExtras.omit, (domCore as Record<string, unknown>).skipRange))
+      const disposeMount = domCore.mount(mountHost, () => domFn(domCore.template, domExtras.insert, domExtras.omit, domCore.skipRange, domCore.frag, domCore.fragText))
       const ps = mountHost.querySelectorAll('p')
       expect(ps[0]!.textContent).toBe(`a & b <c> ' ' \u2014 &lt;`)
       expect(ps[1]!.textContent).toBe('x & y bold')
@@ -1581,5 +1583,118 @@ describe('destructured loop rows and component props in an island', () => {
     const ssrBody = ssrOut.replace(/^import .*\n/gm, '').replace(/export function /g, 'function ')
     const html = (new Function(...Object.keys(ssrRt).map(n => `__${n}`), `${ssrBody}\nreturn SsrSpread({ rest: { class: 'from-rest' } }).__html`)(...Object.values(ssrRt))) as string
     expect(html).toBe('<div class="override"></div><div class="from-rest"></div>')
+  })
+
+  test('#3631 item 5: dispatchEvent restores currentTarget, walks composedPath (Shadow DOM), spread() shares delegation & untracks ref, and disposal cleans listeners', async () => {
+    await withDom(() => {
+      // 1. currentTarget is restored after dispatchEvent (even when a handler throws)
+      domCore.delegate(['click'])
+      const outer = document.body.appendChild(document.createElement('div'))
+      const btn = outer.appendChild(document.createElement('button'))
+      let seenDuring: unknown = null
+      let capturedEvent: Event | undefined
+      ;(btn as unknown as { $$click: (e: Event) => void }).$$click = (e: Event) => {
+        seenDuring = e.currentTarget
+        capturedEvent = e
+      }
+      btn.click()
+      expect(seenDuring).toBe(btn)
+      expect(Object.getOwnPropertyDescriptor(capturedEvent!, 'currentTarget')).toBeUndefined()
+
+      // Even when a handler throws, currentTarget descriptor is restored in finally
+      let thrownEv: Event | undefined
+      ;(btn as unknown as { $$click: (e: Event) => void }).$$click = (e: Event) => {
+        thrownEv = e
+        throw new Error('handler-boom')
+      }
+      try {
+        btn.click()
+      }
+      catch {}
+      expect(thrownEv).toBeDefined()
+      expect(Object.getOwnPropertyDescriptor(thrownEv!, 'currentTarget')).toBeUndefined()
+      outer.remove()
+
+      // 2. spread() delegated events run in child->parent order with compiled handlers so stopPropagation() works
+      const order: string[] = []
+      const stopSrc = `
+        export function Nested({ parentRest }) {
+          return (
+            <div {...parentRest}>
+              <button onClick={(e) => { e.stopPropagation(); globalThis.__order3631.push('child') }}>Go</button>
+            </div>
+          )
+        }
+      `
+      ;(globalThis as Record<string, unknown>).__order3631 = order
+      const sHost = document.body.appendChild(document.createElement('div'))
+      const { dispose: dOrder } = mountIsland(
+        stopSrc,
+        'Nested',
+        { parentRest: { onClick: () => order.push('parent') } },
+        {},
+        sHost,
+      )
+      const spreadDiv = sHost.querySelector('div')!
+      sHost.querySelector('button')!.click()
+      expect(order).toEqual(['child'])
+      // Disposing owner cleans up $$click on the spread element
+      expect((spreadDiv as unknown as Record<string, unknown>).$$click).toBeTypeOf('function')
+      dOrder()
+      expect((spreadDiv as unknown as Record<string, unknown>).$$click).toBeUndefined()
+      sHost.remove()
+      delete (globalThis as Record<string, unknown>).__order3631
+
+      // 3. on() detaches non-delegated listener on owner disposal
+      let changes = 0
+      const onHost = document.body.appendChild(document.createElement('div'))
+      const dOn = domCore.mount(onHost, () => {
+        const inp = document.createElement('input')
+        domCore.on(inp, 'change', () => { changes++ })
+        return inp
+      })
+      const onInp = onHost.querySelector('input')!
+      onInp.dispatchEvent(new Event('change'))
+      expect(changes).toBe(1)
+      dOn()
+      onInp.dispatchEvent(new Event('change'))
+      expect(changes).toBe(1)
+      onHost.remove()
+
+      // 4. Shadow DOM: dispatchEvent walks event.composedPath()
+      const shadowHost = document.body.appendChild(document.createElement('div'))
+      const shadow = shadowHost.attachShadow({ mode: 'open' })
+      const shadowBtn = document.createElement('button')
+      shadow.appendChild(shadowBtn)
+      let shadowClicks = 0
+      ;(shadowBtn as unknown as { $$click: () => void }).$$click = () => { shadowClicks++ }
+      shadowBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }))
+      expect(shadowClicks).toBe(1)
+      shadowHost.remove()
+
+      // 5. spread() untracks ref(el) so signal reads inside ref don't re-trigger spread's effect
+      const trackedSig = signal(0)
+      let spreadGets = 0
+      let refCalls = 0
+      const refHost = document.body.appendChild(document.createElement('div'))
+      const dRef = domCore.mount(refHost, () => {
+        const el = document.createElement('div')
+        domExtras.spread(el, () => {
+          spreadGets++
+          return {
+            ref: () => {
+              refCalls++
+              void trackedSig.value
+            },
+          }
+        })
+        return el
+      })
+      expect([spreadGets, refCalls]).toEqual([1, 1])
+      trackedSig.value = 1
+      expect([spreadGets, refCalls]).toEqual([1, 1])
+      dRef()
+      refHost.remove()
+    })
   })
 })

@@ -3,11 +3,12 @@
 
 import type { Owner, Signal } from '../reactivity/index'
 import { createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, signal, untrack } from '../reactivity/index'
-import { claimLoop, skipRange } from './index'
+import { claimLoop, hydrateCursor, skipRange } from './index'
 
 interface Row<T> {
   key: unknown
-  node: Node
+  node: Node | null
+  nodes?: Node[] | undefined
   item: Signal<T>
   index: Signal<number> | undefined
   owner: Owner
@@ -15,6 +16,59 @@ interface Row<T> {
 
 const EMPTY: readonly never[] = []
 const EMPTY_NUMS: number[] = []
+
+function nextAnchor<T>(rows: Row<T>[], from: number, fallback: Node | null): Node | null {
+  for (let i = from; i < rows.length; i++) {
+    const n = rows[i]!.node
+    if (n !== null)
+      return n
+  }
+  return fallback
+}
+
+function insertRow<T>(parent: Node, row: Row<T>, anchor: Node | null): void {
+  const list = row.nodes
+  if (list === undefined) {
+    if (row.node !== null)
+      parent.insertBefore(row.node, anchor)
+    return
+  }
+  const first = list[0]!
+  const last = list[list.length - 1]!
+  const fp = first.parentNode
+  if (fp !== null && fp === last.parentNode && fp.nodeType !== 11) {
+    for (let cur: Node | null = first; cur !== null;) {
+      const next: Node | null = cur === last ? null : cur.nextSibling
+      parent.insertBefore(cur, anchor)
+      cur = next
+    }
+    return
+  }
+  for (let i = 0; i < list.length; i++)
+    parent.insertBefore(list[i]!, anchor)
+}
+
+function removeRow<T>(parent: Node, row: Row<T>): void {
+  const list = row.nodes
+  if (list === undefined) {
+    if (row.node !== null)
+      parent.removeChild(row.node)
+    return
+  }
+  const first = list[0]!
+  const last = list[list.length - 1]!
+  const fp = first.parentNode
+  if (fp !== null && fp === last.parentNode) {
+    for (let cur: Node | null = first; cur !== null;) {
+      const next: Node | null = cur === last ? null : cur.nextSibling
+      fp.removeChild(cur)
+      cur = next
+    }
+    return
+  }
+  for (let i = 0; i < list.length; i++)
+    list[i]!.parentNode?.removeChild(list[i]!)
+}
 
 // A new rows array holding the kept prefix and suffix of the old one, with room for the middle.
 function keepEnds<T>(rows: Row<T>[], start: number, oldEnd: number, newEnd: number, nextLen: number): Row<T>[] {
@@ -31,7 +85,7 @@ export function loop<T>(
   marker: Node | null,
   each: () => readonly T[] | null | undefined | false,
   keyFn: (item: T, index: number) => unknown,
-  renderRow: (item: Signal<T>, index?: Signal<number>) => Node,
+  renderRow: (item: Signal<T>, index?: Signal<number>) => Node | DocumentFragment | null | undefined | boolean | string | number,
   skip = 0,
 ): void {
   const parentOwner = getOwner()
@@ -48,8 +102,30 @@ export function loop<T>(
     const owner = createOwner(parentOwner)
     const item = signal(itemVal)
     const index = needsIndex ? signal(idx) : undefined
-    const node = runWithOwner(owner, () => renderRow(item, index))
-    return { key, node, item, index, owner }
+    const raw = runWithOwner(owner, () => renderRow(item, index))
+    let node: Node | null = null
+    let nodes: Node[] | undefined
+    if (raw instanceof Node) {
+      if (raw.nodeType === 11) {
+        const len = raw.childNodes.length
+        if (len === 1) {
+          node = raw.firstChild
+        }
+        else if (len > 1) {
+          nodes = Array.from(raw.childNodes)
+          node = nodes[0]!
+        }
+      }
+      else {
+        node = raw
+      }
+    }
+    else if (typeof raw === 'string' || typeof raw === 'number') {
+      const str = String(raw)
+      if (str !== '')
+        node = document.createTextNode(str)
+    }
+    return nodes !== undefined ? { key, node, nodes, item, index, owner } : { key, node, item, index, owner }
   }
 
   effect(() => {
@@ -82,7 +158,7 @@ export function loop<T>(
         }
         else {
           for (let i = 0; i < prevLen; i++)
-            parent.removeChild(rows[i]!.node)
+            removeRow(parent, rows[i]!)
         }
         rows = []
         return
@@ -94,7 +170,28 @@ export function loop<T>(
         if (claimLoop(parent, () => {
           for (let i = 0; i < nextLen; i++) {
             const item = next[i]!
-            created[i] = makeRow(item, i, keyFn(item, i))
+            const before = hydrateCursor()
+            const row = makeRow(item, i, keyFn(item, i))
+            const afterCursor = hydrateCursor()
+            if (row.node === null && before !== null && before !== afterCursor) {
+              const claimed: Node[] = []
+              for (let n: Node | null = before; n !== null && n !== afterCursor; n = n.nextSibling) {
+                if (n.nodeType === 8 && (n as Comment).data === 'k]')
+                  break
+                claimed.push(n)
+              }
+              if (claimed.length === 1) {
+                row.node = claimed[0]!
+              }
+              else if (claimed.length > 1) {
+                row.node = claimed[0]!
+                row.nodes = claimed
+              }
+            }
+            else if (row.node !== null && row.node.parentNode !== parent) {
+              insertRow(parent, row, marker)
+            }
+            created[i] = row
           }
         }, skip, startMarker)) {
           rows = created
@@ -106,7 +203,7 @@ export function loop<T>(
           const item = next[i]!
           const row = makeRow(item, i, keyFn(item, i))
           created[i] = row
-          frag.appendChild(row.node)
+          insertRow(frag, row, null)
         }
         parent.insertBefore(frag, marker)
         rows = created
@@ -147,7 +244,7 @@ export function loop<T>(
       if (start === oldEnd && start === newEnd)
         return
 
-      const after = oldEnd < prevLen ? rows[oldEnd]!.node : marker
+      const after = nextAnchor(rows, oldEnd, marker)
 
       // Fast path 4: Pure insertion (e.g. append 1,000 rows)
       if (start === oldEnd) {
@@ -159,7 +256,7 @@ export function loop<T>(
           const item = next[idx]!
           const row = makeRow(item, idx, keyFn(item, idx))
           result[idx] = row
-          frag.appendChild(row.node)
+          insertRow(frag, row, null)
         }
         parent.insertBefore(frag, after)
         rows = result
@@ -171,7 +268,7 @@ export function loop<T>(
         for (let i = start; i < oldEnd; i++) {
           const row = rows[i]!
           disposeOwner(row.owner)
-          parent.removeChild(row.node)
+          removeRow(parent, row)
         }
         rows = keepEnds(rows, start, oldEnd, newEnd, nextLen)
         return
@@ -214,7 +311,7 @@ export function loop<T>(
         for (let i = 0; i < nextLen; i++) {
           const row = makeRow(next[i]!, i, newKeys[i])
           result[i] = row
-          frag.appendChild(row.node)
+          insertRow(frag, row, null)
         }
         parent.appendChild(frag)
         rows = result
@@ -226,7 +323,7 @@ export function loop<T>(
         if (used[i - start] === 0) {
           const row = rows[i]!
           disposeOwner(row.owner)
-          parent.removeChild(row.node)
+          removeRow(parent, row)
         }
       }
 
@@ -247,14 +344,15 @@ export function loop<T>(
           if (lisPos >= 0 && lis[lisPos] === i)
             lisPos--
           else
-            parent.insertBefore(row.node, anchor)
+            insertRow(parent, row, anchor)
         }
         else {
           row = makeRow(next[idx]!, idx, newKeys[i])
-          parent.insertBefore(row.node, anchor)
+          insertRow(parent, row, anchor)
         }
         result[idx] = row
-        anchor = row.node
+        if (row.node !== null)
+          anchor = row.node
       }
 
       rows = result
