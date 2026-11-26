@@ -187,6 +187,8 @@ function serializeIslandProps(props: Record<string, unknown>): string {
       return { __k: 'R', v: [orig.source, orig.flags] }
     if (typeof orig === 'bigint')
       return { __k: 'B', v: orig.toString() }
+    if (isRawHtml(orig))
+      throw new TypeError(`kay: island prop "${key}" is server-rendered JSX, which cannot reach the browser; pass it as children, or build it inside the island.`)
     if (typeof orig === 'function')
       throw new TypeError(`kay: island prop "${key}" is a function, which cannot reach the browser; define it inside the island, or import it there.`)
     if (typeof orig === 'object' && orig !== null && 'peek' in orig && 'value' in orig)

@@ -70,6 +70,7 @@ Props passed from server code into an island are serialized into HTML and restor
 
 - **Supported**: JSON primitives, arrays, plain objects, `Date`, `Map`, `Set`, `URL`, and `RegExp`.
 - **Refused**: Functions, signals, and arbitrary class instances fail `kay check` and SSR. Define callbacks inside the island, or pass serializable IDs and data instead.
+- **JSX goes in children**: JSX in any other prop (`<Modal header={<h2>Hi</h2>} />`) fails `kay check` and SSR, because it would reach the browser as a plain object. Pass it as children, which render on the server, or build it inside the island.
 
 ## Static children inside islands (`<kay-slot>`)
 

@@ -99,6 +99,23 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     expect(() => compileSsr('Page.tsx', `import { signal } from '@kayjs/kay'\nconst A = () => { const n = signal(0); return <p>{n.value}</p> }\nexport default function B({ n }: { n: number }) { return <p>{n}</p> }`)).not.toThrow()
   })
 
+  test('React and Next habits in plain code: directives, async effects, a signal read without .value (#3611)', () => {
+    const both = (src: string, message: RegExp): void => {
+      expect(() => compileSsr('Page.tsx', src)).toThrow(message)
+      expect(() => compileDom('Page.tsx', src)).toThrow(message)
+    }
+    const page = (body: string): string => `import { computed, effect, signal } from '@kayjs/kay'\nexport default function Page() { const count = signal(0); ${body} return <p>{count.value}</p> }`
+    both(`'use client'\n${page('')}`, /'use client' in Page\.tsx: delete it, kay makes a component an island by itself when it uses state or handlers/)
+    both(`export async function save() { 'use server'; return 1 }\n${page('')}`, /'use server' in Page\.tsx: delete it, a server function is an action\(\) exported from its own file/)
+    both(page('effect(async () => { await fetch(\'/\') });'), /effect\(async \.\.\.\) in Page\.tsx: effect tracks only what it reads before the first await and takes a cleanup function, not a Promise; start the async work inside a plain effect/)
+    both(page('const { value } = count; void value;'), /\{ value \} = count in Page\.tsx: read count\.value where it is used, a copied value never updates/)
+    both(page('if (count) count.value++;'), /count without \.value in Page\.tsx: write count\.value/)
+    both(page('const label = computed(() => count ? \'a\' : \'b\'); void label;'), /count without \.value/)
+    expect(() => compileSsr('Page.tsx', page('effect(() => { void (async () => { await fetch(\'/\') })() }); if (count.value) count.value++;'))).not.toThrow()
+    expect(() => compileSsr('Page.tsx', `'use strict'\n${page('')}`)).not.toThrow()
+    expect(() => compileSsr('Page.tsx', page('const { value } = { value: 1 }; void value;'))).not.toThrow()
+  })
+
   test('a bare signal in one of two components declaring the same name (#3603)', () => {
     const two = (second: string): string => `import { signal } from '@kayjs/kay'\nexport function Menu() { const open = signal(false); return <p>{open.value}</p> }\nexport function Drawer() { const open = signal(false); return ${second} }`
     expect(() => compileSsr('Page.tsx', two('<p>{open}</p>'))).toThrow(/open without \.value in Page\.tsx: write open\.value/)
@@ -204,6 +221,10 @@ describe('kay refuses values it cannot render, instead of printing them', () => 
 })
 
 describe('kay refuses island props the browser cannot receive', () => {
+  test('server-rendered JSX, which JSON turns into a plain object (#3611)', () => {
+    expect(() => ssrIsland('c', () => '', { header: raw('<h2>Hi</h2>') })).toThrow(/island prop "header" is server-rendered JSX, which cannot reach the browser; pass it as children, or build it inside the island/)
+  })
+
   test('a function or a signal, which JSON drops on the way to the browser', () => {
     expect(() => ssrIsland('c', () => '', { onSave: () => {} })).toThrow(/island prop "onSave" is a function, which cannot reach the browser; define it inside the island, or import it there/)
     expect(() => ssrIsland('c', () => '', { opts: { format: () => '' } })).toThrow(/island prop "format" is a function/)

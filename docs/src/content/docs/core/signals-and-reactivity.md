@@ -71,4 +71,7 @@ Kay's compiler and runtime reject common React, Solid, and Astro habits that wou
 - **Refs**: Always pass a callback: `ref={el => ...}`. Ref objects (`{ current }`) are refused.
 - **Attributes & SVG**: Use `class` or `className` (never both), standard `value`/`checked` (never `defaultValue`/`defaultChecked`), kebab-case SVG attributes (`stroke-width`, `fill-opacity`), and boolean `{false}` (never `"false"`). `style` accepts either a CSS string or an object (`style={{ color: 'red' }}`).
 - **Renderable values**: Promises, functions, raw signal objects, and plain objects throw in JSX text and attributes. Read `count.value` instead of passing `count`.
+- **Signal reads in code**: A local signal tested without `.value` (`if (count)`, `count ? a : b`, `!count`) fails compilation, because the signal object is always truthy. So does `const { value } = count`, which copies the value once and never updates.
+- **Effects**: `effect(async () => ...)` fails compilation. An effect tracks only what it reads before the first `await`, and it takes a cleanup function, not a Promise. Start the async work inside a plain effect.
+- **Directives**: `'use client'` and `'use server'` fail compilation. A component becomes an island by itself, and a server function is an `action()`.
 - **Spread safety**: `{...spread}` automatically strips `on*` handlers, `innerHTML`, `srcdoc`, and `javascript:`/`vbscript:` URLs during SSR.

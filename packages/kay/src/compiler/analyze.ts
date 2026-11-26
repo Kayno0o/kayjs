@@ -15,8 +15,9 @@ import type { BindingFacts, Interactivity } from './interactivity'
 import type { CompilerWarning } from './mistakes'
 import { analyzeDefaultDataKeys } from './data-keys'
 import { resolveInteractivity } from './interactivity'
-import { assertScopedKayImport, checkBareSignals, checkHydrateMode, checkMistakes, guarded, islandRemoved, mistake, serverOnlyTagError } from './mistakes'
-import { EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from './shared'
+import { assertScopedKayImport, checkHabits, checkHydrateMode, checkMistakes, guarded, islandRemoved, mistake, serverOnlyTagError } from './mistakes'
+import { calleeName, EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from './shared'
+import { checkBareSignals } from './signal-reads'
 
 
 const REACTIVE_IMPORTS = new Set([
@@ -244,6 +245,7 @@ interface ImportScan {
   reactiveLocals: Map<string, string>
   stateCallees: Set<string>
   signalCallees: Set<string>
+  effectCallees: Set<string>
   serverOnlyLocals: Map<string, string>
   kayNamespaces: Set<string>
   serverNamespaces: Set<string>
@@ -252,7 +254,7 @@ interface ImportScan {
 }
 
 function scanImports(program: Program, filename: string): ImportScan {
-  const scan: ImportScan = { imports: [], reactiveLocals: new Map(), stateCallees: new Set(), signalCallees: new Set(), serverOnlyLocals: new Map(), kayNamespaces: new Set(), serverNamespaces: new Set(), actionLocalName: undefined, usesRenderContext: false }
+  const scan: ImportScan = { imports: [], reactiveLocals: new Map(), stateCallees: new Set(), signalCallees: new Set(), effectCallees: new Set(), serverOnlyLocals: new Map(), kayNamespaces: new Set(), serverNamespaces: new Set(), actionLocalName: undefined, usesRenderContext: false }
   for (const stmt of program.body) {
     if (stmt.type === 'ExportAllDeclaration' || (stmt.type === 'ExportNamedDeclaration' && stmt.source !== null))
       guarded(stmt.source!.start, () => assertScopedKayImport(stmt.source!.value, filename))
@@ -298,6 +300,8 @@ function scanKayImport(scan: ImportScan, source: string, imported: string, local
       scan.stateCallees.add(local)
     if (imported === 'signal' || imported === 'computed')
       scan.signalCallees.add(local)
+    if (imported === 'effect')
+      scan.effectCallees.add(local)
     if (SERVER_ONLY_TAGS.has(imported))
       scan.serverOnlyLocals.set(local, imported)
   }
@@ -472,6 +476,7 @@ function scanBody(program: Program, filename: string, code: string, imports: Imp
   // Identifiers naming a property or a member, which are no reference to a binding.
   const keys = new Set<number>()
   const checkActions = imports.actionLocalName !== undefined || imports.serverNamespaces.size > 0
+  const isEffect = (callee: string): boolean => imports.effectCallees.has(callee) || (callee.endsWith('.effect') && imports.kayNamespaces.has(callee.slice(0, -'.effect'.length)))
   let current: BindingFacts | undefined
   const ref = (binding: BindingFacts, name: string, offset: number): void => {
     if (tracked.has(name) && !binding.refs.has(name))
@@ -483,6 +488,7 @@ function scanBody(program: Program, filename: string, code: string, imports: Imp
       body.hasJsx = true
     if (node.type === 'JSXElement')
       checkMistakes(node, filename, code, warnings)
+    checkHabits(node, isEffect, filename)
     if (checkActions && isActionCall(node, imports.actionLocalName, imports.serverNamespaces) && !decls.registeredActions.has(node))
       guarded(node.start, () => { throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${imports.actionLocalName ?? 'action'}(...) at the top level, only those get a URL`) })
     if (node.type === 'JSXOpeningElement') {
@@ -568,13 +574,7 @@ function stateExportsOf(decls: DeclarationScan, stateCallees: ReadonlySet<string
     const call = init === undefined ? undefined : unwrapTsExpr(init)
     if (call?.type !== 'CallExpression')
       return false
-    const callee = call.callee
-    const name = callee.type === 'Identifier'
-      ? callee.name
-      : callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier'
-        ? `${callee.object.name}.${callee.property.name}`
-        : ''
-    return stateCallees.has(name)
+    return stateCallees.has(calleeName(call.callee))
   }
   return [...decls.exportLocals].filter(([, local]) => isStateCall(decls.localInits.get(local))).map(([exported]) => exported)
 }

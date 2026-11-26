@@ -13,7 +13,7 @@ import { walk } from '../compiler/ast'
 import { withStateReads } from '../compiler/interactivity'
 import { collectMistakes, KayMistake, serverOnlyTagError } from '../compiler/mistakes'
 import { findPrivateEnvOffset, SERVER_ONLY_MODULES } from '../compiler/server-only'
-import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, jsxTagName } from '../compiler/shared'
+import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, isJsxNode, jsxTagName } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 
 export interface CheckResult {
@@ -401,6 +401,12 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
               errors.push(formatDiagnostic(
                 locOf(root, file, sources, attr.start),
                 `kay check: cannot pass function prop "${attrName}" from a server component into island <${tag}>. Define the handler inside the island or pass serializable data.`,
+              ))
+            }
+            else if (attrName !== 'children' && isJsxNode(expr)) {
+              errors.push(formatDiagnostic(
+                locOf(root, file, sources, attr.start),
+                `kay check: cannot pass JSX in prop "${attrName}" from a server component into island <${tag}>; pass it as children, which render on the server, or build it inside the island.`,
               ))
             }
             else if (expr.type === 'NewExpression' && expr.callee.type === 'Identifier' && !SERIALIZABLE_NEW_CTORS.has(expr.callee.name)) {

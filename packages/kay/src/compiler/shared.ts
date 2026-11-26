@@ -212,6 +212,15 @@ export function unwrapParens(node: Node): Node {
   return cur
 }
 
+/** `fn` or `ns.fn` for a call's callee, '' for any other shape. */
+export function calleeName(callee: Node): string {
+  if (callee.type === 'Identifier')
+    return callee.name
+  if (callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier')
+    return `${callee.object.name}.${callee.property.name}`
+  return ''
+}
+
 export function unwrapTsExpr(node: Node): Node {
   let cur = node
   while (

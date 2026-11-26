@@ -95,6 +95,28 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     expect(res.errors.some(e => e.includes('"label"'))).toBe(false)
   })
 
+  it('catches JSX passed in a prop other than children from server code into an island (#3611)', async () => {
+    const dir = makeTemp('kay-check-jsx-prop-')
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/components/Modal.tsx'), `
+      import { signal } from '@kayjs/kay'
+      export function Modal({ header, children }: { header?: unknown, children?: unknown }) {
+        const open = signal(false)
+        return <div><button type="button" onClick={() => { open.value = !open.value }}>{header}</button>{children}</div>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { Modal } from '../components/Modal'
+      export default function Home() {
+        return <Modal header={<h2>Hi</h2>}><p>Body</p></Modal>
+      }
+    `)
+
+    const res = await checkProject(dir, { skipTypecheck: true })
+    expect(res.errors.filter(e => e.includes('<Modal>'))).toEqual([expect.stringContaining('cannot pass JSX in prop "header" from a server component into island <Modal>; pass it as children, which render on the server, or build it inside the island.')])
+  })
+
   it('kay check follows an island into a workspace package the way the build does', async () => {
     const dir = makeTemp('kay-island-package-')
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
