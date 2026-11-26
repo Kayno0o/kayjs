@@ -21,7 +21,7 @@ import { createActionRegistry } from './action-registry'
 import { createAssets } from './assets'
 import { CompressionCache, compressedHtmlResponse, maybeCompressResponse } from './compress'
 import { createDocumentHooks, createHtmlHeaders, resolveRenderedIslands, withPluginHtmlCsp } from './document'
-import { createErrorNotifier, createFallbackPages } from './errors'
+import { createErrorNotifier, createFallbackPages, devErrorResponse } from './errors'
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
 import { allowedMethodsHeader, isPlainObject, mergedHeadTags, pickPageIslandProps, stripHeadBody } from './page'
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
@@ -91,7 +91,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const parentAppCtx = getAppContext()
 
   const alwaysLoadRuntime = plugins.some(p => Boolean(p.clientEntry))
-  const notifyError = createErrorNotifier(config.onError, plugins)
+  const notifyError = createErrorNotifier(config.onError, plugins, { dev: isDev, sink: config.errorSink })
   const document = createDocumentHooks({ plugins, lang, trustProxy, notifyError })
   const { hasHeadHooks, hasHtmlTransformers, htmlTransformers, resolveDocumentHead } = document
 
@@ -165,7 +165,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const router = new Router<CompiledRoute>()
   const fastStaticPages = new Map<string, FastHandler>()
 
-  const { buildNotFoundResponse, renderError } = createFallbackPages({ manifest, modules, lang, alwaysLoadRuntime, document, htmlHeaders, notifyError, finish })
+  const { buildNotFoundResponse, renderError } = createFallbackPages({ manifest, modules, lang, alwaysLoadRuntime, dev: isDev, document, htmlHeaders, notifyError, finish })
 
   async function renderNotFound(cookieStore: CookieStore, url: URL, request: Request, ctx: RequestContext): Promise<Response> {
     const res = await runChain(ctx, middlewaresFor(url.pathname), () => buildNotFoundResponse(url, request, ctx))
@@ -578,7 +578,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     }
     catch (error) {
       notifyError(error, request, 'route')
-      return withHsts(serverError(), request)
+      return withHsts(isDev ? devErrorResponse(error, request) : serverError(), request)
     }
   }
 

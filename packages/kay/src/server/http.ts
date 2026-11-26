@@ -2,7 +2,7 @@
 
 import type { BuildManifest } from '../build/index'
 import type { KayChild } from '../jsx-runtime'
-import type { ServerRuntimeConfig } from '../plugins/index'
+import type { ServerErrorInfo, ServerRuntimeConfig } from '../plugins/index'
 import type { Cookies } from './cookies'
 import type { KayLocals } from './index'
 import type { TrustProxy } from './security'
@@ -95,6 +95,8 @@ export interface ServerOptions extends ServerRuntimeConfig {
   dev?: boolean | undefined
   /** @internal Imports a built server module by absolute path; `kay dev` passes one that keeps unchanged modules loaded. */
   importModule?: ((path: string) => Promise<Record<string, unknown>>) | undefined
+  /** @internal Hears every unhandled route, action and plugin error; `testApp().errors` fills from it. */
+  errorSink?: ((info: ServerErrorInfo) => void) | undefined
 }
 
 export interface RequestContext<Params = Record<string, string>> {
@@ -136,6 +138,7 @@ export interface EmbeddedServerConfig extends ServerRuntimeConfig {
   outDir?: string | undefined
   publicDir?: string | undefined
   dev?: boolean | undefined
+  errorSink?: ((info: ServerErrorInfo) => void) | undefined
 }
 
 export const MIME: Record<string, string> = {

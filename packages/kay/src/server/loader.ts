@@ -69,6 +69,7 @@ export async function startBuiltApp(options: ServerOptions): Promise<{ app: KayA
     outDir,
     publicDir: join(outDir, 'public'),
     dev: options.dev ?? (process.env.KAY_DEV === '1'),
+    errorSink: options.errorSink,
   })
   return { app, entry }
 }

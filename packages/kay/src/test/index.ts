@@ -16,6 +16,8 @@ export interface TestApp {
   readonly app: KayApp
   readonly manifest: BuildManifest | undefined
   readonly cookies: Map<string, string>
+  /** The unhandled route, action and plugin errors seen since the app started, as `route GET /path: message`; a response that is a 500 has one here. */
+  readonly errors: string[]
   fetch(pathOrReq: string | Request, init?: RequestInit): Promise<Response>
   get(path: string, headers?: HeadersInit): Promise<Response>
   post(path: string, body?: unknown, headers?: HeadersInit): Promise<Response>
@@ -37,10 +39,15 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     plugins: options.plugins,
   })
 
+  const errors: string[] = []
   const { app, entry } = await startBuiltApp({
     root: options.root,
     outDir: options.outDir,
+    dev: options.dev,
     ...resolveServerConfig(undefined, options),
+    errorSink: ({ error, request, source }) => {
+      errors.push(`${source} ${request.method} ${new URL(request.url).pathname}: ${error instanceof Error ? error.message : String(error)}`)
+    },
   })
 
   const cookies = new Map<string, string>()
@@ -87,6 +94,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     app,
     manifest,
     cookies,
+    errors,
     fetch: doFetch,
     get(path, headers) {
       return doFetch(path, headers !== undefined ? { method: 'GET', headers } : { method: 'GET' })

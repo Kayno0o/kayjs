@@ -15,7 +15,26 @@ import { inlineStyleHashes } from './security'
 
 export type NotifyError = (error: unknown, request: Request, source: ServerErrorInfo['source']) => void
 
-export function createErrorNotifier(onError: ((info: ServerErrorInfo) => void) | undefined, plugins: readonly KayPlugin[]): NotifyError {
+/** The text of an error a dev response shows: its stack, which starts with its message. */
+export const errorDetail = (error: unknown): string => error instanceof Error ? error.stack ?? error.message : String(error)
+
+const errorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error)
+
+/** What a dev server answers with an unhandled error: its message and stack, as JSON when the request wants it. */
+export function devErrorResponse(error: unknown, request: Request): Response {
+  if (wantsJson(request))
+    return Response.json({ ok: false, status: 500, error: errorMessage(error), stack: errorDetail(error) }, { status: 500 })
+  return new Response(errorDetail(error), { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+}
+
+export interface ErrorNotifierOptions {
+  /** With no `onError` hook to hear an unhandled error, `console.error` does. */
+  dev?: boolean | undefined
+  /** Hears every unhandled error, hooks or not: how `testApp().errors` fills. */
+  sink?: ((info: ServerErrorInfo) => void) | undefined
+}
+
+export function createErrorNotifier(onError: ((info: ServerErrorInfo) => void) | undefined, plugins: readonly KayPlugin[], options: ErrorNotifierOptions = {}): NotifyError {
   const errorHooks: { owner: string, hook: (info: ServerErrorInfo) => void }[] = []
   if (onError !== undefined)
     errorHooks.push({ owner: 'kay.config.ts', hook: onError })
@@ -24,6 +43,9 @@ export function createErrorNotifier(onError: ((info: ServerErrorInfo) => void) |
       errorHooks.push({ owner: p.name, hook: p.onError })
   }
   return (error, request, source) => {
+    options.sink?.({ error, request, source })
+    if (options.dev === true && errorHooks.length === 0)
+      console.error(`kay: unhandled error in ${source} ${request.method} ${new URL(request.url).pathname}`, error)
     for (const { owner, hook } of errorHooks) {
       try {
         hook({ error, request, source })
@@ -52,6 +74,7 @@ export interface FallbackPagesOptions {
   modules: Record<string, unknown>
   lang: string
   alwaysLoadRuntime: boolean
+  dev: boolean
   document: DocumentHooks
   htmlHeaders: HtmlHeaders
   notifyError: NotifyError
@@ -109,7 +132,7 @@ export function createFallbackPages(options: FallbackPagesOptions) {
   }
 
   const buildErrorResponse = (error: unknown, url?: URL, req?: Request, ctx?: RequestContext): Promise<Response> =>
-    renderFallbackPage(500, errorMod && (() => errorMod.default({ error })), 'Internal Server Error', url, req, ctx)
+    renderFallbackPage(500, errorMod && (() => errorMod.default({ error })), options.dev ? errorDetail(error) : 'Internal Server Error', url, req, ctx)
 
   const notFoundPage = notFoundMod?.default
   const buildNotFoundResponse = (url?: URL, req?: Request, ctx?: RequestContext): Promise<Response> =>
@@ -117,7 +140,7 @@ export function createFallbackPages(options: FallbackPagesOptions) {
 
   async function renderError(error: unknown, cookieStore: CookieStore | undefined, url: URL, request: Request, ctx?: RequestContext): Promise<Response> {
     if (wantsJson(request))
-      return finish(Response.json({ ok: false, status: 500, error: 'Internal Server Error' }, { status: 500 }), request, cookieStore)
+      return finish(options.dev ? devErrorResponse(error, request) : Response.json({ ok: false, status: 500, error: 'Internal Server Error' }, { status: 500 }), request, cookieStore)
     return finish(await buildErrorResponse(error, url, request, ctx), request, cookieStore)
   }
 

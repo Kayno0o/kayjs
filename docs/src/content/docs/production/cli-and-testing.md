@@ -69,7 +69,19 @@ describe('app routes', () => {
 - `app.submit(action, fields, headers?)`: Sends `FormData` with `Origin: http://localhost` to an action from `app.import()`, or to an action URL.
 - `app.fetch(pathOrRequest, init?)`: Low-level request helper with cookie jar persistence.
 - `app.cookies` / `app.clearCookies()`: Inspect or reset cookies between test cases.
+- `app.errors`: The route, action and plugin errors the app did not handle, one line each (`route GET /boom: the message`). A request that came back as a 500 left one here, so a test can read what failed instead of an opaque `Internal Server Error`.
 - Pass `prebuilt: true` to `testApp({ root, prebuilt: true })` to reuse an existing `dist/` build across tests.
+- Pass `dev: true` to see the failure in the response too, as `kay dev` does (see below).
+
+### Unhandled errors in dev
+
+An error that no `onError` hook and no `_error.tsx` handled answers with a bare `500 Internal Server Error`, so a production visitor never sees a message or a stack.
+
+With `dev: true` in `testApp()`, and always under `kay dev`, the response carries the real error instead. A request that asks for JSON gets `{ ok: false, status: 500, error, stack }`, and any other request gets the stack as plain text. An app with an `_error.tsx` still renders that page. The error is also logged with `console.error`, unless the app has an `onError` hook, which is then the one that hears it.
+
+When a build fails, `kay dev` answers every request with the build error: JSON for `Accept: application/json`, plain text for `Accept: text/plain`, and the error page with live reload for a browser.
+
+When an island fails to hydrate, the browser console names its component in dev, for instance `<CartButton>`, next to the chunk URL that is a hash.
 
 ## Testing islands in a browser
 

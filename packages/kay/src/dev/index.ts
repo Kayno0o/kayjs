@@ -9,7 +9,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { clearBuildCache } from '../build/graph'
 import { build, createBuildCache } from '../build/index'
 import { createAppContext, loadConfig, resolvePlugins, resolveServerConfig, runWithAppContext } from '../plugins/index'
-import { DEFAULT_MAX_REQUEST_BODY_SIZE } from '../server/http'
+import { DEFAULT_MAX_REQUEST_BODY_SIZE, wantsJson } from '../server/http'
 import { createServer, withCspHashes } from '../server/index'
 
 export interface DevServerOptions {
@@ -494,6 +494,10 @@ export async function devServer(options: DevServerOptions): Promise<{
       }
 
       if (lastError !== undefined) {
+        if (wantsJson(request))
+          return Response.json({ ok: false, status: 500, error: lastError }, { status: 500 })
+        if ((request.headers.get('accept') ?? '').startsWith('text/plain'))
+          return new Response(lastError, { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
         return new Response(renderErrorOverlay(lastError, reloadAssets.script), {
           status: 500,
           headers: { 'content-type': 'text/html; charset=utf-8' },

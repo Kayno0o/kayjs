@@ -161,8 +161,10 @@ export function defineIslandElement(): void {
         return
 
       let dispose: (() => void) | undefined
+      let mod: IslandModule | undefined
       try {
-        const mod = await import(chunk) as IslandModule
+        const loaded = await import(chunk) as IslandModule
+        mod = loaded
         if (!this.isConnected || token !== this._t || this._d !== undefined)
           return
 
@@ -181,7 +183,7 @@ export function defineIslandElement(): void {
         if (slot !== null)
           props.children = slot
         const idPrefix = this.getAttribute('i') ?? `c${clientIslandIdSeq++}-`
-        const render = () => mod.default(props)
+        const render = () => loaded.default(props)
         dispose = (typeof KAY_CLIENT_ONLY === 'undefined' || KAY_CLIENT_ONLY) && clientOnly
           ? mount(this, render, idPrefix)
           : hydrate(this, render, idPrefix)
@@ -193,7 +195,8 @@ export function defineIslandElement(): void {
       }
       catch (err) {
         dispose?.()
-        console.error(`[kay-island] failed to hydrate ${chunk}:`, err)
+        // The chunk URL is a hash; in dev the component's own name says which island failed.
+        console.error(`[kay-island] failed to hydrate ${process.env.NODE_ENV !== 'production' && mod?.default?.name ? `<${mod.default.name}> (${chunk})` : chunk}:`, err)
       }
     }
   }
