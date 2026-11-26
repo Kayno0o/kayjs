@@ -6,6 +6,7 @@ import { renderOnServer } from '../reactivity/index'
 import { styleText } from '../style'
 import { assertRenderable } from '../unrenderable'
 import { currentRenderContext, KAY_STREAM_SCRIPT, renderIsland } from './context'
+export { ssrStyleBlock } from './context'
 
 export const KAY_ISLAND_STYLE = 'kay-island,kay-slot{display:contents}'
 export const KAY_SUSPENSE_STYLE = 'kay-s{display:contents}'

@@ -94,7 +94,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     return sub.toString()
   }
 
-  function compileChildrenListToStringExpr(children: readonly JSXChild[], slotMarkers = emitMarkers): string {
+  function compileChildrenListToStringExpr(children: readonly JSXChild[], slotMarkers = emitMarkers, rawTextTag?: 'style' | 'script'): string {
     const bufVar = `_o${loopCounter++}`
     const stmts: string[] = []
     const parts = new StringParts()
@@ -104,7 +104,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         parts.clear()
       }
     }
-    emitChildrenIntoBuffer(children, bufVar, parts, flush, s => stmts.push(s), undefined, slotMarkers)
+    emitChildrenIntoBuffer(children, bufVar, parts, flush, s => stmts.push(s), rawTextTag, slotMarkers)
     if (stmts.length === 0)
       return parts.toExpr()
     flush()
@@ -159,6 +159,11 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
           parts.pushStatic(escapeStaticText(textareaValue.staticText))
         else if (textareaValue.expr !== undefined)
           parts.pushExpr(`${use('esc')}(${textareaValue.expr})`)
+      }
+      else if (tag === 'style') {
+        const styleExpr = compileChildrenListToStringExpr(node.children, false, 'style')
+        if (styleExpr !== '""')
+          parts.pushExpr(`${use('ssrStyleBlock')}(${styleExpr})`)
       }
       else {
         emitChildrenIntoBuffer(node.children, bufVar, parts, flushParts, pushStmt, RAW_TEXT_ELEMENTS.has(tag) ? tag as 'style' | 'script' : undefined)

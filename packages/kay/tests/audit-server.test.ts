@@ -9,9 +9,11 @@ import {
   CompressionCache,
   createServer,
   createServerFromEmbedded,
+  DEFAULT_CSP,
   definePlugin,
   getClientIp,
   isHttpsRequest,
+  isTrustedOrigin,
   KAY_ISLAND_STYLE_HASH,
   KAY_STREAM_SCRIPT_HASH,
   KAY_SUSPENSE_STYLE_HASH,
@@ -41,9 +43,16 @@ describe('client IP and forwarded headers behind a trusted proxy', () => {
     ['one proxy appending to a client-sent header', true, 'spoofed, 203.0.113.5', '203.0.113.5'],
     ['one proxy, no client header', true, '203.0.113.5', '203.0.113.5'],
     ['two proxies', 2, 'spoofed, 203.0.113.5, 198.51.100.7', '203.0.113.5'],
-    ['two proxies trusted, one hop seen', 2, '203.0.113.5', '203.0.113.5'],
+    ['two proxies trusted, fewer hops seen falls back to remoteIp', 2, '203.0.113.5', '10.0.0.1'],
   ] as const)('ctx.ip with %s', (_, trustProxy, xff, expected) => {
     expect(getClientIp(req({ 'x-forwarded-for': xff }), trustProxy, '10.0.0.1')).toBe(expected)
+  })
+
+  it('ignores spoofable X-Real-IP when X-Forwarded-For is absent or empty (#3625)', () => {
+    expect(getClientIp(req({ 'x-real-ip': '198.51.100.7' }), true, '10.0.0.1')).toBe('10.0.0.1')
+    expect(getClientIp(req({ 'x-real-ip': '198.51.100.7' }), true)).toBeUndefined()
+    expect(getClientIp(req({ 'x-forwarded-for': '   ', 'x-real-ip': '198.51.100.7' }), 2, '10.0.0.1')).toBe('10.0.0.1')
+    expect(getClientIp(req({ 'x-forwarded-for': '203.0.113.5' }), Number.NaN, '10.0.0.1')).toBe('10.0.0.1')
   })
 
   it('reads the protocol and host the trusted proxy set, not the client', () => {
@@ -53,6 +62,30 @@ describe('client IP and forwarded headers behind a trusted proxy', () => {
     expect(verifyOrigin(spoofedHost, undefined, true).ok).toBe(false)
     const realHost = req({ 'origin': 'https://app.example', 'x-forwarded-proto': 'https', 'x-forwarded-host': 'evil.example, app.example' })
     expect(verifyOrigin(realHost, undefined, true).ok).toBe(true)
+  })
+
+  it('rejects null origin, non-http(s) X-Forwarded-Proto, and Sec-Fetch-Site: same-site (#3625)', () => {
+    // Non-http(s) X-Forwarded-Proto must not produce origin "null" and match Origin: null
+    const nullOriginViaProto = req({
+      'origin': 'null',
+      'x-forwarded-proto': 'javascript',
+      'x-forwarded-host': 'app.example',
+    })
+    expect(isTrustedOrigin('null', nullOriginViaProto, new Set(['null']), true)).toBe(false)
+    expect(verifyOrigin(nullOriginViaProto, undefined, true).ok).toBe(false)
+
+    const customProto = req({
+      'origin': 'null',
+      'x-forwarded-proto': 'foo',
+      'x-forwarded-host': 'app.example',
+    })
+    expect(verifyOrigin(customProto, undefined, true).ok).toBe(false)
+
+    // Sec-Fetch-Site: same-site (sibling subdomain) is blocked; same-origin and none are allowed
+    expect(verifyOrigin(req({ 'sec-fetch-site': 'same-site' })).ok).toBe(false)
+    expect(verifyOrigin(req({ 'sec-fetch-site': 'cross-site' })).ok).toBe(false)
+    expect(verifyOrigin(req({ 'sec-fetch-site': 'same-origin' })).ok).toBe(true)
+    expect(verifyOrigin(req({ 'sec-fetch-site': 'none' })).ok).toBe(true)
   })
 })
 
@@ -530,6 +563,11 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
 
       const svgRes = await app.handle(new Request('http://localhost/icon.svg'))
       expect(svgRes.headers.get('x-content-type-options')).toBe('nosniff')
+      // #3625: public/ files (including SVG/HTML) receive full security headers (CSP, X-Frame-Options, form-action 'self')
+      expect(svgRes.headers.get('x-frame-options')).toBe('SAMEORIGIN')
+      expect(svgRes.headers.get('content-security-policy')).toBe(DEFAULT_CSP)
+      expect(DEFAULT_CSP).toContain("form-action 'self'")
+      expect(homeCsp!).toContain("form-action 'self'")
 
       // 4. HSTS emitted on HTTPS in production only
       const prevEnv = process.env.NODE_ENV
@@ -670,10 +708,170 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       }))
       expect(await trustedRes.json()).toEqual({ ip: '203.0.113.5' })
 
+      // X-Real-IP is never blindly trusted when X-Forwarded-For is absent (#3625)
       const realIpRes = await trustedApp.handle(new Request('http://localhost/api/who', {
         headers: { 'x-real-ip': '198.51.100.7' },
+      }), '10.0.0.9')
+      expect(await realIpRes.json()).toEqual({ ip: '10.0.0.9' })
+    })
+  })
+
+  describe('#3625 Security hardening: action Referer scheme, public/ HTML headers, and deferred body limit', () => {
+    it('never redirects actions to javascript: Referer even with non-http X-Forwarded-Proto', async () => {
+      const dir = makeTemp('kay-3625-referer-')
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/actions'), { recursive: true })
+      writeFileSync(join(dir, 'src/actions/ping.ts'), `
+        import { action } from '@kayjs/kay/server'
+        export const ping = action(async () => ({ ok: true }))
+      `)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { ping } from '../actions/ping'
+        export default function Home() {
+          return <form action={ping} method="post"><button>Go</button></form>
+        }
+      `)
+      const manifest = await build({ root: dir })
+      const actionUrl = manifest.actions[0]!.url
+      const app = await createServer({ root: dir, trustProxy: true })
+
+      const res = await app.handle(new Request(`http://localhost${actionUrl}`, {
+        method: 'POST',
+        headers: {
+          'origin': 'http://localhost',
+          'referer': 'javascript:alert(1)',
+          'x-forwarded-proto': 'javascript',
+          'x-forwarded-host': 'localhost',
+        },
       }))
-      expect(await realIpRes.json()).toEqual({ ip: '198.51.100.7' })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('location')).toBeNull()
+    })
+
+    it('applies full security headers to public/ HTML and SVG files (including 304)', async () => {
+      const dir = makeTemp('kay-3625-public-')
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'public'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>hi</p> }\n')
+      writeFileSync(join(dir, 'public/page.html'), '<!DOCTYPE html><h1>Static</h1>')
+      writeFileSync(join(dir, 'public/badge.svg'), '<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+
+      await build({ root: dir })
+      const app = await createServer({ root: dir })
+
+      for (const path of ['/page.html', '/badge.svg']) {
+        const res = await app.handle(new Request(`http://localhost${path}`))
+        expect(res.status).toBe(200)
+        expect(res.headers.get('content-security-policy')).toContain("form-action 'self'")
+        expect(res.headers.get('x-frame-options')).toBe('SAMEORIGIN')
+        expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+        const etag = res.headers.get('etag')!
+        const res304 = await app.handle(new Request(`http://localhost${path}`, {
+          headers: { 'if-none-match': etag },
+        }))
+        expect(res304.status).toBe(304)
+        expect(res304.headers.get('content-security-policy')).toContain("form-action 'self'")
+        expect(res304.headers.get('x-frame-options')).toBe('SAMEORIGIN')
+      }
+    })
+
+    it('defers enforceRequestBodyLimit() past 404, 405, and CSRF 403 rejections without buffering bodies', async () => {
+      const dir = makeTemp('kay-3625-body-order-')
+      mkdirSync(join(dir, 'src/routes/api'), { recursive: true })
+      mkdirSync(join(dir, 'src/actions'), { recursive: true })
+      writeFileSync(join(dir, 'src/actions/save.ts'), `
+        import { action } from '@kayjs/kay/server'
+        export const save = action(async () => ({ saved: true }))
+      `)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { save } from '../actions/save'
+        export default function Home() { return <form action={save} method="post"><button>Save</button></form> }
+      `)
+      writeFileSync(join(dir, 'src/routes/api/items.ts'), `
+        import type { RequestContext } from '@kayjs/kay/server'
+        export function GET(ctx: RequestContext) { return ctx.json({ ok: true }) }
+        export async function POST(ctx: RequestContext) { return ctx.json({ len: (await ctx.request.text()).length }) }
+      `)
+      const plugin = definePlugin({
+        name: 'body-order-plugin',
+        server(api) {
+          api.route('POST', '/plugin/submit', async ctx => ctx.json({ len: (await ctx.request.text()).length }))
+          api.route('GET', '/plugin/readonly', ctx => ctx.json({ ok: true }))
+        },
+      })
+      const manifest = await build({ root: dir, plugins: [plugin] })
+      const actionUrl = manifest.actions[0]!.url
+      const app = await createServer({ root: dir, plugins: [plugin], maxRequestBodySize: 64 })
+
+      const trackedStream = () => {
+        let pulled = 0
+        const body = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pulled++
+            controller.enqueue(new Uint8Array(128))
+            controller.close()
+          },
+        }, { highWaterMark: 0 })
+        return { body, get pulled() { return pulled } }
+      }
+
+      // 404 unknown route -> 404, body never read
+      const s404 = trackedStream()
+      const req404 = new Request('http://localhost/no-such-route', { method: 'POST', headers: { origin: 'http://localhost' }, body: s404.body })
+      const r404 = await app.handle(req404)
+      expect(r404.status).toBe(404)
+      expect(s404.pulled).toBe(0)
+      expect(req404.bodyUsed).toBe(false)
+
+      // 405 page route without POST -> 405, body never read
+      const s405Page = trackedStream()
+      const req405Page = new Request('http://localhost/', { method: 'POST', headers: { origin: 'http://localhost' }, body: s405Page.body })
+      const r405Page = await app.handle(req405Page)
+      expect(r405Page.status).toBe(405)
+      expect(s405Page.pulled).toBe(0)
+      expect(req405Page.bodyUsed).toBe(false)
+
+      // 405 plugin route without POST -> 405, body never read
+      const s405Plugin = trackedStream()
+      const req405Plugin = new Request('http://localhost/plugin/readonly', { method: 'POST', headers: { origin: 'http://localhost' }, body: s405Plugin.body })
+      const r405Plugin = await app.handle(req405Plugin)
+      expect(r405Plugin.status).toBe(405)
+      expect(s405Plugin.pulled).toBe(0)
+      expect(req405Plugin.bodyUsed).toBe(false)
+
+      // 405 action with PUT -> 405, body never read
+      const s405Act = trackedStream()
+      const req405Act = new Request(`http://localhost${actionUrl}`, { method: 'PUT', headers: { origin: 'http://localhost' }, body: s405Act.body })
+      const r405Act = await app.handle(req405Act)
+      expect(r405Act.status).toBe(405)
+      expect(s405Act.pulled).toBe(0)
+      expect(req405Act.bodyUsed).toBe(false)
+
+      // 403 CSRF on API route, plugin route, and action -> 403, body never read
+      for (const path of ['/api/items', '/plugin/submit', actionUrl]) {
+        const sCsrf = trackedStream()
+        const reqCsrf = new Request(`http://localhost${path}`, {
+          method: 'POST',
+          headers: { origin: 'https://evil.example' },
+          body: sCsrf.body,
+        })
+        const rCsrf = await app.handle(reqCsrf)
+        expect(rCsrf.status, path).toBe(403)
+        expect(sCsrf.pulled, path).toBe(0)
+        expect(reqCsrf.bodyUsed, path).toBe(false)
+      }
+
+      // Valid matched route/plugin/action with oversized body -> 413
+      for (const path of ['/api/items', '/plugin/submit', actionUrl]) {
+        const sBig = trackedStream()
+        const rBig = await app.handle(new Request(`http://localhost${path}`, {
+          method: 'POST',
+          headers: { origin: 'http://localhost' },
+          body: sBig.body,
+        }))
+        expect(rBig.status, path).toBe(413)
+        expect(sBig.pulled, path).toBeGreaterThan(0)
+      }
     })
   })
 

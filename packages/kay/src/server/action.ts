@@ -200,6 +200,8 @@ function trustedReferer(request: Request, trustedOrigins: ReadonlySet<string> | 
   catch {
     return undefined
   }
+  if (refUrl.protocol !== 'http:' && refUrl.protocol !== 'https:')
+    return undefined
   return isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy, requestUrl) ? refUrl : undefined
 }
 

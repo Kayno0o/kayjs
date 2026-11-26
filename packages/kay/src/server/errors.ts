@@ -9,9 +9,9 @@ import type { DocumentHooks, HtmlHeaders } from './document'
 import type { RequestContext } from './http'
 import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { raw, renderDocument, ssrChild } from '../ssr/index'
-import { resolveRenderedIslands } from './document'
+import { addedInlineStyleHashes, headTagStyleHashes, mergeStyleHashes, resolveRenderedIslands } from './document'
 import { wantsJson } from './http'
-import { inlineStyleHashes } from './security'
+import { styleHashesOf } from './security'
 
 export type NotifyError = (error: unknown, request: Request, source: ServerErrorInfo['source']) => void
 
@@ -97,6 +97,7 @@ export function createFallbackPages(options: FallbackPagesOptions) {
     alwaysLoadRuntime: options.alwaysLoadRuntime,
     lang: options.lang,
   }
+  const fallbackHeadStyleHashes = headTagStyleHashes(fallbackDoc.headTags)
 
   async function renderFallbackPage(status: number, renderInner: (() => unknown) | undefined, text: string, url?: URL, req?: Request, ctx?: RequestContext): Promise<Response> {
     if (renderInner !== undefined) {
@@ -121,7 +122,8 @@ export function createFallbackPages(options: FallbackPagesOptions) {
           hasIslands,
         })
         const html = await document.applyHtmlTransforms(docHtml, effUrl, req, ctx)
-        return new Response(html, { status, headers: htmlHeaders(hasIslands, false, true, inlineStyleHashes(html)) })
+        const styleHashes = mergeStyleHashes(fallbackHeadStyleHashes, docHead.styleHashes, styleHashesOf(rctx.inlineStyles), addedInlineStyleHashes(docHtml, html))
+        return new Response(html, { status, headers: htmlHeaders(hasIslands, false, true, styleHashes) })
       }
       catch (err) {
         if (req !== undefined)

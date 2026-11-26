@@ -110,12 +110,15 @@ export const ping = action(async () => ({ pong: true }))
       const app = await createServer({ root: dir, plugins: [plugin] })
       const actionUrl = manifest.actions[0]!.url
 
-      // Cross-site POST to page without POST -> middleware runs, then 405 + Allow
-      const pagePost = await app.handle(new Request('http://localhost/', {
+      // Cross-site POST to page without POST -> middleware runs, then 405 + Allow (and body is not buffered)
+      const pagePostReq = new Request('http://localhost/', {
         method: 'POST',
         headers: { origin: 'https://evil.example' },
-      }))
+        body: 'ignored-payload',
+      })
+      const pagePost = await app.handle(pagePostReq)
       expect(pagePost.status).toBe(405)
+      expect(pagePostReq.bodyUsed).toBe(false)
       expect(pagePost.headers.get('allow')).toContain('GET')
       expect(pagePost.headers.get('allow')).toContain('HEAD')
       expect(pagePost.headers.get('x-plugin-mw')).toBe('1')

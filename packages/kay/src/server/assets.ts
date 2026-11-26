@@ -44,6 +44,7 @@ export interface AssetsOptions {
   compressEnabled: boolean
   compressCache: CompressionCache | undefined
   nosniffHeader: Record<string, string>
+  securityRecord: Record<string, string>
   withHsts: (res: Response, request: Request) => Response
 }
 
@@ -57,7 +58,7 @@ export interface PrerenderedSources {
 }
 
 export function createAssets(options: AssetsOptions) {
-  const { assets, assetPrefix, isDev, compressEnabled, compressCache, nosniffHeader, withHsts } = options
+  const { assets, assetPrefix, isDev, compressEnabled, compressCache, nosniffHeader, securityRecord, withHsts } = options
   const varyEncoding: Record<string, string> = compressCache !== undefined ? { vary: 'Accept-Encoding' } : {}
 
   const toBody = (body: EmbeddedBody): BodyInit => typeof body === 'string' ? Bun.file(body) : body
@@ -73,7 +74,7 @@ export function createAssets(options: AssetsOptions) {
     const etag = explicitEtag ?? `W/"${Bun.hash(typeof body === 'string' ? cleanRel : body).toString(36)}"`
     const type = MIME[extname(cleanRel).toLowerCase()] ?? 'application/octet-stream'
     const hasVary = compressCache !== undefined && isCompressibleType(type)
-    const validators = { etag, 'cache-control': publicCacheControl, ...(hasVary ? { vary: 'Accept-Encoding' } : {}), ...nosniffHeader }
+    const validators = { etag, 'cache-control': publicCacheControl, ...(hasVary ? { vary: 'Accept-Encoding' } : {}), ...securityRecord }
     const headers = { 'content-type': type, ...validators }
     publicMap.set(`/${cleanRel}`, {
       etag,

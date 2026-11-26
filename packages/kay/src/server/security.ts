@@ -15,19 +15,39 @@ export const KAY_STREAM_SCRIPT_HASH = cspSha256(KAY_STREAM_SCRIPT)
 const STYLE_HASH_CACHE_SIZE = 256
 const styleHashCache = new Map<string, string>()
 
-// Hashes stay cached by content, so a layout's fixed block costs one SHA-256 per process; past the cap a new block is hashed each time.
+// Hashes stay cached by content with LRU eviction so a layout's fixed block costs one SHA-256 per process.
 function styleHash(content: string): string {
   let hash = styleHashCache.get(content)
-  if (hash === undefined) {
-    hash = cspSha256(content)
-    if (styleHashCache.size < STYLE_HASH_CACHE_SIZE)
-      styleHashCache.set(content, hash)
+  if (hash !== undefined) {
+    styleHashCache.delete(content)
+    styleHashCache.set(content, hash)
+    return hash
   }
+  hash = cspSha256(content)
+  if (styleHashCache.size >= STYLE_HASH_CACHE_SIZE)
+    styleHashCache.delete(styleHashCache.keys().next().value!)
+  styleHashCache.set(content, hash)
   return hash
 }
 
+/** Deduplicated CSP SHA-256 hashes of trusted inline `<style>` contents, leaving out kay's island and Suspense styles. */
+export function styleHashesOf(styles: Iterable<string> | undefined): string[] {
+  if (styles === undefined)
+    return []
+  const hashes: string[] = []
+  for (const content of styles) {
+    if (content === KAY_ISLAND_STYLE || content === KAY_SUSPENSE_STYLE)
+      continue
+    const hash = styleHash(content)
+    if (!hashes.includes(hash))
+      hashes.push(hash)
+  }
+  return hashes
+}
+
 // A regex finds the next tag ~10x faster than `indexOf('<style')`, which stalls on every `<span` and `<strong` of a large page.
-const STYLE_OPEN_RE = /<style[\s>/]/g
+const STYLE_OPEN_RE = /<style(?=[\s>/])/gi
+const STYLE_CLOSE_RE = /<\/style(?=[\s>])/gi
 
 /** CSP hashes of the app's own `<style>` blocks in `html`, leaving out kay's island and Suspense styles (hashed apart). */
 export function inlineStyleHashes(html: string): string[] {
@@ -35,17 +55,20 @@ export function inlineStyleHashes(html: string): string[] {
   STYLE_OPEN_RE.lastIndex = 0
   let open = STYLE_OPEN_RE.exec(html)
   while (open !== null) {
-    const tagEnd = html.indexOf('>', open.index)
-    const close = tagEnd === -1 ? -1 : html.indexOf('</style', tagEnd)
-    if (close === -1)
+    const tagEnd = html.indexOf('>', open.index + 6)
+    if (tagEnd === -1)
       break
-    const content = html.slice(tagEnd + 1, close)
+    STYLE_CLOSE_RE.lastIndex = tagEnd + 1
+    const close = STYLE_CLOSE_RE.exec(html)
+    if (close === null)
+      break
+    const content = html.slice(tagEnd + 1, close.index)
     if (content !== KAY_ISLAND_STYLE && content !== KAY_SUSPENSE_STYLE) {
       const hash = styleHash(content)
       if (!hashes.includes(hash))
         hashes.push(hash)
     }
-    STYLE_OPEN_RE.lastIndex = close
+    STYLE_OPEN_RE.lastIndex = close.index + 7
     open = STYLE_OPEN_RE.exec(html)
   }
   return hashes
@@ -107,7 +130,7 @@ export function withCspHashes(
   }).join('; ')
 }
 
-export const DEFAULT_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+export const DEFAULT_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
 export const DEFAULT_HSTS = 'max-age=31536000; includeSubDomains'
 export const DEFAULT_PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=()'
 
@@ -126,25 +149,35 @@ const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 export type TrustProxy = boolean | number
 
 function proxyHops(trustProxy: TrustProxy): number {
-  return trustProxy === true ? 1 : trustProxy === false ? 0 : Math.max(0, Math.floor(trustProxy))
+  if (trustProxy === true)
+    return 1
+  if (trustProxy === false || !Number.isFinite(trustProxy))
+    return 0
+  return Math.max(0, Math.floor(trustProxy))
 }
 
 // Proxies append to X-Forwarded-*, so only the entries the trusted hops wrote count: the one `hops` from the right.
+// When fewer than `hops` entries exist, return undefined rather than trusting a client-supplied leftmost entry.
 function forwardedValue(request: Request, header: string, trustProxy: TrustProxy): string | undefined {
   const hops = proxyHops(trustProxy)
   if (hops === 0)
     return undefined
   const entries = (request.headers.get(header) ?? '').split(',').map(e => e.trim()).filter(e => e !== '')
-  return entries[Math.max(0, entries.length - hops)]
+  if (entries.length < hops)
+    return undefined
+  return entries[entries.length - hops]
 }
 
 function forwardedOrigin(request: Request, trustProxy: TrustProxy): string | undefined {
-  const proto = forwardedValue(request, 'x-forwarded-proto', trustProxy)
+  const proto = forwardedValue(request, 'x-forwarded-proto', trustProxy)?.toLowerCase()
+  if (proto !== 'http' && proto !== 'https')
+    return undefined
   const host = forwardedValue(request, 'x-forwarded-host', trustProxy) || request.headers.get('host')?.trim()
-  if (!proto || !host)
+  if (!host)
     return undefined
   try {
-    return new URL(`${proto}://${host}`).origin
+    const origin = new URL(`${proto}://${host}`).origin
+    return origin === 'null' ? undefined : origin
   }
   catch {
     return undefined
@@ -157,15 +190,12 @@ export function isHttpsRequest(request: Request, trustProxy: TrustProxy = false)
     || forwardedValue(request, 'x-forwarded-proto', trustProxy)?.toLowerCase() === 'https'
 }
 
-/** Extracts the client IP from the trusted proxies' headers, or falls back to the direct socket IP. */
+/** Extracts the client IP from the trusted proxies' X-Forwarded-For header, or falls back to the direct socket IP. */
 export function getClientIp(request: Request, trustProxy: TrustProxy = false, remoteIp?: string): string | undefined {
   if (proxyHops(trustProxy) > 0) {
     const forwarded = forwardedValue(request, 'x-forwarded-for', trustProxy)
     if (forwarded)
       return forwarded
-    const realIp = request.headers.get('x-real-ip')?.trim()
-    if (realIp)
-      return realIp
   }
   return remoteIp || undefined
 }
@@ -178,6 +208,8 @@ export function isTrustedOrigin(
   trustProxy: TrustProxy = false,
   requestUrl?: URL,
 ): boolean {
+  if (!origin || origin === 'null')
+    return false
   return origin === (requestUrl?.origin ?? new URL(request.url).origin)
     || origin === forwardedOrigin(request, trustProxy)
     || trustedOrigins?.has(origin) === true
@@ -201,7 +233,7 @@ export function verifyOrigin(
   }
 
   const fetchSite = request.headers.get('sec-fetch-site')
-  if (fetchSite !== null && fetchSite !== 'same-origin' && fetchSite !== 'same-site' && fetchSite !== 'none')
+  if (fetchSite !== null && fetchSite !== 'same-origin' && fetchSite !== 'none')
     return { ok: false, reason: `Cross-site request blocked: sec-fetch-site=${fetchSite}` }
 
   return { ok: true }

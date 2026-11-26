@@ -37,7 +37,7 @@ export function createHtmlHeaders(security: SecurityHeadersOptions | false | und
     htmlHeaderSets.push(headers)
   }
 
-  // Pages sharing a layout share its blocks, so their header sets are kept by set and hashes; past the cap a new combination is built each time.
+  // Pages sharing a layout share its blocks, so their header sets are kept with LRU eviction.
   const styledSets = new Map<string, Record<string, string>>()
   return (hasIslands, hasSuspense, isDynamic, styleHashes) => {
     const index = (isDynamic ? 4 : 0) | (hasIslands ? 2 : 0) | (hasSuspense ? 1 : 0)
@@ -46,19 +46,59 @@ export function createHtmlHeaders(security: SecurityHeadersOptions | false | und
       return base
     const key = `${index} ${styleHashes.join(' ')}`
     let headers = styledSets.get(key)
-    if (headers === undefined) {
-      headers = {
-        ...base,
-        'content-security-policy': withCspHashes(baseCsp, {
-          styleHashes: [...kayStyleHashes[index]!, ...styleHashes],
-          scriptHashes: hasSuspense ? [KAY_STREAM_SCRIPT_HASH] : [],
-        }),
-      }
-      if (styledSets.size < STYLED_HEADER_CACHE_SIZE)
-        styledSets.set(key, headers)
+    if (headers !== undefined) {
+      styledSets.delete(key)
+      styledSets.set(key, headers)
+      return headers
     }
+    headers = {
+      ...base,
+      'content-security-policy': withCspHashes(baseCsp, {
+        styleHashes: [...kayStyleHashes[index]!, ...styleHashes],
+        scriptHashes: hasSuspense ? [KAY_STREAM_SCRIPT_HASH] : [],
+      }),
+    }
+    if (styledSets.size >= STYLED_HEADER_CACHE_SIZE)
+      styledSets.delete(styledSets.keys().next().value!)
+    styledSets.set(key, headers)
     return headers
   }
+}
+
+/** Merges multiple style-hash arrays into a deduplicated list, preserving order. */
+export function mergeStyleHashes(...groups: readonly (readonly string[] | undefined)[]): string[] {
+  let out: string[] | undefined
+  for (const group of groups) {
+    if (group === undefined || group.length === 0)
+      continue
+    out ??= []
+    for (const h of group) {
+      if (!out.includes(h))
+        out.push(h)
+    }
+  }
+  return out ?? []
+}
+
+/** Extracts CSP style hashes from framework/plugin-configured `headTags` once at startup. */
+export function headTagStyleHashes(headTags: Iterable<string> | undefined): string[] {
+  if (headTags === undefined)
+    return []
+  let combined = ''
+  for (const tag of headTags)
+    combined += tag
+  return combined === '' ? [] : inlineStyleHashes(combined)
+}
+
+/** Returns only `<style>` hashes newly introduced by plugin `transformHtml` hooks (never preexisting HTML). */
+export function addedInlineStyleHashes(before: string, after: string): string[] {
+  if (before === after)
+    return []
+  const afterHashes = inlineStyleHashes(after)
+  if (afterHashes.length === 0)
+    return []
+  const beforeSet = new Set(inlineStyleHashes(before))
+  return afterHashes.filter(h => !beforeSet.has(h))
 }
 
 /** A plugin's HTML page without a CSP of its own gets the app's, its `<style>` blocks hashed like a rendered page's. */
@@ -112,13 +152,14 @@ export function createDocumentHooks(options: DocumentHooksOptions) {
     url: URL,
     req?: Request,
     ctx?: RequestContext,
-  ): Promise<{ head: string, lang: string, htmlAttrs: Record<string, string> }> {
+  ): Promise<{ head: string, lang: string, htmlAttrs: Record<string, string>, styleHashes: string[] }> {
     const collectedParts = rctx.headParts.join('')
     if (!hasHeadHooks) {
       return {
         head: (rctx.title ?? '') + collectedParts,
         lang,
         htmlAttrs: rctx.htmlAttrs,
+        styleHashes: [],
       }
     }
 
@@ -175,10 +216,12 @@ export function createDocumentHooks(options: DocumentHooksOptions) {
     const titleHtml = titleDirty
       ? (currentTitle !== undefined ? `<title>${currentTitle}</title>` : '')
       : (initialTitleTag ?? '')
+    const addedHtml = added.length > 0 ? added.join('') : ''
     return {
-      head: titleHtml + collectedParts + (added.length > 0 ? added.join('') : ''),
+      head: titleHtml + collectedParts + addedHtml,
       lang: currentLang,
       htmlAttrs,
+      styleHashes: addedHtml !== '' ? inlineStyleHashes(addedHtml) : [],
     }
   }
 

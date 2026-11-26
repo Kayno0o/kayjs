@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliCompressSync, gzipSync } from 'node:zlib'
@@ -45,6 +45,44 @@ describe('createStaticDirServer boundary tests & ServerRuntimeConfig / rootLayou
       expect(res.status).toBe(405)
       expect(res.headers.get('allow')).toBe('GET, HEAD')
     }
+  })
+
+  it('blocks symlink escapes outside outDir and never marks /_kay/%2e%2e/index.html as immutable (#3625)', async () => {
+    const parent = makeTemp('kay-3625-static-sym-')
+    const outDir = join(parent, 'dist')
+    mkdirSync(join(outDir, '_kay'), { recursive: true })
+    writeFileSync(join(parent, 'secret.txt'), 'SYMLINK_SECRET_DATA')
+    writeFileSync(join(outDir, 'index.html'), '<!DOCTYPE html><h1>Home</h1>')
+    writeFileSync(join(outDir, '_kay/app-123.js'), 'console.log(1)')
+    symlinkSync(join(parent, 'secret.txt'), join(outDir, 'leak.txt'))
+    symlinkSync(join(parent, 'secret.txt'), join(outDir, '404.html'))
+    symlinkSync(join(parent, 'secret.txt'), join(outDir, '_kay/app-123.js.br'))
+
+    const app = createStaticDirServer(outDir, '/_kay', undefined, true, false)
+
+    // Symlink pointing outside outDir must be blocked (and symlinked 404.html outside outDir is ignored)
+    const leakRes = await app.handle(new Request('http://localhost/leak.txt'))
+    expect(leakRes.status).toBe(404)
+    expect(await leakRes.text()).not.toContain('SYMLINK_SECRET_DATA')
+
+    // Symlinked .br sidecar pointing outside outDir must never be served
+    const sidecarRes = await app.handle(new Request('http://localhost/_kay/app-123.js', {
+      headers: { 'accept-encoding': 'br' },
+    }))
+    expect(sidecarRes.status).toBe(200)
+    expect(sidecarRes.headers.get('content-encoding')).not.toBe('br')
+    expect(await sidecarRes.text()).toBe('console.log(1)')
+
+    // Encoded dot-segment under assetPrefix must NOT receive immutable Cache-Control
+    const traversalHtml = await app.handle(new Request('http://localhost/_kay/%2e%2e/index.html'))
+    expect(traversalHtml.status).toBe(200)
+    expect(traversalHtml.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+    expect(traversalHtml.headers.get('cache-control')).not.toContain('immutable')
+
+    // Real asset under assetPrefix still gets immutable Cache-Control
+    const realAsset = await app.handle(new Request('http://localhost/_kay/app-123.js'))
+    expect(realAsset.status).toBe(200)
+    expect(realAsset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
   })
 
   it('serves 304 ETag, precompressed .br/.gz sidecars, immutable asset headers, and custom 404.html', async () => {

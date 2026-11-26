@@ -3,6 +3,7 @@
 import type { ActionManifestEntry, BuildManifest, RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
 import type { DocumentOptions } from '../ssr/index'
+import type { RenderContext } from '../ssr/context'
 import type { ActionRegistry } from './action-registry'
 import type { CompressionCache } from './compress'
 import type { CookieStore } from './cookies'
@@ -12,12 +13,14 @@ import type { Middleware, RequestContext } from './http'
 import type { KayLocals } from './index'
 import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } from './page'
 import type { TrustProxy } from './security'
+import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
 import { compressedHtmlResponse } from './compress'
+import { headTagStyleHashes, mergeStyleHashes } from './document'
 import { isNotFound, makeRequestContext } from './http'
 import { pickPageIslandProps } from './page'
 import { Router } from './router'
-import { inlineStyleHashes } from './security'
+import { styleHashesOf } from './security'
 
 const UNSAFE_ENCODED_SEGMENT_RE = /%(?:2f|5c|00)/i
 const MIDDLEWARE_BASENAME_RE = /(?:^|\/)_middleware\.js$/
@@ -244,43 +247,45 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
   const splitAt = shell.indexOf('\0')
   const docPrefix = shell.slice(0, splitAt)
   const docSuffix = shell.slice(splitAt + 1)
+  const headStyleHashes = headTagStyleHashes(doc.headTags)
   const singleLayout = layouts.length === 1 ? layouts[0]! : undefined
 
   const fail = (error: unknown, request: Request, url: URL, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
     notifyError(error, request, 'route')
     return renderError(error, cookieStore, url, request, ctx)
   }
-  const respondHtml = (body: string, request: Request, cookieStore?: CookieStore): Response => {
+  const respondHtml = (body: string, request: Request, rctx: RenderContext, cookieStore?: CookieStore): Response => {
     const html = docPrefix + body + docSuffix
-    const res = compressedHtmlResponse(html, 200, htmlHeaders(hasIslands, false, true, inlineStyleHashes(html)), request, compressCache, !hasLoad)
+    const styleHashes = mergeStyleHashes(headStyleHashes, styleHashesOf(rctx.inlineStyles))
+    const res = compressedHtmlResponse(html, 200, htmlHeaders(hasIslands, false, true, styleHashes), request, compressCache, !hasLoad)
     return cookieStore?.hasChanges ? finish(res, request, cookieStore) : withHsts(res, request)
   }
   const layoutProps = (inner: string, url: URL, locals: KayLocals) => ({ children: raw(inner), url, params: {}, locals })
 
-  const finishSingleLayout = async (wrapped: Promise<Html | string>, request: Request, url: URL, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
+  const finishSingleLayout = async (wrapped: Promise<Html | string>, request: Request, url: URL, rctx: RenderContext, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
     try {
-      return respondHtml(ssrChild(await wrapped as Html), request, cookieStore)
+      return respondHtml(ssrChild(await wrapped as Html), request, rctx, cookieStore)
     }
     catch (error) {
       return fail(error, request, url, cookieStore, ctx)
     }
   }
 
-  const wrapLayouts = (inner: string, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
+  const wrapLayouts = (inner: string, request: Request, url: URL, locals: KayLocals, rctx: RenderContext, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
     if (layouts.length === 0)
-      return respondHtml(inner, request, cookieStore)
+      return respondHtml(inner, request, rctx, cookieStore)
     if (singleLayout !== undefined) {
       const wrapped = singleLayout.default(layoutProps(inner, url, locals))
       if (wrapped instanceof Promise)
-        return finishSingleLayout(wrapped, request, url, cookieStore, ctx)
-      return respondHtml(ssrChild(wrapped as Html), request, cookieStore)
+        return finishSingleLayout(wrapped, request, url, rctx, cookieStore, ctx)
+      return respondHtml(ssrChild(wrapped as Html), request, rctx, cookieStore)
     }
     return (async () => {
       try {
         let cur = inner
         for (let i = layouts.length - 1; i >= 0; i--)
           cur = ssrChild(await layouts[i]!.default(layoutProps(cur, url, locals)) as Html)
-        return respondHtml(cur, request, cookieStore)
+        return respondHtml(cur, request, rctx, cookieStore)
       }
       catch (error) {
         return fail(error, request, url, cookieStore, ctx)
@@ -288,16 +293,16 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
     })()
   }
 
-  const finishAsyncPage = async (rendered: Promise<Html | string>, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
+  const finishAsyncPage = async (rendered: Promise<Html | string>, request: Request, url: URL, locals: KayLocals, rctx: RenderContext, cookieStore?: CookieStore, ctx?: RequestContext): Promise<Response> => {
     try {
-      return await wrapLayouts(ssrChild(await rendered as Html), request, url, locals, cookieStore, ctx)
+      return await wrapLayouts(ssrChild(await rendered as Html), request, url, locals, rctx, cookieStore, ctx)
     }
     catch (error) {
       return fail(error, request, url, cookieStore, ctx)
     }
   }
 
-  const renderPage = (data: unknown, request: Request, url: URL, locals: KayLocals, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
+  const renderPage = (data: unknown, request: Request, url: URL, locals: KayLocals, rctx: RenderContext, cookieStore?: CookieStore, ctx?: RequestContext): Response | Promise<Response> => {
     const pageProps: Record<string, unknown> = { params: {}, locals, url, ...(data !== undefined ? { data } : {}) }
     if (entry.isIsland && entry.islandChunk !== undefined) {
       return wrapLayouts(ssrIsland(
@@ -307,19 +312,20 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
         entry.islandHydrate as HydrateStrategy | undefined,
         true,
         mod.default!.name,
-      ), request, url, locals, cookieStore, ctx)
+      ), request, url, locals, rctx, cookieStore, ctx)
     }
     const rendered = mod.default!(pageProps)
     if (rendered instanceof Promise)
-      return finishAsyncPage(rendered, request, url, locals, cookieStore, ctx)
-    return wrapLayouts(ssrChild(rendered as Html), request, url, locals, cookieStore, ctx)
+      return finishAsyncPage(rendered, request, url, locals, rctx, cookieStore, ctx)
+    return wrapLayouts(ssrChild(rendered as Html), request, url, locals, rctx, cookieStore, ctx)
   }
 
   return (request, remoteIp, url = new URL(request.url)) => {
     const { ctx, cookieStore } = makeRequestContext(request, {}, { trustProxy, remoteIp, url })
+    const rctx = createRenderContext()
     try {
       if (!hasLoad)
-        return actions.run(ctx, () => renderPage(undefined, request, url, ctx.locals, cookieStore, ctx))
+        return actions.run(ctx, () => runWithRenderContext(rctx, () => renderPage(undefined, request, url, ctx.locals, rctx, cookieStore, ctx)))
 
       return actions.run(ctx, async () => {
         try {
@@ -328,7 +334,7 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
             return finish(await buildNotFoundResponse(url, request, ctx), request, cookieStore)
           if (loaded instanceof Response)
             return finish(loaded, request, cookieStore)
-          return await renderPage(loaded, request, url, ctx.locals, cookieStore, ctx)
+          return await runWithRenderContext(rctx, () => renderPage(loaded, request, url, ctx.locals, rctx, cookieStore, ctx))
         }
         catch (error) {
           if (isNotFound(error))

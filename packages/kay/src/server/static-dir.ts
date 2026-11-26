@@ -3,8 +3,8 @@
 import type { Stats } from 'node:fs'
 import type { KayApp } from './http'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
-import { existsSync, statSync } from 'node:fs'
-import { extname, join, resolve } from 'node:path'
+import { existsSync, realpathSync, statSync } from 'node:fs'
+import { extname, join, relative, resolve } from 'node:path'
 import { CompressionCache, isCompressibleType, maybeCompressResponse, pickPrecompressedEncoding, toWeakEtag } from './compress'
 import { applyHstsHeader, etagMatches, MIME } from './http'
 import { buildSecurityHeaderEntries, inlineStyleHashes, KAY_ISLAND_STYLE_HASH, resolveCspPolicy, resolveHstsValue, withCspHashes } from './security'
@@ -21,6 +21,13 @@ export function createStaticDirServer(
 ): KayApp {
   const cleanPrefix = `${assetPrefix.replace(/\/$/, '')}/`
   const absRoot = resolve(outDir)
+  let realRoot = absRoot
+  try {
+    realRoot = realpathSync(absRoot)
+  }
+  catch {}
+  const isContained = (target: string, root: string): boolean =>
+    target === root || target.startsWith(`${root}/`) || target.startsWith(`${root}\\`)
   const compressCache = compressEnabled ? new CompressionCache() : undefined
   const securityEntries = buildSecurityHeaderEntries(security)
   const baseCsp = resolveCspPolicy(security)
@@ -41,6 +48,24 @@ export function createStaticDirServer(
     }
   }
 
+  function resolveContainedFile(abs: string): { path: string, st: Stats } | undefined {
+    if (!isContained(abs, absRoot))
+      return undefined
+    const st = statFile(abs)
+    if (st === undefined)
+      return undefined
+    let real: string
+    try {
+      real = realpathSync(abs)
+    }
+    catch {
+      return undefined
+    }
+    if (!isContained(real, realRoot))
+      return undefined
+    return { path: real, st }
+  }
+
   function resolveStaticFile(pathname: string): { path: string, st: Stats } | undefined {
     let decoded: string
     try {
@@ -56,12 +81,9 @@ export function createStaticDirServer(
       ? ['index.html']
       : [rel, `${rel}.html`, `${rel}/index.html`]
     for (const c of candidates) {
-      const abs = resolve(absRoot, c)
-      if (abs !== absRoot && !abs.startsWith(`${absRoot}/`) && !abs.startsWith(`${absRoot}\\`))
-        continue
-      const st = statFile(abs)
-      if (st !== undefined)
-        return { path: abs, st }
+      const resolved = resolveContainedFile(resolve(absRoot, c))
+      if (resolved !== undefined)
+        return resolved
     }
     return undefined
   }
@@ -93,13 +115,12 @@ export function createStaticDirServer(
     const url = new URL(req.url)
     const found = resolveStaticFile(url.pathname)
     if (found === undefined) {
-      const notFoundPath = join(absRoot, '404.html')
-      const notFoundStat = statFile(notFoundPath)
-      if (notFoundStat !== undefined) {
+      const notFound = resolveContainedFile(join(absRoot, '404.html'))
+      if (notFound !== undefined) {
         const headers = initHeaders(true)
         headers.set('content-type', 'text/html; charset=utf-8')
-        await setPageCsp(headers, notFoundPath, fileEtag(notFoundStat))
-        return withHsts(new Response(req.method === 'HEAD' ? null : Bun.file(notFoundPath), { status: 404, headers }), req)
+        await setPageCsp(headers, notFound.path, fileEtag(notFound.st))
+        return withHsts(new Response(req.method === 'HEAD' ? null : Bun.file(notFound.path), { status: 404, headers }), req)
       }
       return withHsts(new Response('Not Found', { status: 404, headers: initHeaders() }), req)
     }
@@ -109,7 +130,8 @@ export function createStaticDirServer(
     const mime = MIME[ext] ?? 'application/octet-stream'
     const isHtml = ext === '.html' || ext === '.htm'
     const etag = fileEtag(st)
-    const isImmutable = url.pathname.startsWith(cleanPrefix)
+    const normalizedPath = `/${relative(realRoot, filePath).replaceAll('\\', '/')}`
+    const isImmutable = normalizedPath.startsWith(cleanPrefix)
     const headers = initHeaders(isHtml)
     headers.set('content-type', mime)
     headers.set('cache-control', isImmutable ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate')
@@ -117,8 +139,10 @@ export function createStaticDirServer(
     if (isHtml)
       await setPageCsp(headers, filePath, etag)
 
-    const hasBr = compressEnabled && existsSync(`${filePath}.br`)
-    const hasGz = compressEnabled && existsSync(`${filePath}.gz`)
+    const brFile = compressEnabled && existsSync(`${filePath}.br`) ? resolveContainedFile(`${filePath}.br`) : undefined
+    const gzFile = compressEnabled && existsSync(`${filePath}.gz`) ? resolveContainedFile(`${filePath}.gz`) : undefined
+    const hasBr = brFile !== undefined
+    const hasGz = gzFile !== undefined
     if (hasBr || hasGz || (compressEnabled && isCompressibleType(mime)))
       headers.set('vary', 'Accept-Encoding')
 
@@ -128,9 +152,10 @@ export function createStaticDirServer(
     if (compressEnabled && req.method !== 'HEAD' && (hasBr || hasGz)) {
       const preEnc = pickPrecompressedEncoding(req.headers.get('accept-encoding'), { br: hasBr, gz: hasGz })
       if (preEnc !== undefined) {
+        const sidecar = preEnc === 'br' ? brFile! : gzFile!
         headers.set('content-encoding', preEnc)
         headers.set('etag', toWeakEtag(etag))
-        return withHsts(new Response(Bun.file(`${filePath}.${preEnc === 'br' ? 'br' : 'gz'}`), { status: 200, headers }), req)
+        return withHsts(new Response(Bun.file(sidecar.path), { status: 200, headers }), req)
       }
     }
 

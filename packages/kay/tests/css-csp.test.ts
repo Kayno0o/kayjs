@@ -4,7 +4,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { analyzeBundleWeights, build, formatBundleReport } from '../src/build/index'
-import { createServer, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, withCspHashes } from '../src/server/index'
+import { createServer, definePlugin, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, withCspHashes } from '../src/server/index'
+import { createHtmlHeaders } from '../src/server/document'
+import { inlineStyleHashes } from '../src/server/security'
 import { KAY_STREAM_SCRIPT } from '../src/ssr/context'
 
 const tempDirs: string[] = []
@@ -303,5 +305,106 @@ describe('the default CSP lets an app style its pages (#3582)', () => {
     const app = await styledApp(strict)
     const res = await app.handle(new Request('http://localhost/'))
     expect(res.headers.get('content-security-policy')).toBe(`default-src 'self'; script-src 'self'; style-src 'self' ${LAYOUT_STYLE_HASH}`)
+  })
+
+  it('never hashes attacker-injected <style> tags from raw() or innerHTML while still hashing compiler & plugin styles (#3625)', async () => {
+    const dir = makeTemp('kay-3625-csp-inject-')
+    mkdirSync(join(dir, 'src/routes/dyn'), { recursive: true })
+    const attackerCss = 'body{background:url(https://evil.example/exfil)}'
+    const attackerHash = inlineStyleHashes(`<style>${attackerCss}</style>`)[0]!
+    const pluginHeadCss = '.plugin-head{border:1px solid #000}'
+    const pluginHeadHash = inlineStyleHashes(`<style>${pluginHeadCss}</style>`)[0]!
+    const pluginTransformCss = '.plugin-tx{outline:0}'
+    const pluginTransformHash = inlineStyleHashes(`<style>${pluginTransformCss}</style>`)[0]!
+    const fallbackCss = '.fb{opacity:.5}'
+    const fallbackHash = inlineStyleHashes(`<style>${fallbackCss}</style>`)[0]!
+
+    writeFileSync(join(dir, 'src/routes/_layout.tsx'), `
+      export default function Layout({ children }) {
+        return <div><style>{'main{color:red}'}</style><main>{children}</main></div>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { raw } from '@kayjs/kay/internal/ssr'
+      export default function Home() {
+        const injected = '<style>${attackerCss}</style>'
+        return <section>{raw(injected)}<div innerHTML={injected} /></section>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/dyn/[id].tsx'), `
+      export default function Dyn() {
+        return <article innerHTML={'<STYLE>${attackerCss}</STYLE>'} />
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/stream.tsx'), `
+      import { Suspense } from '@kayjs/kay'
+      async function Later() {
+        await Bun.sleep(2)
+        return <p>later</p>
+      }
+      export default function Stream() {
+        return (
+          <Suspense fallback={<><style>{'${fallbackCss}'}</style><p>wait</p><div innerHTML={'<style>${attackerCss}</style>'} /></>}>
+            <Later />
+          </Suspense>
+        )
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/_404.tsx'), `
+      export default function NotFound() {
+        return <div innerHTML={'<style>${attackerCss}</style>missing'} />
+      }
+    `)
+
+    const plugin = definePlugin({
+      name: 'csp-plugin-styles',
+      head(doc) {
+        doc.add(`<style>${pluginHeadCss}</style>`)
+      },
+      transformHtml(html) {
+        return html.replace('</head>', `<style>${pluginTransformCss}</style></head>`)
+      },
+    })
+
+    // First verify fast static path (no plugins) does not authorize injected <style>
+    await build({ root: dir })
+    const fastApp = await createServer({ root: dir })
+    for (const path of ['/', '/dyn/1', '/stream', '/missing']) {
+      const res = await fastApp.handle(new Request(`http://localhost${path}`))
+      const csp = res.headers.get('content-security-policy')!
+      expect(styleSrc(csp), path).toContain(LAYOUT_STYLE_HASH)
+      expect(styleSrc(csp), path).not.toContain(attackerHash)
+    }
+    const streamRes = await fastApp.handle(new Request('http://localhost/stream'))
+    expect(styleSrc(streamRes.headers.get('content-security-policy'))).toContain(fallbackHash)
+    const streamHeadRes = await fastApp.handle(new Request('http://localhost/stream', { method: 'HEAD' }))
+    expect(styleSrc(streamHeadRes.headers.get('content-security-policy'))).toContain(LAYOUT_STYLE_HASH)
+    expect(styleSrc(streamHeadRes.headers.get('content-security-policy'))).toContain(fallbackHash)
+
+    // With plugin head + transformHtml hooks: plugin styles ARE hashed, preexisting injected <style> is STILL not hashed
+    const pluginApp = await createServer({ root: dir, plugins: [plugin] })
+    const pluginRes = await pluginApp.handle(new Request('http://localhost/'))
+    const pluginCsp = pluginRes.headers.get('content-security-policy')!
+    expect(styleSrc(pluginCsp)).toContain(LAYOUT_STYLE_HASH)
+    expect(styleSrc(pluginCsp)).toContain(pluginHeadHash)
+    expect(styleSrc(pluginCsp)).toContain(pluginTransformHash)
+    expect(styleSrc(pluginCsp)).not.toContain(attackerHash)
+  })
+
+  it('handles case-insensitive <STYLE> tags in inlineStyleHashes and LRU cache eviction past 256 entries (#3625)', () => {
+    const hashes = inlineStyleHashes('<STYLE type="text/css">a{color:red}</STYLE><Style>b{color:blue}</Style>')
+    expect(hashes.length).toBe(2)
+    expect(hashes).toEqual([
+      inlineStyleHashes('<style>a{color:red}</style>')[0]!,
+      inlineStyleHashes('<style>b{color:blue}</style>')[0]!,
+    ])
+
+    // Evicts least-recently-used entries cleanly past 256 without errors or stale headers
+    const htmlHeaders = createHtmlHeaders(undefined, { 'content-security-policy': "default-src 'self'; style-src 'self'" })
+    for (let i = 0; i < 300; i++) {
+      const h = inlineStyleHashes(`<style>.k${i}{z-index:${i}}</style>`)
+      const headers = htmlHeaders(false, false, true, h)
+      expect(headers['content-security-policy']).toContain(h[0]!)
+    }
   })
 })

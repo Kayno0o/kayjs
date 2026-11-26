@@ -46,6 +46,8 @@ export interface RenderContext {
   regionAncestors: ReadonlySet<string>
   /** True while the requested region's children render: regions inside it render in full. */
   inTarget: boolean
+  /** Compiler-emitted inline `<style>` contents rendered during this request, for CSP hashing. */
+  inlineStyles: string[] | undefined
 }
 
 const STORAGE_KEY = Symbol.for('kay.render.storage')
@@ -115,7 +117,25 @@ export function createRenderContext(region?: string, ancestors: ReadonlySet<stri
     regionNames: new Set(),
     regionAncestors: ancestors,
     inTarget: false,
+    inlineStyles: undefined,
   }
+}
+
+/** Records a compiler-emitted inline `<style>` block's CSS in the active RenderContext for CSP hashing. */
+export function recordInlineStyle(css: string): void {
+  const ctx = renderStorage.getStore()
+  if (ctx === undefined || css === '')
+    return
+  if (ctx.inlineStyles === undefined)
+    ctx.inlineStyles = [css]
+  else if (!ctx.inlineStyles.includes(css))
+    ctx.inlineStyles.push(css)
+}
+
+/** Emits compiler-authored `<style>` text unchanged while registering it for CSP hashing. */
+export function ssrStyleBlock(css: string): string {
+  recordInlineStyle(css)
+  return css
 }
 
 // An island sees only the contexts provided inside it, as in the browser.
