@@ -41,24 +41,32 @@ afterAll(() => {
 
 describe('Milestone 4: Compiler hardening (spreads, SVG, destructured .map, kay-slot)', () => {
   it('compiles JSX spread attributes on intrinsic elements for SSR and DOM and folds static literal attrs', () => {
-    const src = `
+    const spreadSrc = `
       import { signal } from '@kayjs/kay'
       export function Btn({ label, ...rest }: { label: string, [k: string]: unknown }) {
-        return <button type="button" tabIndex={-1} rows={4} disabled={false} hidden={true} {...rest}>{label}</button>
+        return <button type="button" {...rest}>{label}</button>
       }
     `
-    const ssr = compileSsr('Btn.tsx', src)
-    expect(ssr.code).toContain('__ssrSpread(rest)')
+    const ssr = compileSsr('Btn.tsx', spreadSrc)
+    expect(ssr.code).toContain('__ssrSpread({ type: "button", ...(rest) })')
 
-    const dom = compileDom('Btn.tsx', src)
+    const dom = compileDom('Btn.tsx', spreadSrc)
     expect(dom.code).toContain('__omit(__p, ["label"])')
     expect(dom.code).toContain('__spread(')
-    // Static literals folded straight into template HTML — zero setAttr effects!
-    expect(dom.code).toContain('tabIndex=\\"-1\\"')
-    expect(dom.code).toContain('rows=\\"4\\"')
-    expect(dom.code).toContain(' hidden')
-    expect(dom.code).not.toContain('disabled')
     expect(dom.code).not.toContain('__setAttr')
+
+    // Static literals without a spread fold straight into template HTML — zero setAttr effects!
+    const staticSrc = `
+      export function StaticBtn({ label }: { label: string }) {
+        return <button type="button" tabIndex={-1} rows={4} disabled={false} hidden={true}>{label}</button>
+      }
+    `
+    const staticDom = compileDom('StaticBtn.tsx', staticSrc)
+    expect(staticDom.code).toContain('tabIndex=\\"-1\\"')
+    expect(staticDom.code).toContain('rows=\\"4\\"')
+    expect(staticDom.code).toContain(' hidden')
+    expect(staticDom.code).not.toContain('disabled')
+    expect(staticDom.code).not.toContain('__setAttr')
   })
 
   it('compiles SVG child root templates with isSvg=true and handles destructured .map()', () => {
