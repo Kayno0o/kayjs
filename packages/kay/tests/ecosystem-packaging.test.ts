@@ -189,3 +189,12 @@ console.log('EXT_OK')
     }
   })
 })
+
+describe('#3590 kay ships its own reference', () => {
+  test('the @kayjs/kay tarball holds llms.txt, and a scaffolded app\'s AGENTS.md points its agent at the installed copy', async () => {
+    const pack = Bun.spawnSync(['bun', 'pm', 'pack', '--dry-run'], { cwd: join(REPO_ROOT, 'packages/kay'), stdout: 'pipe', stderr: 'pipe' })
+    expect(pack.stdout.toString()).toMatch(/packed [\d.]+K?B llms\.txt/)
+    const agents = readFileSync(join(REPO_ROOT, 'packages/kay/templates/_shared/AGENTS.md'), 'utf8')
+    expect(agents).toContain('node_modules/@kayjs/kay/llms.txt')
+  })
+})

@@ -17,5 +17,5 @@ Kay v2 is a Bun-native web framework. You write standard TypeScript and JSX. Sta
 - **Small core, modular plugins**: Everything optional (`@kayjs/ui`, `@kayjs/auth`, `@kayjs/content`, `@kayjs/live`, `@kayjs/mcp`, `@kayjs/images`, `@kayjs/seo`, `@kayjs/i18n`, `@kayjs/mail`, `@kayjs/icons`, `@kayjs/tailwind`, `@kayjs/spa`) plugs in through `KayPlugin`.
 
 <Callout title="Coding-agent reference" tone="tip">
-The entire Kay v2 API fits on one dense page at [`/llms.txt`](/llms.txt).
+The entire Kay v2 API fits on one dense page at [`/llms.txt`](/llms.txt). Every install carries the copy for its own version at `node_modules/@kayjs/kay/llms.txt`, and the `AGENTS.md` that `kay new` writes points coding agents at it.
 </Callout>

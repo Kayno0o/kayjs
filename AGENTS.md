@@ -1,6 +1,6 @@
 # kay v2
 
-This file is for agents working on kay itself. Agents writing an app on kay read `llms.txt`, and people read the docs in `docs/src/content/docs/`. This file does not repeat the API: `llms.txt` holds it.
+This file is for agents working on kay itself. Agents writing an app on kay read `llms.txt` (`packages/kay/llms.txt`, shipped in `@kayjs/kay` and linked from the repo root), and people read the docs in `docs/src/content/docs/`. This file does not repeat the API: `llms.txt` holds it.
 
 kay v2 is a Bun-native full-stack web framework. You write plain TypeScript and TSX, and kay decides what reaches the browser: a static page ships 0 KB of JS, an interactive component becomes an island on its own, and a deploy is one binary or a static export. The aim is to beat what people use today (Astro, Next, Nuxt, Solid) on how little the app writes, how little the browser downloads, how early a mistake is caught, and how much of French law an app gets right without trying.
 

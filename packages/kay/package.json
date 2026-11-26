@@ -11,7 +11,8 @@
   },
   "files": [
     "src",
-    "templates"
+    "templates",
+    "llms.txt"
   ],
   "exports": {
     ".": "./src/index.ts",
