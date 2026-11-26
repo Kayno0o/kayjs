@@ -5,16 +5,11 @@
 // - Restores scroll position on popstate, scrolls to #hash targets, manages focus & polite live announcements
 // - Opt-in prefetch via [data-kay-prefetch] (bounded 8-entry / 15s TTL cache, respects Save-Data)
 
-interface PrefetchEntry {
-  html: string
-  url: string
-  ts: number
-}
+import { ANNOUNCER_ID, announce } from './announcer'
+import { fetchKeyOf, getCachedHtml, inflightPrefetch, prefetch, prefetchCache } from './prefetch'
 
-const PREFETCH_TTL = 15_000
-const PREFETCH_MAX = 8
-const prefetchCache = new Map<string, PrefetchEntry>()
-const inflightPrefetch = new Map<string, Promise<PrefetchEntry | undefined>>()
+export { prefetch }
+
 let activeController: AbortController | undefined
 let currentDocKey = typeof location !== 'undefined' ? `${location.pathname}${location.search}` : ''
 
@@ -37,91 +32,7 @@ function saveScrollState(): void {
   catch {}
 }
 
-function getCachedHtml(href: string): PrefetchEntry | undefined {
-  const hit = prefetchCache.get(href)
-  if (hit === undefined)
-    return undefined
-  if (Date.now() - hit.ts > PREFETCH_TTL) {
-    prefetchCache.delete(href)
-    return undefined
-  }
-  return hit
-}
-
-function putCachedHtml(href: string, entry: PrefetchEntry): void {
-  prefetchCache.delete(href)
-  prefetchCache.set(href, entry)
-  if (prefetchCache.size > PREFETCH_MAX) {
-    const oldest = prefetchCache.keys().next()
-    if (!oldest.done)
-      prefetchCache.delete(oldest.value)
-  }
-}
-
-export async function prefetch(url: string): Promise<void> {
-  const clean = new URL(url, location.href)
-  clean.hash = ''
-  const key = clean.href
-  if (getCachedHtml(key) !== undefined || inflightPrefetch.has(key))
-    return
-  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
-  if (conn?.saveData)
-    return
-
-  const task = (async (): Promise<PrefetchEntry | undefined> => {
-    try {
-      const res = await fetch(key, { headers: { 'x-kay-spa': '1' } })
-      if (!res.ok || !(res.headers.get('content-type') ?? '').includes('text/html'))
-        return undefined
-      const entry: PrefetchEntry = { html: await res.text(), url: res.url || key, ts: Date.now() }
-      putCachedHtml(key, entry)
-      return entry
-    }
-    catch {
-      return undefined
-    }
-    finally {
-      inflightPrefetch.delete(key)
-    }
-  })()
-  inflightPrefetch.set(key, task)
-  await task
-}
-
 const SYNC_HEAD_SELECTOR = 'meta[name="description"],meta[name="robots"],meta[property^="og:"],meta[name^="twitter:"],link[rel="canonical"],link[rel="alternate"][hreflang],script[type="application/ld+json"]'
-const ANNOUNCER_ID = '__kay-spa-announcer'
-
-function applySrOnlyStyle(el: HTMLElement): void {
-  const s = el.style
-  s.position = 'absolute'
-  s.width = '1px'
-  s.height = '1px'
-  s.padding = '0'
-  s.margin = '-1px'
-  s.overflow = 'hidden'
-  s.clip = 'rect(0,0,0,0)'
-  s.whiteSpace = 'nowrap'
-  s.border = '0'
-}
-
-function getOrCreateAnnouncer(): HTMLElement {
-  let region = document.getElementById(ANNOUNCER_ID)
-  if (region === null) {
-    region = document.createElement('div')
-    region.id = ANNOUNCER_ID
-    region.setAttribute('role', 'status')
-    region.setAttribute('aria-live', 'polite')
-    region.setAttribute('aria-atomic', 'true')
-    applySrOnlyStyle(region)
-    document.body.appendChild(region)
-  }
-  return region
-}
-
-function announcePageTitle(title: string): void {
-  const region = getOrCreateAnnouncer()
-  region.textContent = title
-}
 
 function resolveSuspenseTemplates(doc: Document): void {
   for (const tpl of doc.querySelectorAll<HTMLTemplateElement>('template[data-ks]')) {
@@ -220,7 +131,7 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
 
   const targetUrl = new URL(url, location.href)
   const hash = targetUrl.hash
-  const fetchKey = `${targetUrl.origin}${targetUrl.pathname}${targetUrl.search}`
+  const fetchKey = fetchKeyOf(targetUrl)
 
   try {
     let html: string
@@ -323,7 +234,7 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
       }
 
       focusPrimaryLandmark()
-      announcePageTitle(document.title)
+      announce(document.title)
 
       window.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: nextFullUrl } }))
     }
@@ -366,7 +277,8 @@ if (typeof document !== 'undefined') {
   const onIntent = (event: Event) => {
     const target = event.target as Element | null
     const link = target?.closest?.('a[href]') as HTMLAnchorElement | null
-    if (!link || link.hasAttribute('data-no-prefetch'))
+    // A region link prefetches its region alone, in regions().
+    if (!link || link.hasAttribute('data-no-prefetch') || link.hasAttribute('data-kay-target'))
       return
     // Prefetch is strictly opt-in via [data-kay-prefetch] so side-effecting links like /logout are never prefetched
     if (link.closest('[data-kay-prefetch]') === null)
@@ -386,7 +298,10 @@ if (typeof document !== 'undefined') {
     const nextDocKey = `${location.pathname}${location.search}`
     if (nextDocKey === currentDocKey)
       return
-    const st = event.state as { __kayScrollY?: number } | null
+    const st = event.state as { __kayScrollY?: number, __kayIdx?: number } | null
+    // An entry a region swap made belongs to regions().
+    if (typeof st?.__kayIdx === 'number')
+      return
     void navigate(location.href, false, typeof st?.__kayScrollY === 'number' ? st.__kayScrollY : 0)
   })
 }

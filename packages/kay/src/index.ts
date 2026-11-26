@@ -1,4 +1,4 @@
-export { createContext, Head, provideContext, Suspense, useContext, useId } from './context'
+export { createContext, Head, provideContext, Region, Suspense, useContext, useId } from './context'
 export type { Context } from './context'
 export {
   batch,

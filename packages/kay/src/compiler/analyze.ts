@@ -36,8 +36,8 @@ const STATE_PRIMITIVES = new Set(['signal', 'computed', 'selector', 'store'])
 const KAY_SOURCES = new Set(['@kayjs/kay'])
 const KAY_SSR_SOURCES = new Set(['@kayjs/kay', '@kayjs/kay/internal/ssr'])
 const KAY_SERVER_SOURCES = new Set(['@kayjs/kay/server'])
-const RENDER_CONTEXT_IMPORTS = new Set(['Head', 'Suspense', 'createContext', 'provideContext', 'useContext', 'useId'])
-const SERVER_ONLY_TAGS = new Set(['Head', 'Suspense'])
+const RENDER_CONTEXT_IMPORTS = new Set(['Head', 'Region', 'Suspense', 'createContext', 'provideContext', 'useContext', 'useId'])
+const SERVER_ONLY_TAGS = new Set(['Head', 'Region', 'Suspense'])
 
 export interface ImportInfo {
   source: string

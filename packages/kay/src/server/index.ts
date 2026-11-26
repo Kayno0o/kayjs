@@ -25,6 +25,7 @@ import { createErrorNotifier, createFallbackPages, devErrorResponse } from './er
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
 import { allowedMethodsHeader, isPlainObject, mergedHeadTags, pickPageIslandProps, stripHeadBody } from './page'
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
+import { requestedRegion, respondRegion } from './region'
 import { Router } from './router'
 import { buildSecurityHeaderEntries, inlineStyleHashes, resolveHstsValue, verifyOrigin } from './security'
 import { STREAM_TAIL_MARK, streamDocument } from './stream'
@@ -380,6 +381,10 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       url: ctx.url,
       ...(data !== undefined ? { data } : {}),
     }
+
+    const region = requestedRegion(ctx.request)
+    if (region !== undefined)
+      return respondRegion(region, mod, pageProps, entry.path, htmlHeaders)
 
     const rctx = createRenderContext()
     const renderBody = async (): Promise<string> => {

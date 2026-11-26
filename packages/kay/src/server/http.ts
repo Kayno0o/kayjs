@@ -8,6 +8,7 @@ import type { KayLocals } from './index'
 import type { TrustProxy } from './security'
 import { CookieStore } from './cookies'
 import { nodeEnv } from './env'
+import { requestedRegion } from './region'
 import { getClientIp, isHttpsRequest } from './security'
 
 export const DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 1024
@@ -106,6 +107,8 @@ export interface RequestContext<Params = Record<string, string>> {
   cookies: Cookies
   locals: KayLocals
   ip?: string | undefined
+  /** The region a `data-kay-target` link or form asked for alone (`x-kay-region`): `load()` can skip the data the others show. */
+  readonly region?: string | undefined
   json: (data: unknown, init?: ResponseInit) => Response
   text: (body: string, init?: ResponseInit) => Response
   redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => Response
@@ -255,6 +258,9 @@ export function makeRequestContext(
     set ip(val: string | undefined) {
       ipComputed = true
       cachedIp = val
+    },
+    get region() {
+      return requestedRegion(request)
     },
     json,
     text,

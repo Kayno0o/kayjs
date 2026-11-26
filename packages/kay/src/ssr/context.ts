@@ -5,6 +5,7 @@ import type { Html, KayChild } from '../jsx-runtime'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { registerServerContextBridge } from '../context'
 import { raw, ssrChild } from './index'
+import { Region } from './region'
 
 export interface SettledChunk {
   html: string
@@ -36,6 +37,13 @@ export interface RenderContext {
   renderedIslands: Map<string, boolean>
   hasIslands: boolean
   htmlAttrs: Record<string, string>
+  /** The region a request asked for alone (`x-kay-region`). */
+  region: string | undefined
+  /** The requested region's HTML, once the page rendered it. */
+  regionHtml: string | undefined
+  regionNames: Set<string>
+  /** The region whose children are rendering. */
+  inRegion: string | undefined
 }
 
 const STORAGE_KEY = Symbol.for('kay.render.storage')
@@ -73,6 +81,9 @@ registerServerContextBridge({
       return undefined
     return `${ctx.idPrefix}${ctx.idSeq++}`
   },
+  region(props) {
+    return Region(props)
+  },
   head(props) {
     return Head(props)
   },
@@ -81,7 +92,7 @@ registerServerContextBridge({
   },
 })
 
-export function createRenderContext(): RenderContext {
+export function createRenderContext(region?: string): RenderContext {
   return {
     headParts: [],
     title: undefined,
@@ -97,6 +108,10 @@ export function createRenderContext(): RenderContext {
     renderedIslands: new Map(),
     hasIslands: false,
     htmlAttrs: {},
+    region,
+    regionHtml: undefined,
+    regionNames: new Set(),
+    inRegion: undefined,
   }
 }
 

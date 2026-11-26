@@ -78,6 +78,21 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<div innerHTML={html}>\n</div>', 'const html = \'\'')
   })
 
+  test('region markup the browser would ignore (#3597)', () => {
+    const region = 'import { Region } from \'@kayjs/kay\''
+    refuses('<Region><p>x</p></Region>', /<Region> without a name in Page\.tsx: write <Region name="pane">/, region)
+    accepts('<Region name="pane"><p>x</p></Region>', region)
+    accepts('<Region {...{ name: \'pane\' }}><p>x</p></Region>', region)
+    refuses('<button data-kay-target="pane">x</button>', /data-kay-target on <button> in Page\.tsx: put it on the <a href>/)
+    refuses('<form method="post" data-kay-target="pane"></form>', /data-kay-target on a <form method="post"> in Page\.tsx: a region swaps from a GET/)
+    accepts('<form method="get" data-kay-target="pane" data-kay-live></form>')
+    accepts('<form data-kay-target="pane"></form>')
+    refuses('<a href="?page=2" data-kay-append>More</a>', /data-kay-append without data-kay-target in Page\.tsx: name the region/)
+    accepts('<a href="?page=2" data-kay-target="results" data-kay-append>More</a>')
+    refuses('<a href="?q=1" data-kay-target="results" data-kay-live>x</a>', /data-kay-live in Page\.tsx: it belongs on a <form method="get"/)
+    refuses('<form data-kay-live></form>', /data-kay-live in Page\.tsx/)
+  })
+
   test('<Suspense> with several children, which renders none of them', () => {
     refuses('<Suspense fallback={<p>...</p>}><A /><B /></Suspense>', /<Suspense> with 2 children in Page\.tsx: give it one child/, 'import { Suspense } from \'@kayjs/kay\'\nconst A = () => <p>a</p>\nconst B = () => <p>b</p>')
     accepts('<Suspense fallback={<p>...</p>}>\n  <A />\n</Suspense>', 'import { Suspense } from \'@kayjs/kay\'\nconst A = () => <p>a</p>')

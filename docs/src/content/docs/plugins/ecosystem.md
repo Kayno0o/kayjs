@@ -97,3 +97,45 @@ export default defineConfig({
 - **Prefetch on hover/focus**: Add `data-kay-prefetch` to internal links (respects `Save-Data`).
 - **Opt-out**: Add `data-no-spa` to any link that should trigger a full page load.
 - **Accessibility**: Updates `<title>`, `<html lang>`, head metadata, scroll position, focus, and a polite `aria-live` route announcer.
+
+### Regions
+
+A link that opens a detail pane or switches a tab should not download the whole page. `regions()` swaps one part of the page and asks the server for that part alone. It works with or without `spa()`.
+
+```ts
+import { regions } from '@kayjs/spa'
+
+export default defineConfig({
+  plugins: [regions()],
+})
+```
+
+Wrap the part in a `<Region>` and point links at it by name:
+
+```tsx
+import { Region } from '@kayjs/kay'
+
+export default function Icons({ data }) {
+  return (
+    <main>
+      <Region name="results">
+        {data.items.map(i => <a href={`?icon=${i}`} data-kay-target="pane">{i}</a>)}
+      </Region>
+      <Region name="pane" aria-label="Icon detail">
+        <h2>{data.icon}</h2>
+      </Region>
+    </main>
+  )
+}
+```
+
+The browser asks for `x-kay-region: pane`. The server skips the layouts and every other region, and sends only the inside of `pane`. Without JavaScript the link is a normal link and the whole page loads. History works as usual: each swap is an entry, and back and forward restore the region. `ctx.region` is the name asked for, so `load()` can skip data the region does not show.
+
+- **Append**: add `data-kay-append` to a "Load more" link. The next page is added to the region and the link goes. The history entry is replaced, not pushed.
+- **Forms**: a `<form method="get" data-kay-target="results">` swaps on submit. Add `data-kay-live` to swap while the user types. A typing burst makes one history entry, and a pause of one second ends the burst.
+- **Keep links in step**: `data-kay-sync="q icon"` on a link copies those query params from the current URL after each swap. On an input or select it keeps the field equal to the param of its name.
+- **Prefetch**: put the link inside `data-kay-prefetch` and its region is fetched on hover or focus, with the same cache as `spa()`.
+- **Loading and focus**: the region gets `aria-busy="true"` when a fetch takes more than 150 ms, so you can style it. A link moves focus to the region. A region with an `aria-label` announces it. Give the region an `aria-label` that says what changed.
+- **Islands** inside the new HTML hydrate as usual.
+
+If the page has no region of that name, or the fetch fails, the link loads the whole page. `kay check` reports a `data-kay-target` that names no `<Region>`. Two regions with one name, or a region inside another, throw. If you use `spa()` too, give each path either region links or page links, not both for the same history entries.

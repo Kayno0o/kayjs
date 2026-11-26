@@ -309,6 +309,7 @@ export function checkMistakes(element: JSXElement, filename: string, code: strin
       guarded(element.start, () => { throw mistake(`<Suspense> with ${children} children`, filename, 'give it one child, and one <Suspense> per async component') })
   }
   const attributes = element.openingElement.attributes
+  guarded(element.start, () => checkRegionMarkup(tag, isElement, attributes, filename))
   const className = isElement && staticAttr(attributes, 'class') !== undefined ? staticAttr(attributes, 'className') : undefined
   if (className !== undefined)
     guarded(className.start, () => { throw mistake('class and className', filename, 'keep one, they set the same attribute') })
@@ -326,6 +327,30 @@ export function checkMistakes(element: JSXElement, filename: string, code: strin
         checkElementAttribute(attr, isCustomElement, filename, code)
     })
   }
+}
+
+// A literal string value of an attribute, when it has one.
+function literalText(attr: JSXAttribute): string | undefined {
+  return attr.value?.type === 'Literal' && typeof attr.value.value === 'string' ? attr.value.value : undefined
+}
+
+// The markup `regions()` from `@kayjs/spa` reads: <Region name>, and data-kay-target, data-kay-append and data-kay-live on the elements that can use them.
+function checkRegionMarkup(tag: string, isElement: boolean, attributes: readonly JSXAttributeItem[], filename: string): void {
+  if (tag === 'Region' && staticAttr(attributes, 'name') === undefined && !attributes.some(a => a.type === 'JSXSpreadAttribute'))
+    throw mistake('<Region> without a name', filename, 'write <Region name="pane">, the name a link names in data-kay-target')
+  if (!isElement)
+    return
+  const target = staticAttr(attributes, 'data-kay-target')
+  if (target !== undefined && tag !== 'a' && tag !== 'form')
+    throw mistake(`data-kay-target on <${tag}>`, filename, 'put it on the <a href> or the <form method="get"> that should swap the region')
+  const method = tag === 'form' && target !== undefined ? staticAttr(attributes, 'method') : undefined
+  const methodText = method === undefined ? undefined : literalText(method)
+  if (methodText !== undefined && methodText.toLowerCase() !== 'get')
+    throw mistake(`data-kay-target on a <form method="${methodText}">`, filename, 'a region swaps from a GET: use method="get", or drop data-kay-target and post to an action')
+  if (target === undefined && staticAttr(attributes, 'data-kay-append') !== undefined)
+    throw mistake('data-kay-append without data-kay-target', filename, 'name the region the next page is appended to: data-kay-target="results"')
+  if (staticAttr(attributes, 'data-kay-live') !== undefined && (tag !== 'form' || target === undefined))
+    throw mistake('data-kay-live', filename, 'it belongs on a <form method="get" data-kay-target="..."> that swaps while typing')
 }
 
 const DIRECTIVE_FIXES: Record<string, string> = {

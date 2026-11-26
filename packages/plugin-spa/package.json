@@ -5,14 +5,16 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": [
-    "./src/client.ts"
+    "./src/client.ts",
+    "./src/regions.ts"
   ],
   "files": [
     "src"
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./regions": "./src/regions.ts"
   },
   "engines": {
     "bun": ">=1.4.0"

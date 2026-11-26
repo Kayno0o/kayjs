@@ -5,7 +5,16 @@ import type { KayChild } from './jsx-runtime'
 import type { IdScope, Owner } from './reactivity/index'
 import { createOwner, getOwner, runWithOwner } from './reactivity/index'
 
+export interface RegionProps {
+  name: string
+  /** The element tag, `div` by default. */
+  as?: string
+  children?: KayChild
+  [attribute: string]: unknown
+}
+
 export interface ServerContextBridge {
+  region(props: RegionProps): KayChild
   getContext(key: symbol): { found: true, value: unknown } | undefined
   runWithContext<T>(key: symbol, value: unknown, fn: () => T): T
   nextId(): string | undefined
@@ -36,6 +45,12 @@ export function Suspense(props: { fallback?: KayChild, error?: KayChild | ((erro
   if (bridge !== undefined)
     return bridge.suspense(props)
   return props.children instanceof Promise ? (props.fallback ?? null) : (props.children ?? null)
+}
+
+/** A part of the page that a link or form with `data-kay-target` swaps alone: a request for it renders only its children. Server-only, like `Head`. */
+export function Region(props: RegionProps): KayChild {
+  const bridge = getServerBridge()
+  return bridge !== undefined ? bridge.region(props) : null
 }
 
 export interface Context<T> {
