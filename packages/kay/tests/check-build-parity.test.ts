@@ -232,3 +232,71 @@ describe('kay check and kay build decide islands per component (#3587)', () => {
     ])
   })
 })
+
+describe('kay check and kay build share island planning and reachability checks (#3599)', () => {
+  it('surfaces a parse error in a broken import during state-read promotion instead of swallowing it', async () => {
+    const dir = appWith('kay-3599-broken-state-', {
+      'shared/broken-state.ts': 'import { signal } from \'@kayjs/kay\'\nexport const count = signal(\n',
+      'src/state.ts': 'export { count } from \'../shared/broken-state\'\n',
+      'src/routes/index.tsx': 'import { count } from \'../state\'\nexport default function Home() { return <output>{count.value}</output> }\n',
+    })
+
+    const checked = await checkProject(dir, { skipTypecheck: true })
+    expect(checked.ok).toBe(false)
+    expect(checked.errors).toEqual([expect.stringMatching(/^shared\/broken-state\.ts:\d+:\d+: error: kay compiler: syntax error:/)])
+    await expect(build({ root: dir, minify: false })).rejects.toThrow(/shared\/broken-state\.ts:.*syntax error/)
+  })
+
+  it('surfaces a parse error on a namespace state import outside src/ during state-read promotion', async () => {
+    const dir = appWith('kay-3599-broken-ns-state-', {
+      'shared/broken-state.ts': 'import { signal } from \'@kayjs/kay\'\nexport const count = signal(\n',
+      'src/routes/index.tsx': 'import * as state from \'../../shared/broken-state\'\nexport default function Home() { return <output>{state.count.value}</output> }\n',
+    })
+
+    const checked = await checkProject(dir, { skipTypecheck: true })
+    expect(checked.ok).toBe(false)
+    expect(checked.errors).toEqual([expect.stringMatching(/^shared\/broken-state\.ts:\d+:\d+: error: kay compiler: syntax error:/)])
+    await expect(build({ root: dir, minify: false })).rejects.toThrow(/shared\/broken-state\.ts:.*syntax error/)
+  })
+
+  it('agrees on re-exports from a stubbed server action file (allows actions, rejects non-actions)', async () => {
+    const okDir = appWith('kay-3599-action-reexport-ok-', {
+      'src/actions/notes.ts': [
+        'import { readFileSync } from \'node:fs\'',
+        'import { action } from \'@kayjs/kay/server\'',
+        'export const addNote = action(async () => readFileSync(\'/etc/hostname\', \'utf8\'))',
+      ].join('\n'),
+      'src/lib/actions.ts': 'export { addNote } from \'../actions/notes\'\n',
+      'src/routes/index.tsx': [
+        'import { signal } from \'@kayjs/kay\'',
+        'import { addNote } from \'../lib/actions\'',
+        'export default function Home() { const n = signal(0); return <button type="button" onClick={() => { n.value++; void addNote(undefined) }}>{n.value}</button> }',
+      ].join('\n'),
+    })
+    expect(await checkProject(okDir, { skipTypecheck: true })).toMatchObject({ ok: true, errors: [] })
+    const manifest = await build({ root: okDir, minify: false })
+    expect(Object.keys(manifest.islands).length).toBe(1)
+
+    const badDir = appWith('kay-3599-action-reexport-bad-', {
+      'src/actions/notes.ts': [
+        'import { action } from \'@kayjs/kay/server\'',
+        'export const MAX_LENGTH = 140',
+        'export const addNote = action(async () => \'ok\')',
+      ].join('\n'),
+      'src/lib/actions.ts': 'export { MAX_LENGTH } from \'../actions/notes\'\n',
+      'src/routes/index.tsx': [
+        'import { signal } from \'@kayjs/kay\'',
+        'import { MAX_LENGTH } from \'../lib/actions\'',
+        'export default function Home() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{MAX_LENGTH - n.value}</button> }',
+      ].join('\n'),
+    })
+    const checked = await checkProject(badDir, { skipTypecheck: true })
+    expect(checked.ok).toBe(false)
+    expect(checked.errors).toEqual([
+      'src/lib/actions.ts:1:1: error: kay check: re-exports non-action "MAX_LENGTH" from server action file src/actions/notes.ts. Move MAX_LENGTH into a module without actions.',
+    ])
+    await expect(build({ root: badDir, minify: false })).rejects.toThrow(
+      'kay build: src/lib/actions.ts runs in the browser and re-exports MAX_LENGTH from src/actions/notes.ts, a file of server actions: the browser only gets its actions. Move MAX_LENGTH into a module without actions.',
+    )
+  })
+})

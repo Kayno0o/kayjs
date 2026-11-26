@@ -13,7 +13,7 @@ import { readsPrivateEnv } from '../compiler/server-only'
 import { clientPlugin, KAY_SPECIFIER_FILTER, TS_FILTER } from './client-plugin'
 import { formatBunBuildLogs, isOutsideRoot, isTsFile, relPosix } from './files'
 import { stampFiles, stampsMatch } from './graph'
-import { islandKey } from './islands'
+import { clientLeakError, islandKey } from './islands'
 import { resolveKaySpecifier } from './resolve'
 
 export interface BundleEnv {
@@ -121,10 +121,6 @@ export interface ClientBuild {
   styleUrls: string[]
   runtimeScript: string | undefined
   metafile: Bun.BuildOutput['metafile']
-}
-
-function clientLeakError(leaks: Set<string>): Error {
-  return new Error(`kay build (client): server code is reachable from an island:\n${[...leaks].map(l => `  ${l}`).join('\n')}\nMove server logic to a server action or async server component.`)
 }
 
 function publicEnvDefines(): Record<string, string> {
@@ -317,12 +313,8 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
         continue
       const abs = resolveMetaPath(inKey)
       let program = graph.analyses.get(abs)?.program
-      if (program === undefined && existsSync(abs) && isTsFile(abs) && !/[\\/]node_modules[\\/]/.test(abs)) {
-        try {
-          program = graph.load(abs).program
-        }
-        catch {}
-      }
+      if (program === undefined && existsSync(abs) && isTsFile(abs) && !/[\\/]node_modules[\\/]/.test(abs))
+        program = graph.load(abs).program
       if (program !== undefined && readsPrivateEnv(program, inlinedEnvKey))
         clientLeaks.add(`${relPosix(root, abs)} reads process.env or Bun.env (only a process.env.PUBLIC_* set at build time is inlined)`)
     }

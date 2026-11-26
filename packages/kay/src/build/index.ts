@@ -200,7 +200,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     }
   }
 
-  const islands = planIslands(graph, root, pageFiles, specialFiles, actionsByFile)
+  const islands = planIslands(graph, root, pageFiles, specialFiles)
 
   rmSync(outDir, { recursive: true, force: true })
   mkdirSync(clientDir, { recursive: true })

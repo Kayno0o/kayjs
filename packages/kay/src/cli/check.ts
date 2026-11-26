@@ -1,18 +1,18 @@
 // `kay check [dir]`: validates routes, Kay compiler & island rules (unified with `kay build`), config, and TypeScript types.
 
 import type { Program } from 'oxc-parser'
+import type { IslandIssue } from '../build/islands'
 import type { ModuleAnalysis } from '../compiler/analyze'
 import type { CheckPluginContext, KayPlugin } from '../plugins/index'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
 import { isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
+import { analyzeIslands } from '../build/islands'
 import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblemLocation, routeFileProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
 import { analyzeModule } from '../compiler/analyze'
 import { walk } from '../compiler/ast'
-import { withStateReads } from '../compiler/interactivity'
 import { collectMistakes, KayMistake, serverOnlyTagError } from '../compiler/mistakes'
-import { findPrivateEnvOffset, SERVER_ONLY_MODULES } from '../compiler/server-only'
 import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, isJsxNode, jsxTagName } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 
@@ -92,39 +92,77 @@ function sourceOf(file: string, sources: Map<string, string>): string {
   return code
 }
 
-function analysisOf(file: string, analyses: Map<string, ModuleAnalysis>, sources: Map<string, string>, unparsable: Set<string>): ModuleAnalysis | undefined {
-  if (!analyses.has(file) && !unparsable.has(file) && isTsFile(file)) {
-    const { value } = collectMistakes(() => analyzeModule(file, sourceOf(file, sources)))
-    if (value !== undefined)
-      analyses.set(file, value)
-    else
-      unparsable.add(file)
-  }
-  return analyses.get(file)
-}
-
 function locOf(root: string, file: string, sources: Map<string, string>, offset = 0): string {
   const rel = relPosix(root, file)
   const code = sources.get(file)
   return code !== undefined ? formatLoc(rel, code, offset) : `${rel}:1:1`
 }
 
-// Analyzes each file, reporting every compiler mistake at its place. A file whose analysis stopped short (a syntax error, a mistake no later check can work past) is left out of the checks that need it.
-function analyzeFiles(root: string, files: readonly string[], analyses: Map<string, ModuleAnalysis>, sources: Map<string, string>, unparsable: Set<string>, errors: string[], warnings: string[]): void {
-  for (const file of files) {
-    const { value, mistakes, error } = collectMistakes(() => analyzeModule(file, sourceOf(file, sources)))
-    const rel = relPosix(root, file)
-    for (const m of mistakes)
-      errors.push(formatDiagnostic(locOf(root, file, sources, m.start), m.message.replaceAll(file, rel)))
-    if (value !== undefined) {
-      analyses.set(file, value)
-      for (const w of value.warnings)
-        warnings.push(formatDiagnostic(locOf(root, file, sources, w.start), w.message.replaceAll(file, rel), 'warning'))
-      continue
+function normalizeDiagnosticPath(root: string, file: string, message: string): string {
+  const rel = relPosix(root, file)
+  const relMessage = message.replaceAll(file, rel)
+  if (DIAGNOSTIC_PREFIX_RE.test(relMessage))
+    return relMessage
+  return formatDiagnostic(`${rel}:1:1`, relMessage)
+}
+
+// Analyzes a file once, reporting every compiler mistake or parse error at its place. A file whose analysis stopped short is remembered in `unparsable` so later graph walks do not re-report it.
+function loadCheckedModule(
+  file: string,
+  root: string,
+  analyses: Map<string, ModuleAnalysis>,
+  sources: Map<string, string>,
+  unparsable: Set<string>,
+  errors: string[],
+  warnings: string[],
+): ModuleAnalysis | undefined {
+  const existing = analyses.get(file)
+  if (existing !== undefined)
+    return existing
+  if (unparsable.has(file) || !isTsFile(file))
+    return undefined
+  const { value, mistakes, error } = collectMistakes(() => analyzeModule(file, sourceOf(file, sources)))
+  const rel = relPosix(root, file)
+  for (const m of mistakes)
+    errors.push(formatDiagnostic(locOf(root, file, sources, m.start), m.message.replaceAll(file, rel)))
+  if (value !== undefined) {
+    analyses.set(file, value)
+    for (const w of value.warnings)
+      warnings.push(formatDiagnostic(locOf(root, file, sources, w.start), w.message.replaceAll(file, rel), 'warning'))
+    return value
+  }
+  unparsable.add(file)
+  const msg = error instanceof Error ? error.message : String(error)
+  errors.push(error instanceof KayMistake && error.start !== undefined
+    ? formatDiagnostic(locOf(root, file, sources, error.start), msg.replaceAll(file, rel))
+    : normalizeDiagnosticPath(root, file, msg))
+  return undefined
+}
+
+function formatIslandIssue(issue: IslandIssue, root: string, sources: Map<string, string>): string {
+  const rel = relPosix(root, issue.file)
+  switch (issue.kind) {
+    case 'async-interactive':
+      return formatDiagnostic(locOf(root, issue.file, sources, issue.offset), `kay check: async route component cannot use browser interactivity (${issue.reason}).`)
+    case 'server-only-tag':
+      return formatDiagnostic(locOf(root, issue.file, sources, issue.serverOnly.offset), serverOnlyTagError(rel, issue.serverOnly).message)
+    case 'special-interactive':
+      return formatDiagnostic(locOf(root, issue.file, sources, issue.offset), `kay check: ${rel} uses browser interactivity (${issue.reason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`)
+    case 'action-export': {
+      const verb = issue.reexport ? 're-exports' : 'imports'
+      return formatDiagnostic(locOf(root, issue.file, sources, issue.offset), `kay check: ${verb} non-action "${issue.name}" from server action file ${relPosix(root, issue.target)}. Move ${issue.name} into a module without actions.`)
     }
-    unparsable.add(file)
-    const msg = error instanceof Error ? error.message : String(error)
-    errors.push(error instanceof KayMistake && error.start !== undefined ? formatDiagnostic(locOf(root, file, sources, error.start), msg.replaceAll(file, rel)) : normalizeDiagnosticPath(root, file, msg))
+    case 'server-only-import': {
+      const islandRel = relPosix(root, issue.island)
+      const message = issue.reexport
+        ? `kay check: re-exports from server-only module "${issue.source}" and is reachable from the island in ${islandRel}.`
+        : issue.file === issue.island
+          ? `kay check: interactive island imports server-only module "${issue.source}". Move server logic to a server action or async server component.`
+          : `kay check: imports server-only module "${issue.source}" and is reachable from the island in ${islandRel}. Move server logic to a server action or async server component.`
+      return formatDiagnostic(locOf(root, issue.file, sources, issue.offset), message)
+    }
+    case 'private-env':
+      return formatDiagnostic(locOf(root, issue.file, sources, issue.offset), `kay check: reads process.env and is reachable from the island in ${relPosix(root, issue.island)}. Only process.env.PUBLIC_* reaches the browser.`)
   }
 }
 
@@ -164,75 +202,45 @@ function findExportedConstOffset(analysis: ModuleAnalysis, name: string): number
   return 0
 }
 
-function normalizeDiagnosticPath(root: string, file: string, message: string): string {
-  const rel = relPosix(root, file)
-  const relMessage = message.replaceAll(file, rel)
-  if (DIAGNOSTIC_PREFIX_RE.test(relMessage))
-    return relMessage
-  return formatDiagnostic(`${rel}:1:1`, relMessage)
-}
-
-// Walks the local imports of an island the way the client build follows them: a module that only declares actions is stubbed there, so its imports stop the walk.
-function checkIslandReach(
-  island: string,
-  root: string,
-  graph: ModuleGraph,
-  sources: Map<string, string>,
-  unparsable: Set<string>,
-  reported: Set<string>,
-  errors: string[],
-): void {
-  const islandRel = relPosix(root, island)
-  const seen = new Set<string>()
-  const stack = [island]
-  while (stack.length > 0) {
-    const file = stack.pop()!
-    if (seen.has(file))
-      continue
-    seen.add(file)
-    if (NODE_MODULES_RE.test(file))
-      continue
-    const analysis = analysisOf(file, graph.analyses, sources, unparsable)
-    if (analysis === undefined || (file !== island && !analysis.isInteractive && analysis.exportedActions.length > 0))
-      continue
-    const report = (key: string, offset: number, message: string): void => {
-      if (reported.has(`${file}\0${key}`))
-        return
-      reported.add(`${file}\0${key}`)
-      errors.push(formatDiagnostic(locOf(root, file, sources, offset), message))
-    }
-    for (const imp of analysis.imports) {
-      if (SERVER_ONLY_MODULES.has(imp.source)) {
-        report(imp.source, imp.start, file === island
-          ? `kay check: interactive island imports server-only module "${imp.source}". Move server logic to a server action or async server component.`
-          : `kay check: imports server-only module "${imp.source}" and is reachable from the island in ${islandRel}. Move server logic to a server action or async server component.`)
+function checkIslandProps(file: string, analysis: ModuleAnalysis, islandTags: ReadonlyMap<string, unknown>, root: string, sources: Map<string, string>, errors: string[]): void {
+  // JSX inside the module's own islands runs in the browser, where any prop is fine.
+  const inIsland = (offset: number): boolean => analysis.islandSpans.some(([start, end]) => offset >= start && offset < end)
+  const localFunctions = functionNames(analysis.program)
+  walk(analysis.program, (node) => {
+    if (node.type !== 'JSXOpeningElement' || inIsland(node.start))
+      return
+    const tag = jsxTagName(node.name)
+    if (!islandTags.has(tag))
+      return
+    for (const attr of node.attributes) {
+      if (attr.type !== 'JSXAttribute' || attr.name.type !== 'JSXIdentifier')
         continue
-      }
-      const target = graph.resolve(file, imp.source)
-      if (target !== undefined) {
-        const targetAnalysis = analysisOf(target, graph.analyses, sources, unparsable)
-        if (targetAnalysis !== undefined && !targetAnalysis.isInteractive && targetAnalysis.exportedActions.length > 0) {
-          const missing = imp.specifiers.find(s => s.imported !== '*' && !targetAnalysis.exportedActions.includes(s.imported))
-          if (missing !== undefined)
-            report(`action-export:${target}:${missing.imported}`, imp.start, `kay check: imports non-action "${missing.imported}" from server action file ${relPosix(root, target)}. Move ${missing.imported} into a module without actions.`)
-          continue
-        }
-        stack.push(target)
-      }
-    }
-    for (const re of analysis.reexports) {
-      if (SERVER_ONLY_MODULES.has(re.source)) {
-        report(re.source, re.start, `kay check: re-exports from server-only module "${re.source}" and is reachable from the island in ${islandRel}.`)
+      const attrName = attr.name.name
+      if (attrName === 'key' || attrName === '$hydrate')
         continue
+      if (attr.value?.type !== 'JSXExpressionContainer' || attr.value.expression.type === 'JSXEmptyExpression')
+        continue
+      const expr = attr.value.expression
+      if (expr.type === 'ArrowFunctionExpression' || expr.type === 'FunctionExpression' || (expr.type === 'Identifier' && localFunctions.has(expr.name))) {
+        errors.push(formatDiagnostic(
+          locOf(root, file, sources, attr.start),
+          `kay check: cannot pass function prop "${attrName}" from a server component into island <${tag}>. Define the handler inside the island or pass serializable data.`,
+        ))
       }
-      const target = graph.resolve(file, re.source)
-      if (target !== undefined)
-        stack.push(target)
+      else if (attrName !== 'children' && isJsxNode(expr)) {
+        errors.push(formatDiagnostic(
+          locOf(root, file, sources, attr.start),
+          `kay check: cannot pass JSX in prop "${attrName}" from a server component into island <${tag}>; pass it as children, which render on the server, or build it inside the island.`,
+        ))
+      }
+      else if (expr.type === 'NewExpression' && expr.callee.type === 'Identifier' && !SERIALIZABLE_NEW_CTORS.has(expr.callee.name)) {
+        errors.push(formatDiagnostic(
+          locOf(root, file, sources, expr.start),
+          `kay check: cannot pass non-serializable \`new ${expr.callee.name}()\` prop "${attrName}" into island <${tag}>.`,
+        ))
+      }
     }
-    const envOffset = findPrivateEnvOffset(analysis.program)
-    if (envOffset !== undefined)
-      report('process.env', envOffset, `kay check: reads process.env and is reachable from the island in ${islandRel}. Only process.env.PUBLIC_* reaches the browser.`)
-  }
+  })
 }
 
 export async function checkProject(rootDir: string, options: { skipTypecheck?: boolean } = {}): Promise<CheckResult> {
@@ -280,145 +288,42 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   const { analyses } = graph
   const sources = new Map<string, string>()
   const unparsable = new Set<string>()
-
   const warnings: string[] = []
-  analyzeFiles(root, files, analyses, sources, unparsable, errors, warnings)
+  const load = (file: string): ModuleAnalysis | undefined =>
+    loadCheckedModule(file, root, analyses, sources, unparsable, errors, warnings)
 
-  // 3a. Promote components reading imported reactive state (same rule as `planIslands` in `kay build`)
-  for (const [file, analysis] of [...analyses]) {
-    if (!file.endsWith('.tsx'))
-      continue
-    const promoted = withStateReads(analysis, (imp, imported) => {
-      const resolved = graph.resolve(file, imp.source)
-      if (resolved === undefined || !isTsFile(resolved))
-        return false
-      try {
-        if (imported === '*')
-          return (analysisOf(resolved, analyses, sources, unparsable)?.stateExports.length ?? 0) > 0
-        const target = graph.exportTarget(resolved, imported)
-        return analysisOf(target.file, analyses, sources, unparsable)?.stateExports.includes(target.exportName) === true
-      }
-      catch {
-        return false
-      }
-    })
-    const page = promoted?.exports.get('default')
-    if (promoted === undefined)
-      continue
-    if (analysis.hasAsyncDefault && page?.interactive === true)
-      errors.push(formatDiagnostic(locOf(root, file, sources, page.offset ?? 0), `kay check: async route component cannot use browser interactivity (${page.reason}).`))
-    else if (promoted.serverOnly !== undefined)
-      errors.push(formatDiagnostic(locOf(root, file, sources, promoted.serverOnly.offset), serverOnlyTagError(relPosix(root, file), promoted.serverOnly).message))
-    else
-      analyses.set(file, { ...analysis, ...promoted })
-  }
+  for (const file of files)
+    load(file)
 
   // Exact route discovery matching `kay build` (`walkRoutes` skips `_components/` dirs, `.d.ts`, `.test.ts`)
   const routeFiles = existsSync(routesDir) ? walkRoutes(routesDir).sort() : []
   const routeFileSet = new Set(routeFiles)
+  const specialFiles = routeFiles.filter(f => SPECIAL_ROUTE_FILES.has(basename(f)))
+  const pageFiles = routeFiles.filter(f => !basename(f).startsWith('_') && analyses.has(f) && hasRouteHandlerExport(analyses.get(f)!))
 
-  // 3b. Static guardrails: server-only imports in islands, non-serializable island props, special files, route conflicts, missing paths()
+  // 3a. Unified island planning, state-read promotion, special-file checks & reachability checks (shared with `kay build`)
+  const islands = analyzeIslands({
+    graph,
+    root,
+    pageFiles,
+    specialFiles,
+    load,
+    includeAllInteractive: true,
+    checkLeaks: true,
+  })
+  for (const issue of islands.issues)
+    errors.push(formatIslandIssue(issue, root, sources))
+
+  // 3b. Static guardrails: non-serializable island props, route exports, route conflicts, missing paths()
   const seenRoutes = new Map<string, string>()
-  const reported = new Set<string>()
-
   for (const [file, analysis] of [...analyses]) {
+    if (NODE_MODULES_RE.test(file))
+      continue
     const rel = relPosix(root, file)
 
-    // Special route files (`_layout.tsx`, `_error.tsx`, `_404.tsx`) cannot be interactive
-    const page = analysis.exports.get('default')
-    if (routeFileSet.has(file) && SPECIAL_ROUTE_FILES.has(basename(file)) && page?.interactive === true) {
-      errors.push(formatDiagnostic(
-        locOf(root, file, sources, page.offset ?? 0),
-        `kay check: ${rel} uses browser interactivity (${page.reason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`,
-      ))
-    }
-
-    // Guardrail 1: server-only imports and private env reads in an island or any module it imports
-    if (analysis.isInteractive)
-      checkIslandReach(file, root, graph, sources, unparsable, reported, errors)
-
-    // Guardrail 2: non-serializable props passed from static server code into an island (including barrels & namespaces)
-    if (analysis.staticJsxTags.size > 0 && file.endsWith('.tsx')) {
-      const islandTags = new Set<string>()
-      const islandNamespaces = new Map<string, string>() // localNs -> resolved file
-      for (const imp of analysis.imports) {
-        const resolved = graph.resolve(file, imp.source)
-        if (resolved === undefined || !isTsFile(resolved))
-          continue
-        for (const spec of imp.specifiers) {
-          if (spec.imported === '*') {
-            islandNamespaces.set(spec.local, resolved)
-            continue
-          }
-          try {
-            const target = graph.exportTarget(resolved, spec.imported)
-            if (analysisOf(target.file, analyses, sources, unparsable)?.exports.get(target.exportName)?.interactive === true)
-              islandTags.add(spec.local)
-          }
-          catch {}
-        }
-      }
-
-      const isIslandTag = (tag: string): boolean => {
-        if (islandTags.has(tag))
-          return true
-        if (tag.includes('.')) {
-          const [ns, member] = tag.split('.')
-          const nsFile = ns !== undefined ? islandNamespaces.get(ns) : undefined
-          if (nsFile !== undefined && member !== undefined) {
-            try {
-              const target = graph.exportTarget(nsFile, member)
-              return analysisOf(target.file, analyses, sources, unparsable)?.exports.get(target.exportName)?.interactive === true
-            }
-            catch {}
-          }
-        }
-        return false
-      }
-
-      if (islandTags.size > 0 || islandNamespaces.size > 0) {
-        // JSX inside the module's own islands runs in the browser, where any prop is fine.
-        const inIsland = (offset: number): boolean => analysis.islandSpans.some(([start, end]) => offset >= start && offset < end)
-        const localFunctions = functionNames(analysis.program)
-        walk(analysis.program, (node) => {
-          if (node.type !== 'JSXOpeningElement')
-            return
-          if (inIsland(node.start))
-            return
-          const tag = jsxTagName(node.name)
-          if (!isIslandTag(tag))
-            return
-          for (const attr of node.attributes) {
-            if (attr.type !== 'JSXAttribute' || attr.name.type !== 'JSXIdentifier')
-              continue
-            const attrName = attr.name.name
-            if (attrName === 'key' || attrName === '$hydrate')
-              continue
-            if (attr.value?.type !== 'JSXExpressionContainer' || attr.value.expression.type === 'JSXEmptyExpression')
-              continue
-            const expr = attr.value.expression
-            if (expr.type === 'ArrowFunctionExpression' || expr.type === 'FunctionExpression' || (expr.type === 'Identifier' && localFunctions.has(expr.name))) {
-              errors.push(formatDiagnostic(
-                locOf(root, file, sources, attr.start),
-                `kay check: cannot pass function prop "${attrName}" from a server component into island <${tag}>. Define the handler inside the island or pass serializable data.`,
-              ))
-            }
-            else if (attrName !== 'children' && isJsxNode(expr)) {
-              errors.push(formatDiagnostic(
-                locOf(root, file, sources, attr.start),
-                `kay check: cannot pass JSX in prop "${attrName}" from a server component into island <${tag}>; pass it as children, which render on the server, or build it inside the island.`,
-              ))
-            }
-            else if (expr.type === 'NewExpression' && expr.callee.type === 'Identifier' && !SERIALIZABLE_NEW_CTORS.has(expr.callee.name)) {
-              errors.push(formatDiagnostic(
-                locOf(root, file, sources, expr.start),
-                `kay check: cannot pass non-serializable \`new ${expr.callee.name}()\` prop "${attrName}" into island <${tag}>.`,
-              ))
-            }
-          }
-        })
-      }
-    }
+    const islandTags = islands.pageBindings.get(file)
+    if (islandTags !== undefined && file.endsWith('.tsx'))
+      checkIslandProps(file, analysis, islandTags, root, sources, errors)
 
     // Route-specific guardrails, on the files `kay build` reads as routes
     const isSpecial = SPECIAL_ROUTE_FILES.has(basename(file))
@@ -439,7 +344,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
           seenRoutes.set(conflictKey, rel)
         }
 
-        // Guardrail 4: dynamic prerender = true route missing paths()
+        // Dynamic prerender = true route missing paths()
         if (analysis.hasPrerender && (conflictKey.includes(':') || conflictKey.includes('*')) && !analysis.hasPaths) {
           const offset = findExportedConstOffset(analysis, 'prerender')
           errors.push(formatDiagnostic(locOf(root, file, sources, offset), `kay check: dynamic route exports \`prerender = true\` without exporting \`paths()\`.`))
