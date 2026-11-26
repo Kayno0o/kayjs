@@ -5,8 +5,10 @@
 // - Restores scroll position on popstate, scrolls to #hash targets, manages focus & polite live announcements
 // - Opt-in prefetch via [data-kay-prefetch] (bounded 8-entry / 15s TTL cache, respects Save-Data)
 
+import type { EntryScroll } from './swap'
 import { ANNOUNCER_ID, announce } from './announcer'
-import { fetchKeyOf, getCachedHtml, getDocId, inflightPrefetch, isSameDocRegionState, nextDocId, prefetch, prefetchCache, setDocId } from './prefetch'
+import { fetchKeyOf, getCachedHtml, inflightPrefetch, isSameDocRegionState, nextDocId, prefetch, prefetchCache, setDocId } from './prefetch'
+import { entryScroll, readScrolls, restoreScroll, saveScroll, swapInTransition, trackScroll, writeScrolls } from './swap'
 
 export { prefetch }
 
@@ -71,16 +73,6 @@ function isEligibleLink(link: HTMLAnchorElement): URL | undefined {
   return url
 }
 
-function saveScrollState(): void {
-  try {
-    const prev = (history.state && typeof history.state === 'object') ? history.state as Record<string, unknown> : {}
-    history.replaceState({ ...prev, __kayDoc: getDocId(), __kayScrollY: window.scrollY }, '')
-  }
-  catch {
-    // Restricted history API environments (e.g. sandboxed iframes) ignore state updates.
-  }
-}
-
 const SYNC_HEAD_SELECTOR = 'meta[name="description"],meta[name="robots"],meta[property^="og:"],meta[name^="twitter:"],link[rel="canonical"],link[rel="alternate"][hreflang],script[type="application/ld+json"]'
 
 function resolveSuspenseTemplates(doc: Document): void {
@@ -117,25 +109,51 @@ async function prepareHeadStyles(nextDoc: Document): Promise<{ commit: () => voi
     currentByHref.set(el.getAttribute('href') ?? '', el)
 
   const nextHrefs = new Set<string>()
+  // Every link this call puts in the head: the added ones and the copies of kept ones that had to move.
   const added: HTMLLinkElement[] = []
+  const moved: HTMLLinkElement[] = []
   const waitLoads: Promise<void>[] = []
+  const track = (link: HTMLLinkElement): void => {
+    waitLoads.push(new Promise<void>((resolve) => {
+      link.addEventListener('load', () => resolve(), { once: true })
+      link.addEventListener('error', () => resolve(), { once: true })
+    }))
+    added.push(link)
+  }
 
+  // The next page's stylesheets in the order it serves them, each as the link that stands for it here: the kept one, or a copy of the served one with every attribute it came with.
+  const order: HTMLLinkElement[] = []
   for (const nextEl of nextDoc.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')) {
     const href = nextEl.getAttribute('href') ?? ''
     if (!href)
       continue
     nextHrefs.add(href)
-    if (!currentByHref.has(href)) {
-      const clone = document.createElement('link')
-      clone.rel = 'stylesheet'
-      clone.href = href
-      waitLoads.push(new Promise<void>((resolve) => {
-        clone.addEventListener('load', () => resolve(), { once: true })
-        clone.addEventListener('error', () => resolve(), { once: true })
-      }))
-      document.head.appendChild(clone)
-      added.push(clone)
+    order.push(currentByHref.get(href) ?? document.importNode(nextEl, true))
+  }
+
+  // Layer order and cascade follow the order the next page serves, kept links included. A kept link taken out and put back would leave the page unstyled until it loaded again: a copy takes the place, and the original goes once the copy loaded.
+  let last: HTMLLinkElement | undefined
+  for (const [at, link] of order.entries()) {
+    let el = link
+    const fresh = !el.isConnected
+    if (last === undefined) {
+      const firstKept = order.find(other => other.isConnected)
+      if (fresh && firstKept !== undefined)
+        firstKept.before(el)
+      else if (fresh)
+        document.head.append(el)
     }
+    else if (fresh || !(last.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+      if (!fresh) {
+        moved.push(el)
+        el = el.cloneNode() as HTMLLinkElement
+        order[at] = el
+      }
+      last.after(el)
+    }
+    if (!currentLinks.includes(el))
+      track(el)
+    last = el
   }
 
   if (waitLoads.length > 0)
@@ -151,6 +169,8 @@ async function prepareHeadStyles(nextDoc: Document): Promise<{ commit: () => voi
         if (!nextHrefs.has(href))
           el.remove()
       }
+      for (const el of moved)
+        el.remove()
       // Sync non-builtin <head> <style> tags (skipping kay-island/kay-s styles already covered by kay-island.css).
       const nextHeadStyles = new Set<string>()
       for (const nextStyle of nextDoc.head.querySelectorAll('style')) {
@@ -217,7 +237,7 @@ async function fetchPageHtml(fetchKey: string, signal: AbortSignal): Promise<{ h
   return { html: await res.text(), url: res.url || fetchKey, csp: res.headers.get('content-security-policy') }
 }
 
-export async function navigate(url: string, push = true, restoreScrollY?: number, targetDocId?: number): Promise<void> {
+export async function navigate(url: string, push = true, restore?: EntryScroll, targetDocId?: number): Promise<void> {
   // Abort any in-flight navigation so rapid clicks always win immediately
   activeController?.abort()
   const controller = new AbortController()
@@ -259,7 +279,9 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
 
     const applySwap = () => {
       if (push)
-        saveScrollState()
+        saveScroll()
+      // Elements that keep their scroll by key keep it into the next page.
+      const kept = readScrolls(false)
 
       const existingAnnouncer = document.getElementById(ANNOUNCER_ID)
 
@@ -287,15 +309,19 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
       if (push) {
         const newDocId = nextDocId()
         setDocId(newDocId)
-        history.pushState({ __kayDoc: newDocId, __kayScrollY: 0 }, '', nextFullUrl)
+        history.pushState({ __kayDoc: newDocId }, '', nextFullUrl)
       }
       else {
         setDocId(targetDocId ?? nextDocId())
       }
       currentDocKey = `${nextParsed.pathname}${nextParsed.search}`
+      writeScrolls(kept)
+      // A page module the next page loads that this one did not (regions' client) runs now: scripts of a parsed page never do.
+      for (const script of nextDoc.head.querySelectorAll<HTMLScriptElement>('script[type="module"][src]'))
+        void import(new URL(script.getAttribute('src') ?? '', location.href).href)
 
-      if (typeof restoreScrollY === 'number') {
-        window.scrollTo(0, restoreScrollY)
+      if (restore !== undefined) {
+        restoreScroll(restore)
       }
       else if (hash.length > 1) {
         let anchorId = hash.slice(1)
@@ -321,11 +347,7 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
       window.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: nextFullUrl } }))
     }
 
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown }
-    if (typeof doc.startViewTransition === 'function')
-      doc.startViewTransition(applySwap)
-    else
-      applySwap()
+    await swapInTransition(applySwap)
   }
   catch (err) {
     if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError'))
@@ -382,11 +404,14 @@ if (typeof document !== 'undefined') {
     const nextDocKey = `${location.pathname}${location.search}`
     if (nextDocKey === currentDocKey)
       return
-    const st = event.state as { __kayScrollY?: number, __kayIdx?: number, __kayDoc?: number } | null
+    const st = event.state as { __kayIdx?: number, __kayDoc?: number } | null
     // Only same-document region swaps belong to regions(); cross-document entries (even with __kayIdx) belong to spa().
     if (isSameDocRegionState(st))
       return
     const targetDocId = typeof st?.__kayDoc === 'number' ? st.__kayDoc : undefined
-    void navigate(location.href, false, typeof st?.__kayScrollY === 'number' ? st.__kayScrollY : 0, targetDocId)
+    void navigate(location.href, false, entryScroll(st), targetDocId)
   })
+  // The browser's own restoring would fight the one the swap does, once the new page is in.
+  history.scrollRestoration = 'manual'
+  trackScroll()
 }

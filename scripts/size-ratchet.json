@@ -20,7 +20,7 @@
     "packages/kay/src/dom/loop.ts::loop": 247,
     "packages/kay/src/dom/loop.ts::loop.effect()": 200,
     "packages/kay/src/dom/loop.ts::loop.effect().untrack()": 183,
-    "packages/kay/src/server/index.ts::createServerFromEmbedded": 422,
+    "packages/kay/src/server/index.ts::createServerFromEmbedded": 415,
     "packages/plugin-auth/src/index.ts::createAuth": 309,
     "packages/plugin-auth/src/routes.ts::registerAuthRoutes": 199,
     "packages/plugin-auth/src/session.ts::createSessionManager": 249,
