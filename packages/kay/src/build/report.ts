@@ -213,6 +213,10 @@ export function formatBundleReport(report: BundleReport): string {
   return lines.join('\n')
 }
 
+export function formatBundleReportJson(report: BundleReport): string {
+  return JSON.stringify(report, null, 2)
+}
+
 /** Throws naming each route whose eager JS, gzipped, is over `maxBytes`, with the islands it loads with the page. */
 export function checkJsBudget(report: BundleReport, maxBytes: number): void {
   const over = report.routes.filter(r => r.jsGzip > maxBytes)

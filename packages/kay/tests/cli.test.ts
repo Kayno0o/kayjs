@@ -25,6 +25,7 @@ describe('#3568 CLI argument parsing, plugin commands & dev config fidelity', ()
     const top = await kay(['--help'])
     expect(top.code).toBe(0)
     expect(top.out).toContain('check')
+    expect(top.out).toContain('inspect')
     expect(top.out).toContain('--completions')
     const check = await kay(['check', '--help'])
     expect(check.code).toBe(0)
@@ -252,6 +253,64 @@ describe('kay build names the islands behind each route\'s JS (#3585)', () => {
     finally {
       log.mockRestore()
       err.mockRestore()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('kay build --analyze --json outputs pure valid BundleReport JSON on stdout (#3610)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3610-analyze-json-'))
+    try {
+      for (const [file, text] of Object.entries(app)) {
+        mkdirSync(join(dir, file, '..'), { recursive: true })
+        writeFileSync(join(dir, file), text)
+      }
+      mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
+      symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/@kayjs/kay'), 'dir')
+
+      // `--json` without `--analyze` is a usage error (exit 2).
+      const misuse = await kay(['build', '--json'], dir)
+      expect(misuse.code).toBe(2)
+      expect(misuse.err).toContain('--analyze')
+
+      // `--analyze --json` prints pure JSON matching BundleReport with no summary/table lines on stdout.
+      const res = await kay(['build', '--analyze', '--json'], dir)
+      expect(res.code).toBe(0)
+      expect(res.out).not.toContain('kay build done')
+      expect(res.out).not.toContain('KAY BUNDLE WEIGHT REPORT')
+
+      const report = JSON.parse(res.out) as BundleReport
+      expect(typeof report.totalJsGzip).toBe('number')
+      expect(report.totalJsGzip).toBeGreaterThan(0)
+      expect(typeof report.totalCssGzip).toBe('number')
+      expect(Array.isArray(report.topModules)).toBe(true)
+      expect(report.routes).toEqual([
+        {
+          path: '/about',
+          jsRaw: 0,
+          jsGzip: 0,
+          cssRaw: 0,
+          cssGzip: 0,
+          jsFiles: 0,
+          cssFiles: 0,
+          islands: [],
+        },
+        {
+          path: '/',
+          jsRaw: expect.any(Number),
+          jsGzip: expect.any(Number),
+          cssRaw: 0,
+          cssGzip: 0,
+          jsFiles: expect.any(Number),
+          cssFiles: 0,
+          islands: [
+            { name: 'Clicker', file: 'src/components/Count.tsx', reason: 'uses onClick', eager: true },
+            { name: 'Total', file: 'src/components/Count.tsx', reason: 'reads count from \'../stores/count\'', eager: true },
+            { name: 'Later', file: 'src/components/Later.tsx', reason: 'uses onClick', eager: false },
+          ],
+        },
+      ])
+    }
+    finally {
       rmSync(dir, { recursive: true, force: true })
     }
   })

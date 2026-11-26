@@ -136,6 +136,22 @@ function upgradeCommand(cwd: string): Commands[string] {
   }
 }
 
+function inspectCommand(cwd: string): Commands[string] {
+  return {
+    summary: 'inspect routes, islands, actions and plugins without bundling',
+    run: async (args) => {
+      const { values, positionals: [dir] } = parse(args, 'kay inspect [options] [dir]: inspects routes, islands, actions and plugins statically without bundling', {
+        json: { type: 'boolean', description: 'print { routes, islands, actions, plugins } as JSON' },
+        root: ROOT,
+      }, { positionals: ['[dir]'], exits: [OK, [1, 'the config or a source file failed to load'], USAGE_EXIT] })
+      const { formatInspectReport, inspectProject } = await import('./inspect')
+      const report = await failing('inspect', () => inspectProject(rootOf(cwd, values.root, dir)))
+      console.log(values.json === true ? JSON.stringify(report, null, 2) : formatInspectReport(report))
+      return 0
+    },
+  }
+}
+
 function buildCommand(cwd: string): Commands[string] {
   return {
     summary: 'build the app into dist/',
@@ -144,16 +160,21 @@ function buildCommand(cwd: string): Commands[string] {
         'static': { type: 'boolean', description: 'export plain HTML files instead of a server' },
         'compile': { type: 'string', optional: { bare: '' }, description: 'also produce one binary, at [out] when given' },
         'analyze': { type: 'boolean', description: 'list each island with why it is one' },
+        'json': { type: 'boolean', description: 'with --analyze, print the bundle report as JSON' },
         'max-js': { type: 'string', description: 'fail a route whose eager JS gzips over this size (40kb, or bytes)' },
         'root': ROOT,
       }, { positionals: ['[dir]'], exits: [[0, 'the build succeeded'], [1, 'the build failed, or a route is over --max-js'], USAGE_EXIT] })
+      if (values.json === true && values.analyze !== true)
+        return badUsage('--json requires --analyze: pass kay build --analyze --json')
       const maxJs = values['max-js'] === undefined ? undefined : parseSize(values['max-js'])
       const compile = values.compile === undefined ? undefined : values.compile === '' ? true : values.compile
+      const analyzeJson = values.analyze === true && values.json === true
       const { build } = await import('../build/index')
       const t0 = performance.now()
-      const manifest = await failing('build', async () => build({ root: rootOf(cwd, values.root, dir), static: values.static === true, compile, analyze: values.analyze === true, maxJs }))
+      const manifest = await failing('build', async () => build({ root: rootOf(cwd, values.root, dir), static: values.static === true, compile, analyze: values.analyze === true, analyzeJson, maxJs }))
       const ms = (performance.now() - t0).toFixed(1)
-      console.log(`kay build done in ${ms} ms (${manifest.routes.length} routes, ${manifest.assets.length} client assets, ${manifest.actions.length} actions)`)
+      if (!analyzeJson)
+        console.log(`kay build done in ${ms} ms (${manifest.routes.length} routes, ${manifest.assets.length} client assets, ${manifest.actions.length} actions)`)
       return 0
     },
   }
@@ -204,6 +225,7 @@ export function builtinCommands(cwd: string): Commands {
   return {
     new: newCommand(cwd),
     check: checkCommand(cwd),
+    inspect: inspectCommand(cwd),
     dev: devCommand(cwd),
     build: buildCommand(cwd),
     start: startCommand(cwd),
