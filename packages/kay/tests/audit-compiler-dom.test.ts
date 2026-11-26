@@ -98,6 +98,67 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
     expect(ssrRt.ssrAttr('href', 'javascript:alert(1)')).toBe('')
     expect(ssrRt.ssrAttr('src', 'vbscript:1')).toBe('')
 
+    // #3638: inline SVG & image data URLs are kept on <link href> and <img src>, dropped on <a href> and data:text/html, with dev warning
+    const svgDataUrl = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E'
+    const mixedCaseSvgUrl = '  DATA:Image/SVG+xml;base64,PHN2Zy8+'
+    expect(ssrRt.ssrAttr('href', svgDataUrl, 'link')).toContain('data:image/svg+xml')
+    expect(ssrRt.ssrAttr('href', mixedCaseSvgUrl, 'link')).toContain('DATA:Image/SVG+xml')
+    expect(ssrRt.ssrSpread({ rel: 'icon', href: svgDataUrl }, 'link')).toContain('data:image/svg+xml')
+    expect(ssrRt.ssrAttr('src', svgDataUrl, 'img')).toContain('data:image/svg+xml')
+    expect(ssrRt.ssrAttr('src', mixedCaseSvgUrl, 'img')).toContain('DATA:Image/SVG+xml')
+    expect(ssrRt.ssrAttr('href', 'data:text/html,<script>1</script>', 'a')).toBe('')
+    expect(ssrRt.ssrAttr('href', svgDataUrl, 'a')).toBe('')
+    expect(ssrRt.ssrAttr('href', 'data:text/html,<script>1</script>', 'link')).toBe('')
+
+    const faviconSrc = `
+      export function Favicon({ dyn }: { dyn: string }) {
+        return (
+          <>
+            <link rel="icon" href="data:image/svg+xml,%3Csvg/%3E" />
+            <link rel="icon" href={dyn} />
+            <img src="  DATA:Image/SVG+xml;base64,PHN2Zy8+" />
+            <a href="data:text/html,<script>1</script>">bad</a>
+          </>
+        )
+      }
+    `
+    const ssrFavicon = compileSsr('Favicon.tsx', faviconSrc).code
+    expect(ssrFavicon).toContain('data:image/svg+xml')
+    expect(ssrFavicon).toContain('DATA:Image/SVG+xml')
+    expect(ssrFavicon).toContain('__ssrAttr("href", dyn, "link")')
+    expect(ssrFavicon).not.toContain('data:text/html')
+
+    const domFavicon = compileDom('Favicon.tsx', faviconSrc).code
+    expect(domFavicon).toContain('data:image/svg+xml')
+    expect(domFavicon).toContain('DATA:Image/SVG+xml')
+    expect(domFavicon).not.toContain('data:text/html')
+
+    const warnOrig = console.warn
+    const warnings: string[] = []
+    console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(' ')) }
+    try {
+      expect(ssrRt.ssrAttr('href', 'data:text/html,<script>1</script>', 'a')).toBe('')
+      expect(warnings.some(w => w.includes('<a href>'))).toBe(true)
+      warnings.length = 0
+      await withDom(() => {
+        const link = document.createElement('link')
+        domCore.setAttr(link, 'href', svgDataUrl)
+        expect(link.getAttribute('href')).toBe(svgDataUrl)
+        domCore.setAttr(link, 'href', mixedCaseSvgUrl)
+        expect(link.getAttribute('href')).toBe(mixedCaseSvgUrl)
+        const img = document.createElement('img')
+        domCore.setAttr(img, 'src', svgDataUrl)
+        expect(img.getAttribute('src')).toBe(svgDataUrl)
+        const anchor = document.createElement('a')
+        domCore.setAttr(anchor, 'href', 'data:text/html,<script>1</script>')
+        expect(anchor.getAttribute('href')).toBeNull()
+        expect(warnings.some(w => w.includes('<a href>'))).toBe(true)
+      })
+    }
+    finally {
+      console.warn = warnOrig
+    }
+
     // Compiled static URL literals on SSR and DOM
     const urlSrc = `
       export function Links({ ok }: { ok: boolean }) {

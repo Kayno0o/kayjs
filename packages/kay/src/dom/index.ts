@@ -343,7 +343,9 @@ export function setAttr(el: Element, name: string, value: unknown): void {
     else
       el.removeAttribute(name)
   }
-  else if (isUnsafeUrlAttr(name, value)) {
+  else if (isUnsafeUrlAttr(name, value, el.tagName)) {
+    if (process.env.NODE_ENV !== 'production')
+      console.warn(`kay: dropped unsafe URL on <${el.tagName.toLowerCase()} ${name}>.`)
     el.removeAttribute(name)
   }
   else {

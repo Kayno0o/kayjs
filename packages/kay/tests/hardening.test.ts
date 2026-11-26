@@ -48,7 +48,7 @@ describe('Milestone 4: Compiler hardening (spreads, SVG, destructured .map, kay-
       }
     `
     const ssr = compileSsr('Btn.tsx', spreadSrc)
-    expect(ssr.code).toContain('__ssrSpread({ type: "button", ...(rest) })')
+    expect(ssr.code).toContain('__ssrSpread({ type: "button", ...(rest) }, "button")')
 
     const dom = compileDom('Btn.tsx', spreadSrc)
     expect(dom.code).toContain('__omit(__p, ["label"])')

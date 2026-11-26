@@ -98,7 +98,7 @@ export function raw(html: string): Html {
   return { __html: html, [RAW_HTML]: true } as unknown as Html
 }
 
-export function ssrAttr(name: string, value: unknown): string {
+export function ssrAttr(name: string, value: unknown, tag?: string): string {
   if (value == null || isBlockedAttr(name))
     return ''
   if (typeof value === 'boolean') {
@@ -106,8 +106,11 @@ export function ssrAttr(name: string, value: unknown): string {
       return ` ${name}="${value ? 'true' : 'false'}"`
     return value ? ` ${name}` : ''
   }
-  if (isUnsafeUrlAttr(name, value))
+  if (isUnsafeUrlAttr(name, value, tag)) {
+    if (process.env.NODE_ENV !== 'production')
+      console.warn(`kay: dropped unsafe URL on <${tag ?? 'element'} ${name}>.`)
     return ''
+  }
   assertRenderable(value, name)
   return ` ${name}="${escAttr(value)}"`
 }
@@ -126,7 +129,7 @@ export function ssrStyle(value: unknown): string {
 
 const SPREAD_DANGEROUS_HTML = 'kay: dangerouslySetInnerHTML in a spread: write innerHTML={html} on the element.'
 
-export function ssrSpread(props: Record<string, unknown> | null | undefined): string {
+export function ssrSpread(props: Record<string, unknown> | null | undefined, tag?: string): string {
   if (props == null || typeof props !== 'object')
     return ''
   let out = ''
@@ -138,7 +141,7 @@ export function ssrSpread(props: Record<string, unknown> | null | undefined): st
     const name = rawKey === 'className' ? 'class' : rawKey === 'htmlFor' ? 'for' : rawKey
     if (isBlockedAttr(name))
       continue
-    out += name === 'style' ? ssrStyle(value) : ssrAttr(name, value)
+    out += name === 'style' ? ssrStyle(value) : ssrAttr(name, value, tag)
   }
   return out
 }

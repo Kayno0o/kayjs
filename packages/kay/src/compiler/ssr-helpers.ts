@@ -1,6 +1,7 @@
 // Helper utilities for the SSR compiler: string buffer builder, static attribute folding, component prop serialization, and `<select>`/`<option>` helpers.
 
 import type { JSXAttributeItem, JSXChild, JSXElement, Node } from 'oxc-parser'
+import { URL_ATTRS } from '../attrs'
 import { walk } from './ast'
 import {
   cleanJsxText,
@@ -75,7 +76,7 @@ function isStaticNullish(node: Node): boolean {
     || (node.type === 'Literal' && node.value === null)
 }
 
-export function formatStaticAttrBranch(attrName: string, node: Node): string | undefined {
+export function formatStaticAttrBranch(attrName: string, node: Node, tag?: string): string | undefined {
   if (isBlockedAttr(attrName))
     return '""'
   if (isStaticNullish(node))
@@ -87,8 +88,11 @@ export function formatStaticAttrBranch(attrName: string, node: Node): string | u
       return node.value ? JSON.stringify(` ${attrName}`) : '""'
     }
     if (typeof node.value === 'string' || typeof node.value === 'number') {
-      if (isUnsafeUrlAttr(attrName, node.value))
+      if (isUnsafeUrlAttr(attrName, node.value, tag)) {
+        if (process.env.NODE_ENV !== 'production')
+          console.warn(`kay: dropped unsafe URL on <${tag ?? 'element'} ${attrName}>.`)
         return '""'
+      }
       return JSON.stringify(` ${attrName}="${escapeStaticAttr(String(node.value))}"`)
     }
   }
@@ -321,8 +325,10 @@ export function emitSsrElementAttrs(ctx: SsrElementAttrsContext): SsrElementAttr
     else if (attr.value.type === 'Literal') {
       if (isOption && name === 'value')
         optionValue = { staticValue: String(attr.value.value) }
-      if (!isUnsafeUrlAttr(name, attr.value.value))
+      if (!isUnsafeUrlAttr(name, attr.value.value, tag))
         parts.pushStatic(` ${name}="${escapeStaticAttr(String(attr.value.value))}"`)
+      else if (process.env.NODE_ENV !== 'production')
+        console.warn(`kay: dropped unsafe URL on <${tag} ${name}>.`)
     }
     else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
       const expr = attr.value.expression
@@ -344,8 +350,8 @@ export function emitSsrElementAttrs(ctx: SsrElementAttrsContext): SsrElementAttr
       }
 
       if (name !== 'style' && expr.type === 'ConditionalExpression') {
-        const cons = formatStaticAttrBranch(name, expr.consequent)
-        const alt = formatStaticAttrBranch(name, expr.alternate)
+        const cons = formatStaticAttrBranch(name, expr.consequent, tag)
+        const alt = formatStaticAttrBranch(name, expr.alternate, tag)
         if (cons !== undefined && alt !== undefined) {
           parts.pushExpr(`${compileSubExpression(expr.test)} ? ${cons} : ${alt}`)
           continue
@@ -355,6 +361,8 @@ export function emitSsrElementAttrs(ctx: SsrElementAttrsContext): SsrElementAttr
       const exprCode = compileSubExpression(expr)
       if (name === 'style')
         parts.pushExpr(`${use('ssrStyle')}(${exprCode})`)
+      else if (URL_ATTRS.has(name.toLowerCase()))
+        parts.pushExpr(`${use('ssrAttr')}(${JSON.stringify(name)}, ${exprCode}, ${JSON.stringify(tag)})`)
       else
         parts.pushExpr(`${use('ssrAttr')}(${JSON.stringify(name)}, ${exprCode})`)
     }
@@ -363,10 +371,10 @@ export function emitSsrElementAttrs(ctx: SsrElementAttrsContext): SsrElementAttr
   if (hasSpread) {
     if (spreadEntries.length === 1 && attrs.length === 1) {
       const spreadAttr = attrs[0] as Extract<typeof attrs[number], { type: 'JSXSpreadAttribute' }>
-      parts.pushExpr(`${use('ssrSpread')}(${compileSubExpression(spreadAttr.argument)})`)
+      parts.pushExpr(`${use('ssrSpread')}(${compileSubExpression(spreadAttr.argument)}, ${JSON.stringify(tag)})`)
     }
     else if (spreadEntries.length > 0) {
-      parts.pushExpr(`${use('ssrSpread')}({ ${spreadEntries.join(', ')} })`)
+      parts.pushExpr(`${use('ssrSpread')}({ ${spreadEntries.join(', ')} }, ${JSON.stringify(tag)})`)
     }
   }
 

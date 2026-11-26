@@ -168,8 +168,11 @@ export function compileElementAttributes(ctx: ElementAttrCompileContext): string
         const targetOps = isSelect ? postChildOps : ops
         targetOps.push(`${use('setProp')}(${elVar}, "value", ${JSON.stringify(String(attr.value.value))});`)
       }
-      else if (!isUnsafeUrlAttr(name, attr.value.value)) {
+      else if (!isUnsafeUrlAttr(name, attr.value.value, tag)) {
         html += ` ${name}="${escapeStaticAttr(String(attr.value.value))}"`
+      }
+      else if (process.env.NODE_ENV !== 'production') {
+        console.warn(`kay: dropped unsafe URL on <${tag} ${name}>.`)
       }
     }
     else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
@@ -182,8 +185,11 @@ export function compileElementAttributes(ctx: ElementAttrCompileContext): string
           else if (lit.value === true)
             html += ` ${name}`
         }
-        else if (lit.value !== null && !isUnsafeUrlAttr(name, lit.value)) {
+        else if (lit.value !== null && !isUnsafeUrlAttr(name, lit.value, tag)) {
           html += ` ${name}="${escapeStaticAttr(String(lit.value))}"`
+        }
+        else if (lit.value !== null && process.env.NODE_ENV !== 'production') {
+          console.warn(`kay: dropped unsafe URL on <${tag} ${name}>.`)
         }
         continue
       }
