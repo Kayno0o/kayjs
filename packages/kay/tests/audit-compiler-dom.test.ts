@@ -805,6 +805,79 @@ describe('destructured loop rows and component props in an island', () => {
     })
   })
 
+  describe('destructured prop defaults run once per component call', () => {
+    // Props whose values a test swaps at will, read through a proxy like a parent's reactive props.
+    const reactiveProps = (first: Record<string, unknown>): { props: object, set: (next: Record<string, unknown>) => void } => {
+      const current = signal<Record<string, unknown>>(first)
+      const props = new Proxy({}, { get: (_t, key) => current.value[key as string] })
+      return { props, set: (next) => { current.value = next } }
+    }
+
+    test.each([['an object', '{ n: 1 }'], ['an array', '[1]']])('%s default keeps one reference across reads', async (_, def) => {
+      await withDom(() => {
+        const seen: unknown[] = []
+        const { dispose } = mountIsland(`export function F({ v = ${def} }) { return <p>{(seen.push(v), seen.push(v), 'x')}</p> }`, 'F', {}, { seen })
+        expect(seen).toHaveLength(2)
+        expect(Object.is(seen[0], seen[1])).toBe(true)
+        dispose()
+      })
+    })
+
+    test('a side-effect default runs once however often it is read', async () => {
+      await withDom(() => {
+        let calls = 0
+        const make = (): number[] => { calls++; return [calls] }
+        const { host, dispose } = mountIsland('export function F({ v = make() }) { return <p>{v.length}{v.length}<i>{v.length}</i></p> }', 'F', {}, { make })
+        expect(host.querySelector('p')!.textContent).toBe('111')
+        expect(calls).toBe(1)
+        dispose()
+      })
+    })
+
+    test('a useId() default runs at call time, once, ahead of a useId() in the body', async () => {
+      await withDom(() => {
+        let n = 0
+        const useId = (): string => `id${n++}`
+        const { host, dispose } = mountIsland('export function F({ id = useId() }) { const other = useId(); return <p data-a={id} data-b={id} data-o={other} /> }', 'F', {}, { useId })
+        const p = host.querySelector('p')!
+        expect([p.dataset.a, p.dataset.b, p.dataset.o]).toEqual(['id0', 'id0', 'id1'])
+        expect(n).toBe(2)
+        dispose()
+      })
+    })
+
+    test('reading a nested prop runs no other prop\'s default', async () => {
+      await withDom(() => {
+        let calls = 0
+        const make = (): string => `m${++calls}`
+        const { host, dispose } = mountIsland('export function F({ id = make(), user: { name } = { name: \'anon\' } }) { return <p>{name}{name}{id}</p> }', 'F', {}, { make })
+        expect(host.querySelector('p')!.textContent).toBe('anonanonm1')
+        expect(calls).toBe(1)
+        dispose()
+      })
+    })
+
+    test('a default follows the prop going undefined and back, evaluated once', async () => {
+      await withDom(() => {
+        let calls = 0
+        const make = (): string => `def${++calls}`
+        const { props, set } = reactiveProps({ v: 'given' })
+        const { host, dispose } = mountIsland('export function F({ v = make() }) { return <p>{v}</p> }', 'F', props, { make })
+        const text = (): string => host.querySelector('p')!.textContent!
+        expect(text()).toBe('given')
+        expect(calls).toBe(0)
+        set({})
+        expect(text()).toBe('def1')
+        set({ v: 'again' })
+        expect(text()).toBe('again')
+        set({})
+        expect(text()).toBe('def1')
+        expect(calls).toBe(1)
+        dispose()
+      })
+    })
+  })
+
   test.each([
     ['a nested object', '{ user: { name } }', 'name', { user: { name: 'Ada' } }, { user: { name: 'Bob' } }, 'Ada', 'Bob'],
     ['a nested object with a default', '{ user: { name } = { name: \'anon\' } }', 'name', {}, { user: { name: 'Bob' } }, 'anon', 'Bob'],

@@ -29,7 +29,7 @@ export function moduleHeader(used: Set<string>, templates: readonly { name: stri
 
   if (used.size > 0) {
     const hasLoop = used.delete('loop')
-    const EXTRA_HELPERS = ['fragInsert', 'insert', 'mergeProps', 'omit', 'setInnerHtml', 'show', 'spread']
+    const EXTRA_HELPERS = ['fragInsert', 'insert', 'mergeProps', 'omit', 'propDefault', 'setInnerHtml', 'show', 'spread']
     const usedExtras: string[] = []
     for (const name of EXTRA_HELPERS) {
       if (used.delete(name))

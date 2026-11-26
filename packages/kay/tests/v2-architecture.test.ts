@@ -226,7 +226,8 @@ describe('Kay v2 architecture & regression suite', () => {
     expect(dom.code).toContain('for (const item of [1, 2])')
     expect(dom.code).toContain('title() { return 1 }')
     expect(dom.code).not.toContain('catch (__p.err)')
-    expect(dom.code).toContain('__p.icon === undefined ? (_t0()) : __p.icon')
+    expect(dom.code).toMatch(/__p\.icon === undefined \? __d\d+\(\) : __p\.icon/)
+    expect(dom.code).toContain('__propDefault(() => (_t0()), __p.icon === undefined)')
     expect(dom.code).toContain('__p.b === undefined ? (__p.a === undefined ? 1 : __p.a) : __p.b')
 
     // Root JSXFragment with logical expression compiles to valid JS

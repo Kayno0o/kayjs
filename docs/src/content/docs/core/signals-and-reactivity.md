@@ -53,6 +53,8 @@ export function Badge({ count = 0, label }: { count?: number, label: string }) {
 }
 ```
 
+A default that is more than a literal or a name (`items = []`, `id = useId()`) runs once per component call, as in plain TypeScript, so `items` is the same array on every read. If the prop is passed and later becomes `undefined`, the default is computed then, once.
+
 To let a child mutate parent state, pass the signal itself as a prop (`<Modal open={isOpen} />`). No `bind:` syntax is needed.
 
 ## Tree-shakable helpers (`selector` & `store`)

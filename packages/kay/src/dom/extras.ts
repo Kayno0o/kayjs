@@ -47,6 +47,22 @@ export function mergeProps(...sources: (Record<string, unknown> | null | undefin
   return out
 }
 
+/** A destructured prop's default: computed at most once per component call, at call time when the prop is already undefined, else on the first read after it turns undefined. */
+export function propDefault<T>(fn: () => T, now: boolean): () => T {
+  let value: T
+  let done = false
+  const get = (): T => {
+    if (!done) {
+      value = fn()
+      done = true
+    }
+    return value
+  }
+  if (now)
+    get()
+  return get
+}
+
 export function omit(props: Record<string, unknown>, excluded: string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   const skip = new Set(excluded)

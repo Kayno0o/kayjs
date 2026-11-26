@@ -72,9 +72,15 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
   const { code, editor, jsxNodes, use, freshVar, compileExpression } = ctx
 
   // How each name a destructuring pattern binds is read from `source` on every access, so reads stay reactive.
-  function patternReads(pattern: Node, source: string, outerRewrites: ReadonlyMap<string, string>): Map<string, string> {
+  // With `hoisted`, a default and a nested pattern's getter become statements for the start of the component body (evaluated once per call) instead of running on every read.
+  function patternReads(pattern: Node, source: string, outerRewrites: ReadonlyMap<string, string>, hoisted?: string[]): Map<string, string> {
     const reads = new Map<string, string>()
     const running = new Map(outerRewrites)
+    const hoist = (init: string): string => {
+      const name = freshVar('__d')
+      hoisted!.push(`const ${name} = ${init};`)
+      return name
+    }
     if (pattern.type === 'ObjectPattern') {
       for (const prop of pattern.properties) {
         if (prop.type !== 'Property' || prop.computed || prop.key.type !== 'Identifier')
@@ -87,7 +93,10 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
         else if (prop.value.type === 'AssignmentPattern' && prop.value.left.type === 'Identifier') {
           const defExpr = compileExpression(prop.value.right, running)
           const simpleDef = prop.value.right.type === 'Literal' || prop.value.right.type === 'Identifier'
-          const expr = `(${read} === undefined ? ${simpleDef ? defExpr : `(${defExpr})`} : ${read})`
+          let fallback = simpleDef ? defExpr : `(${defExpr})`
+          if (!simpleDef && hoisted !== undefined)
+            fallback = `${hoist(`${use('propDefault')}(() => (${defExpr}), ${read} === undefined)`)}()`
+          const expr = `(${read} === undefined ? ${fallback} : ${read})`
           reads.set(prop.value.left.name, expr)
           running.set(prop.value.left.name, expr)
         }
@@ -95,12 +104,45 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
     }
     const names = new Set<string>()
     collectPatternNames(pattern, names)
-    const patCode = code.slice(pattern.start, pattern.end)
+    // The pattern a read runs: only the property binding `name`, so another property's default does not run on this read.
+    const patternFor = (name: string): string => {
+      if (pattern.type === 'ObjectPattern') {
+        for (const prop of (pattern as ObjectPattern).properties) {
+          const bound = new Set<string>()
+          collectPatternNames(prop.type === 'RestElement' ? prop.argument : prop.value, bound)
+          if (prop.type === 'Property' && bound.has(name))
+            return `{ ${code.slice(prop.start, prop.end)} }`
+        }
+      }
+      return code.slice(pattern.start, pattern.end)
+    }
+    // A component's `...rest` is read through `omit` instead (see computePropRewrites).
+    const omitted = hoisted !== undefined && pattern.type === 'ObjectPattern' ? omittedRest(pattern as ObjectPattern) : undefined
     for (const name of names) {
-      if (!reads.has(name))
-        reads.set(name, `((${patCode}) => ${name})(${source})`)
+      if (reads.has(name) || name === omitted?.restName)
+        continue
+      const getter = `(${patternFor(name)}) => ${name}`
+      reads.set(name, hoisted === undefined ? `(${getter})(${source})` : `${hoist(getter)}(${source})`)
     }
     return reads
+  }
+
+  // The keys a `...rest` leaves out, when every key of the pattern is a plain name or string.
+  function omittedRest(pattern: ObjectPattern): { restName: string | undefined, keys: string[] | undefined } {
+    const keys: string[] = []
+    let restName: string | undefined
+    let isStatic = true
+    for (const prop of pattern.properties) {
+      if (prop.type === 'RestElement')
+        restName = prop.argument.type === 'Identifier' ? prop.argument.name : undefined
+      else if (!prop.computed && prop.key.type === 'Identifier')
+        keys.push(prop.key.name)
+      else if (!prop.computed && prop.key.type === 'Literal' && typeof prop.key.value === 'string')
+        keys.push(prop.key.value)
+      else
+        isStatic = false
+    }
+    return isStatic && restName !== undefined ? { restName, keys } : { restName: undefined, keys: undefined }
   }
 
   function extractDestructuredParam(firstParam: ParamPattern | undefined): {
@@ -128,27 +170,23 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
     destructured: { pattern: ObjectPattern, defaultExpr: Node | undefined },
     pVar: string,
     outerRewrites: ReadonlyMap<string, string>,
-  ): Map<string, string> {
-    const propRewrites = new Map(outerRewrites)
-    for (const [name, read] of patternReads(destructured.pattern, pVar, outerRewrites))
-      propRewrites.set(name, read)
+  ): { rewrites: Map<string, string>, prelude: string } {
+    const rewrites = new Map(outerRewrites)
+    const hoisted: string[] = []
+    for (const [name, read] of patternReads(destructured.pattern, pVar, outerRewrites, hoisted))
+      rewrites.set(name, read)
 
-    const extractedKeys: string[] = []
-    let restName: string | undefined
-    let staticKeys = true
-    for (const prop of destructured.pattern.properties) {
-      if (prop.type === 'RestElement')
-        restName = prop.argument.type === 'Identifier' ? prop.argument.name : undefined
-      else if (!prop.computed && prop.key.type === 'Identifier')
-        extractedKeys.push(prop.key.name)
-      else if (!prop.computed && prop.key.type === 'Literal' && typeof prop.key.value === 'string')
-        extractedKeys.push(prop.key.value)
-      else
-        staticKeys = false
-    }
-    if (restName !== undefined && staticKeys)
-      propRewrites.set(restName, `${use('omit')}(${pVar}, ${JSON.stringify(extractedKeys)})`)
-    return propRewrites
+    const { restName, keys } = omittedRest(destructured.pattern)
+    if (restName !== undefined)
+      rewrites.set(restName, `${use('omit')}(${pVar}, ${JSON.stringify(keys)})`)
+    return { rewrites, prelude: hoisted.join(' ') }
+  }
+
+  // Puts the hoisted default statements at the start of a body, giving an expression body a block to hold them.
+  function withPrelude(compiledBody: string, body: Node, prelude: string): string {
+    if (prelude === '')
+      return compiledBody
+    return body.type === 'BlockStatement' ? `{ ${prelude}${compiledBody.slice(1)}` : `{ ${prelude} return (${compiledBody}); }`
   }
 
   function buildCompiledFunction(fn: ArrowFunctionExpression | OxcFunction, outerRewrites: ReadonlyMap<string, string>): string {
@@ -157,17 +195,18 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
     const destructured = extractDestructuredParam(fn.params[0])
     const pVar = freshVar('__p')
     let propRewrites = new Map(outerRewrites)
+    let prelude = ''
 
     if (destructured !== undefined) {
       const defSuffix = destructured.defaultExpr !== undefined
         ? ` = ${compileExpression(destructured.defaultExpr, outerRewrites)}`
         : ''
       fnEditor.replace(destructured.replaceStart - offset, destructured.replaceEnd - offset, `${pVar}${destructured.typeAnn}${defSuffix}`)
-      propRewrites = computePropRewrites(destructured, pVar, outerRewrites)
+      ;({ rewrites: propRewrites, prelude } = computePropRewrites(destructured, pVar, outerRewrites))
     }
 
     if (fn.body !== null)
-      fnEditor.replace(fn.body.start - offset, fn.body.end - offset, compileExpression(fn.body, propRewrites))
+      fnEditor.replace(fn.body.start - offset, fn.body.end - offset, withPrelude(compileExpression(fn.body, propRewrites), fn.body, prelude))
     return fnEditor.toString()
   }
 
@@ -178,6 +217,7 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
 
     const destructured = extractDestructuredParam(fn.params[0])
     let propRewrites = new Map<string, string>()
+    let prelude = ''
 
     if (destructured !== undefined) {
       const pVar = '__p'
@@ -185,10 +225,12 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
         ? ` = ${compileExpression(destructured.defaultExpr, new Map())}`
         : ''
       editor.replace(destructured.replaceStart, destructured.replaceEnd, `${pVar}${destructured.typeAnn}${defSuffix}`)
-      propRewrites = computePropRewrites(destructured, pVar, new Map())
+      ;({ rewrites: propRewrites, prelude } = computePropRewrites(destructured, pVar, new Map()))
     }
 
     if (propRewrites.size > 0 && fn.body.type === 'BlockStatement') {
+      if (prelude !== '')
+        editor.replace(fn.body.start + 1, fn.body.start + 1, ` ${prelude}`)
       const shadowed = new Set<string>()
       for (const stmt of fn.body.body) {
         if (stmt.type === 'FunctionDeclaration' && stmt.id !== null)
@@ -211,7 +253,7 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
       }
     }
     else {
-      editor.replace(fn.body.start, fn.body.end, compileExpression(fn.body, propRewrites))
+      editor.replace(fn.body.start, fn.body.end, withPrelude(compileExpression(fn.body, propRewrites), fn.body, prelude))
     }
   }
 
