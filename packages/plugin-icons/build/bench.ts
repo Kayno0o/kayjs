@@ -1,14 +1,18 @@
 // Scores the search on tables that never saw the set they are tested on: learned from one set's tags, queried with the other set's.
-// A case is a tag naming at most 5 icons that the icon's name does not hold, so the plain substring search scores about 0; a hit is the icon within the first 50, the picker's first page.
+// A case is a tag naming at most 5 icons that the icon's name does not hold, so the plain substring search scores about 0; each suite reports the share found in the first 10 (what `kay icons-find` prints) and 50 (a picker's first page), and the mean reciprocal rank.
+// The typed queries of queries.ts add multi-word cases and count how often an icon they must not lead with comes first.
 import type { Tagged } from './learn'
+import type { Query } from './queries'
 import { findIcons } from '../src/search'
 import { replaceTable } from '../src/table'
 import { fromMeaning, fromTags, iconifyNameWords, lucideTags, merge, modelWords, setWords, tablerTags } from './learn'
+import { QUERIES } from './queries'
 import { FLOOR, MEANING_WEIGHT, NEIGHBOURS } from './settings'
 
 interface Case { query: string, target: string }
 
 const PAGE = 50
+const FOUND = 10
 const MOST_TAGGED = 5
 const SAMPLE = 1500
 const SINGLE_WORD = /^[a-z]{5,}$/
@@ -66,15 +70,40 @@ function cases(test: Tagged): Record<string, Case[]> {
   }
 }
 
-function score(names: string[], suite: Case[]): string {
-  let hits = 0
+function percent(share: number): string {
+  return `${(share * 100).toFixed(1).padStart(5)}%`
+}
 
-  for (const { query, target } of suite) {
-    if (findIcons(names, query, { limit: PAGE }).includes(target))
-      hits++
+// Recall at 10 and 50 and the mean reciprocal rank of the first answer, over cases each holding the names that answer it.
+function rank(names: string[], suite: { query: string, answers: string[] }[]): string {
+  let at10 = 0
+  let at50 = 0
+  let reciprocal = 0
+
+  for (const { query, answers } of suite) {
+    const at = findIcons(names, query, { limit: PAGE }).findIndex(name => answers.includes(name))
+
+    if (at === -1)
+      continue
+    at50++
+    if (at < FOUND)
+      at10++
+    reciprocal += 1 / (at + 1)
   }
 
-  return `${(hits / suite.length * 100).toFixed(1).padStart(5)}%`
+  return `R@10 ${percent(at10 / suite.length)} R@50 ${percent(at50 / suite.length)} MRR ${(reciprocal / suite.length).toFixed(3)}`
+}
+
+function score(names: string[], suite: Case[]): string {
+  return rank(names, suite.map(({ query, target }) => ({ query, answers: [target] })))
+}
+
+function scoreQueries(names: string[], queries: Query[]): string {
+  const known = new Set(names)
+  const held = queries.filter(({ answers }) => answers.some(name => known.has(name)))
+  const wrongFirst = held.filter(({ query, never = [] }) => never.includes(findIcons(names, query, { limit: 1 })[0] ?? ''))
+
+  return `${rank(names, held)} wrong first ${wrongFirst.length}/${held.length}${wrongFirst.length > 0 ? ` (${wrongFirst.map(({ query }) => query).join(', ')})` : ''}`
 }
 
 const sets = { tabler: await tablerTags(), lucide: await lucideTags() }
@@ -95,6 +124,9 @@ for (const [train, test] of [['tabler', 'lucide'], ['lucide', 'tabler']] as cons
 
   for (const [label, table] of Object.entries(tables)) {
     replaceTable(table)
-    console.log(`  ${label.padEnd(15)} ${Object.entries(suites).map(([kind, suite]) => `${kind} ${score(names, suite)}`).join('  ')}`)
+    console.log(`  ${label}`)
+    for (const [kind, suite] of Object.entries(suites))
+      console.log(`    ${kind.padEnd(8)} ${score(names, suite)}`)
+    console.log(`    ${'queries'.padEnd(8)} ${scoreQueries(names, QUERIES)}`)
   }
 }
