@@ -52,7 +52,7 @@ describe('first-load weight (#3644)', () => {
     writeFileSync(join(dir, 'public/logo.png'), bytes(500, 5))
 
     const html = '<link rel="preload" href="/_kay/fonts/pre.woff2" as="font"><link rel="stylesheet" href="/_kay/a.css"><script type="module" src="/_kay/runtime.js"></script><img src="/logo.png">'
-    const result = measureFirstLoad(firstLoadUrls(html), distLocator({ clientDir: client, assetPrefix: '/_kay', publicDirs: [join(dir, 'public')] }), 123)
+    const result = measureFirstLoad(firstLoadUrls(html), distLocator({ clientDir: client, assetPrefix: '/_kay', publicDirs: [join(dir, 'public')] }), 123, url => url.startsWith('/_kay/'))
 
     expect(result.html).toBe(123)
     expect(result.fonts).toBe(3000)
@@ -61,6 +61,8 @@ describe('first-load weight (#3644)', () => {
     expect(result.js).toBe(brotli(runtime) + brotli(chunk))
     expect(result.total).toBe(result.html + result.css + result.js + result.fonts + result.images + result.other)
     expect(result.files).toBe(6)
+    // The hashed /_kay/ files stay cached for the next page; the page and the public logo do not.
+    expect(result.cached).toBe(3000 + brotli(css) + brotli(runtime) + brotli(chunk))
   })
 
   it('reports fonts, preloads and a first-load total per route in --analyze', async () => {

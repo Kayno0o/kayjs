@@ -31,6 +31,8 @@ export interface FirstLoad {
   images: number
   other: number
   total: number
+  /** The part of `total` a browser keeps in its cache for the next page: the files `cacheable` accepts. */
+  cached: number
   /** Files counted besides the page. */
   files: number
 }
@@ -129,9 +131,9 @@ function dependenciesOf(url: string, file: string): string[] {
   return raw.map(dep => (dep.startsWith('/') ? dep : posix.join(base, dep)))
 }
 
-/** Adds up what a first visit fetches from these root URLs and what they pull in; `htmlBytes` is the page itself, brotli. */
-export function measureFirstLoad(roots: Iterable<string>, locate: Locate, htmlBytes = 0): FirstLoad {
-  const result: FirstLoad = { html: htmlBytes, css: 0, js: 0, fonts: 0, images: 0, other: 0, total: htmlBytes, files: 0 }
+/** Adds up what a first visit fetches from these root URLs and what they pull in; `htmlBytes` is the page itself, brotli; `cacheable` names the URLs served for long caching (kay's hashed assets). */
+export function measureFirstLoad(roots: Iterable<string>, locate: Locate, htmlBytes = 0, cacheable: (url: string) => boolean = () => false): FirstLoad {
+  const result: FirstLoad = { html: htmlBytes, css: 0, js: 0, fonts: 0, images: 0, other: 0, total: htmlBytes, cached: 0, files: 0 }
   const seen = new Set<string>()
   const stack = [...roots]
   while (stack.length > 0) {
@@ -153,6 +155,8 @@ export function measureFirstLoad(roots: Iterable<string>, locate: Locate, htmlBy
     else
       result.other += size
     result.total += size
+    if (cacheable(url))
+      result.cached += size
     result.files++
     stack.push(...dependenciesOf(url, file))
   }
