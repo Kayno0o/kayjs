@@ -2,9 +2,9 @@
 
 import type { BunPlugin } from 'bun'
 import type { RouteManifestEntry } from '../build/index'
-import type { ActionResult, ServerAction } from '../server/action'
 import type { Middleware, RequestContext } from '../server/index'
 import type { SecurityHeadersOptions, TrustProxy } from '../server/security'
+import type { ServiceKey } from './services'
 
 export type BuildPluginTarget = 'client' | 'server' | 'compile'
 
@@ -30,9 +30,9 @@ export interface BuildPluginContext {
   /** Add raw HTML to <head> on a specific route path only. */
   addRouteHead(routePath: string, html: string): void
   /** Register an explicit build-scoped service for other plugins or render-time helpers. */
-  provide<T>(key: string, value: T): void
+  provide<T>(key: ServiceKey<T>, value: T): void
   /** Look up a build-scoped service registered by another plugin. */
-  inject<T>(key: string): T | undefined
+  inject<T>(key: ServiceKey<T>): T | undefined
   /** Persist JSON-serializable build data into `manifest.pluginData[plugin.name]` for cold-start servers and `--compile`. */
   setData(data: Record<string, unknown>): void
 }
@@ -54,9 +54,9 @@ export interface FinalizeBuildContext {
   /** Emit a static file into dist/public/<relPath> served at `/<relPath>` (included in `--static` and `--compile`). */
   emitPublic(relPath: string, content: string | Uint8Array): string
   /** Register a build-scoped service. */
-  provide<T>(key: string, value: T): void
+  provide<T>(key: ServiceKey<T>, value: T): void
   /** Look up a build-scoped service. */
-  inject<T>(key: string): T | undefined
+  inject<T>(key: ServiceKey<T>): T | undefined
   /** Merge/persist JSON-serializable build data into `manifest.pluginData[plugin.name]`. */
   setData(data: Record<string, unknown>): void
 }
@@ -100,15 +100,13 @@ export interface ServerPluginAPI {
   /** Rewrite an incoming pathname before route matching (e.g. strip /fr locale prefix). */
   rewrite(fn: (pathname: string, ctx: RequestContext) => string | undefined): void
   /** Register a server-scoped service for other plugins or render-time helpers (isolated per server instance). */
-  provide<T>(key: string, value: T): void
+  provide<T>(key: ServiceKey<T>, value: T): void
   /** Look up a server-scoped service registered by another plugin. */
-  inject<T>(key: string): T | undefined
+  inject<T>(key: ServiceKey<T>): T | undefined
   /** Read persisted build data from `manifest.pluginData` (defaults to the current plugin's name). */
   getBuildData<T = Record<string, unknown>>(pluginName?: string): T | undefined
   /** Register a shutdown cleanup callback run when `app.dispose()` is called (dev reloads, tests, graceful exit). */
   onShutdown(fn: () => void | Promise<void>): void
-  /** Invoke a ServerAction with Standard Schema validation and directory-scoped `_middleware.ts` checks. */
-  invokeAction<I, O>(action: ServerAction<I, O>, input: I, ctx: RequestContext): Promise<ActionResult<O>>
 }
 
 export interface ServerErrorInfo {
@@ -142,8 +140,6 @@ export interface KayPlugin {
   readsLocals?: readonly string[] | undefined
   /** Register server routes, global middleware, URL rewrites, or runtime services. */
   server?: (api: ServerPluginAPI) => void | Promise<void>
-  /** Optional cleanup hook called when a server instance is disposed (dev reloads, tests, graceful shutdown). */
-  dispose?: () => void | Promise<void>
   /** Error hook called whenever a route, action, or plugin handler throws an unhandled error. */
   onError?: (info: ServerErrorInfo) => void
   /** Build hook run after route compilation, before prerender / --static / --compile. */

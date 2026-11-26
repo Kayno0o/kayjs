@@ -1,7 +1,8 @@
 // Refuses JSX that compiles but does the wrong thing, mostly habits from React, Solid and Astro, with an error naming the fix.
 
 import type { JSXAttribute, JSXAttributeItem, JSXElement, Node, Program } from 'oxc-parser'
-import { walk } from './analyze'
+import type { ServerOnlyInIsland } from './interactivity'
+import { walk } from './ast'
 import { EVENT_ATTR, filterMeaningfulChildren, isComponentTag, jsxTagName, unwrapParens, VOID_ELEMENTS } from './shared'
 
 // The kay prop for each DOM event, keyed by the event name kay binds (`onKeyDown` binds `keydown`).
@@ -48,6 +49,15 @@ function eventProp(event: string): string {
 
 export function mistake(what: string, filename: string, fix: string): Error {
   return new Error(`kay compiler: ${what} in ${filename}: ${fix}.`)
+}
+
+export function islandRemoved(filename: string): Error {
+  return mistake('island()', filename, 'it is gone; write export const hydrate = \'visible\' in the component\'s file, or set $hydrate where it renders')
+}
+
+// `<Head>` and `<Suspense>` run during server rendering only, so in an island they never update.
+export function serverOnlyTagError(filename: string, { tag, island, reason }: ServerOnlyInIsland): Error {
+  return mistake(`<${tag}> in an island`, filename, `${island} is an island because it ${reason}; move <${tag}> to the page or a layout, outside any component with state or handlers`)
 }
 
 const BARE_KAY_RE = /^kay(?:\/|$)/

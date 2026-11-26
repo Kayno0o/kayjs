@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { contentPlugin, defineCollection, renderMarkdown } from '../../plugin-content/src/index'
+import { content, defineCollection, renderMarkdown } from '../../plugin-content/src/index'
 import { i18n, localizePath } from '../../plugin-i18n/src/index'
 import { createMarkdownImageResolver } from '../../plugin-images/src/plugin'
 import { createRooms } from '../../plugin-live/src/index'
@@ -292,7 +292,7 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
 
       let mapItemCalls = 0
       const col = defineCollection({ dir: postsDir })
-      const plugin = contentPlugin({
+      const plugin = content({
         feeds: [{
           path: '/rss.xml',
           title: 'Test Feed',
@@ -519,13 +519,12 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
       expect(left).toBe(true)
     })
 
-    it('supports authorize hook on rooms.plugin() returning false (403), custom Response, or true (200)', async () => {
+    it('supports authorize hook on the rooms endpoint returning false (403), custom Response, or true (200)', async () => {
       const dir = makeTemp('kay-live-auth-')
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <h1>Live</h1> }')
 
-      const rooms = createRooms<{ text: string }, string>()
-      const plugin = rooms.plugin({
+      const rooms = createRooms<{ text: string }, string>({
         path: '/api/live',
         room: ctx => ctx.url.searchParams.get('room') ?? 'default',
         member: () => 'guest',
@@ -540,7 +539,7 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
         },
       })
 
-      const app = await testApp({ root: dir, plugins: [plugin] })
+      const app = await testApp({ root: dir, plugins: [rooms] })
 
       const denied = await app.get('/api/live?room=secret')
       expect(denied.status).toBe(403)

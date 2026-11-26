@@ -20,16 +20,3 @@ export type { ActionForm, ClientAction, UseActionOptions } from './dom/action'
 export type { Component, Html, HydrateStrategy, KayChild } from './jsx-runtime'
 export type { ExtractRouteParams, KayLocals, LayoutProps, LoaderData, LoaderFn, NotFoundResult, PageProps, RouteContext } from './server/index'
 
-import type { Component, HydrateStrategy } from './jsx-runtime'
-
-export interface IslandOptions {
-  hydrate?: HydrateStrategy | undefined
-}
-
-/** Optional component-level hydration metadata helper. */
-export function island<P>(component: Component<P>, options: IslandOptions = {}): Component<P> & { $hydrate?: HydrateStrategy } {
-  const tagged = component as Component<P> & { $hydrate?: HydrateStrategy }
-  if (options.hydrate !== undefined)
-    tagged.$hydrate = options.hydrate
-  return tagged
-}

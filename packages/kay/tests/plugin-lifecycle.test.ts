@@ -1,12 +1,12 @@
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
-import { contentPlugin } from '../../plugin-content/src/index'
+import { content } from '../../plugin-content/src/index'
 import { i18n } from '../../plugin-i18n/src/index'
 import { images } from '../../plugin-images/src/plugin'
-import { mailer, mailPlugin } from '../../plugin-mail/src/index'
+import { createMailer } from '../../plugin-mail/src/index'
 import { mcp } from '../../plugin-mcp/src/index'
 import { seo } from '../../plugin-seo/src/index'
 import { build, createBuildCache } from '../src/build/index'
@@ -28,6 +28,46 @@ function makeTemp(prefix: string): string {
 afterAll(() => {
   for (const d of tempDirs)
     rmSync(d, { recursive: true, force: true })
+})
+
+describe('a throwing onError or onShutdown hook (#3584)', () => {
+  it('is logged with its owner, and the other hooks still run', async () => {
+    const dir = makeTemp('kay-hook-errors-')
+    const files: Record<string, string> = {
+      'kay.config.ts': `
+        const seen = (globalThis as { hookLog?: string[] }).hookLog ??= []
+        export default {
+          onError() { throw new Error('app hook broke') },
+          plugins: [
+            { name: 'first', onError() { throw new Error('first broke') }, server(api: any) { api.onShutdown(() => { throw new Error('first shutdown broke') }) } },
+            { name: 'second', onError(info: { error: Error }) { seen.push(\`second saw \${info.error.message}\`) }, server(api: any) { api.onShutdown(() => { seen.push('second closed') }) } },
+          ],
+        }
+      `,
+      'src/routes/index.ts': 'export function GET(): Response { throw new Error(\'route broke\') }\n',
+    }
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(join(dir, file, '..'), { recursive: true })
+      writeFileSync(join(dir, file), text)
+    }
+    await build({ root: dir })
+    const logged: unknown[][] = []
+    const spy = spyOn(console, 'error').mockImplementation((...args: unknown[]) => { logged.push(args) })
+    try {
+      const app = await createServer({ root: dir })
+      expect((await app.handle(new Request('http://localhost/'))).status).toBe(500)
+      await app.dispose?.()
+    }
+    finally {
+      spy.mockRestore()
+    }
+    expect((globalThis as { hookLog?: string[] }).hookLog).toEqual(['second saw route broke', 'second closed'])
+    expect(logged.map(([message, error]) => `${String(message)} ${(error as Error).message}`)).toEqual([
+      'kay: the onError hook of kay.config.ts threw; the other hooks still run. app hook broke',
+      'kay: the onError hook of first threw; the other hooks still run. first broke',
+      'kay: the onShutdown hook of first threw; the other hooks still run. first shutdown broke',
+    ])
+  })
 })
 
 describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#3566)', () => {
@@ -99,9 +139,9 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
       }
     `)
 
-    // Reversed plugin order: contentPlugin BEFORE images
+    // Reversed plugin order: content BEFORE images
     const buildPlugins = [
-      contentPlugin(),
+      content(),
       images({
         widths: [320],
         formats: ['webp'],
@@ -114,7 +154,7 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
     // Simulate a cold-start server with brand-new plugin instances whose build() was NEVER called
     const coldApp = await createServer({
       root: dir,
-      plugins: [contentPlugin(), images()],
+      plugins: [content(), images()],
     })
     const res = await coldApp.handle(new Request('http://localhost/'))
     expect(res.status).toBe(200)
@@ -312,12 +352,12 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
       tools: {},
     })
 
-    const mail = mailer({ from: 'test@example.test', to: 'user@example.test', optional: true })
+    const mail = createMailer({ from: 'test@example.test', to: 'user@example.test', optional: true })
     await mail.send({ subject: 'Hello CSP', text: 'Plain body' })
 
     const app = await testApp({
       root: dir,
-      plugins: [auth.plugin, mcpPlugin, mailPlugin(mail)],
+      plugins: [auth, mcpPlugin, mail],
     })
 
     // 1. @kayjs/auth trustedOrigins works WITHOUT duplicating trustedOrigins in KayConfig

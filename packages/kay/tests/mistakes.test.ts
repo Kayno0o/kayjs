@@ -123,7 +123,18 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<Counter $hydrate="media(max-width: 600px)" />', counter)
     accepts('<Counter $hydrate={mode} />', `${counter}\nconst mode = 'idle'`)
     expect(() => compileSsr('Counter.tsx', 'export const hydrate = \'idle \'\nexport default function C() { return <p>x</p> }')).toThrow(/hydrate = "idle " in Counter\.tsx: use load, visible/)
-    expect(() => compileSsr('Counter.tsx', 'import { island } from \'@kayjs/kay\'\nconst C = () => <p>x</p>\nexport const Counter = island(C, { hydrate: \'idle\' })')).toThrow(/island\(\) options on export Counter in Counter\.tsx: only the default export's island\(\) options apply/)
+  })
+
+  test('<Head> or <Suspense> in an island, which renders once on the server and never updates (#3583)', () => {
+    refuses('<button onClick={fn}><Head><title>x</title></Head></button>', /kay compiler: <Head> in an island in Page\.tsx: Page is an island because it uses onClick; move <Head> to the page or a layout, outside any component with state or handlers\./, 'import { Head } from \'@kayjs/kay\'')
+    refuses('<kay.Suspense fallback="..."><p>{String(n.value)}</p></kay.Suspense>', /<Suspense> in an island in Page\.tsx: Page is an island because it uses n, which uses signal;/, 'import * as kay from \'@kayjs/kay\'\nimport { signal } from \'@kayjs/kay\'\nconst n = signal(0)')
+    accepts('<Head><title>x</title></Head>', 'import { Head } from \'@kayjs/kay\'')
+  })
+
+  test('island(), the removed third way to set hydration (#3583)', () => {
+    const fix = 'kay compiler: island() in Counter.tsx: it is gone; write export const hydrate = \'visible\' in the component\'s file, or set $hydrate where it renders.'
+    expect(() => compileSsr('Counter.tsx', 'import { island as wrap } from \'@kayjs/kay\'\nconst C = () => <p>x</p>\nexport default wrap(C, { hydrate: \'idle\' })')).toThrow(fix)
+    expect(() => compileSsr('Counter.tsx', 'import * as kay from \'@kayjs/kay\'\nconst C = () => <p>x</p>\nexport default kay.island(C)')).toThrow(fix)
   })
 
   test('$hydrate on a component that is not an island, which kay ignores', () => {

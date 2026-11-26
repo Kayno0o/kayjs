@@ -33,7 +33,6 @@ export interface ServerPluginHostOptions {
   trustProxy: TrustProxy
   trustedOriginsList: readonly string[]
   trustedOrigins: Set<string> | undefined
-  invokeAction: ServerPluginAPI['invokeAction']
 }
 
 function middlewareAppliesToPath(scope: ScopedMiddleware['scope'], path: string, isStaticFast: boolean): boolean {
@@ -59,7 +58,7 @@ export function allowedPluginMethodsHeader(methods: ReadonlyMap<string, PluginRo
 export async function createServerPluginHost(options: ServerPluginHostOptions) {
   const { plugins, config, manifest, appCtx, trustedOrigins, trustProxy } = options
   const scopedMiddlewares: ScopedMiddleware[] = []
-  const shutdownHooks: (() => void | Promise<void>)[] = []
+  const shutdownHooks: { plugin: string, hook: () => void | Promise<void> }[] = []
   const rewrites: ((pathname: string, ctx: RequestContext) => string | undefined)[] = []
   const router = new Router<Map<string, PluginRouteDef>>()
   const routeEntries = new Map<string, Map<string, PluginRouteDef>>()
@@ -102,8 +101,6 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
   const readonlyRuntimeConfig: Readonly<Record<string, unknown>> = Object.freeze({ ...forwardedConfig })
 
   for (const plugin of plugins) {
-    if (plugin.dispose !== undefined)
-      shutdownHooks.push(() => plugin.dispose!())
     if (plugin.server !== undefined) {
       const pluginApi: ServerPluginAPI = {
         root: options.root,
@@ -127,9 +124,8 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
           return manifest.pluginData?.[pluginName ?? plugin.name] as T | undefined
         },
         onShutdown(fn) {
-          shutdownHooks.push(fn)
+          shutdownHooks.push({ plugin: plugin.name, hook: fn })
         },
-        invokeAction: options.invokeAction,
       }
       await runWithAppContext(appCtx, () => plugin.server!(pluginApi))
     }
@@ -153,11 +149,13 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
     if (disposed)
       return
     disposed = true
-    for (const hook of shutdownHooks) {
+    for (const { plugin, hook } of shutdownHooks) {
       try {
         await hook()
       }
-      catch {}
+      catch (error) {
+        console.error(`kay: the onShutdown hook of ${plugin} threw; the other hooks still run.`, error)
+      }
     }
   }
 

@@ -1,7 +1,6 @@
 // OXC-based static analysis for TSX/TS files: automatic island detection, actions, prerender, Head/Suspense.
 
 import type {
-  ArrowFunctionExpression,
   CallExpression,
   ExportNamedDeclaration,
   Function as OxcFunction,
@@ -11,10 +10,13 @@ import type {
   VariableDeclaration,
 } from 'oxc-parser'
 import { parseSync, visitorKeys } from 'oxc-parser'
-import { assertScopedKayImport, checkBareSignals, checkHydrateMode, checkMistakes, mistake } from './mistakes'
+import { walk } from './ast'
+import type { BindingFacts, Interactivity } from './interactivity'
+import { analyzeDefaultDataKeys } from './data-keys'
+import { resolveInteractivity } from './interactivity'
+import { assertScopedKayImport, checkBareSignals, checkHydrateMode, checkMistakes, islandRemoved, mistake, serverOnlyTagError } from './mistakes'
 import { EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from './shared'
 
-export type AstNode = Node
 
 const REACTIVE_IMPORTS = new Set([
   'signal',
@@ -24,7 +26,6 @@ const REACTIVE_IMPORTS = new Set([
   'onCleanup',
   'selector',
   'store',
-  'island',
   'useAction',
 ])
 
@@ -34,6 +35,7 @@ const KAY_SOURCES = new Set(['@kayjs/kay'])
 const KAY_SSR_SOURCES = new Set(['@kayjs/kay', '@kayjs/kay/internal/ssr'])
 const KAY_SERVER_SOURCES = new Set(['@kayjs/kay/server'])
 const RENDER_CONTEXT_IMPORTS = new Set(['Head', 'Suspense', 'createContext', 'provideContext', 'useContext', 'useId'])
+const SERVER_ONLY_TAGS = new Set(['Head', 'Suspense'])
 
 export interface ImportInfo {
   source: string
@@ -49,12 +51,9 @@ export interface ReexportInfo {
   start: number
 }
 
-export interface ModuleAnalysis {
+export interface ModuleAnalysis extends Interactivity {
   filename: string
   program: Program
-  isInteractive: boolean
-  interactiveReason: string | undefined
-  interactiveOffset?: number | undefined
   hasAsyncDefault: boolean
   hasLoadExport: boolean
   hasJsx: boolean
@@ -77,6 +76,10 @@ export interface ModuleAnalysis {
   imports: ImportInfo[]
   reexports: ReexportInfo[]
   exportedNames: string[]
+  /** Facts per top-level binding, which `kay build` and `kay check` re-resolve once imported state is known. */
+  bindings: BindingFacts[]
+  /** Each export by name, with the top-level binding it exports. */
+  exportLocals: Map<string, string>
   /** Code that compiles but usually means something else, worded for build and `kay check` to print. */
   warnings: string[]
 }
@@ -124,38 +127,6 @@ export function computeJsxNodes(program: Program): WeakSet<Node> {
   return jsxNodes
 }
 
-export function walk(node: unknown, visit: (node: Node) => boolean | void): void {
-  if (node === null || typeof node !== 'object')
-    return
-  if (Array.isArray(node)) {
-    for (let i = 0; i < node.length; i++)
-      walk(node[i], visit)
-    return
-  }
-  const ast = node as Node
-  const type = ast.type
-  if (typeof type !== 'string')
-    return
-  if (visit(ast) === false)
-    return
-  const keys = visitorKeys[type]
-  if (keys !== undefined) {
-    const rec = ast as unknown as Record<string, unknown>
-    for (let i = 0; i < keys.length; i++) {
-      const val = rec[keys[i]!]
-      if (val !== null && typeof val === 'object')
-        walk(val, visit)
-    }
-    return
-  }
-  for (const [key, val] of Object.entries(ast)) {
-    if (key === 'start' || key === 'end' || key === 'type')
-      continue
-    if (val !== null && typeof val === 'object')
-      walk(val, visit)
-  }
-}
-
 function exportedName(node: { type: string, name?: string, value?: string }): string | undefined {
   return node.type === 'Identifier' ? node.name : node.value
 }
@@ -194,240 +165,6 @@ export function loadDeclarations(program: Program): Node[] {
       collect(stmt, localNames)
   }
   return found
-}
-
-function staticPropKey(prop: Node): string | undefined {
-  if (prop.type !== 'Property')
-    return undefined
-  if (!prop.computed && prop.key.type === 'Identifier')
-    return prop.key.name
-  if (prop.key.type === 'Literal' && typeof prop.key.value === 'string')
-    return prop.key.value
-  return undefined
-}
-
-function extractObjectPatternKeys(pat: Node): string[] | undefined {
-  if (pat.type !== 'ObjectPattern')
-    return undefined
-  const keys: string[] = []
-  for (const prop of pat.properties) {
-    if (prop.type === 'RestElement')
-      return undefined
-    const k = staticPropKey(prop)
-    if (k === undefined)
-      return undefined
-    keys.push(k)
-  }
-  return keys
-}
-
-function memberKeyName(node: Node): string | undefined {
-  if (node.type !== 'MemberExpression')
-    return undefined
-  if (!node.computed && node.property.type === 'Identifier')
-    return node.property.name
-  if (node.computed && node.property.type === 'Literal' && typeof node.property.value === 'string')
-    return node.property.value
-  return undefined
-}
-
-function unwrapParamPattern(param: Node): Node {
-  return param.type === 'AssignmentPattern' ? param.left : param
-}
-
-function resolveDefaultFunction(
-  program: Program,
-  defaultLocal: string | undefined,
-  localInits: ReadonlyMap<string, Node>,
-  islandLocalName: string | undefined,
-  kayNamespaces: ReadonlySet<string>,
-): OxcFunction | ArrowFunctionExpression | undefined {
-  const localFns = new Map<string, OxcFunction>()
-  for (const stmt of program.body) {
-    if (stmt.type === 'FunctionDeclaration' && stmt.id !== null)
-      localFns.set(stmt.id.name, stmt)
-    else if (stmt.type === 'ExportNamedDeclaration' && stmt.declaration?.type === 'FunctionDeclaration' && stmt.declaration.id !== null)
-      localFns.set(stmt.declaration.id.name, stmt.declaration)
-  }
-
-  const unwrapTarget = (node: Node | undefined, depth = 0): OxcFunction | ArrowFunctionExpression | undefined => {
-    if (node === undefined || depth > 4)
-      return undefined
-    const inner = unwrapTsExpr(node)
-    if (inner.type === 'FunctionDeclaration' || inner.type === 'FunctionExpression' || inner.type === 'ArrowFunctionExpression')
-      return inner
-    if (isIslandCall(inner, islandLocalName, kayNamespaces))
-      return unwrapTarget(inner.arguments[0], depth + 1)
-    if (inner.type === 'Identifier')
-      return localFns.get(inner.name) ?? unwrapTarget(localInits.get(inner.name), depth + 1)
-    return undefined
-  }
-
-  for (const stmt of program.body) {
-    if (stmt.type === 'ExportDefaultDeclaration')
-      return unwrapTarget(stmt.declaration)
-  }
-  if (defaultLocal !== undefined)
-    return localFns.get(defaultLocal) ?? unwrapTarget(localInits.get(defaultLocal))
-  return undefined
-}
-
-/** Statically bounds which top-level keys of `props.data` a page island reads; returns `undefined` if `data` escapes. */
-function analyzeDefaultDataKeys(
-  program: Program,
-  defaultLocal: string | undefined,
-  localInits: ReadonlyMap<string, Node>,
-  islandLocalName: string | undefined,
-  kayNamespaces: ReadonlySet<string>,
-): string[] | undefined {
-  const fn = resolveDefaultFunction(program, defaultLocal, localInits, islandLocalName, kayNamespaces)
-  if (fn === undefined || fn.body === null)
-    return undefined
-  if (fn.params.length === 0)
-    return []
-
-  const firstParam = unwrapParamPattern(fn.params[0]!)
-  const keys = new Set<string>()
-  let escaped = false
-  let dataVar: string | undefined
-  let propsVar: string | undefined
-
-  if (firstParam.type === 'ObjectPattern') {
-    let dataProp: Node | undefined
-    for (const prop of firstParam.properties) {
-      if (prop.type === 'RestElement')
-        return undefined
-      if (staticPropKey(prop) === 'data')
-        dataProp = prop
-    }
-    if (dataProp === undefined || dataProp.type !== 'Property')
-      return []
-    const binding = unwrapParamPattern(dataProp.value)
-    if (binding.type === 'ObjectPattern') {
-      const nested = extractObjectPatternKeys(binding)
-      if (nested === undefined)
-        return undefined
-      return [...new Set(nested)].sort()
-    }
-    if (binding.type !== 'Identifier')
-      return undefined
-    dataVar = binding.name
-  }
-  else if (firstParam.type === 'Identifier') {
-    propsVar = firstParam.name
-  }
-  else {
-    return undefined
-  }
-
-  // Walk the function body tracking parent chains so every reference to `dataVar` or `propsVar` is verified.
-  const ancestors: Node[] = []
-  const walkWithParents = (node: unknown): void => {
-    if (escaped || node === null || typeof node !== 'object')
-      return
-    if (Array.isArray(node)) {
-      for (let i = 0; i < node.length; i++)
-        walkWithParents(node[i])
-      return
-    }
-    const ast = node as Node
-    const type = ast.type
-    if (typeof type !== 'string')
-      return
-
-    // Respect inner function parameters that shadow `dataVar` or `propsVar`.
-    if (ast !== fn && (type === 'FunctionDeclaration' || type === 'FunctionExpression' || type === 'ArrowFunctionExpression')) {
-      const shadowed = new Set<string>()
-      for (const p of (ast as OxcFunction).params) {
-        walk(p, (pn) => {
-          if (pn.type === 'Identifier')
-            shadowed.add(pn.name)
-        })
-      }
-      if ((dataVar !== undefined && shadowed.has(dataVar)) || (propsVar !== undefined && shadowed.has(propsVar)))
-        return
-    }
-
-    if (type === 'Identifier') {
-      const parent = ancestors[ancestors.length - 1]
-      const grand = ancestors[ancestors.length - 2]
-      const isNonRef = parent !== undefined && (
-        (parent.type === 'MemberExpression' && !parent.computed && parent.property === ast)
-        || (parent.type === 'Property' && !parent.computed && parent.key === ast && !parent.shorthand)
-        || (parent.type === 'VariableDeclarator' && parent.id === ast)
-        || (parent.type === 'LabeledStatement' && parent.label === ast)
-        || (parent.type === 'FunctionDeclaration' && parent.id === ast)
-        || (parent.type === 'FunctionExpression' && parent.id === ast)
-      )
-
-      if (!isNonRef && dataVar !== undefined && ast.name === dataVar) {
-        if (parent?.type === 'MemberExpression' && parent.object === ast) {
-          const k = memberKeyName(parent)
-          if (k === undefined)
-            escaped = true
-          else
-            keys.add(k)
-        }
-        else if (parent?.type === 'VariableDeclarator' && parent.init === ast) {
-          const nested = extractObjectPatternKeys(parent.id)
-          if (nested === undefined)
-            escaped = true
-          else
-            for (const k of nested) keys.add(k)
-        }
-        else {
-          escaped = true
-        }
-      }
-      else if (!isNonRef && propsVar !== undefined && ast.name === propsVar) {
-        if (parent?.type === 'MemberExpression' && parent.object === ast) {
-          const propName = memberKeyName(parent)
-          if (propName === undefined) {
-            escaped = true
-          }
-          else if (propName === 'data') {
-            const holder = grand?.type === 'ChainExpression' ? ancestors[ancestors.length - 3] : grand
-            const target = grand?.type === 'ChainExpression' ? grand : parent
-            if (holder?.type === 'MemberExpression' && holder.object === target) {
-              const k = memberKeyName(holder)
-              if (k === undefined)
-                escaped = true
-              else
-                keys.add(k)
-            }
-            else if (holder?.type === 'VariableDeclarator' && holder.init === target) {
-              const nested = extractObjectPatternKeys(holder.id)
-              if (nested === undefined)
-                escaped = true
-              else
-                for (const k of nested) keys.add(k)
-            }
-            else {
-              escaped = true
-            }
-          }
-        }
-        else {
-          escaped = true
-        }
-      }
-    }
-
-    ancestors.push(ast)
-    const childKeys = visitorKeys[type]
-    if (childKeys !== undefined) {
-      const rec = ast as unknown as Record<string, unknown>
-      for (let i = 0; i < childKeys.length; i++) {
-        const val = rec[childKeys[i]!]
-        if (val !== null && typeof val === 'object')
-          walkWithParents(val)
-      }
-    }
-    ancestors.pop()
-  }
-
-  walkWithParents(fn.body)
-  return escaped ? undefined : [...keys].sort()
 }
 
 export function parseTsx(filename: string, code: string): Program {
@@ -498,72 +235,23 @@ function isActionCall(node: Node, actionLocalName: string | undefined, serverNam
   return false
 }
 
-function isIslandCall(node: Node, islandLocalName: string | undefined, kayNamespaces: ReadonlySet<string>): node is CallExpression {
-  if (node.type !== 'CallExpression')
-    return false
-  if (islandLocalName !== undefined && node.callee.type === 'Identifier' && node.callee.name === islandLocalName)
-    return true
-  if (
-    node.callee.type === 'MemberExpression'
-    && !node.callee.computed
-    && node.callee.object.type === 'Identifier'
-    && kayNamespaces.has(node.callee.object.name)
-    && node.callee.property.type === 'Identifier'
-    && node.callee.property.name === 'island'
-  ) {
-    return true
-  }
-  return false
+
+/** What a module's imports declare, read before its body so import order never matters. */
+interface ImportScan {
+  imports: ImportInfo[]
+  /** Kay's reactive primitives by local name, with the reason a use of one gives. */
+  reactiveLocals: Map<string, string>
+  stateCallees: Set<string>
+  signalCallees: Set<string>
+  serverOnlyLocals: Map<string, string>
+  kayNamespaces: Set<string>
+  serverNamespaces: Set<string>
+  actionLocalName: string | undefined
+  usesRenderContext: boolean
 }
 
-export function analyzeModule(filename: string, code: string, program: Program = parseTsx(filename, code)): ModuleAnalysis {
-  let isInteractive = false
-  let interactiveReason: string | undefined
-  let interactiveOffset: number | undefined
-  let hasAsyncDefault = false
-  let hasLoadExport = false
-  let hasJsx = false
-  let hasPrerender = false
-  let hasPaths = false
-  let usesRenderContext = false
-  let defaultHydrate: string | undefined
-  const deferredIslandTags = new Set<string>()
-  const jsxTags = new Set<string>()
-  const hydrateModes = new Set<string>()
-  const kayNamespaces = new Set<string>()
-  const serverNamespaces = new Set<string>()
-  const stateCallees = new Set<string>()
-  const warnings: string[] = []
-  const signalCallees = new Set<string>()
-  const asyncLocals = new Set<string>()
-  const localInits = new Map<string, Node>()
-  const localExports = new Map<string, string>()
-  let defaultLocal: string | undefined
-  const exportedActions: string[] = []
-  const imports: ImportInfo[] = []
-  const reexports: ReexportInfo[] = []
-  const exportedNames: string[] = []
-  let actionLocalName: string | undefined
-  let islandLocalName: string | undefined
-  // The action() calls kay gives a URL to: the initialisers of top-level `export const`s.
-  const registeredActions = new Set<Node>()
-
-  const markInteractive = (reason: string, offset?: number) => {
-    if (!isInteractive) {
-      isInteractive = true
-      interactiveReason = reason
-      interactiveOffset = offset
-    }
-  }
-
-  const collectInits = (decl: VariableDeclaration): void => {
-    for (const d of decl.declarations) {
-      if (d.id.type === 'Identifier' && d.init !== null)
-        localInits.set(d.id.name, d.init)
-    }
-  }
-
-  // Pass 1: hoist all runtime imports first so import order relative to exports never matters.
+function scanImports(program: Program, filename: string): ImportScan {
+  const scan: ImportScan = { imports: [], reactiveLocals: new Map(), stateCallees: new Set(), signalCallees: new Set(), serverOnlyLocals: new Map(), kayNamespaces: new Set(), serverNamespaces: new Set(), actionLocalName: undefined, usesRenderContext: false }
   for (const stmt of program.body) {
     if (stmt.type === 'ExportAllDeclaration' || (stmt.type === 'ExportNamedDeclaration' && stmt.source !== null))
       assertScopedKayImport(stmt.source!.value, filename)
@@ -575,251 +263,310 @@ export function analyzeModule(filename: string, code: string, program: Program =
       continue
     const source = stmt.source.value
     const specifiers: { local: string, imported: string }[] = []
-
     for (const spec of stmt.specifiers) {
       if (spec.type === 'ImportSpecifier') {
-        if (spec.importKind === 'type')
-          continue
-        const imported = exportedName(spec.imported)
+        const imported = spec.importKind === 'type' ? undefined : exportedName(spec.imported)
         if (imported === undefined)
           continue
-        const local = spec.local.name
-        specifiers.push({ local, imported })
-        if (KAY_SOURCES.has(source) && REACTIVE_IMPORTS.has(imported))
-          markInteractive(`imports ${imported} from '${source}'`, spec.start)
-        if (KAY_SOURCES.has(source) && imported === 'island')
-          islandLocalName = local
-        if (KAY_SOURCES.has(source) && STATE_PRIMITIVES.has(imported))
-          stateCallees.add(local)
-        if (KAY_SOURCES.has(source) && (imported === 'signal' || imported === 'computed'))
-          signalCallees.add(local)
-        if (KAY_SSR_SOURCES.has(source) && RENDER_CONTEXT_IMPORTS.has(imported))
-          usesRenderContext = true
-        if (KAY_SERVER_SOURCES.has(source) && imported === 'action')
-          actionLocalName = local
+        specifiers.push({ local: spec.local.name, imported })
+        scanKayImport(scan, source, imported, spec.local.name, filename)
       }
       else if (spec.type === 'ImportDefaultSpecifier') {
         specifiers.push({ local: spec.local.name, imported: 'default' })
       }
-      else if (spec.type === 'ImportNamespaceSpecifier') {
+      else {
         specifiers.push({ local: spec.local.name, imported: '*' })
         if (KAY_SOURCES.has(source))
-          kayNamespaces.add(spec.local.name)
+          scan.kayNamespaces.add(spec.local.name)
         if (KAY_SERVER_SOURCES.has(source))
-          serverNamespaces.add(spec.local.name)
+          scan.serverNamespaces.add(spec.local.name)
       }
     }
-
-    imports.push({ source, specifiers, start: stmt.start, end: stmt.end })
+    scan.imports.push({ source, specifiers, start: stmt.start, end: stmt.end })
   }
+  return scan
+}
 
-  const readIslandHydrate = (call: CallExpression): void => {
-    markInteractive('island() wrapper', call.start)
-    const opts = call.arguments[1]
-    if (opts !== undefined && opts.type === 'ObjectExpression') {
-      for (const prop of opts.properties) {
-        if (
-          prop.type === 'Property'
-          && !prop.computed
-          && prop.key.type === 'Identifier'
-          && prop.key.name === 'hydrate'
-          && prop.value.type === 'Literal'
-          && typeof prop.value.value === 'string'
-        ) {
-          checkHydrateMode(prop.value.value, `island() hydrate: "${prop.value.value}"`, filename)
-          defaultHydrate = prop.value.value
-        }
-      }
+function scanKayImport(scan: ImportScan, source: string, imported: string, local: string, filename: string): void {
+  if (KAY_SOURCES.has(source)) {
+    if (REACTIVE_IMPORTS.has(imported))
+      scan.reactiveLocals.set(local, `uses ${imported}`)
+    if (imported === 'island')
+      throw islandRemoved(filename)
+    if (STATE_PRIMITIVES.has(imported))
+      scan.stateCallees.add(local)
+    if (imported === 'signal' || imported === 'computed')
+      scan.signalCallees.add(local)
+    if (SERVER_ONLY_TAGS.has(imported))
+      scan.serverOnlyLocals.set(local, imported)
+  }
+  if (KAY_SSR_SOURCES.has(source) && RENDER_CONTEXT_IMPORTS.has(imported))
+    scan.usesRenderContext = true
+  if (KAY_SERVER_SOURCES.has(source) && imported === 'action')
+    scan.actionLocalName = local
+}
+
+/** A module's top-level declarations and exports. */
+interface DeclarationScan {
+  localInits: Map<string, Node>
+  /** Each export by name, with the top-level binding it exports (`default` for an anonymous default export). */
+  exportLocals: Map<string, string>
+  asyncLocals: Set<string>
+  defaultLocal: string | undefined
+  hasAsyncDefault: boolean
+  hasLoadExport: boolean
+  hasPaths: boolean
+  hasPrerender: boolean
+  defaultHydrate: string | undefined
+  exportedActions: string[]
+  /** The action() calls kay gives a URL to: the initialisers of top-level `export const`s. */
+  registeredActions: Set<Node>
+  reexports: ReexportInfo[]
+  exportedNames: string[]
+}
+
+function scanDeclarations(program: Program, filename: string, imports: ImportScan): DeclarationScan {
+  const scan: DeclarationScan = { localInits: new Map(), exportLocals: new Map(), asyncLocals: new Set(), defaultLocal: undefined, hasAsyncDefault: false, hasLoadExport: false, hasPaths: false, hasPrerender: false, defaultHydrate: undefined, exportedActions: [], registeredActions: new Set(), reexports: [], exportedNames: [] }
+  const collectInits = (decl: VariableDeclaration): void => {
+    for (const d of decl.declarations) {
+      if (d.id.type === 'Identifier' && d.init !== null)
+        scan.localInits.set(d.id.name, d.init)
     }
   }
-
-  // Pass 2: collect top-level declarations, exports, re-exports, actions, and metadata.
+  const addExport = (exported: string, local: string | undefined): void => {
+    scan.exportedNames.push(exported)
+    if (local !== undefined)
+      scan.exportLocals.set(exported, local)
+    if (exported === 'load')
+      scan.hasLoadExport = true
+    if (exported === 'paths')
+      scan.hasPaths = true
+  }
   for (const stmt of program.body) {
     if (stmt.type === 'VariableDeclaration') {
       collectInits(stmt)
     }
     else if (stmt.type === 'FunctionDeclaration') {
       if (stmt.async === true && stmt.id !== null)
-        asyncLocals.add(stmt.id.name)
+        scan.asyncLocals.add(stmt.id.name)
     }
     else if (stmt.type === 'ExportAllDeclaration') {
       if (stmt.exportKind !== 'type')
-        reexports.push({ exported: '*', local: '*', source: stmt.source.value, start: stmt.start })
+        scan.reexports.push({ exported: '*', local: '*', source: stmt.source.value, start: stmt.start })
     }
     else if (stmt.type === 'ExportDefaultDeclaration') {
-      exportedNames.push('default')
       const decl = unwrapTsExpr(stmt.declaration)
+      const named = (decl.type === 'FunctionDeclaration' || decl.type === 'ClassDeclaration') ? decl.id?.name : undefined
+      addExport('default', decl.type === 'Identifier' ? decl.name : named ?? 'default')
       if (isAsyncFunction(decl))
-        hasAsyncDefault = true
+        scan.hasAsyncDefault = true
       else if (decl.type === 'Identifier')
-        defaultLocal = decl.name
+        scan.defaultLocal = decl.name
       else
-        localInits.set('default', decl)
+        scan.localInits.set('default', decl)
+    }
+    else if (stmt.type === 'ExportNamedDeclaration' && stmt.exportKind !== 'type') {
+      for (const spec of stmt.specifiers) {
+        const exported = spec.exportKind === 'type' ? undefined : exportedName(spec.exported)
+        const local = exportedName(spec.local)
+        if (exported === undefined || local === undefined)
+          continue
+        addExport(exported, stmt.source === null ? local : undefined)
+        if (stmt.source !== null)
+          scan.reexports.push({ exported, local, source: stmt.source.value, start: stmt.start })
+        else if (exported === 'default')
+          scan.defaultLocal = local
+      }
+      if (stmt.declaration !== null)
+        scanExportedDeclaration(scan, stmt.declaration, filename, imports, collectInits, addExport)
+    }
+  }
+  return scan
+}
 
-      if (isIslandCall(decl, islandLocalName, kayNamespaces)) {
-        readIslandHydrate(decl)
-        const target = decl.arguments[0]
-        if (target !== undefined && isAsyncFunction(target))
-          hasAsyncDefault = true
+function scanExportedDeclaration(scan: DeclarationScan, decl: NonNullable<ExportNamedDeclaration['declaration']>, filename: string, imports: ImportScan, collectInits: (decl: VariableDeclaration) => void, addExport: (exported: string, local: string) => void): void {
+  if (decl.type === 'FunctionDeclaration' && decl.id !== null) {
+    if (decl.async === true)
+      scan.asyncLocals.add(decl.id.name)
+    addExport(decl.id.name, decl.id.name)
+  }
+  else if (decl.type === 'ClassDeclaration' && decl.id !== null) {
+    addExport(decl.id.name, decl.id.name)
+  }
+  else if (decl.type === 'VariableDeclaration') {
+    collectInits(decl)
+    for (const d of decl.declarations) {
+      if (d.id.type !== 'Identifier')
+        continue
+      const name = d.id.name
+      addExport(name, name)
+      if (name === 'prerender' && d.init?.type === 'Literal' && d.init.value === true)
+        scan.hasPrerender = true
+      if (name === 'hydrate' && d.init?.type === 'Literal' && typeof d.init.value === 'string') {
+        checkHydrateMode(d.init.value, `hydrate = "${d.init.value}"`, filename)
+        scan.defaultHydrate = d.init.value
+      }
+      if (d.init !== null && isActionCall(d.init, imports.actionLocalName, imports.serverNamespaces)) {
+        scan.exportedActions.push(name)
+        scan.registeredActions.add(d.init)
       }
     }
-    else if (stmt.type === 'ExportNamedDeclaration') {
-      if (stmt.exportKind === 'type')
-        continue
-      if (stmt.source !== null) {
-        const src = stmt.source.value
-        for (const spec of stmt.specifiers) {
-          if (spec.exportKind === 'type')
-            continue
-          const exported = exportedName(spec.exported)
-          const local = exportedName(spec.local)
-          if (exported !== undefined && local !== undefined) {
-            exportedNames.push(exported)
-            reexports.push({ exported, local, source: src, start: stmt.start })
-            if (exported === 'load')
-              hasLoadExport = true
-            if (exported === 'paths')
-              hasPaths = true
-          }
-        }
-      }
-      else {
-        for (const spec of stmt.specifiers) {
-          if (spec.exportKind === 'type')
-            continue
-          const exported = exportedName(spec.exported)
-          const local = exportedName(spec.local)
-          if (exported !== undefined && local !== undefined) {
-            exportedNames.push(exported)
-            localExports.set(exported, local)
-            if (exported === 'default')
-              defaultLocal = local
-            if (exported === 'load')
-              hasLoadExport = true
-            if (exported === 'paths')
-              hasPaths = true
-          }
-        }
-      }
+  }
+}
+
+// A module's body as top-level bindings, each with the node holding its code; module-level statements go under ''.
+function bindingUnits(program: Program): { name: string, node: Node }[] {
+  const units: { name: string, node: Node }[] = []
+  const add = (node: Node): void => {
+    if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id !== null) {
+      units.push({ name: node.id.name, node })
+    }
+    else if (node.type === 'VariableDeclaration') {
+      for (const d of node.declarations)
+        units.push({ name: d.id.type === 'Identifier' ? d.id.name : '', node: d })
+    }
+    else {
+      units.push({ name: '', node })
+    }
+  }
+  for (const stmt of program.body) {
+    if (stmt.type === 'ExportNamedDeclaration') {
+      if (stmt.declaration !== null)
+        add(stmt.declaration)
+    }
+    else if (stmt.type === 'ExportDefaultDeclaration') {
       const decl = stmt.declaration
-      if (decl === null)
-        continue
-      if (decl.type === 'FunctionDeclaration' && decl.id !== null) {
-        if (decl.async === true)
-          asyncLocals.add(decl.id.name)
-        const name = decl.id.name
-        exportedNames.push(name)
-        if (name === 'load')
-          hasLoadExport = true
-        if (name === 'paths')
-          hasPaths = true
-      }
-      else if (decl.type === 'VariableDeclaration') {
-        collectInits(decl)
-        for (const d of decl.declarations) {
-          if (d.id.type !== 'Identifier')
-            continue
-          const name = d.id.name
-          exportedNames.push(name)
-          if (name === 'load')
-            hasLoadExport = true
-          if (name === 'paths')
-            hasPaths = true
-          if (name === 'prerender' && d.init?.type === 'Literal' && d.init.value === true)
-            hasPrerender = true
-          if (name === 'hydrate' && d.init?.type === 'Literal' && typeof d.init.value === 'string') {
-            checkHydrateMode(d.init.value, `hydrate = "${d.init.value}"`, filename)
-            defaultHydrate = d.init.value
-          }
-          if (d.init !== null && isIslandCall(d.init, islandLocalName, kayNamespaces) && d.init.arguments.length > 1)
-            throw mistake(`island() options on export ${name}`, filename, 'only the default export\'s island() options apply; export the island as default, or set $hydrate where it renders')
-          if (d.init !== null && isActionCall(d.init, actionLocalName, serverNamespaces)) {
-            exportedActions.push(name)
-            registeredActions.add(d.init)
-          }
-        }
-      }
-      else if (decl.type === 'ClassDeclaration' && decl.id !== null) {
-        exportedNames.push(decl.id.name)
-      }
+      if ((decl.type === 'FunctionDeclaration' || decl.type === 'ClassDeclaration') && decl.id !== null)
+        add(decl)
+      else if (decl.type !== 'Identifier')
+        units.push({ name: 'default', node: decl })
+    }
+    else if (stmt.type !== 'ImportDeclaration') {
+      add(stmt)
     }
   }
+  return units
+}
 
-  // Handle indirect `const C = island(Comp, { hydrate: 'visible' }); export default C`
-  if (defaultLocal !== undefined) {
-    const defInit = localInits.get(defaultLocal)
-    if (defInit !== undefined && isIslandCall(defInit, islandLocalName, kayNamespaces)) {
-      readIslandHydrate(defInit)
-      const target = defInit.arguments[0]
-      if (target !== undefined && isAsyncFunction(target))
-        hasAsyncDefault = true
-    }
+/** What the walk over a module's body finds. */
+interface BodyScan {
+  hasJsx: boolean
+  usesRenderContext: boolean
+  deferredIslandTags: Set<string>
+  hydrateModes: Set<string>
+  jsxTags: Set<string>
+  bindings: BindingFacts[]
+}
+
+// Walks each top-level binding for JSX, mistakes, action() placement and what makes it run in the browser.
+function scanBody(program: Program, filename: string, code: string, imports: ImportScan, decls: DeclarationScan, warnings: string[]): BodyScan {
+  const body: BodyScan = { hasJsx: false, usesRenderContext: imports.usesRenderContext, deferredIslandTags: new Set(), hydrateModes: new Set(), jsxTags: new Set(), bindings: [] }
+  const units = bindingUnits(program)
+  const tracked = new Set(units.map(u => u.name))
+  for (const imp of imports.imports) {
+    for (const spec of imp.specifiers)
+      tracked.add(spec.local)
   }
-
-  // Pass 3: walk AST for JSX, mistakes, interactive handlers/refs, action() placement, namespace accesses.
-  walk(program, (node) => {
+  // Identifiers naming a property or a member, which are no reference to a binding.
+  const keys = new Set<number>()
+  const checkActions = imports.actionLocalName !== undefined || imports.serverNamespaces.size > 0
+  let current: BindingFacts | undefined
+  const ref = (binding: BindingFacts, name: string, offset: number): void => {
+    if (tracked.has(name) && !binding.refs.has(name))
+      binding.refs.set(name, offset)
+  }
+  const visit = (node: Node): void => {
+    const binding = current!
     if (isJsxNode(node))
-      hasJsx = true
+      body.hasJsx = true
     if (node.type === 'JSXElement')
       checkMistakes(node, filename, code, warnings)
-    if ((actionLocalName !== undefined || serverNamespaces.size > 0) && isActionCall(node, actionLocalName, serverNamespaces) && !registeredActions.has(node))
-      throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${actionLocalName ?? 'action'}(...) at the top level, only those get a URL`)
+    if (checkActions && isActionCall(node, imports.actionLocalName, imports.serverNamespaces) && !decls.registeredActions.has(node))
+      throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${imports.actionLocalName ?? 'action'}(...) at the top level, only those get a URL`)
     if (node.type === 'JSXOpeningElement') {
-      const tag = jsxTagName(node.name)
-      const isComponent = isComponentTag(tag)
-      if (isComponent) {
-        jsxTags.add(tag)
-        if (tag.includes('.')) {
-          const [ns, member] = tag.split('.')
-          if (ns !== undefined && kayNamespaces.has(ns) && member !== undefined && RENDER_CONTEXT_IMPORTS.has(member))
-            usesRenderContext = true
-        }
-      }
-      for (const attr of node.attributes) {
-        if (attr.type !== 'JSXAttribute' || attr.name.type !== 'JSXIdentifier')
-          continue
-        const attrName = attr.name.name
-        if (isComponent && attrName === '$hydrate') {
-          const mode = hydrateMode(attr.value)
-          checkHydrateMode(mode, `$hydrate="${mode}"`, filename)
-          hydrateModes.add(mode)
-          if (mode !== 'load')
-            deferredIslandTags.add(tag)
-        }
-        // A handler or ref on a component tag is a prop for that component; only a DOM element binds it in the browser.
-        if (!isComponent && tag !== '' && (EVENT_ATTR.test(attrName) || attrName === 'ref'))
-          markInteractive(`uses ${attrName}`, attr.start)
-      }
+      scanOpeningElement(node, binding, body, imports, filename)
+      const root = jsxTagName(node.name).split('.')[0]!
+      if (isComponentTag(root))
+        ref(binding, root, node.start)
     }
-    if (node.type === 'MemberExpression' && !node.computed && node.object.type === 'Identifier' && kayNamespaces.has(node.object.name) && node.property.type === 'Identifier') {
-      const member = node.property.name
-      if (REACTIVE_IMPORTS.has(member))
-        markInteractive(`calls ${node.object.name}.${member}`, node.start)
-      if (STATE_PRIMITIVES.has(member))
-        stateCallees.add(`${node.object.name}.${member}`)
-      if (member === 'signal' || member === 'computed')
-        signalCallees.add(`${node.object.name}.${member}`)
-      if (RENDER_CONTEXT_IMPORTS.has(member))
-        usesRenderContext = true
+    else if (node.type === 'MemberExpression') {
+      if (!node.computed)
+        keys.add(node.property.start)
+      scanKayMember(node, binding, body, imports, filename)
     }
-  })
-
-  checkBareSignals(program, signalCallees, filename)
-
-  for (const [name, init] of localInits) {
-    if (isAsyncFunction(init))
-      asyncLocals.add(name)
+    else if (node.type === 'Property' && !node.computed && !node.shorthand) {
+      keys.add(node.key.start)
+    }
+    else if (node.type === 'Identifier' && !keys.has(node.start)) {
+      ref(binding, node.name, node.start)
+      const reason = imports.reactiveLocals.get(node.name)
+      if (reason !== undefined)
+        binding.fact ??= { reason, offset: node.start }
+    }
   }
-  if (defaultLocal !== undefined && asyncLocals.has(defaultLocal))
-    hasAsyncDefault = true
+  for (const unit of units) {
+    current = { name: unit.name, start: unit.node.start, end: unit.node.end, fact: undefined, refs: new Map(), tags: new Set(), serverOnlyTag: undefined }
+    body.bindings.push(current)
+    walk(unit.node, visit)
+  }
+  return body
+}
 
+function scanOpeningElement(node: Extract<Node, { type: 'JSXOpeningElement' }>, binding: BindingFacts, body: BodyScan, imports: ImportScan, filename: string): void {
+  const tag = jsxTagName(node.name)
+  const isComponent = isComponentTag(tag)
+  if (isComponent) {
+    body.jsxTags.add(tag)
+    binding.tags.add(tag)
+    binding.serverOnlyTag ??= imports.serverOnlyLocals.get(tag)
+    const [ns, member] = tag.split('.')
+    if (member !== undefined && imports.kayNamespaces.has(ns!) && RENDER_CONTEXT_IMPORTS.has(member)) {
+      body.usesRenderContext = true
+      if (SERVER_ONLY_TAGS.has(member))
+        binding.serverOnlyTag ??= member
+    }
+  }
+  for (const attr of node.attributes) {
+    if (attr.type !== 'JSXAttribute' || attr.name.type !== 'JSXIdentifier')
+      continue
+    const attrName = attr.name.name
+    if (isComponent && attrName === '$hydrate') {
+      const mode = hydrateMode(attr.value)
+      checkHydrateMode(mode, `$hydrate="${mode}"`, filename)
+      body.hydrateModes.add(mode)
+      if (mode !== 'load')
+        body.deferredIslandTags.add(tag)
+    }
+    // A handler or ref on a component tag is a prop for that component; only a DOM element binds it in the browser.
+    if (!isComponent && tag !== '' && (EVENT_ATTR.test(attrName) || attrName === 'ref'))
+      binding.fact ??= { reason: `uses ${attrName}`, offset: attr.start }
+  }
+}
+
+// `kay.signal(...)`, `kay.Head` and the like, through a namespace import of kay.
+function scanKayMember(node: Extract<Node, { type: 'MemberExpression' }>, binding: BindingFacts, body: BodyScan, imports: ImportScan, filename: string): void {
+  if (node.computed || node.object.type !== 'Identifier' || !imports.kayNamespaces.has(node.object.name) || node.property.type !== 'Identifier')
+    return
+  const member = node.property.name
+  const callee = `${node.object.name}.${member}`
+  if (member === 'island')
+    throw islandRemoved(filename)
+  if (REACTIVE_IMPORTS.has(member))
+    binding.fact ??= { reason: `calls ${callee}`, offset: node.start }
+  if (STATE_PRIMITIVES.has(member))
+    imports.stateCallees.add(callee)
+  if (member === 'signal' || member === 'computed')
+    imports.signalCallees.add(callee)
+  if (RENDER_CONTEXT_IMPORTS.has(member))
+    body.usesRenderContext = true
+}
+
+function stateExportsOf(decls: DeclarationScan, stateCallees: ReadonlySet<string>): string[] {
   const isStateCall = (init: Node | undefined): boolean => {
-    if (init === undefined)
+    const call = init === undefined ? undefined : unwrapTsExpr(init)
+    if (call?.type !== 'CallExpression')
       return false
-    const unwrapped = unwrapTsExpr(init)
-    if (unwrapped.type !== 'CallExpression')
-      return false
-    const callee = unwrapped.callee
+    const callee = call.callee
     const name = callee.type === 'Identifier'
       ? callee.name
       : callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier'
@@ -827,48 +574,52 @@ export function analyzeModule(filename: string, code: string, program: Program =
         : ''
     return stateCallees.has(name)
   }
-  const stateExportSet = new Set<string>()
-  for (const name of exportedNames) {
-    if (isStateCall(localInits.get(name)))
-      stateExportSet.add(name)
-  }
-  for (const [exported, local] of localExports) {
-    if (isStateCall(localInits.get(local)))
-      stateExportSet.add(exported)
-  }
-  const stateExports = [...stateExportSet]
+  return [...decls.exportLocals].filter(([, local]) => isStateCall(decls.localInits.get(local))).map(([exported]) => exported)
+}
 
-  if (hasAsyncDefault && isInteractive)
-    throw asyncInteractiveError(filename, interactiveReason)
+export function analyzeModule(filename: string, code: string, program: Program = parseTsx(filename, code)): ModuleAnalysis {
+  const imports = scanImports(program, filename)
+  const decls = scanDeclarations(program, filename, imports)
+  const warnings: string[] = []
+  const body = scanBody(program, filename, code, imports, decls, warnings)
+  checkBareSignals(program, imports.signalCallees, filename)
 
-  const defaultDataKeys = isInteractive
-    ? analyzeDefaultDataKeys(program, defaultLocal, localInits, islandLocalName, kayNamespaces)
-    : undefined
+  for (const [name, init] of decls.localInits) {
+    if (isAsyncFunction(init))
+      decls.asyncLocals.add(name)
+  }
+  const hasAsyncDefault = decls.hasAsyncDefault || (decls.defaultLocal !== undefined && decls.asyncLocals.has(decls.defaultLocal))
+  const interactivity = resolveInteractivity(body.bindings, decls.exportLocals)
+  const page = interactivity.exports.get('default')
+  if (hasAsyncDefault && page?.interactive === true)
+    throw asyncInteractiveError(filename, page.reason)
+  if (interactivity.serverOnly !== undefined)
+    throw serverOnlyTagError(filename, interactivity.serverOnly)
 
   return {
     filename,
     program,
     warnings,
-    isInteractive,
-    interactiveReason,
-    interactiveOffset,
+    ...interactivity,
     hasAsyncDefault,
-    hasLoadExport: hasLoadExport || loadDeclarations(program).length > 0,
-    hasJsx,
-    jsxNodes: hasJsx ? computeJsxNodes(program) : new WeakSet<Node>(),
-    hasPrerender,
-    hasPaths,
-    usesRenderContext,
-    defaultHydrate,
-    deferredIslandTags,
-    hydrateModes,
-    jsxTags,
-    stateExports,
-    defaultDataKeys,
-    exportedActions,
-    imports,
-    reexports,
-    exportedNames,
+    hasLoadExport: decls.hasLoadExport || loadDeclarations(program).length > 0,
+    hasJsx: body.hasJsx,
+    jsxNodes: body.hasJsx ? computeJsxNodes(program) : new WeakSet<Node>(),
+    hasPrerender: decls.hasPrerender,
+    hasPaths: decls.hasPaths,
+    usesRenderContext: body.usesRenderContext,
+    defaultHydrate: decls.defaultHydrate,
+    deferredIslandTags: body.deferredIslandTags,
+    hydrateModes: body.hydrateModes,
+    jsxTags: body.jsxTags,
+    stateExports: stateExportsOf(decls, imports.stateCallees),
+    defaultDataKeys: page?.interactive === true ? analyzeDefaultDataKeys(program, decls.defaultLocal, decls.localInits) : undefined,
+    exportedActions: decls.exportedActions,
+    imports: imports.imports,
+    reexports: decls.reexports,
+    exportedNames: decls.exportedNames,
+    bindings: body.bindings,
+    exportLocals: decls.exportLocals,
   }
 }
 

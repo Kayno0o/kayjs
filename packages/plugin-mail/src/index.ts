@@ -77,7 +77,7 @@ export function resend(options: { apiKey?: string | undefined, endpoint?: string
   }
 }
 
-export interface MailerOptions {
+export interface MailerOptions extends MailPreviewOptions {
   from?: MailAddress | undefined
   to?: MailAddress | MailAddress[] | undefined
   transport?: MailTransport | undefined
@@ -85,16 +85,15 @@ export interface MailerOptions {
   optional?: boolean | undefined
 }
 
-export interface Mailer {
+/** The plugin `kay.config.ts` registers for the dev outbox preview, and the handle routes and actions send with. */
+export interface Mailer extends KayPlugin {
   readonly outbox: SentMail[]
   isConfigured(): boolean
   clearOutbox(): void
   send(message: MailMessage): Promise<SentMail>
-  /** Returns the Kay plugin mounting the dev outbox preview route (matching `rooms.plugin()`). */
-  plugin(options?: MailPluginOptions): KayPlugin
 }
 
-export function mailer(options: MailerOptions = {}): Mailer {
+export function createMailer(options: MailerOptions = {}): Mailer {
   const outbox: SentMail[] = []
 
   const getTransport = (): MailTransport | undefined => {
@@ -106,6 +105,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   }
 
   const instance: Mailer = {
+    ...previewPlugin(outbox, options),
     outbox,
     isConfigured() {
       return getTransport() !== undefined
@@ -143,14 +143,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
       }
       return record
     },
-    plugin(pluginOpts?: MailPluginOptions) {
-      return mailPlugin(instance, pluginOpts)
-    },
   }
   return instance
 }
 
-export interface MailPluginOptions {
+export interface MailPreviewOptions {
   /** Dev outbox preview route (default: '/_kay/mail'). */
   previewRoute?: string | undefined
   /** Turns the outbox preview off; it is only ever mounted under `kay dev` or NODE_ENV development or test, never in production. */
@@ -160,7 +157,7 @@ export interface MailPluginOptions {
 const MAIL_OUTBOX_CSS = 'body{font-family:system-ui,sans-serif;max-width:48rem;margin:2rem auto;padding:0 1rem;background:#f9fafb}article{border:1px solid #e5e7eb;border-radius:8px;padding:1rem;margin-bottom:1rem;background:#fff}h2{margin:0 0 .25rem;font-size:1rem}.meta,.empty{margin:0 0 .5rem;font-size:.85rem;color:#6b7280}iframe{width:100%;min-height:16rem;border:0}pre{margin:0;white-space:pre-wrap;font-size:.85rem}'
 
 
-export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): KayPlugin {
+function previewPlugin(outbox: readonly SentMail[], options: MailPreviewOptions): KayPlugin {
   const route = options.previewRoute ?? '/_kay/mail'
 
   return definePlugin({
@@ -171,10 +168,10 @@ export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): K
       if (!enablePreview)
         return
 
-      api.route('GET', `${route}.json`, ctx => ctx.json({ count: instance.outbox.length, messages: instance.outbox }))
+      api.route('GET', `${route}.json`, ctx => ctx.json({ count: outbox.length, messages: outbox }))
 
       api.route('GET', route, () => {
-        const rows = instance.outbox.map(m =>
+        const rows = outbox.map(m =>
           `<article>`
           + `<h2>${esc(m.subject)}</h2>`
           + `<p class="meta">From: ${esc(m.from)} → To: ${esc(m.to.join(', '))}${m.replyTo ? ` (Reply-To: ${esc(m.replyTo)})` : ''} · ${esc(m.sentAt)}</p>`
@@ -182,7 +179,7 @@ export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): K
           + `</article>`,
         ).join('')
 
-        const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Kay Mail Outbox (${instance.outbox.length})</title><style>${MAIL_OUTBOX_CSS}</style></head><body><h1>Mail Outbox (${instance.outbox.length})</h1>${rows || '<p class="empty">No messages sent yet.</p>'}</body></html>`
+        const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Kay Mail Outbox (${outbox.length})</title><style>${MAIL_OUTBOX_CSS}</style></head><body><h1>Mail Outbox (${outbox.length})</h1>${rows || '<p class="empty">No messages sent yet.</p>'}</body></html>`
         // kay adds the app's CSP with this page's <style> hash.
         return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
       })

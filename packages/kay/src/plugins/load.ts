@@ -3,7 +3,7 @@
 import type { AppRuntimeContext } from './context'
 import type { KayConfig } from './types'
 import { existsSync, readFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { createAppContext, getAppContext, runWithAppContext } from './context'
 
 let configReloadSeq = 0
@@ -33,6 +33,29 @@ export async function loadConfig(root: string, options?: { fresh?: boolean, appC
         assetPrefix: '/_kay',
         dev: process.env.KAY_DEV === '1',
       })
-  const mod = await runWithAppContext(ctx, () => import(spec)) as { default?: KayConfig }
+  let mod: { default?: KayConfig }
+  try {
+    mod = await runWithAppContext(ctx, () => import(spec)) as { default?: KayConfig }
+  }
+  catch (error) {
+    // Several syntax errors arrive together; the first one names the line to fix.
+    const first: unknown = (error as AggregateError).errors?.[0] ?? error
+    throw new Error(`kay: ${configErrorLocation(first, configPath, absRoot)}: ${first instanceof Error ? first.message : String(first)}`, { cause: error })
+  }
   return mod.default ?? {}
+}
+
+const STACK_LOCATION_RE = /:(\d+):(\d+)\)?$/
+
+// Where a config failed: the syntax error's position, else the config's own frame in the stack, which names the line calling a throwing plugin factory.
+function configErrorLocation(error: unknown, configPath: string, root: string): string {
+  const position = (error as { position?: { file?: string, line: number, column: number } }).position
+  if (position?.file !== undefined)
+    return `${relative(root, position.file)}:${position.line}:${position.column}`
+  for (const frame of String((error as Error).stack ?? '').split('\n')) {
+    const match = frame.includes(configPath) ? STACK_LOCATION_RE.exec(frame) : null
+    if (match !== null)
+      return `kay.config.ts:${match[1]}:${match[2]}`
+  }
+  return 'kay.config.ts'
 }

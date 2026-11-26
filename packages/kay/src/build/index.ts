@@ -21,17 +21,17 @@ import { planIslands } from './islands'
 import { buildActionEntries, buildRouteEntries } from './manifest'
 import { createPluginHost, createPublicFiles } from './plugin-host'
 import { prerender } from './prerender'
-import { formatBundleReport } from './report'
+import { analyzeBundleWeights, checkJsBudget, formatBundleReport, islandOrigins } from './report'
 import { SERVER_ENTRY_FILE, serverEntrySource } from './server-entry'
 import { KAY_SRC_ROOT, resolveKaySpecifier } from './resolve'
-import { assertNoRouteConflicts, hasRouteHandlerExport, routeExportProblem, SPECIAL_ROUTE_FILES } from './routes'
+import { assertNoRouteConflicts, hasRouteHandlerExport, routeExportProblem, routeFileProblem, SPECIAL_ROUTE_FILES } from './routes'
 import { exportStatic } from './static'
 
 export type { BuildCache } from './graph'
 export { createBuildCache } from './graph'
 export type { ActionManifestEntry, BuildManifest, RouteManifestEntry } from './manifest'
-export { analyzeBundleWeights, formatBundleReport } from './report'
-export type { RouteBundleMetrics } from './report'
+export { analyzeBundleWeights, checkJsBudget, formatBundleReport } from './report'
+export type { BundleReport, RouteBundleMetrics, RouteIsland } from './report'
 export { resolveKaySpecifier } from './resolve'
 
 export interface BuildOptions {
@@ -47,6 +47,8 @@ export interface BuildOptions {
   cache?: BuildCache | undefined
   /** Print a per-route JS/CSS bundle weight report using Bun.build's metafile. */
   analyze?: boolean | undefined
+  /** Fail the build when a route's eager JS, gzipped, is over this many bytes, naming the route and its islands. */
+  maxJs?: number | undefined
   /** Export a static site directly into outDir (dist/) with no server/ folder left behind. */
   static?: boolean | undefined
   /** Run build-time prerendering for routes exporting `prerender = true` (default: true; disabled in `kay dev`). */
@@ -159,7 +161,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
 
   const allRouteFiles = walkRoutes(routesDir).sort()
   const specialFiles = allRouteFiles.filter(f => SPECIAL_ROUTE_FILES.has(basename(f)))
-  const candidatePageFiles = allRouteFiles.filter(f => !basename(f).startsWith('_'))
+  const candidateFiles = allRouteFiles.filter(f => !basename(f).startsWith('_'))
   const rootLayoutSrc = join(routesDir, '_layout.tsx')
   const errorSrc = join(routesDir, '_error.tsx')
   const notFoundSrc = join(routesDir, '_404.tsx')
@@ -172,20 +174,22 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const configSrc = join(root, 'kay.config.ts')
   const hasConfigFile = existsSync(configSrc)
   const graph = new ModuleGraph(root, options.cache)
-  for (const f of [...specialFiles, ...candidatePageFiles, ...(hasConfigFile ? [configSrc] : [])])
+  for (const f of [...specialFiles, ...candidateFiles, ...(hasConfigFile ? [configSrc] : [])])
     graph.load(f)
   for (const analysis of graph.analyses.values()) {
     for (const warning of analysis.warnings)
       console.warn(warning)
   }
 
-  // Skip helper files inside routes/ that export neither a default component nor an HTTP method handler
-  for (const f of candidatePageFiles) {
-    const problem = routeExportProblem(graph.analyses.get(f)!, relPosix(root, f))
+  const routesRel = relPosix(root, routesDir)
+  for (const f of [...specialFiles, ...candidateFiles]) {
+    const analysis = graph.analyses.get(f)!
+    const problem = routeFileProblem(analysis, relPosix(root, f), routesRel) ?? routeExportProblem(analysis, relPosix(root, f))
     if (problem !== undefined)
       throw new Error(`kay build: ${problem}`)
   }
-  const pageFiles = candidatePageFiles.filter(f => hasRouteHandlerExport(graph.analyses.get(f)!))
+  // A file exporting only actions stays in routes/ for its folder's middleware.
+  const pageFiles = candidateFiles.filter(f => hasRouteHandlerExport(graph.analyses.get(f)!))
   assertNoRouteConflicts(root, routesDir, pageFiles)
 
   // Server actions, keyed by source file
@@ -209,7 +213,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     .flatMap(p => p.css ?? [])
     .map(c => resolve(root, c))
     .filter(c => existsSync(c))
-  const env = { root, outDir, clientDir, serverDir, assetPrefix, minify: run.minify, isDev, analyze: options.analyze === true, graph, cache: options.cache, plugins, actionsByFile, islands }
+  const env = { root, outDir, clientDir, serverDir, assetPrefix, minify: run.minify, isDev, analyze: options.analyze === true || options.maxJs !== undefined, graph, cache: options.cache, plugins, actionsByFile, islands }
 
   const routeEntryFiles = new Set([...specialFiles, ...pageFiles])
   const standaloneActionFiles = [...actionsByFile.keys()].filter(f => !routeEntryFiles.has(f))
@@ -351,6 +355,13 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   }
   const writeManifest = (): void => writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
   writeManifest()
+  if (options.analyze === true || options.maxJs !== undefined) {
+    const report = analyzeBundleWeights(manifest, clientDir, assetPrefix, client.metafile, islandOrigins(islands, client.islandChunks, graph, root))
+    if (options.analyze === true)
+      console.log(formatBundleReport(report))
+    if (options.maxJs !== undefined)
+      checkJsBudget(report, options.maxJs)
+  }
 
   // Hybrid prerendering / static export (skipped in `kay dev`, where routes render on-demand)
   const prerenderRoutes = options.prerender !== false || isStatic ? routes.filter(r => r.prerender) : []
@@ -400,9 +411,6 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
       bunPlugins: pluginBunPlugins(env, 'compile'),
     })
   }
-
-  if (options.analyze)
-    console.log(formatBundleReport(manifest, clientDir, assetPrefix, client.metafile))
 
   return manifest
 }

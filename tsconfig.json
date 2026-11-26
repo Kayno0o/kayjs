@@ -51,6 +51,8 @@
     "packages/*/tests",
     "bench-app",
     "examples/*/src",
-    "examples/*/kay.config.ts"
+    "examples/*/kay.config.ts",
+    "packages/kay/templates/*/src",
+    "packages/kay/templates/*/kay.config.ts"
   ]
 }

@@ -84,7 +84,9 @@ function createReachWalker(graph: ModuleGraph, islands: IslandPlan, islandChunks
         if (analysis.defaultHydrate === undefined || analysis.defaultHydrate === 'load')
           reach.eager.add(chunk)
       }
-      return
+      // Imports rendered only inside the module's islands ship within them; a static component beside an island renders its own.
+      if (analysis.staticJsxTags.size === 0)
+        return
     }
     for (const [localName, target] of islands.pageBindings.get(file) ?? []) {
       const chunk = islandChunks.get(islandKey(target))
@@ -182,6 +184,7 @@ export function buildRouteEntries(options: {
 
   const routes = options.pageFiles.map((file): RouteManifestEntry => {
     const analysis = graph.analyses.get(file)
+    const page = analysis?.exports.get('default')
     const layoutSrcs = ancestorFiles(routesDir, file, ['_layout.tsx'])
     const chunks = new Set<string>()
     const eagerChunks = new Set<string>()
@@ -203,10 +206,10 @@ export function buildRouteEntries(options: {
       layouts: layoutSrcs.map(toOutRel),
       middlewares: ancestorFiles(routesDir, file, MIDDLEWARE_NAMES).map(toOutRel),
       hasLoad: analysis?.hasLoadExport,
-      isIsland: analysis?.isInteractive,
+      isIsland: page?.interactive,
       islandChunk: islandChunks.get(`${file}#default`),
       islandHydrate: analysis?.defaultHydrate,
-      islandDataKeys: analysis?.isInteractive && analysis.hasLoadExport ? analysis.defaultDataKeys : undefined,
+      islandDataKeys: page?.interactive === true && analysis?.hasLoadExport === true ? analysis.defaultDataKeys : undefined,
       islandChunks: [...chunks],
       eagerIslandChunks: [...eagerChunks],
       styles: [...styles],

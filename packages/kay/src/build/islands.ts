@@ -3,6 +3,8 @@
 import type { ModuleGraph } from './graph'
 import { basename, extname } from 'node:path'
 import { asyncInteractiveError } from '../compiler/analyze'
+import { withStateReads } from '../compiler/interactivity'
+import { serverOnlyTagError } from '../compiler/mistakes'
 import { isTsFile, relPosix } from './files'
 
 export interface IslandTarget {
@@ -55,40 +57,36 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
 
   // A component reading reactive state another module exports runs in the browser too. The promoted analysis lives in this build's map only, so the cached one still reflects the file alone.
   for (const [file, analysis] of analyses) {
-    if (!file.endsWith('.tsx') || analysis.isInteractive)
+    if (!file.endsWith('.tsx'))
       continue
-    for (const imp of analysis.imports) {
+    const promoted = withStateReads(analysis, (imp, imported) => {
       const resolved = graph.resolve(file, imp.source)
-      const state = resolved === undefined || !isTsFile(resolved)
-        ? undefined
-        : imp.specifiers.find((spec) => {
-            if (analysis.jsxTags.has(spec.local))
-              return false
-            if (spec.imported === '*')
-              return graph.load(resolved).stateExports.length > 0
-            const target = graph.exportTarget(resolved, spec.imported)
-            return graph.load(target.file).stateExports.includes(target.exportName)
-          })
-      if (state !== undefined) {
-        const reason = `reads ${state.local} from '${imp.source}'`
-        if (analysis.hasAsyncDefault)
-          throw asyncInteractiveError(file, reason)
-        analyses.set(file, { ...analysis, isInteractive: true, interactiveReason: reason })
-        break
-      }
-    }
+      if (resolved === undefined || !isTsFile(resolved))
+        return false
+      if (imported === '*')
+        return graph.load(resolved).stateExports.length > 0
+      const target = graph.exportTarget(resolved, imported)
+      return graph.load(target.file).stateExports.includes(target.exportName)
+    })
+    if (promoted === undefined)
+      continue
+    const page = promoted.exports.get('default')
+    if (analysis.hasAsyncDefault && page?.interactive === true)
+      throw asyncInteractiveError(file, page.reason)
+    if (promoted.serverOnly !== undefined)
+      throw serverOnlyTagError(relPosix(root, file), promoted.serverOnly)
+    analyses.set(file, { ...analysis, ...promoted })
   }
 
   for (const [file, analysis] of analyses) {
     if (!file.endsWith('.tsx'))
       continue
-    if (analysis.isInteractive) {
-      if (pageSet.has(file))
-        registerIsland(file, 'default')
+    if (analysis.exports.get('default')?.interactive === true && pageSet.has(file)) {
+      registerIsland(file, 'default')
       continue
     }
 
-    // Only names rendered as tags become islands: `<Counter />`, or `<UI.Counter />` through a namespace import.
+    // Only names rendered as tags from server-side code become islands: `<Counter />`, or `<UI.Counter />` through a namespace import.
     const bindings = new Map<string, IslandTarget>()
     for (const imp of analysis.imports) {
       const resolved = graph.resolve(file, imp.source)
@@ -96,11 +94,11 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
         continue
       for (const spec of imp.specifiers) {
         const tags = spec.imported === '*'
-          ? [...analysis.jsxTags].filter(tag => tag.startsWith(`${spec.local}.`) && !tag.slice(spec.local.length + 1).includes('.')).map(tag => [tag, tag.slice(spec.local.length + 1)] as const)
-          : analysis.jsxTags.has(spec.local) ? [[spec.local, spec.imported] as const] : []
+          ? [...analysis.staticJsxTags].filter(tag => tag.startsWith(`${spec.local}.`) && !tag.slice(spec.local.length + 1).includes('.')).map(tag => [tag, tag.slice(spec.local.length + 1)] as const)
+          : analysis.staticJsxTags.has(spec.local) ? [[spec.local, spec.imported] as const] : []
         for (const [tag, exportName] of tags) {
           const target = graph.exportTarget(resolved, exportName)
-          if (target.file.endsWith('.tsx') && graph.load(target.file).isInteractive)
+          if (target.file.endsWith('.tsx') && graph.load(target.file).exports.get(target.exportName)?.interactive === true)
             bindings.set(tag, registerIsland(target.file, target.exportName))
         }
       }
@@ -134,10 +132,10 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
 
   // A layout, error or 404 page renders on the server only, so interactivity written in it would never run.
   for (const file of specialFiles) {
-    const analysis = analyses.get(file)
-    if (analysis?.isInteractive === true) {
+    const page = analyses.get(file)?.exports.get('default')
+    if (page?.interactive === true) {
       const rel = relPosix(root, file)
-      throw new Error(`kay build: ${rel} uses browser interactivity (${analysis.interactiveReason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`)
+      throw new Error(`kay build: ${rel} uses browser interactivity (${page.reason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`)
     }
   }
 

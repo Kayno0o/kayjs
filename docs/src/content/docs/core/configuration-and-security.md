@@ -39,7 +39,7 @@ export default defineConfig({
 | `maxRequestBodySize` | `1048576` (1 MiB) | Maximum request body size before returning `413 Payload Too Large`. |
 | `streamTimeout` | `30000` | Milliseconds a `<Suspense>` boundary may wait before failing. |
 | `compress` | `true` in prod, `false` in dev | On-the-fly and sidecar Brotli/Gzip response compression. |
-| `onError` | `undefined` | Hook called on unhandled errors in routes, actions, or plugins (`source: 'route' \| 'action' \| 'plugin'`). |
+| `onError` | `undefined` | Hook called on unhandled errors in routes, actions, or plugins (`source: 'route' \| 'action' \| 'plugin'`). A hook that throws is logged with its owner, and the other hooks still run. |
 | `plugins` | `[]` | Array of `KayPlugin` instances. |
 
 ## Security headers & strict CSP

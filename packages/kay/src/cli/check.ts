@@ -5,8 +5,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
 import { isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
-import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblemLocation, SPECIAL_ROUTE_FILES } from '../build/routes'
-import { analyzeModule, walk } from '../compiler/analyze'
+import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblemLocation, routeFileProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
+import { analyzeModule } from '../compiler/analyze'
+import { walk } from '../compiler/ast'
+import { withStateReads } from '../compiler/interactivity'
+import { serverOnlyTagError } from '../compiler/mistakes'
 import { findPrivateEnvOffset, SERVER_ONLY_MODULES } from '../compiler/server-only'
 import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, jsxTagName } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
@@ -201,34 +204,31 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
 
   // 3a. Promote components reading imported reactive state (same rule as `planIslands` in `kay build`)
   for (const [file, analysis] of [...analyses]) {
-    if (!file.endsWith('.tsx') || analysis.isInteractive)
+    if (!file.endsWith('.tsx'))
       continue
-    for (const imp of analysis.imports) {
+    const promoted = withStateReads(analysis, (imp, imported) => {
       const resolved = graph.resolve(file, imp.source)
       if (resolved === undefined || !isTsFile(resolved))
-        continue
-      const state = imp.specifiers.find((spec) => {
-        if (analysis.jsxTags.has(spec.local))
-          return false
-        try {
-          if (spec.imported === '*')
-            return (analysisOf(resolved, analyses, sources, unparsable)?.stateExports.length ?? 0) > 0
-          const target = graph.exportTarget(resolved, spec.imported)
-          return analysisOf(target.file, analyses, sources, unparsable)?.stateExports.includes(target.exportName) === true
-        }
-        catch {
-          return false
-        }
-      })
-      if (state !== undefined) {
-        const reason = `reads ${state.local} from '${imp.source}'`
-        if (analysis.hasAsyncDefault)
-          errors.push(formatDiagnostic(locOf(root, file, sources, imp.start), `kay check: async route component cannot use browser interactivity (${reason}).`))
-        else
-          analyses.set(file, { ...analysis, isInteractive: true, interactiveReason: reason, interactiveOffset: imp.start })
-        break
+        return false
+      try {
+        if (imported === '*')
+          return (analysisOf(resolved, analyses, sources, unparsable)?.stateExports.length ?? 0) > 0
+        const target = graph.exportTarget(resolved, imported)
+        return analysisOf(target.file, analyses, sources, unparsable)?.stateExports.includes(target.exportName) === true
       }
-    }
+      catch {
+        return false
+      }
+    })
+    const page = promoted?.exports.get('default')
+    if (promoted === undefined)
+      continue
+    if (analysis.hasAsyncDefault && page?.interactive === true)
+      errors.push(formatDiagnostic(locOf(root, file, sources, page.offset ?? 0), `kay check: async route component cannot use browser interactivity (${page.reason}).`))
+    else if (promoted.serverOnly !== undefined)
+      errors.push(formatDiagnostic(locOf(root, file, sources, promoted.serverOnly.offset), serverOnlyTagError(relPosix(root, file), promoted.serverOnly).message))
+    else
+      analyses.set(file, { ...analysis, ...promoted })
   }
 
   // Exact route discovery matching `kay build` (`walkRoutes` skips `_components/` dirs, `.d.ts`, `.test.ts`)
@@ -243,10 +243,11 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     const rel = relPosix(root, file)
 
     // Special route files (`_layout.tsx`, `_error.tsx`, `_404.tsx`) cannot be interactive
-    if (routeFileSet.has(file) && SPECIAL_ROUTE_FILES.has(basename(file)) && analysis.isInteractive) {
+    const page = analysis.exports.get('default')
+    if (routeFileSet.has(file) && SPECIAL_ROUTE_FILES.has(basename(file)) && page?.interactive === true) {
       errors.push(formatDiagnostic(
-        locOf(root, file, sources, analysis.interactiveOffset ?? 0),
-        `kay check: ${rel} uses browser interactivity (${analysis.interactiveReason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`,
+        locOf(root, file, sources, page.offset ?? 0),
+        `kay check: ${rel} uses browser interactivity (${page.reason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`,
       ))
     }
 
@@ -255,7 +256,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       checkIslandReach(file, root, graph, sources, unparsable, reported, errors)
 
     // Guardrail 2: non-serializable props passed from static server code into an island (including barrels & namespaces)
-    if (!analysis.isInteractive && file.endsWith('.tsx')) {
+    if (analysis.staticJsxTags.size > 0 && file.endsWith('.tsx')) {
       const islandTags = new Set<string>()
       const islandNamespaces = new Map<string, string>() // localNs -> resolved file
       for (const imp of analysis.imports) {
@@ -269,7 +270,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
           }
           try {
             const target = graph.exportTarget(resolved, spec.imported)
-            if (analysisOf(target.file, analyses, sources, unparsable)?.isInteractive)
+            if (analysisOf(target.file, analyses, sources, unparsable)?.exports.get(target.exportName)?.interactive === true)
               islandTags.add(spec.local)
           }
           catch {}
@@ -285,7 +286,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
           if (nsFile !== undefined && member !== undefined) {
             try {
               const target = graph.exportTarget(nsFile, member)
-              return analysisOf(target.file, analyses, sources, unparsable)?.isInteractive === true
+              return analysisOf(target.file, analyses, sources, unparsable)?.exports.get(target.exportName)?.interactive === true
             }
             catch {}
           }
@@ -294,8 +295,12 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       }
 
       if (islandTags.size > 0 || islandNamespaces.size > 0) {
+        // JSX inside the module's own islands runs in the browser, where any prop is fine.
+        const inIsland = (offset: number): boolean => analysis.islandSpans.some(([start, end]) => offset >= start && offset < end)
         walk(analysis.program, (node) => {
           if (node.type !== 'JSXOpeningElement')
+            return
+          if (inIsland(node.start))
             return
           const tag = jsxTagName(node.name)
           if (!isIslandTag(tag))
@@ -326,12 +331,15 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       }
     }
 
-    // Route-specific guardrails (only real route files matching `kay build`)
-    if (routeFileSet.has(file) && !basename(file).startsWith('_')) {
-      const problem = routeExportProblemLocation(analysis, rel)
+    // Route-specific guardrails, on the files `kay build` reads as routes
+    const isSpecial = SPECIAL_ROUTE_FILES.has(basename(file))
+    if (routeFileSet.has(file) && (isSpecial || !basename(file).startsWith('_'))) {
+      const fileProblem = routeFileProblem(analysis, rel, relPosix(root, routesDir))
+      const problem = fileProblem === undefined ? routeExportProblemLocation(analysis, rel) : { message: fileProblem, offset: 0 }
       if (problem !== undefined)
         errors.push(formatDiagnostic(locOf(root, file, sources, problem.offset), `kay check: ${problem.message}`))
-
+    }
+    if (routeFileSet.has(file) && !basename(file).startsWith('_')) {
       if (hasRouteHandlerExport(analysis)) {
         const conflictKey = normalizeRoutePattern(fileToRoutePath(routesDir, file))
         const prev = seenRoutes.get(conflictKey)

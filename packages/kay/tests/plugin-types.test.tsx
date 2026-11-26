@@ -1,14 +1,16 @@
 import type { AuthUser, PublicUser } from '@kayjs/auth'
 import type { IconData } from '@kayjs/icons'
 import type { KayChild } from '@kayjs/kay'
+import type { ActiveI18nConfig } from '@kayjs/kay/config'
 import type { KayLocals, RequestContext, StandardSchemaV1 } from '@kayjs/kay/server'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
-import { contentPlugin, defineCollection } from '../../plugin-content/src/index'
+import { content, defineCollection } from '../../plugin-content/src/index'
 import { Icon } from '../../plugin-icons/src/index'
+import { createRooms } from '../../plugin-live/src/index'
 import { mcp, mcpTool } from '../../plugin-mcp/src/index'
 import { action } from '../src/server/action'
 import { testApp } from '../src/test/index'
@@ -126,7 +128,7 @@ describe('Plugin generics: @kayjs/auth, @kayjs/mcp, @kayjs/content (#3545)', () 
       },
     }
 
-    const app = await testApp({ root, plugins: [auth.plugin, probePlugin] })
+    const app = await testApp({ root, plugins: [auth, probePlugin] })
     const signin = await app.post('/auth/signin', {
       email: 'alice@example.com',
       password: 'super-secret-password-123',
@@ -234,7 +236,7 @@ describe('Plugin generics: @kayjs/auth, @kayjs/mcp, @kayjs/content (#3545)', () 
     expect(plugin.name).toBe('@kayjs/mcp')
   })
 
-  it('@kayjs/content enforces Record<string, unknown> without schema and eliminates any from contentPlugin & MarkdownComponent', () => {
+  it('@kayjs/content enforces Record<string, unknown> without schema and eliminates any from content & MarkdownComponent', () => {
     const dir = makeTemp('kay-content-types-')
     writeFileSync(join(dir, 'hello.md'), '---\ntitle: Hello\npublished: true\n---\n\nBody text\n')
 
@@ -269,8 +271,8 @@ describe('Plugin generics: @kayjs/auth, @kayjs/mcp, @kayjs/content (#3545)', () 
     const _okTyped: _TypedData = true
     expect(_okTyped).toBe(true)
 
-    // 3. contentPlugin accepts heterogeneous collections and typed feeds without any
-    const plugin = contentPlugin({
+    // 3. content accepts heterogeneous collections and typed feeds without any
+    const plugin = content({
       collections: [untyped, posts],
       feeds: [
         {
@@ -303,5 +305,44 @@ describe('<Icon> props (#3592)', () => {
       <Icon icon={arrow} strokeWidth="2" />,
     ]
     expect(elements).toHaveLength(3)
+  })
+})
+
+describe('services are typed by their key (#3579)', () => {
+  it('types what inject returns, and refuses a string key or a value of the wrong type', async () => {
+    const { serviceKey, definePlugin, I18N_CONFIG_SERVICE } = await import('@kayjs/kay/config')
+    const Greeting = serviceKey<{ text: string }>('test.greeting')
+    let seen: { text: string } | undefined
+    const plugin = definePlugin({
+      name: 'typed-services',
+      server(api) {
+        api.provide(Greeting, { text: 'bonjour' })
+        const got = api.inject(Greeting)
+        const i18n = api.inject(I18N_CONFIG_SERVICE)
+        type _Got = Expect<Equal<typeof got, { text: string } | undefined>>
+        type _I18n = Expect<Equal<typeof i18n, ActiveI18nConfig | undefined>>
+        const typed: [_Got, _I18n] = [true, true]
+        void typed
+        seen = got
+        // @ts-expect-error a value that does not match the key's type
+        api.provide(Greeting, { text: 1 })
+        // @ts-expect-error a bare string is not a service key
+        api.inject('test.greeting')
+      },
+    })
+    // @ts-expect-error plugins release their state through api.onShutdown, not a dispose hook
+    definePlugin({ name: 'old-dispose', dispose() {} })
+
+    const root = makeTemp('kay-typed-services-')
+    mkdirSync(join(root, 'src/routes'), { recursive: true })
+    writeFileSync(join(root, 'src/routes/index.tsx'), 'export default function Home() { return <p>ok</p> }\n')
+    await testApp({ root, plugins: [plugin] })
+    expect(seen).toEqual({ text: 'bonjour' })
+  })
+
+  it('refuses a rooms endpoint without the member each stream joins as', () => {
+    // @ts-expect-error `path` mounts an endpoint, which needs `member`
+    expect(() => createRooms({ path: '/api/live' })).toThrow('@kayjs/live: createRooms({ path: \'/api/live\' }) needs member(ctx), the member each stream joins as')
+    expect(createRooms({ pingMs: 0 } as never).name).toBe('@kayjs/live')
   })
 })

@@ -260,3 +260,57 @@ describe('TSX compiler', () => {
     expect(ssrOut.code).toContain('<li class=\\"link\\">')
   })
 })
+
+describe('islands per component, not per file (#3587)', () => {
+  const facts = (code: string): Record<string, unknown> => Object.fromEntries(analyzeModule('ui.tsx', code).exports)
+
+  test('a static component exported beside an island stays static', () => {
+    const code = `
+      export function Card() { return <p>Card</p> }
+      export function Counter() { return <button onClick={() => 1}>+</button> }
+    `
+    expect(facts(code)).toEqual({
+      Card: { interactive: false },
+      Counter: { interactive: true, reason: 'uses onClick', offset: code.indexOf('onClick') },
+    })
+  })
+
+  test('a local helper with state or handlers makes each component calling or rendering it an island, and only those', () => {
+    const code = `
+      function renderDialog(title: string) { return <dialog><button onClick={() => 1}>{title}</button></dialog> }
+      const Frame = () => <div>{renderDialog('x')}</div>
+      export function Dialog() { return renderDialog('Dialog') }
+      export function Sheet() { return <Frame /> }
+      export function Badge() { return <span>Badge</span> }
+    `
+    expect(facts(code)).toEqual({
+      Dialog: { interactive: true, reason: 'uses renderDialog, which uses onClick', offset: code.indexOf('renderDialog(\'Dialog\')') },
+      Sheet: { interactive: true, reason: 'uses Frame, which uses renderDialog, which uses onClick', offset: code.indexOf('<Frame />') },
+      Badge: { interactive: false },
+    })
+  })
+
+  test('module-level code that needs the browser makes every component an island', () => {
+    const code = `
+      import { effect } from '@kayjs/kay'
+      effect(() => document.title)
+      export function Card() { return <p>Card</p> }
+    `
+    expect(facts(code)).toEqual({ Card: { interactive: true, reason: 'uses effect', offset: code.indexOf('effect(') } })
+  })
+
+  test('a kay primitive imported but never called leaves the module static', () => {
+    expect(analyzeModule('ui.tsx', `import { signal } from '@kayjs/kay'\nexport function Card() { return <p>Card</p> }`).isInteractive).toBe(false)
+  })
+
+  test('an async page and a <Head> are fine beside an island, which only refuses them in its own code', () => {
+    const page = `
+      import { Head } from '@kayjs/kay'
+      export function Counter() { return <button onClick={() => 1}>+</button> }
+      export default async function Home() { return <main><Head><title>Home</title></Head></main> }
+    `
+    expect(analyzeModule('index.tsx', page).exports.get('default')).toEqual({ interactive: false })
+    expect(() => analyzeModule('index.tsx', page.replace('<main>', '<main onClick={() => 1}>'))).toThrow(/async route component/)
+    expect(() => analyzeModule('index.tsx', page.replace('async ', '').replace('<main>', '<main onClick={() => 1}>'))).toThrow('kay compiler: <Head> in an island in index.tsx: Home is an island because it uses onClick')
+  })
+})

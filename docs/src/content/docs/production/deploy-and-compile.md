@@ -29,6 +29,10 @@ kay build --compile ./server
 - `NODE_ENV` defaults to `production` inside compiled binaries
 - SQLite (`bun:sqlite`) works out of the box alongside the binary
 
+## Stopping the server
+
+`kay start` and a compiled binary stop gracefully on `SIGTERM`, `SIGINT` or `SIGHUP`, so a rolling deploy drops no request. The server stops taking connections, `@kayjs/live` ends its open streams, and each plugin's `api.onShutdown()` hook runs. The process exits 0 once the requests already in flight have answered. A request still open after 10 seconds is cut, and the process exits 1.
+
 ## 3. Static HTML Export (`kay build --static`)
 
 ```bash

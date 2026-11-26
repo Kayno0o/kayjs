@@ -14,7 +14,8 @@ import type {
 } from 'oxc-parser'
 import type { ModuleAnalysis } from './analyze'
 import { visitorKeys } from 'oxc-parser'
-import { analyzeModule, loadDeclarations, parseTsx, walk } from './analyze'
+import { analyzeModule, loadDeclarations, parseTsx } from './analyze'
+import { walk } from './ast'
 import { SourceEditor } from './patch'
 import {
   classifyJsxChild,

@@ -2,7 +2,7 @@
 
 import type { ModuleAnalysis } from '../compiler/index'
 import { existsSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { basename, dirname, join, relative } from 'node:path'
 import { relPosix } from './files'
 
 export const SPECIAL_ROUTE_FILES = new Set(['_layout.tsx', '_middleware.ts', '_middleware.tsx', '_error.tsx', '_404.tsx'])
@@ -13,28 +13,19 @@ const CATCH_ALL_RE = /\[\.\.\.([^\]]+)\]/g
 const PARAM_RE = /\[([^\]]+)\]/g
 const PATH_SEPARATOR_RE = /[/\\]/
 
-interface ExportSpecifierNode {
-  type: string
-  exportKind?: string
-  specifiers?: { exportKind?: string, exported?: { name?: string, value?: string } }[]
-}
-
 /** A file in routes/ is a route when it exports a default component or an HTTP method handler, directly or through `export { ... }`. */
 export function hasRouteHandlerExport(analysis: ModuleAnalysis): boolean {
-  for (const name of analysis.exportedNames) {
-    if (ROUTE_EXPORTS.has(name))
-      return true
-  }
-  for (const stmt of analysis.program.body as ExportSpecifierNode[]) {
-    if (stmt.type !== 'ExportNamedDeclaration' || stmt.exportKind === 'type' || stmt.specifiers === undefined)
-      continue
-    for (const spec of stmt.specifiers) {
-      const exported = spec.exportKind === 'type' ? undefined : spec.exported?.name ?? spec.exported?.value
-      if (exported !== undefined && ROUTE_EXPORTS.has(exported))
-        return true
-    }
-  }
-  return false
+  return analysis.exportedNames.some(name => ROUTE_EXPORTS.has(name))
+}
+
+const SPECIAL_FILE_DEFAULTS = new Map([['_layout', 'layout component'], ['_middleware', 'middleware function'], ['_error', 'error page component'], ['_404', 'not-found page component']])
+
+/** For a route file or a `_layout`, `_middleware`, `_error` or `_404`, what kay would otherwise drop or fail on per request: neither a route nor an action, which its folder's middleware guards, or no default export. `routesRel` is the routes folder as the app writes it. */
+export function routeFileProblem(analysis: ModuleAnalysis, file: string, routesRel: string): string | undefined {
+  const name = basename(file)
+  if (SPECIAL_ROUTE_FILES.has(name))
+    return analysis.exportedNames.includes('default') ? undefined : `${file} has no default export: export default its ${SPECIAL_FILE_DEFAULTS.get(name.replace(TS_EXT_RE, ''))}.`
+  return hasRouteHandlerExport(analysis) || analysis.exportedActions.length > 0 ? undefined : `${file} exports no route; move it out of ${routesRel} or prefix it with _.`
 }
 
 const LOAD_FIX = 'kay never calls it; export async function load() and read its data with the page\'s load prop'

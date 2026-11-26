@@ -1,6 +1,5 @@
 // JSON-RPC 2.0 & MCP Streamable HTTP (2025-03-26) dispatcher with bounded batch execution.
 
-import type { ServerPluginAPI } from '@kayjs/kay/config'
 import type { ActionContext, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
 import type { McpPruneMode, McpToolResult } from './format'
 import type { JsonSchemaObject } from './schema'
@@ -67,7 +66,6 @@ export interface RpcDispatcherConfig {
   listedResources: readonly { uri: string, name: string, description?: string, mimeType: string }[]
   formatResult?: ((output: unknown, toolName: string, input: unknown) => unknown) | undefined
   mapError?: ((error: unknown) => string | { message: string } | undefined) | undefined
-  getServerApi: () => ServerPluginAPI | undefined
 }
 
 export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
@@ -94,10 +92,9 @@ export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
     }
 
     try {
-      const serverApi = cfg.getServerApi()
       let rawResult: unknown
-      if (tool.action !== undefined && serverApi !== undefined) {
-        const invoked = await serverApi.invokeAction(tool.action, input, ctx)
+      if (tool.action !== undefined) {
+        const invoked = await tool.action(input)
         if (!invoked.ok) {
           const fields = formatFieldErrors(invoked.fieldErrors)
           const msg = fields ? `${invoked.error} (${fields})` : invoked.error

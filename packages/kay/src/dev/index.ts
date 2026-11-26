@@ -165,15 +165,23 @@ export async function devServer(options: DevServerOptions): Promise<{
   stats: () => BuildCacheStats
 }> {
   const prevKayDev = process.env.KAY_DEV
+  const restoreKayDev = (): void => {
+    if (prevKayDev === undefined)
+      delete process.env.KAY_DEV
+    else
+      process.env.KAY_DEV = prevKayDev
+  }
   process.env.KAY_DEV = '1'
   const root = resolve(options.root)
   const devRoot = join(root, '.kay-dev')
-  let initialConfigFailed = false
-  const initialCfg = await loadConfig(root).catch((err) => {
-    initialConfigFailed = true
-    console.warn(`[kay dev] failed to load kay.config.ts: ${err instanceof Error ? err.message : String(err)}`)
-    return {} as Awaited<ReturnType<typeof loadConfig>>
-  })
+  let initialCfg: Awaited<ReturnType<typeof loadConfig>>
+  try {
+    initialCfg = await loadConfig(root)
+  }
+  catch (error) {
+    restoreKayDev()
+    throw error
+  }
   const assetPrefix = (initialCfg.assetPrefix ?? '/_kay').replace(/\/$/, '')
   let reloadAssets = makeDevReloadAssets(assetPrefix)
   const srcDir = resolve(root, 'src')
@@ -188,7 +196,6 @@ export async function devServer(options: DevServerOptions): Promise<{
   const pluginWatchers: FSWatcher[] = []
   const graphWatchers = new Map<string, FSWatcher>()
   let activeAssetPrefix = assetPrefix
-  let pluginWatchersAttached = false
 
   const isInsideDir = (parent: string, target: string): boolean =>
     target === parent || target.startsWith(`${parent}/`) || target.startsWith(`${parent}\\`)
@@ -344,18 +351,6 @@ export async function devServer(options: DevServerOptions): Promise<{
       await prevApp?.dispose?.()
       lastError = undefined
       syncBuildWatchers(buildCache.watchedFiles)
-      if (!pluginWatchersAttached && !initialConfigFailed) {
-        pluginWatchersAttached = true
-      }
-      else if (initialConfigFailed) {
-        initialConfigFailed = false
-        try {
-          const recoveredCfg = await loadConfig(root)
-          refreshPluginWatchers(recoveredCfg)
-          pluginWatchersAttached = true
-        }
-        catch {}
-      }
       if (n > 2)
         rmSync(join(devRoot, `b${n - 2}`), { recursive: true, force: true })
       console.log(`[kay dev] rebuilt in ${(performance.now() - t0).toFixed(1)} ms`)
@@ -549,10 +544,7 @@ export async function devServer(options: DevServerOptions): Promise<{
       server.stop(true)
       void currentApp?.dispose?.()
       rmSync(devRoot, { recursive: true, force: true })
-      if (prevKayDev === undefined)
-        delete process.env.KAY_DEV
-      else
-        process.env.KAY_DEV = prevKayDev
+      restoreKayDev()
     },
   }
 }

@@ -18,7 +18,7 @@ import type {
   ParamPattern,
   Program,
 } from 'oxc-parser'
-import { walk } from './analyze'
+import { walk } from './ast'
 
 export { DOM_PROPS, isBlockedAttr, isStringBoolAttr, isUnsafeUrlAttr } from '../attrs'
 

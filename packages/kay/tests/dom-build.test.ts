@@ -454,7 +454,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       writeFileSync(join(dir, file), `import { signal } from '@kayjs/kay'\n${code}`)
       writeFileSync(join(dir, 'src/routes/index.tsx'), `export default function Page() { return <p>home</p> }`)
-      await expect(build({ root: dir })).rejects.toThrow(`kay build: ${file} uses browser interactivity (imports signal from '@kayjs/kay'), but it renders on the server only. Move the interactive part into a component and render that component from ${file}.`)
+      await expect(build({ root: dir })).rejects.toThrow(`kay build: ${file} uses browser interactivity (uses signal), but it renders on the server only. Move the interactive part into a component and render that component from ${file}.`)
     }
     finally {
       rmSync(dir, { recursive: true, force: true })

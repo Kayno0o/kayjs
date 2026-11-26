@@ -53,14 +53,14 @@ Supports **bold**, lists, and fenced code blocks inside components.
 </Note>
 ```
 
-## RSS feeds (`contentPlugin`)
+## RSS feeds (`content`)
 
 ```ts
-import { contentPlugin } from '@kayjs/content'
+import { content } from '@kayjs/content'
 
 export default defineConfig({
   plugins: [
-    contentPlugin({
+    content({
       feeds: [{
         path: '/rss.xml',
         title: 'My Blog',

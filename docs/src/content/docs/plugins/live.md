@@ -13,37 +13,45 @@ order: 4
 // src/live.ts
 import { createRooms } from '@kayjs/live'
 
-export interface BoardEvents {
-  presence: { count: number }
-  notice: { id: number, title: string, author: string }
-}
+export type BoardMessage
+  = | { type: 'presence', count: number }
+    | { type: 'notice', title: string }
 
-export const rooms = createRooms<BoardEvents>({
+export const rooms = createRooms<BoardMessage, string>({
   path: '/_live',
-  coalescePresence: true,
+  room: ctx => ctx.url.searchParams.get('room') ?? 'main',
+  member: () => 'guest',
+  onJoin: room => presence(room),
+  onLeave: room => presence(room),
 })
+
+// One broadcast per room and microtask, however many clients join at once.
+const presence = rooms.coalesce((room): BoardMessage => ({ type: 'presence', count: rooms.size(room) }))
 ```
 
-Mount `rooms.plugin` in `kay.config.ts`, then broadcast from any server `action()` or API route:
+Register `rooms` in `kay.config.ts` (`plugins: [rooms]`): it mounts the stream at `path`. Without `path`, nothing is mounted and a route opens streams itself with `rooms.stream(ctx, { room, member })`. Broadcast from any server `action()` or API route:
 
 ```ts
-rooms.publish('main', 'notice', { id: 1, title: 'Shipped v2!', author: 'Kévyn' })
+rooms.publish('main', { type: 'notice', title: 'Shipped v2!' })
 ```
 
 ## 2. Subscribe reactively in any island (`useLive`)
 
 ```tsx
+import { signal } from '@kayjs/kay'
 import { useLive } from '@kayjs/live/client'
-import type { BoardEvents } from '../live'
+import type { BoardMessage } from '../live'
 
 export function LiveBoard() {
-  const { connected, data } = useLive<BoardEvents>('/_live?room=main', {
-    presence: { count: 1 },
+  const online = signal(0)
+  const live = useLive<BoardMessage>('/_live?room=main', (message) => {
+    if (message.type === 'presence')
+      online.value = message.count
   })
 
   return (
     <p>
-      {connected.value ? 'Live' : 'Connecting…'} · {data.value.presence.count} online
+      {live.status.value === 'open' ? 'Live' : 'Connecting…'} · {online.value} online
     </p>
   )
 }

@@ -4,6 +4,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { serviceKey } from '@kayjs/kay/config'
 import { getAppContext } from '@kayjs/kay/internal/server'
 import { escAttr } from '@kayjs/kay/server'
 
@@ -34,7 +35,7 @@ export interface ShareCardInput {
   accent?: string | undefined
 }
 
-export const SHARE_CARD_CONFIG_SERVICE = 'kay.images.shareCardConfig'
+export const SHARE_CARD_CONFIG_SERVICE = serviceKey<ShareCardDefaults>('kay.images.shareCardConfig')
 
 let magickCache: { path: string | undefined, available: boolean } | undefined
 let rsvgCache: { path: string | undefined, available: boolean } | undefined
@@ -81,7 +82,7 @@ export function configureShareCard(defaults: ShareCardDefaults): void {
 
 function getCardConfig(): ShareCardDefaults {
   const appCtx = getAppContext()
-  const scoped = appCtx?.inject<ShareCardDefaults>(SHARE_CARD_CONFIG_SERVICE)
+  const scoped = appCtx?.inject(SHARE_CARD_CONFIG_SERVICE)
   if (scoped !== undefined)
     return scoped
   if (appCtx !== undefined)

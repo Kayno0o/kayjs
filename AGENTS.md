@@ -29,6 +29,7 @@ Non-goals: React compatibility, Node or Deno as runtimes, a virtual DOM, SPA nav
 - A change that moves browser bytes or server CPU and RAM shows its before and after: `bun run bench:weight` for page weight, `bun run bench` and `bun run bench:server` for speed and memory.
 - Keep each file of `src/` under 600 code lines, each function under 150 lines and a complexity of 40. A file already past one of these (`compiler/dom.ts`, `server/index.ts` and a few plugins) is split by the first change that would grow it.
 - Accessibility rules for `@kayjs/ui`, the templates and the docs are in `ACCESSIBILITY.md`.
+- The `kay new` templates are real apps under `packages/kay/templates/` (`_shared` plus one folder per template); `__APP_NAME__` and `__KAY_VERSION__` are filled in on scaffold. The repo's tsconfig typechecks them and `hardening.test.ts` runs `kay check` and `kay build` on each.
 
 ## Workflow
 

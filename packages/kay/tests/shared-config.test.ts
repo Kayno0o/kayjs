@@ -151,7 +151,7 @@ describe('Shared site, locales, proxy trust & localized sitemap (#3551)', () => 
       site: 'https://auth.example.com',
       trustProxy: true,
       trustedOrigins: ['https://partner.example.com'],
-      plugins: [auth.plugin],
+      plugins: [auth],
     })
 
     // Cross-origin POST from core `trustedOrigins` is accepted on auth route without redeclaring in createAuth()

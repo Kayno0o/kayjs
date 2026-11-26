@@ -10,7 +10,8 @@
     "kay": "./src/cli/index.ts"
   },
   "files": [
-    "src"
+    "src",
+    "templates"
   ],
   "exports": {
     ".": "./src/index.ts",

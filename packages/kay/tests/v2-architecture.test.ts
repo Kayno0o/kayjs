@@ -18,6 +18,7 @@ import { store } from '../src/reactivity/store'
 import { CookieStore } from '../src/server/cookies'
 import { createServer, KAY_ISLAND_STYLE_HASH } from '../src/server/index'
 import { Router } from '../src/server/router'
+
 import { createRenderContext, runWithRenderContext } from '../src/ssr/context'
 import * as ssrRt from '../src/ssr/index'
 import { sanitizeMarkdownHtml } from '../../plugin-content/src/sanitize'
@@ -78,6 +79,35 @@ describe('Kay v2 architecture & regression suite', () => {
       expect(captured).toBe('ui-i0-0|orbit:ui-i0-1|light')
       dispose()
     })
+  })
+
+  it('an island sees only the contexts provided inside it, and the server children it is handed render outside it (#3583)', async () => {
+    const dir = makeTemp('kay-island-context-')
+    const files: Record<string, string> = {
+      'src/theme.ts': 'import { createContext } from \'@kayjs/kay\'\nexport const Theme = createContext(\'light\')\nexport const Size = createContext(\'m\')\n',
+      'src/Counter.tsx': 'import { signal, useContext } from \'@kayjs/kay\'\nimport { Theme } from \'./theme\'\nexport function Counter() { const n = signal(0); return <button onClick={() => n.value++}>{useContext(Theme)}</button> }\n',
+      'src/Panel.tsx': 'import type { KayChild } from \'@kayjs/kay\'\nimport { signal, useContext, useId } from \'@kayjs/kay\'\nimport { Size } from \'./theme\'\nexport function Panel(props: { children?: KayChild }) { const open = signal(true); return <section id={useId()} onClick={() => { open.value = !open.value }}><Size.Provider value="l">{useContext(Size)}{props.children}</Size.Provider></section> }\n',
+      'src/Label.tsx': 'import { useContext, useId } from \'@kayjs/kay\'\nimport { Size, Theme } from \'./theme\'\nexport function Label() { return <i id={useId()}>{useContext(Theme)}-{useContext(Size)}</i> }\n',
+      'src/Clicker.tsx': 'import { signal } from \'@kayjs/kay\'\nexport function Clicker() { const n = signal(0); return <b onClick={() => n.value++}>{n.value}</b> }\n',
+      'src/routes/index.tsx': 'import { Theme } from \'../theme\'\nimport { Clicker } from \'../Clicker\'\nimport { Label } from \'../Label\'\nimport { Panel } from \'../Panel\'\nexport default function Home() { return <Theme.Provider value="dark"><Panel><Label /><Clicker /></Panel></Theme.Provider> }\n',
+      'src/routes/counter.tsx': 'import { Theme } from \'../theme\'\nimport { Counter } from \'../Counter\'\nexport default function Page() { return <Theme.Provider value="dark"><Counter /></Theme.Provider> }\n',
+    }
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(join(dir, file, '..'), { recursive: true })
+      writeFileSync(join(dir, file), text)
+    }
+    await build({ root: dir })
+    const errors: unknown[] = []
+    const app = await createServer({ root: dir, onError: info => errors.push(info.error) })
+    try {
+      const page = await (await app.handle(new Request('http://localhost/'))).text()
+      expect(page.slice(page.indexOf('<body>'), page.indexOf('</body>'))).toMatch(/^<body><kay-island c="[^"]+" i="i1-"><section id="k-i1-0">l<kay-slot><i id="k-0">dark-m<\/i><kay-island c="\/_kay\/clicker-[^"]+"><b>0<\/b><\/kay-island><\/kay-slot><\/section><\/kay-island>$/)
+      expect((await app.handle(new Request('http://localhost/counter'))).status).toBe(500)
+      expect(errors).toEqual([new Error('kay: <Counter> reads a context provided outside the island, which the browser never sees; pass its value as a prop.')])
+    }
+    finally {
+      await app.dispose?.()
+    }
   })
 
   it('selector() cleans up cleanly across alternating owners without leaking refcounts', () => {

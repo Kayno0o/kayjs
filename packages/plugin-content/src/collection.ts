@@ -1,12 +1,11 @@
 // Typed file-backed Markdown collections with caching, schema validation, localization, and lazy renderers.
 
-import type { ActiveI18nConfig, ContentImageResolver, ContentImageResult } from '@kayjs/kay/config'
+import type { ContentImageResolver, ContentImageResult } from '@kayjs/kay/config'
 import type { StandardSchemaV1 } from '@kayjs/kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
-import { I18N_CONFIG_SERVICE } from '@kayjs/kay/config'
-import { getAppContext } from '@kayjs/kay/internal/server'
 import { formatIssuePath, validateSchemaSync } from '@kayjs/kay/server'
+import { currentApp } from './app'
 import { findFrontmatterFieldLine, parseFrontmatter } from './frontmatter'
 import { renderMarkdown } from './markdown'
 
@@ -136,7 +135,7 @@ export function isInsideOrSame(dir: string, target: string): boolean {
 function resolveCollectionDir(dir: string, explicitRoot?: string): string {
   if (isAbsolute(dir))
     return dir
-  const kayRoot = explicitRoot ?? getAppContext()?.root
+  const kayRoot = explicitRoot ?? currentApp.root()
   if (typeof kayRoot === 'string' && kayRoot !== '') {
     const candidate = resolve(kayRoot, dir)
     if (existsSync(candidate))
@@ -242,7 +241,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
   const includeDrafts = options.includeDrafts ?? false
   const localized = options.localized ?? false
   const getDefaultLocale = (): string =>
-    options.defaultLocale ?? getAppContext()?.inject<ActiveI18nConfig>(I18N_CONFIG_SERVICE)?.defaultLocale ?? 'en'
+    options.defaultLocale ?? currentApp.defaultLocale() ?? 'en'
   const baseRenderOpts: RenderMarkdownOptions = {
     highlight: options.highlight,
     components: options.components,
@@ -302,7 +301,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
   let cacheVersion = 0
 
   function isDevMode(): boolean {
-    return getAppContext()?.dev ?? (process.env.KAY_DEV === '1')
+    return currentApp.dev() ?? (process.env.KAY_DEV === '1')
   }
 
   function loadFile(absFile: string, baseDir: string, entryLocale?: string): ContentEntry<TData> | null {

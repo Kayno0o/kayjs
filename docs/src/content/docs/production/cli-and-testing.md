@@ -11,12 +11,12 @@ order: 4
 | :--- | :--- |
 | `kay new <dir> [--template minimal\|fullstack\|blog\|app] [--force]` | Scaffold a new project |
 | `kay check [dir] [--no-typecheck]` | Run Kay compiler checks, route checks, plugin `check()` hooks, and `bun check`/`tsgo`/`tsc` |
-| `kay dev [dir] [--port 3000] [--host [addr]]` | Dev server with live reload (binds `127.0.0.1` by default; pass `--host` for `0.0.0.0`) |
-| `kay build [dir] [--analyze]` | Single-pass production build into `dist/`; `--analyze` prints per-route JS/CSS weights |
+| `kay dev [dir] [--port 3000] [--host [addr]]` | Dev server with live reload (binds `127.0.0.1` by default; pass `--host` for `0.0.0.0`). A `kay.config.ts` that fails to load stops it with the error and its `file:line:column` |
+| `kay build [dir] [--analyze] [--max-js <size>]` | Single-pass production build into `dist/`. `--analyze` prints per-route JS/CSS weights and each island with the reason it became one. `--max-js 40kb` (or a byte count) fails the build when a route's gzipped eager JS is over the size, naming the route and its islands |
 | `kay build --static` | Static HTML + asset export into `dist/` |
 | `kay build --compile [out]` | Compile into a single standalone Bun executable |
 | `kay start [dir] [--port 3000] [--host [addr]]` | Serve a built `dist/` app on `Bun.serve()` (binds `127.0.0.1` by default) |
-| `kay upgrade [dir] [--no-install]` | Move an app onto the `@kayjs/kay` spelling: renames the dependency, sets `jsxImportSource`, rewrites every `kay` import and moves `icons` to `@kayjs/icons/plugin`, then runs `bun install`. Imports it cannot move are printed with their file and line |
+| `kay upgrade [dir] [--no-install]` | Move an app onto the `@kayjs/kay` spelling: renames the dependency, sets `jsxImportSource`, rewrites every `kay` import, moves `icons` to `@kayjs/icons/plugin` and registers `auth`, `mail` and `rooms` as the handles `createX()` returned, then runs `bun install`. What it cannot move is printed with its file and line |
 | `kay ui-eject <grammar> [dest]` | Eject a `@kayjs/ui` CSS Grammar into your repo |
 | `kay mcp-footprint` | Print `@kayjs/mcp` tool sizes in bytes and estimated tokens |
 | `kay i18n-check` | List missing translation keys across `@kayjs/i18n` locales |

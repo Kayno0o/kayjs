@@ -104,7 +104,7 @@ describe('Compile, check, and build error locations & code frames (#3546)', () =
     }
 
     expect(res.errors.some(e => e.startsWith('src/components/SyntaxErr.tsx:2:'))).toBe(true)
-    expect(res.errors.some(e => e.startsWith('src/routes/_layout.tsx:1:'))).toBe(true)
+    expect(res.errors.some(e => e.startsWith('src/routes/_layout.tsx:3:'))).toBe(true)
     expect(res.errors.some(e => e.startsWith('src/components/BadIsland.tsx:2:'))).toBe(true)
     expect(res.errors.some(e => e.startsWith('src/routes/index.tsx:2:'))).toBe(true)
     expect(res.errors.some(e => e.startsWith('src/routes/index.tsx:4:'))).toBe(true)

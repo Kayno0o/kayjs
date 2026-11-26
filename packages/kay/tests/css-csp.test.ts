@@ -145,7 +145,7 @@ describe('Per-route CSS scoping, strict CSP hashes, and bundle weight report (#3
     expect(aboutRow.jsGzip).toBe(0)
     expect(aboutRow.cssFiles).toBeLessThan(homeRow.cssFiles)
 
-    const reportText = formatBundleReport(manifest, join(dir, 'dist/client'))
+    const reportText = formatBundleReport(weights)
     expect(reportText).toContain('KAY BUNDLE WEIGHT REPORT')
     expect(reportText).toContain('/about')
   })

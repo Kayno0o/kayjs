@@ -59,7 +59,7 @@ kay build --static
 </Tab>
 </Tabs>
 
-Pass `--analyze` to `kay build` to print per-route eager JS and CSS weights plus the largest bundled modules.
+Pass `--analyze` to `kay build` to print each route's eager JS and CSS weight, the islands behind it with the reason each became one, and the largest bundled modules. Pass `--max-js 40kb` to fail the build when a route's gzipped eager JS is over 40 KB.
 
 ## 3. Validate before shipping
 

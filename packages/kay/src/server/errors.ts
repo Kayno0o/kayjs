@@ -16,19 +16,21 @@ import { inlineStyleHashes } from './security'
 export type NotifyError = (error: unknown, request: Request, source: ServerErrorInfo['source']) => void
 
 export function createErrorNotifier(onError: ((info: ServerErrorInfo) => void) | undefined, plugins: readonly KayPlugin[]): NotifyError {
-  const errorHooks: ((info: ServerErrorInfo) => void)[] = []
+  const errorHooks: { owner: string, hook: (info: ServerErrorInfo) => void }[] = []
   if (onError !== undefined)
-    errorHooks.push(onError)
+    errorHooks.push({ owner: 'kay.config.ts', hook: onError })
   for (const p of plugins) {
     if (p.onError !== undefined)
-      errorHooks.push(p.onError)
+      errorHooks.push({ owner: p.name, hook: p.onError })
   }
   return (error, request, source) => {
-    for (const hook of errorHooks) {
+    for (const { owner, hook } of errorHooks) {
       try {
         hook({ error, request, source })
       }
-      catch {}
+      catch (hookError) {
+        console.error(`kay: the onError hook of ${owner} threw; the other hooks still run.`, hookError)
+      }
     }
   }
 }

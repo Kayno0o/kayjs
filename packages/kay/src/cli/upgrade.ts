@@ -8,6 +8,7 @@ import { relPosix } from '../build/files'
 import { resolveKaySpecifier } from '../build/resolve'
 import { parseTsx } from '../compiler/analyze'
 import { SourceEditor } from '../compiler/patch'
+import { lineOf, upgradePluginHandles } from './upgrade-plugins'
 
 export interface UpgradeResult {
   /** Root-relative files rewritten. */
@@ -50,7 +51,7 @@ export function upgradeProject(root: string): UpgradeResult {
   for (const file of sourceFiles(root)) {
     const text = readFileSync(join(root, file), 'utf8')
     if (text.includes('kay'))
-      write(file, text, upgradeSource(file, text, manual))
+      write(file, text, upgradePluginHandles(file, upgradeSource(file, text, manual), manual))
   }
   return { changed: changed.sort(), manual }
 }
@@ -129,14 +130,6 @@ function exportsOf(entry: string): Set<string> {
   return names
 }
 
-function lineOf(code: string, offset: number): number {
-  let line = 1
-  for (let i = 0; i < offset; i++) {
-    if (code.charCodeAt(i) === 10)
-      line++
-  }
-  return line
-}
 
 type Statement = Program['body'][number]
 type ImportStatement = Extract<Statement, { type: 'ImportDeclaration' }>

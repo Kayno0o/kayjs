@@ -9,7 +9,8 @@ import type {
   Node,
 } from 'oxc-parser'
 import type { ModuleAnalysis } from './analyze'
-import { analyzeModule, parseTsx, walk } from './analyze'
+import { analyzeModule, parseTsx } from './analyze'
+import { walk } from './ast'
 import { mistake } from './mistakes'
 import { SourceEditor } from './patch'
 import {
@@ -542,9 +543,11 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
     if (islandInfo !== undefined) {
       const propsCode = `{ ${propEntries.join(', ')} }`
-      const callPropsCode = hasChildren
-        ? `{ ${[...propEntries, `children: ${use('raw')}("<kay-slot>" + (${childExpr}) + "</kay-slot>")`].join(', ')} }`
-        : propsCode
+      // The server children an island is handed render before it, outside its contexts and ids, as the browser never re-renders them.
+      const slotVar = hasChildren ? `_c${loopCounter++}` : undefined
+      const slotProp = slotVar === undefined ? '' : `children: ${use('raw')}("<kay-slot>" + ${slotVar} + "</kay-slot>")`
+      const callPropsCode = slotVar === undefined ? propsCode : `{ ${[...propEntries, slotProp].join(', ')} }`
+      const withSlot = (expr: string): string => slotVar === undefined ? expr : `((${slotVar}) => ${expr})(${childExpr})`
       const resolvedHydrate = staticHydrate ?? (hydrateExpr === undefined ? islandInfo.defaultHydrate : undefined)
 
       // Compile-time static island props fast path (only when not inside an island-reachable component and children don't contain direct `await`):
@@ -561,15 +564,14 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         const renderArg = resolvedHydrate === 'client'
           ? 'undefined'
           : `() => ${use('ssrChild')}(${tag}(${callPropsCode}))`
-        parts.pushExpr(`${use('ssrIslandStatic')}(${JSON.stringify(islandInfo.chunk)}, ${JSON.stringify(openTag)}, ${renderArg}, ${hydrateArg})`)
+        const expr = `${use('ssrIslandStatic')}(${JSON.stringify(islandInfo.chunk)}, ${JSON.stringify(openTag)}, ${renderArg}, ${hydrateArg}, ${JSON.stringify(tag)})`
+        parts.pushExpr(resolvedHydrate === 'client' ? expr : withSlot(expr))
         return
       }
 
       const hydrateArg = hydrateExpr ?? (islandInfo.defaultHydrate !== undefined ? JSON.stringify(islandInfo.defaultHydrate) : 'undefined')
       if (!childrenHaveAwait && allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
-        parts.pushExpr(
-          `${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg})`,
-        )
+        parts.pushExpr(withSlot(`${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg}, false, ${JSON.stringify(tag)})`))
         return
       }
 
@@ -578,15 +580,10 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       const argNames = [pVar]
       const argExprs = [propsCode]
       let callArg = pVar
-      if (hasChildren) {
-        let childSlotVal = childExpr
-        if (childrenHaveAwait) {
-          const cVar = `_c${loopCounter++}`
-          argNames.push(cVar)
-          argExprs.push(childExpr)
-          childSlotVal = cVar
-        }
-        callArg = `{ ...${pVar}, children: ${use('raw')}("<kay-slot>" + (${childSlotVal}) + "</kay-slot>") }`
+      if (slotVar !== undefined) {
+        argNames.push(slotVar)
+        argExprs.push(childExpr)
+        callArg = `{ ...${pVar}, ${slotProp} }`
       }
       let hArg = hydrateArg
       if (hydrateExpr !== undefined && staticHydrate === undefined) {
@@ -596,7 +593,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         hArg = hVar
       }
       parts.pushExpr(
-        `((${argNames.join(', ')}) => ${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callArg})), ${pVar}, ${hArg}))(${argExprs.join(', ')})`,
+        `((${argNames.join(', ')}) => ${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callArg})), ${pVar}, ${hArg}, false, ${JSON.stringify(tag)}))(${argExprs.join(', ')})`,
       )
       return
     }
