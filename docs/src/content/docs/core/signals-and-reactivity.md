@@ -36,7 +36,7 @@ export function Counter({ step = 1 }: { step?: number }) {
 | :--- | :--- |
 | `signal(initial)` | Reactive cell. Read and write via `.value`; read without subscribing via `.peek()`. |
 | `computed(fn)` | Lazy, memoized, glitch-free derived signal. |
-| `effect(fn)` | Runs whenever tracked dependencies change. Return a cleanup function if needed. |
+| `effect(fn)` | Runs whenever tracked dependencies change. Return a cleanup function if needed. It does not run while an island renders on the server, so a timer or request it starts never outlives the response; derive what the page shows with `computed`. |
 | `batch(fn)` | Coalesces multiple signal writes into a single flush. |
 | `untrack(fn)` | Reads signals without subscribing the enclosing computation. |
 | `onMount(fn)` | Runs in the browser after the component's elements attach to the document. Return a cleanup function if needed. |

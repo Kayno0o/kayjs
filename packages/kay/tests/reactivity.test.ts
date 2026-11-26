@@ -1,6 +1,10 @@
-import { describe, expect, spyOn, test } from 'bun:test'
+import { afterAll, describe, expect, spyOn, test } from 'bun:test'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { batch, computed, effect, onCleanup, root, selector, signal, snapshot, store } from '../src/index'
 import { createOwner, disposeOwner, runWithOwner } from '../src/reactivity/index'
+import { testApp } from '../src/test/index'
 
 // A source's subscriber list, read to see whether a computed still holds on to it.
 const subscribed = (source: object): boolean => (source as { s?: unknown }).s !== undefined
@@ -571,5 +575,48 @@ describe('owned list disposal', () => {
     })
     expect(runs).toBe(0)
     expect(cleaned).toBe(1)
+  })
+})
+
+describe('effect on the server (#3614)', () => {
+  const dirs: string[] = []
+  afterAll(() => {
+    for (const d of dirs)
+      rmSync(d, { recursive: true, force: true })
+  })
+
+  test('an island\'s effect neither runs nor leaves a timer behind during SSR', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-ssr-effect-'))
+    dirs.push(dir)
+    const files: Record<string, string> = {
+      'src/components/Poller.tsx': `
+        import { effect, signal } from '@kayjs/kay'
+        export function Poller() {
+          const ticks = signal(0)
+          effect(() => {
+            const seen = globalThis as { kayEffectRuns?: number }
+            seen.kayEffectRuns = (seen.kayEffectRuns ?? 0) + 1
+            const id = setInterval(() => { ticks.value++ }, 10)
+            return () => clearInterval(id)
+          })
+          return <button onClick={() => { ticks.value++ }}>Ticks {ticks.value}</button>
+        }
+      `,
+      'src/routes/index.tsx': 'import { Poller } from \'../components/Poller\'\nexport default function Home() { return <main><Poller /></main> }\n',
+    }
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(join(dir, file, '..'), { recursive: true })
+      writeFileSync(join(dir, file), text)
+    }
+    const app = await testApp({ root: dir })
+    try {
+      const html = await (await app.get('/')).text()
+      expect(html).toContain('<kay-island')
+      expect(html).toContain('Ticks <!---->0')
+      expect((globalThis as { kayEffectRuns?: number }).kayEffectRuns).toBeUndefined()
+    }
+    finally {
+      await app.app.dispose?.()
+    }
   })
 })

@@ -2,6 +2,7 @@
 
 import type { Html, HydrateStrategy, KayChild } from '../jsx-runtime'
 import { isBlockedAttr, isStringBoolAttr, isUnsafeUrlAttr } from '../attrs'
+import { renderOnServer } from '../reactivity/index'
 import { styleText } from '../style'
 import { assertRenderable } from '../unrenderable'
 import { currentRenderContext, KAY_STREAM_SCRIPT, renderIsland } from './context'
@@ -220,7 +221,7 @@ export function ssrInIsland(render: () => string, chunk?: string, hydrate?: Hydr
       recordRenderedIsland(chunk, hydrate)
     ctx.islandDepth++
     try {
-      return ctx.islandDepth === 1 ? renderIsland(ctx, name, render) : render()
+      return renderOnServer(ctx.islandDepth === 1 ? () => renderIsland(ctx, name, render) : render)
     }
     finally {
       ctx.islandDepth--
@@ -228,7 +229,7 @@ export function ssrInIsland(render: () => string, chunk?: string, hydrate?: Hydr
   }
   fallbackIslandDepth++
   try {
-    return render()
+    return renderOnServer(render)
   }
   finally {
     fallbackIslandDepth--

@@ -604,7 +604,27 @@ export function computed<T>(fn: () => T): ReadonlySignal<T> {
   return new ComputedNode(fn, currentOwner)
 }
 
+declare const KAY_BROWSER: boolean | undefined
+
+let serverRenders = 0
+
+/** Internal: runs an island's server render, during which `effect` does nothing. */
+export function renderOnServer<T>(fn: () => T): T {
+  serverRenders++
+  try {
+    return fn()
+  }
+  finally {
+    serverRenders--
+  }
+}
+
+function noop(): void {}
+
+// An effect skips the server render, as onMount does: a timer or request it starts would outlive the response. The client build defines KAY_BROWSER, which drops the check.
 export function effect(fn: () => void | (() => void)): () => void {
+  if ((typeof KAY_BROWSER === 'undefined' || !KAY_BROWSER) && serverRenders > 0)
+    return noop
   if (process.env.NODE_ENV !== 'production' && currentOwner === undefined && currentSub !== undefined && (currentSub.f & COMPUTED))
     console.warn('kay: effect() created while a computed runs has no owner and is never disposed. Create it in a component or an effect.')
   const node = new EffectNode(fn, currentOwner)

@@ -267,6 +267,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
       define: {
         KAY_DEFERRED: hasDeferredHydrate ? 'true' : 'false',
         KAY_CLIENT_ONLY: hasClientOnlyHydrate ? 'true' : 'false',
+        KAY_BROWSER: 'true',
         'process.env.NODE_ENV': JSON.stringify(env.isDev ? 'development' : 'production'),
         ...envDefines,
       },
