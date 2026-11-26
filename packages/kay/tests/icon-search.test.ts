@@ -104,6 +104,32 @@ describe('findIcons', () => {
     expect(findIcons(['left', 'arrow-big-left'], 'arrow left')).toEqual(['arrow-big-left', 'left'])
   })
 
+  it('lists a name holding the query inside a word after the related icons, once when a related word names it too', () => {
+    replaceTable({ pin: 'map 80' })
+    expect(findIcons(['spinner', 'map', 'pin'], 'pin')).toEqual(['pin', 'map', 'spinner'])
+
+    replaceTable({ pin: 'map 80 spinner 40' })
+    expect(findIcons(['spinner', 'map', 'pin'], 'pin')).toEqual(['pin', 'map', 'spinner'])
+  })
+
+  it('ranks a name by where it holds the query best', () => {
+    expect(findIcons(['pinboard', 'pinwheel-pin'], 'pin')).toEqual(['pinwheel-pin', 'pinboard'])
+  })
+
+  it('lists once a name holding every query word that also holds the query at the start of or inside a word', () => {
+    expect(findIcons(['arrow-lefty-left', 'sarrow-left-arrow'], 'arrow left')).toEqual(['arrow-lefty-left', 'sarrow-left-arrow'])
+  })
+
+  it('ranks a name ending with the query word above names holding it inside a word', () => {
+    expect(findIcons(['inbox', 'box', 'square-x', 'x'], 'x')).toEqual(['x', 'square-x', 'inbox', 'box'])
+  })
+
+  it('ranks a name holding every query word, in any order, above names a related word reaches', () => {
+    replaceTable({ left: 'west 90' })
+
+    expect(findIcons(['arrow-west', 'chevron-left', 'arrow-big-left-line'], 'left arrow')).toEqual(['arrow-big-left-line', 'arrow-west', 'chevron-left'])
+  })
+
   it('finds an icon named by one letter through a related word', () => {
     replaceTable({ close: 'x 80' })
 

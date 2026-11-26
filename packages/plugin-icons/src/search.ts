@@ -23,6 +23,7 @@ interface Index {
 }
 
 const SPACES = /\s+/g
+const BOUNDARY = /[^a-z0-9]/
 // A word typed as given counts twice what a related word, a completion or a respelling brings.
 const OWN_WEIGHT = 2
 const COMPLETION_WEIGHT = 0.7
@@ -90,14 +91,43 @@ function readings(word: string, index: Index): Map<string, number> {
   return found
 }
 
-function literalRank(name: string, literal: string): number {
-  if (name === literal)
-    return 0
+// How a name holds the query as typed: the name itself, its first words, whole words further in, every query word in any order, the start of a word, or inside a word.
+const enum Held { Name, FirstWords, Words, EveryWord, WordStart, InsideWord }
 
-  return name.startsWith(literal) ? 1 : 2
+function held(name: string, literal: string): Held | undefined {
+  if (name === literal)
+    return Held.Name
+
+  let best: Held | undefined
+
+  for (let at = name.indexOf(literal); at !== -1 && at < name.length; at = name.indexOf(literal, at + 1)) {
+    const end = at + literal.length
+    const startsWord = at === 0 || BOUNDARY.test(name[at - 1]!)
+    const endsWord = end === name.length || BOUNDARY.test(name[end]!)
+    const rank = !startsWord ? Held.InsideWord : !endsWord ? Held.WordStart : at === 0 ? Held.FirstWords : Held.Words
+
+    best = best === undefined ? rank : Math.min(best, rank)
+  }
+
+  return best
 }
 
-// A page of the icon names of a set, or of a list of names, matching `query`: the names holding it first (the exact name, then names starting with it, then the rest), then the icons a related word, a completion or a respelling names, those answering more of the query's words first, then the best scored.
+// The names holding each of several words whole, in any order.
+function holdingEvery(words: string[], index: Index): Set<string> {
+  if (words.length < 2)
+    return new Set()
+
+  // The names holding the word fewest names hold, kept when their own words hold the others too.
+  const fewest = words.map(word => index.byWord.get(word) ?? []).reduce((a, b) => b.length < a.length ? b : a)
+
+  return new Set(fewest.filter((name) => {
+    const own = new Set(nameWords(name))
+
+    return words.every(word => own.has(word))
+  }))
+}
+
+// A page of the icon names of a set, or of a list of names, matching `query`: the names holding it as whole words first (the exact name, names starting with it, names holding it further in, names holding each of its words in any order), then names starting a word with it, then the icons a related word, a completion or a respelling names, those answering more of the query's words first, then names holding it inside a word.
 export function findIcons(source: readonly string[] | IconifyNames, query: string, page: IconPage = {}): string[] {
   const { limit = Infinity, offset = 0 } = page
   if (!Number.isInteger(offset) || offset < 0 || !(limit === Infinity || (Number.isInteger(limit) && limit >= 1)))
@@ -107,7 +137,31 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
   const index = indexOf(source)
   const { names } = index
   const literal = needle.replace(SPACES, '-')
-  const literals = names.filter(name => name.includes(literal)).sort((a, b) => literalRank(a, literal) - literalRank(b, literal))
+  const typedWords = [...new Set(nameWords(needle))]
+  const every = holdingEvery(typedWords, index)
+  // The names holding the query, one list per way of holding it, each in the set's order.
+  const byHeld: string[][] = [[], [], [], [], [], []]
+  const rankOf = new Map<string, Held>()
+
+  for (const name of names) {
+    const rank = name.includes(literal) ? held(name, literal) : undefined
+
+    if (rank !== undefined) {
+      byHeld[rank]!.push(name)
+      rankOf.set(name, rank)
+    }
+  }
+
+  // A name holding every query word moves up to that rank unless it holds the query better already.
+  const moved = new Set([...every].filter(name => (rankOf.get(name) ?? Held.InsideWord + 1) > Held.EveryWord))
+
+  if (moved.size > 0) {
+    byHeld[Held.EveryWord] = [...moved]
+    byHeld[Held.WordStart] = byHeld[Held.WordStart]!.filter(name => !moved.has(name))
+    byHeld[Held.InsideWord] = byHeld[Held.InsideWord]!.filter(name => !moved.has(name))
+  }
+
+  const literals = byHeld.slice(0, Held.InsideWord).flat()
   // Each credited name's score, how many of the query's words it answers, and the last word that counted.
   const scores = new Map<string, { score: number, answered: number, lastTyped: number }>()
   let typedAt = 0
@@ -130,7 +184,7 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
     }
   }
 
-  for (const typed of new Set(nameWords(needle))) {
+  for (const typed of typedWords) {
     typedAt++
 
     for (const [reading, weight] of readings(typed, index)) {
@@ -147,5 +201,9 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
     .sort((a, b) => b[1].answered - a[1].answered || b[1].score - a[1].score || index.order.get(a[0])! - index.order.get(b[0])!)
     .map(([name]) => name)
 
-  return [...literals, ...related].slice(offset, offset + limit)
+  // A name holding the query only inside a word, as `spinner` holds `pin`, comes last.
+  const shownToo = new Set(related)
+  const inside = byHeld[Held.InsideWord]!.filter(name => !shownToo.has(name))
+
+  return [...literals, ...related, ...inside].slice(offset, offset + limit)
 }
