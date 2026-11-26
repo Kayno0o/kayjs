@@ -3,9 +3,9 @@
 import type { BunPlugin } from 'bun'
 import type { KayPlugin } from '@kayjs/kay/config'
 import type { IconSet } from './types'
-import { join } from 'node:path'
 import { definePlugin } from '@kayjs/kay/config'
 import { iconData } from './icon-data'
+import { installedSets, isSetPrefix, setFile } from './sets'
 
 const FOUND_PER_SET = 10
 const ICON_SPEC_RE = /^~icons\/([^/]+)\/(.+)$/
@@ -16,15 +16,14 @@ function withEndTags(body: string): string {
   return body.replace(SELF_CLOSING_RE, '<$1$2></$1>')
 }
 
-function resolveIconSetFile(prefix: string, root: string): string {
-  const pkgPath = `@iconify-json/${prefix}/icons.json`
-  for (const from of [root, process.cwd()]) {
-    try {
-      return Bun.resolveSync(pkgPath, from)
-    }
-    catch {}
+async function readSet(prefix: string, root: string): Promise<IconSet> {
+  const file = setFile(prefix, root)
+  if (file === undefined) {
+    throw new Error(isSetPrefix(prefix)
+      ? `@kayjs/icons: no icon set "${prefix}" is installed: install @iconify-json/${prefix}, or pass it in icons({ sets }).`
+      : `@kayjs/icons: "${prefix}" is not an icon set name: write ~icons/<set>/<name>, such as ~icons/tabler/home.`)
   }
-  throw new Error(`@kayjs/icons: could not resolve "${pkgPath}". Install @iconify-json/${prefix}.`)
+  return await Bun.file(file).json() as IconSet
 }
 
 export interface IconsPluginOptions {
@@ -33,7 +32,24 @@ export interface IconsPluginOptions {
 }
 
 export function icons(options: IconsPluginOptions = {}): KayPlugin {
-  const cache = new Map<string, IconSet>(Object.entries(options.sets ?? {}))
+  // The in-flight read of each set, so icons loaded in parallel parse their set once.
+  const cache = new Map<string, Promise<IconSet>>(Object.entries(options.sets ?? {}).map(([prefix, set]) => [prefix, Promise.resolve(set)]))
+  const loadSet = (prefix: string, root: string): Promise<IconSet> => {
+    let set = cache.get(prefix)
+    if (set === undefined) {
+      set = (async () => {
+        try {
+          return await readSet(prefix, root)
+        }
+        catch (error) {
+          cache.delete(prefix)
+          throw error
+        }
+      })()
+      cache.set(prefix, set)
+    }
+    return set
+  }
 
   return definePlugin({
     name: '@kayjs/icons',
@@ -49,14 +65,7 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
 
           const prefix = match[1]!
           const name = match[2]!
-          let set = cache.get(prefix)
-
-          if (set === undefined) {
-            set = await Bun.file(resolveIconSetFile(prefix, root)).json() as IconSet
-            cache.set(prefix, set)
-          }
-
-          const data = iconData(set, name)
+          const data = iconData(await loadSet(prefix, root), name)
           if (data === undefined)
             throw new Error(`@kayjs/icons: icon "${name}" not found in set "${prefix}"`)
 
@@ -76,7 +85,7 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
           process.exit(1)
         }
 
-        const files = [...new Bun.Glob('node_modules/@iconify-json/*/icons.json').scanSync({ cwd: root, followSymlinks: true })].sort()
+        const files = [...installedSets(root).values()]
         if (files.length === 0) {
           console.error('No icon set installed. Install one, such as @iconify-json/tabler.')
           process.exit(1)
@@ -85,7 +94,7 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
         // Imported here so the word table never reaches a bundle that only draws icons.
         const { findIcons } = await import('./search')
         for (const file of files) {
-          const set = await Bun.file(join(root, file)).json() as IconSet
+          const set = await Bun.file(file).json() as IconSet
           for (const name of findIcons(set, query, { limit: FOUND_PER_SET }))
             console.log(`~icons/${set.prefix}/${name}`)
         }

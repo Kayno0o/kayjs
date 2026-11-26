@@ -17,10 +17,9 @@ export interface IconifyIcon {
   vFlip?: boolean | undefined
 }
 
-export interface IconSet {
+// An Iconify JSON set: its root may carry defaults for the size, offset and transforms of every icon.
+export interface IconSet extends Omit<IconifyIcon, 'body' | 'parent'> {
   prefix: string
   icons: Record<string, IconifyIcon>
   aliases?: Record<string, IconifyIcon> | undefined
-  width?: number | undefined
-  height?: number | undefined
 }

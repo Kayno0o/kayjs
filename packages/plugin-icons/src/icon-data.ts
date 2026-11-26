@@ -25,31 +25,50 @@ function resolveIcon(set: IconSet, name: string, depth: number): IconifyIcon | u
   }
 }
 
+// The viewBox, size and body Iconify's `iconToSVG` would draw: flips first, then the rotation around them, a quarter turn swapping the sides.
 export function iconData(set: IconSet, name: string): IconData | undefined {
   const ownPrefix = `${set.prefix}:`
   const icon = resolveIcon(set, name.startsWith(ownPrefix) ? name.slice(ownPrefix.length) : name, 0)
   if (icon?.body === undefined || icon.body === '')
     return undefined
 
-  const width = icon.width ?? set.width ?? DEFAULT_SIZE
-  const height = icon.height ?? set.height ?? DEFAULT_SIZE
-  const left = icon.left ?? 0
-  const top = icon.top ?? 0
+  const box = {
+    left: icon.left ?? set.left ?? 0,
+    top: icon.top ?? set.top ?? 0,
+    width: icon.width ?? set.width ?? DEFAULT_SIZE,
+    height: icon.height ?? set.height ?? DEFAULT_SIZE,
+  }
+  if (!(box.width > 0 && box.height > 0))
+    return undefined
+
+  const hFlip = icon.hFlip ?? set.hFlip ?? false
+  const vFlip = icon.vFlip ?? set.vFlip ?? false
+  let rotate = icon.rotate ?? set.rotate ?? 0
   const transforms: string[] = []
 
-  if (icon.hFlip)
-    transforms.push(`translate(${left * 2 + width} 0) scale(-1 1)`)
-  if (icon.vFlip)
-    transforms.push(`translate(0 ${top * 2 + height}) scale(1 -1)`)
-  if (icon.rotate !== undefined && icon.rotate !== 0)
-    transforms.push(`rotate(${(icon.rotate % 4) * 90} ${left + width / 2} ${top + height / 2})`)
+  if (hFlip && vFlip) {
+    rotate += 2
+  }
+  else if (hFlip || vFlip) {
+    transforms.push(hFlip ? `translate(${box.width + box.left} ${-box.top})` : `translate(${-box.left} ${box.height + box.top})`, hFlip ? 'scale(-1 1)' : 'scale(1 -1)')
+    box.left = 0
+    box.top = 0
+  }
 
-  const body = transforms.length > 0 ? `<g transform="${transforms.join(' ')}">${icon.body}</g>` : icon.body
+  rotate = ((rotate % 4) + 4) % 4
+  if (rotate === 1)
+    transforms.unshift(`rotate(90 ${box.height / 2 + box.top} ${box.height / 2 + box.top})`)
+  else if (rotate === 2)
+    transforms.unshift(`rotate(180 ${box.width / 2 + box.left} ${box.height / 2 + box.top})`)
+  else if (rotate === 3)
+    transforms.unshift(`rotate(-90 ${box.width / 2 + box.left} ${box.width / 2 + box.left})`)
+  if (rotate % 2 === 1)
+    [box.left, box.top, box.width, box.height] = [box.top, box.left, box.height, box.width]
 
   return {
-    viewBox: `${left} ${top} ${width} ${height}`,
-    width: `${Math.round((width / height) * 1000) / 1000}em`,
+    viewBox: `${box.left} ${box.top} ${box.width} ${box.height}`,
+    width: `${Math.round((box.width / box.height) * 1000) / 1000}em`,
     height: '1em',
-    body,
+    body: transforms.length > 0 ? `<g transform="${transforms.join(' ')}">${icon.body}</g>` : icon.body,
   }
 }

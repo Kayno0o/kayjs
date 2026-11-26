@@ -1,9 +1,10 @@
 import type { IconSet } from '../../plugin-icons/src/index'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { iconData } from '../../plugin-icons/src/icon-data'
 import { icons } from '../../plugin-icons/src/plugin'
 import { build } from '../src/build/index'
 import { createServer } from '../src/server/index'
@@ -169,5 +170,86 @@ describe('<Icon> in a hydrated island', () => {
 
       expect(host.querySelector('path') === path).toBe(true)
     })
+  })
+})
+
+describe('iconData', () => {
+  // A 32×16 glyph, wider than tall, so a quarter turn shows in the viewBox.
+  const wide = (alias: IconSet['icons'][string], set: Partial<IconSet> = {}): ReturnType<typeof iconData> =>
+    iconData({ prefix: 'w', width: 32, height: 16, icons: { a: { body: '<path/>' } }, aliases: { x: { parent: 'a', ...alias } }, ...set }, 'x')
+
+  it('turns a quarter rotation about the glyph and swaps the viewBox sides', () => {
+    expect(wide({ rotate: 1 })).toEqual({ viewBox: '0 0 16 32', width: '0.5em', height: '1em', body: '<g transform="rotate(90 8 8)"><path/></g>' })
+  })
+
+  it('reads a negative rotation as the same turn counted forward', () => {
+    expect(wide({ rotate: -1 })).toEqual({ viewBox: '0 0 16 32', width: '0.5em', height: '1em', body: '<g transform="rotate(-90 16 16)"><path/></g>' })
+  })
+
+  it('drops a full turn', () => {
+    expect(wide({ rotate: 4 })).toEqual({ viewBox: '0 0 32 16', width: '2em', height: '1em', body: '<path/>' })
+  })
+
+  it('rotates the flipped glyph, as Iconify does', () => {
+    expect(wide({ hFlip: true, rotate: 1 })).toEqual({ viewBox: '0 0 16 32', width: '0.5em', height: '1em', body: '<g transform="rotate(90 8 8) translate(32 0) scale(-1 1)"><path/></g>' })
+  })
+
+  it('draws both flips as a half turn', () => {
+    expect(wide({ hFlip: true, vFlip: true })).toEqual({ viewBox: '0 0 32 16', width: '2em', height: '1em', body: '<g transform="rotate(180 16 8)"><path/></g>' })
+  })
+
+  it('draws a flipped glyph with an offset in a box at the origin', () => {
+    expect(wide({ hFlip: true }, { left: 2, top: 3 })).toEqual({ viewBox: '0 0 32 16', width: '2em', height: '1em', body: '<g transform="translate(34 -3) scale(-1 1)"><path/></g>' })
+  })
+
+  it('takes left and top from the set when the icon has none', () => {
+    expect(wide({}, { left: 2, top: 3 })?.viewBox).toBe('2 3 32 16')
+  })
+
+  it('finds no icon of zero height', () => {
+    expect(wide({ height: 0 })).toBeUndefined()
+  })
+})
+
+describe('icons() loading an installed set', () => {
+  it('reads and parses a set once however many of its icons a build imports', async () => {
+    const root = linkedApp({
+      'node_modules/@iconify-json/demo/icons.json': JSON.stringify(DEMO),
+      'src/routes/index.tsx': `
+        import { Icon } from '@kayjs/icons'
+        import a from '~icons/demo/arrow'
+        import b from '~icons/demo/wide'
+        import c from '~icons/demo/demo:arrow'
+        export default function Home() { return <main><Icon icon={a} /><Icon icon={b} /><Icon icon={c} /></main> }
+      `,
+    })
+    const file = spyOn(Bun, 'file')
+
+    try {
+      await build({ root, plugins: [icons()], static: true })
+
+      expect(file.mock.calls.filter(([path]) => String(path).endsWith('@iconify-json/demo/icons.json'))).toHaveLength(1)
+    }
+    finally {
+      file.mockRestore()
+    }
+  })
+
+  it('loads a set installed after a build failed to find it', async () => {
+    const root = linkedApp({
+      'src/routes/index.tsx': `
+        import { Icon } from '@kayjs/icons'
+        import arrow from '~icons/demo/arrow'
+        export default function Home() { return <main><Icon icon={arrow} /></main> }
+      `,
+    })
+    const plugin = icons()
+
+    await expect(build({ root, plugins: [plugin], static: true })).rejects.toThrow('@iconify-json/demo')
+    mkdirSync(join(root, 'node_modules/@iconify-json/demo'), { recursive: true })
+    writeFileSync(join(root, 'node_modules/@iconify-json/demo/icons.json'), JSON.stringify(DEMO))
+    await build({ root, plugins: [plugin], static: true })
+
+    expect(readFileSync(join(root, 'dist/index.html'), 'utf8')).toContain('M5 12h14')
   })
 })
