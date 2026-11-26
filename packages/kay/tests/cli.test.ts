@@ -299,6 +299,8 @@ describe('kay build names the islands behind each route\'s JS (#3585)', () => {
           cssGzip: 0,
           jsFiles: 0,
           cssFiles: 0,
+          fonts: 0,
+          firstLoad: 0,
           islands: [],
         },
         {
@@ -309,6 +311,8 @@ describe('kay build names the islands behind each route\'s JS (#3585)', () => {
           cssGzip: 0,
           jsFiles: expect.any(Number),
           cssFiles: 0,
+          fonts: 0,
+          firstLoad: expect.any(Number),
           islands: [
             { name: 'Clicker', file: 'src/components/Count.tsx', reason: 'uses onClick', eager: true },
             { name: 'Total', file: 'src/components/Count.tsx', reason: 'reads count from \'../stores/count\'', eager: true },
@@ -323,7 +327,7 @@ describe('kay build names the islands behind each route\'s JS (#3585)', () => {
   })
 
   test('a route at the size passes, one byte over fails, and a route with no eager island names the runtime', () => {
-    const route = (path: string, jsGzip: number, islands: BundleReport['routes'][number]['islands']) => ({ path, jsGzip, jsRaw: 0, cssRaw: 0, cssGzip: 0, jsFiles: 1, cssFiles: 0, islands })
+    const route = (path: string, jsGzip: number, islands: BundleReport['routes'][number]['islands']) => ({ path, jsGzip, jsRaw: 0, cssRaw: 0, cssGzip: 0, jsFiles: 1, cssFiles: 0, fonts: 0, firstLoad: 0, islands })
     const report = (jsGzip: number): BundleReport => ({
       routes: [
         route('/', 2048, [{ name: 'Clicker', file: 'src/Clicker.tsx', reason: 'uses onClick', eager: true }]),

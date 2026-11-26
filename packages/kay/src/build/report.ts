@@ -6,9 +6,7 @@ import type { BuildManifest } from './manifest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, posix } from 'node:path'
 import { relPosix } from './files'
-
-// A static `import ... from "./x.js"` or `import "./x.js"` of an emitted chunk; `import("./x.js")` stays lazy and is left out.
-const STATIC_CHUNK_IMPORT_RE = /\b(?:import|export)\s*(?:[^"'();]*?\bfrom\s*)?["'](\.\.?\/[^"']+\.js)["']/g
+import { distLocator, firstLoadUrls, measureFirstLoad, STATIC_CHUNK_IMPORT_RE } from './first-load'
 
 export interface IslandOrigin {
   /** The component's export name, `default` for a page or a default export. */
@@ -32,6 +30,10 @@ export interface RouteBundleMetrics {
   cssGzip: number
   jsFiles: number
   cssFiles: number
+  /** Fonts the page preloads or its stylesheets declare, brotli. */
+  fonts: number
+  /** Everything a first visit fetches except the HTML (CSS, eager JS and its imports, fonts, images, icons), brotli. */
+  firstLoad: number
   islands: RouteIsland[]
 }
 
@@ -59,7 +61,9 @@ export function analyzeBundleWeights(
   assetPrefix = '/_kay',
   metafile?: Bun.BuildOutput['metafile'],
   origins = new Map<string, IslandOrigin>(),
+  publicDirs: readonly string[] = [],
 ): BundleReport {
+  const locate = distLocator({ clientDir, assetPrefix, publicDirs })
   const prefix = `${assetPrefix.replace(/\/$/, '')}/`
   const sizeCache = new Map<string, { raw: number, gzip: number }>()
 
@@ -155,8 +159,13 @@ export function analyzeBundleWeights(
       cssGzip += s.gzip
     }
 
+    const headUrls = firstLoadUrls([...manifest.headTags ?? [], ...r.headTags ?? []].join(''))
+    const load = measureFirstLoad([...cssList, ...eagerJsRoots, ...headUrls], locate)
+
     return {
       path: r.path,
+      fonts: load.fonts,
+      firstLoad: load.total,
       jsRaw,
       jsGzip,
       cssRaw,
@@ -193,18 +202,21 @@ export function formatBundleReport(report: BundleReport): string {
     '\n=== KAY BUNDLE WEIGHT REPORT ===',
     `Total emitted: JS ${kb(report.totalJsGzip)} gz | CSS ${kb(report.totalCssGzip)} gz`,
     '',
-    'Route'.padEnd(28) + 'Eager JS (gz)'.padStart(16) + 'CSS (gz)'.padStart(14) + 'Files'.padStart(10),
+    'Route'.padEnd(28) + 'Eager JS (gz)'.padStart(16) + 'CSS (gz)'.padStart(14) + 'Fonts (br)'.padStart(14) + 'First load (br)'.padStart(18) + 'Files'.padStart(10),
   ]
   for (const r of report.routes) {
     lines.push(
       r.path.padEnd(28)
       + kb(r.jsGzip).padStart(16)
       + kb(r.cssGzip).padStart(14)
+      + kb(r.fonts).padStart(14)
+      + kb(r.firstLoad).padStart(18)
       + `${r.jsFiles}j/${r.cssFiles}c`.padStart(10),
     )
     for (const island of r.islands)
       lines.push(`  ${island.eager ? 'island' : 'island, deferred'}: ${islandLine(island)}`)
   }
+  lines.push('', 'First load is what a first visit downloads besides the page\'s HTML: CSS, eager JS and its imports, fonts, images and icons, brotli.')
   if (report.topModules.length > 0) {
     lines.push('', 'Top modules (minified output bytes):')
     for (const m of report.topModules.slice(0, 8))

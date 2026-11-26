@@ -391,7 +391,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const writeManifest = (): void => writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
   writeManifest()
   if (options.analyze === true || options.analyzeJson === true || options.maxJs !== undefined) {
-    const report = analyzeBundleWeights(manifest, clientDir, assetPrefix, client.metafile, islandOrigins(islands, client.islandChunks, graph, root))
+    const report = analyzeBundleWeights(manifest, clientDir, assetPrefix, client.metafile, islandOrigins(islands, client.islandChunks, graph, root), [outPublicDir, run.publicDir])
     if (options.analyzeJson === true)
       console.log(formatBundleReportJson(report))
     else if (options.analyze === true)
