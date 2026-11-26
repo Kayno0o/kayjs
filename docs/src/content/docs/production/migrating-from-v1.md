@@ -47,6 +47,7 @@ Kay v2 replaces v1's `.kay` single-file format and Elysia runtime with standard 
 
 ## Changes during the v2 beta
 
+- **2.0.0-beta.4**: `icons()` moves to `@kayjs/icons/plugin`, so an island can import `<Icon>` from `@kayjs/icons`. Change `kay.config.ts` to `import { icons } from '@kayjs/icons/plugin'`.
 - **2.0.0-beta.4**: kay is imported as `@kayjs/kay` only. Depend on `"@kayjs/kay"`, set `"jsxImportSource": "@kayjs/kay"`, and replace `from 'kay…'` with `from '@kayjs/kay…'`: a bare `kay` import now fails the compile. `defineConfig`, `definePlugin` and the plugin types move from `@kayjs/kay/server` to `@kayjs/kay/config`. `@kayjs/kay/server` no longer exports kay's internals (`createServer`, `loadConfig`, `DEFAULT_CSP`, `withCspHashes`, compression and app-context helpers). A plugin HTML route gets the app's CSP with its `<style>` blocks hashed, so it no longer builds its own.
 
 <Callout title="Verify after porting" tone="tip">

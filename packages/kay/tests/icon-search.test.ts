@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { icons } from '../../plugin-icons/src/index'
+import { icons } from '../../plugin-icons/src/plugin'
 import { findIcons } from '../../plugin-icons/src/search'
 import { replaceTable } from '../../plugin-icons/src/table'
 

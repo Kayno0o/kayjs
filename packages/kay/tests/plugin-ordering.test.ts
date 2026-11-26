@@ -73,7 +73,7 @@ describe('Plugin ordering, definePlugin & locals validation (#3550)', () => {
       'packages/plugin-auth/src/index.ts',
       'packages/plugin-content/src/index.ts',
       'packages/plugin-i18n/src/index.ts',
-      'packages/plugin-icons/src/index.ts',
+      'packages/plugin-icons/src/plugin.ts',
       'packages/plugin-images/src/plugin.ts',
       'packages/plugin-live/src/index.ts',
       'packages/plugin-mail/src/index.ts',

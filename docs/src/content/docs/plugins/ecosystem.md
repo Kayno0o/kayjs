@@ -9,9 +9,9 @@ Every remaining capability is an opt-in package built strictly on `KayPlugin` vi
 
 ## Conventions & ordering
 
-- **Stateless plugins** export a single camelCase factory matching the package name from the package root: `tailwind()`, `icons()`, `images()`, `i18n()`, `content()`, `seo()`, `spa()`, `mcp()`.
+- **Stateless plugins** export a single camelCase factory matching the package name from the package root: `tailwind()`, `images()`, `i18n()`, `content()`, `seo()`, `spa()`, `mcp()`.
 - **Stateful service plugins** (which also export a runtime handle used by routes/actions) expose `.plugin` / `.plugin(opts)` on the instance: `auth.plugin`, `rooms.plugin(opts)`, `mail.plugin(opts)` (with `mailPlugin(mail, opts)` and `contentPlugin(opts)` kept as aliases).
-- **Client-safe UI barrel exception**: `@kayjs/ui` exports only browser-safe JSX components; its build plugin lives at `@kayjs/ui/plugin` (`ui()`).
+- **Client-safe barrels**: `@kayjs/ui` and `@kayjs/icons` export only what an island can import; their build plugins live at `@kayjs/ui/plugin` (`ui()`) and `@kayjs/icons/plugin` (`icons()`).
 - **Declarative ordering**: plugins declare `enforce: 'pre' | 'post'`, `after: ['...']`, `providesLocals`, and `readsLocals`. Core sorts plugins deterministically (`pre` → normal → `post`, respecting `after`) and fails at startup if a plugin declares `readsLocals` before its provider runs.
 
 ## `@kayjs/i18n`
@@ -52,7 +52,7 @@ Register `mailPlugin(mail)` in `kay.config.ts`. In development and tests, sent m
 
 ## `@kayjs/icons`
 
-Zero-runtime inline SVGs from any `@iconify-json/*` icon pack:
+Zero-runtime inline SVGs from any `@iconify-json/*` icon pack. Register `icons()` from `@kayjs/icons/plugin` in `kay.config.ts`, then import icons anywhere, islands included:
 
 ```tsx
 import { Icon } from '@kayjs/icons'
