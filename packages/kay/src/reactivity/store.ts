@@ -53,6 +53,34 @@ function notifyKey(target: object, key: PropertyKey): void {
     dep.value = dep.peek() + 1
 }
 
+function deleteDep(target: object, key: PropertyKey): void {
+  const map = depsCache.get(target)
+  const dep = map?.get(key)
+  if (dep !== undefined) {
+    dep.value = dep.peek() + 1
+    map!.delete(key)
+    if (map!.size === 0)
+      depsCache.delete(target)
+  }
+}
+
+function evictTruncated(target: object, nextLen: number, prevLen: number): void {
+  const map = depsCache.get(target)
+  if (map === undefined)
+    return
+  for (const [k, dep] of map) {
+    if (typeof k === 'string') {
+      const idx = Number(k)
+      if ((idx >>> 0) === idx && idx >= nextLen && idx < prevLen && String(idx) === k) {
+        dep.value = dep.peek() + 1
+        map.delete(k)
+      }
+    }
+  }
+  if (map.size === 0)
+    depsCache.delete(target)
+}
+
 function wrap<T extends object>(target: T): T {
   const existing = proxyCache.get(target)
   if (existing !== undefined)
@@ -78,24 +106,39 @@ function wrap<T extends object>(target: T): T {
       const rawValue = unwrap(value)
       const had = Object.prototype.hasOwnProperty.call(obj, key)
       const prev = Reflect.get(obj, key, obj)
-      const prevLength = Array.isArray(obj) ? obj.length : 0
+      const isArr = Array.isArray(obj)
+      const prevLength = isArr ? obj.length : 0
       const ok = Reflect.set(obj, key, rawValue, receiver)
-      if (!had || !Object.is(prev, rawValue)) {
-        notifyKey(obj, key)
-        if (!had || Array.isArray(obj))
-          notifyKey(obj, OWN_KEYS)
+      if (!ok)
+        return false
+      const changed = !had || !Object.is(prev, rawValue)
+      const lenChanged = isArr && obj.length !== prevLength
+      if (changed || lenChanged) {
+        batch(() => {
+          if (changed) {
+            notifyKey(obj, key)
+            if (!had || isArr)
+              notifyKey(obj, OWN_KEYS)
+          }
+          // Writing past the end grows the array without a later `length` write that differs; truncating drops trailing elements.
+          if (lenChanged) {
+            if (key !== 'length')
+              notifyKey(obj, 'length')
+            else if (obj.length < prevLength)
+              evictTruncated(obj, obj.length, prevLength)
+          }
+        })
       }
-      // Writing past the end grows the array without a later `length` write that differs, so readers of length are told here.
-      if (Array.isArray(obj) && key !== 'length' && obj.length !== prevLength)
-        notifyKey(obj, 'length')
-      return ok
+      return true
     },
     deleteProperty(obj, key) {
       const had = Object.prototype.hasOwnProperty.call(obj, key)
       const ok = Reflect.deleteProperty(obj, key)
       if (had && ok) {
-        notifyKey(obj, key)
-        notifyKey(obj, OWN_KEYS)
+        batch(() => {
+          deleteDep(obj, key)
+          notifyKey(obj, OWN_KEYS)
+        })
       }
       return ok
     },
@@ -124,19 +167,36 @@ export function store<T extends object>(initial: T): T {
 }
 
 export function snapshot<T>(value: T): T {
-  return untrack(() => cloneRaw(value))
+  return untrack(() => cloneRaw(value, new Map()))
 }
 
-function cloneRaw<T>(value: T): T {
+/** @internal Test helper: number of tracked dependency keys currently cached for `target`. */
+export function _storeDepsSize(target: object): number {
+  return depsCache.get(unwrap(target))?.size ?? 0
+}
+
+function cloneRaw<T>(value: T, seen: Map<object, unknown>): T {
   const raw = unwrap(value)
   if (typeof raw !== 'object' || raw === null)
     return raw
-  if (Array.isArray(raw))
-    return raw.map(item => cloneRaw(item)) as unknown as T
+  const cached = seen.get(raw)
+  if (cached !== undefined)
+    return cached as T
+  if (Array.isArray(raw)) {
+    const copy: unknown[] = []
+    copy.length = raw.length
+    seen.set(raw, copy)
+    for (let i = 0; i < raw.length; i++) {
+      if (i in raw)
+        copy[i] = cloneRaw(raw[i], seen)
+    }
+    return copy as unknown as T
+  }
   if (isPlain(raw)) {
     const copy: Record<string, unknown> = {}
+    seen.set(raw, copy)
     for (const [k, v] of Object.entries(raw))
-      copy[k] = cloneRaw(v)
+      copy[k] = cloneRaw(v, seen)
     return copy as T
   }
   return raw as T

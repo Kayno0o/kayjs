@@ -1,59 +1,51 @@
 // O(1) row selection primitive: zero WeakSet overhead per row.
 
-import type { Owner, Signal } from './index'
-import { effect, getOwner, isTracking, onCleanup, signal } from './index'
+import type { Signal } from './index'
+import { effect, isObserving, isTracking, watchedSignal } from './index'
 
 export interface Selector<K> {
   is(key: K): boolean
 }
 
-interface Entry {
-  s: Signal<boolean>
-  owners: Set<Owner>
-}
-
 export function selector<K>(source: () => K): Selector<K> {
-  const subs = new Map<K, Entry>()
+  const subs = new Map<K, Signal<boolean>>()
   let current: K | undefined
+  let active = false
 
   effect(() => {
     const next = source()
-    if (Object.is(current, next))
+    if (active && Object.is(current, next))
       return
 
-    const prevEntry = subs.get(current as K)
-    if (prevEntry !== undefined)
-      prevEntry.s.value = false
+    if (active) {
+      const prev = subs.get(current as K)
+      if (prev !== undefined)
+        prev.value = false
+    }
 
+    active = true
     current = next
-    const nextEntry = subs.get(next)
-    if (nextEntry !== undefined)
-      nextEntry.s.value = true
+    const nextSub = subs.get(next)
+    if (nextSub !== undefined)
+      nextSub.value = true
   })
 
   return {
     is(key: K): boolean {
-      const owner = getOwner()
-      if (owner === undefined && !isTracking())
-        return Object.is(current, key)
+      if (!active)
+        return Object.is(source(), key)
+      if (!isObserving())
+        return isTracking() ? Object.is(source(), key) : Object.is(current, key)
 
-      let entry = subs.get(key)
-      if (entry === undefined) {
-        entry = { s: signal(Object.is(current, key)), owners: new Set() }
-        subs.set(key, entry)
-      }
-
-      if (owner !== undefined && !entry.owners.has(owner)) {
-        entry.owners.add(owner)
-        const target = entry
-        onCleanup(() => {
-          target.owners.delete(owner)
-          if (target.owners.size === 0)
+      let sub = subs.get(key)
+      if (sub === undefined) {
+        sub = watchedSignal(Object.is(current, key), () => {
+          if (subs.get(key) === sub)
             subs.delete(key)
         })
+        subs.set(key, sub)
       }
-
-      return entry.s.value
+      return sub.value
     },
   }
 }
