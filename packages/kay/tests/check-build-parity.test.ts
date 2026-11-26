@@ -299,4 +299,56 @@ describe('kay check and kay build share island planning and reachability checks 
       'kay build: src/lib/actions.ts runs in the browser and re-exports MAX_LENGTH from src/actions/notes.ts, a file of server actions: the browser only gets its actions. Move MAX_LENGTH into a module without actions.',
     )
   })
+
+  it('refuses co-locating server action() inside an interactive .tsx file in both check and build (#3627)', async () => {
+    // 1. Directly interactive .tsx page exporting an action
+    const directDir = appWith('kay-3627-direct-action-', {
+      'src/routes/index.tsx': [
+        'import { signal } from \'@kayjs/kay\'',
+        'import { action } from \'@kayjs/kay/server\'',
+        'export const save = action(async () => ({ secret: \'NEVER_IN_CLIENT\' }))',
+        'export default function Home() { const n = signal(0); return <button type="button" onClick={() => { n.value++; void save() }}>{n.value}</button> }',
+      ].join('\n'),
+    })
+    const directCheck = await checkProject(directDir, { skipTypecheck: true })
+    expect(directCheck.ok).toBe(false)
+    expect(directCheck.errors).toEqual([
+      expect.stringContaining('src/routes/index.tsx exports server action "save" and also uses browser interactivity'),
+    ])
+    await expect(build({ root: directDir, minify: false })).rejects.toThrow(
+      /kay build: src\/routes\/index\.tsx exports server action "save" and also uses browser interactivity/,
+    )
+
+    // 2. State-read-promoted interactive .tsx component exporting an action
+    const promotedDir = appWith('kay-3627-promoted-action-', {
+      'src/state.ts': 'import { signal } from \'@kayjs/kay\'\nexport const count = signal(0)\n',
+      'src/ui/Widget.tsx': [
+        'import { action } from \'@kayjs/kay/server\'',
+        'import { count } from \'../state\'',
+        'export const save = action(async () => \'ok\')',
+        'export function Widget() { return <output>{count.value}</output> }',
+      ].join('\n'),
+      'src/routes/index.tsx': 'import { Widget } from \'../ui/Widget\'\nexport default function Home() { return <main><Widget /></main> }\n',
+    })
+    const promotedCheck = await checkProject(promotedDir, { skipTypecheck: true })
+    expect(promotedCheck.ok).toBe(false)
+    expect(promotedCheck.errors).toEqual([
+      expect.stringContaining('src/ui/Widget.tsx exports server action "save" and also uses browser interactivity'),
+    ])
+    await expect(build({ root: promotedDir, minify: false })).rejects.toThrow(
+      /kay build: src\/ui\/Widget\.tsx exports server action "save" and also uses browser interactivity/,
+    )
+
+    // 3. Non-interactive static .tsx page co-locating an action remains allowed
+    const staticDir = appWith('kay-3627-static-action-', {
+      'src/routes/index.tsx': [
+        'import { action } from \'@kayjs/kay/server\'',
+        'export const save = action(async () => \'ok\')',
+        'export default function Home() { return <form action={save} method="post"><button>Save</button></form> }',
+      ].join('\n'),
+    })
+    expect(await checkProject(staticDir, { skipTypecheck: true })).toMatchObject({ ok: true, errors: [] })
+    const manifest = await build({ root: staticDir, minify: false })
+    expect(manifest.actions.map(a => a.exportName)).toEqual(['save'])
+  })
 })

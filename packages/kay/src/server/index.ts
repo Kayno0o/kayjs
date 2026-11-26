@@ -8,7 +8,6 @@
 import type { RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
 import type { DocumentOptions } from '../ssr/index'
-import type { ActionErrorFlash } from './action'
 import type { CookieStore } from './cookies'
 import type { EmbeddedServerConfig, KayApp, Middleware, RequestContext } from './http'
 import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } from './page'
@@ -16,14 +15,14 @@ import { join } from 'node:path'
 import { createAppContext, getAppContext, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
-import { ACTION_ERROR_COOKIE, executeAction, isServerAction } from './action'
+import { ACTION_ERROR_COOKIE, executeAction, finishActionRedirect, hydrateActionErrorFlash, isServerAction } from './action'
 import { createActionRegistry } from './action-registry'
 import { createAssets } from './assets'
 import { CompressionCache, compressedHtmlResponse, maybeCompressResponse } from './compress'
 import { createDocumentHooks, createHtmlHeaders, resolveRenderedIslands, withPluginHtmlCsp } from './document'
 import { createErrorNotifier, createFallbackPages, devErrorResponse } from './errors'
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
-import { allowedMethodsHeader, isPlainObject, mergedHeadTags, pickPageIslandProps, stripHeadBody } from './page'
+import { allowedMethodsHeader, mergedHeadTags, pickPageIslandProps, stripHeadBody } from './page'
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
 import { requestedRegion, respondRegion } from './region'
 import { Router } from './router'
@@ -320,15 +319,16 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   ): Promise<Response> {
     const { entry, mod, layouts, doc } = route
 
-    // Serve prerendered HTML after middlewares have passed (when route had middlewares)
+    const isRegion = requestedRegion(ctx.request) !== undefined
+    // Serve prerendered HTML after middlewares have passed (skip on full-page GETs with a flash cookie so it hydrates & clears, and on region requests)
     if (isRead(ctx.request)) {
       const rawPath = ctx.url.pathname
       const normPath = rawPath.length > 1 && rawPath.endsWith('/') ? rawPath.slice(0, -1) : rawPath
       const pre = prerenderedMap.get(rawPath) ?? prerenderedMap.get(normPath)
-      if (pre !== undefined)
+      if (pre !== undefined && !isRegion && (ctx.request.method === 'HEAD' || !hasActionErrorCookie(ctx.request)))
         return serveFile(ctx.request, pre)
       // Prerendered dynamic route: unlisted param returns 404 (never falls back to SSR)
-      if (entry.prerender === true && entry.prerendered !== undefined && route.dynamic)
+      if (pre === undefined && entry.prerender === true && entry.prerendered !== undefined && route.dynamic)
         return buildNotFoundResponse(ctx.url, ctx.request, ctx)
     }
 
@@ -346,19 +346,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       return new Response('Method Not Allowed', allow ? { status: 405, headers: { allow } } : { status: 405 })
     }
 
-    // Hydrate & clear one-shot progressive form validation flash cookie only on page GETs (never API/plugin GETs)
-    if (ctx.request.method === 'GET' && hasActionErrorCookie(ctx.request)) {
-      const rawFlash = ctx.cookies.get(ACTION_ERROR_COOKIE)
-      if (rawFlash !== undefined) {
-        try {
-          const parsed: unknown = JSON.parse(rawFlash)
-          if (isPlainObject(parsed))
-            ctx.locals.actionError = parsed as unknown as ActionErrorFlash
-        }
-        catch {}
-        ctx.cookies.delete(ACTION_ERROR_COOKIE)
-      }
-    }
+    // Hydrate one-shot flash cookie on full page GETs only; defer deletion until a full page renders (not load() redirects or <Region> requests)
+    const hasFlash = ctx.request.method === 'GET' && !isRegion && hasActionErrorCookie(ctx.request) && hydrateActionErrorFlash(ctx)
 
     let data: unknown
     if (entry.hasLoad && typeof mod.load === 'function') {
@@ -382,7 +371,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       ...(data !== undefined ? { data } : {}),
     }
 
-    if (requestedRegion(ctx.request) !== undefined)
+    if (isRegion)
       return respondRegion(ctx.request, mod, pageProps, entry.path, htmlHeaders, rctx => resolveDocumentHead(rctx, doc.headTags as readonly string[] | undefined, ctx.url, ctx.request, ctx))
 
     const rctx = createRenderContext()
@@ -406,6 +395,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     }
 
     const body = await runWithRenderContext(rctx, renderBody)
+    if (hasFlash)
+      ctx.cookies.delete(ACTION_ERROR_COOKIE)
     const docHead = await resolveDocumentHead(rctx, doc.headTags as readonly string[] | undefined, ctx.url, ctx.request, ctx)
     const renderedIslands = resolveRenderedIslands(rctx, body)
     const isStreamed = rctx.pending.length > 0
@@ -482,7 +473,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         const { act, middlewares } = actionHandler
         const { ctx, cookieStore } = makeRequestContext(req, {}, { trustProxy, remoteIp, url })
         try {
-          return finish(await actions.run(ctx, () => runChain(ctx, middlewares, () => executeAction(act, req, ctx, trustedOrigins, trustProxy))), req, cookieStore)
+          const res = await actions.run(ctx, () => runChain(ctx, middlewares, () => executeAction(act, req, ctx, trustedOrigins, trustProxy)))
+          return finish(finishActionRedirect(res, req), req, cookieStore)
         }
         catch (error) {
           notifyError(error, req, 'action')

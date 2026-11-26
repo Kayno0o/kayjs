@@ -90,4 +90,31 @@ describe('a server action called from server code (#3580)', () => {
       await app.app.dispose?.()
     }
   })
+
+  it('preserves ctx.deny() status, error, and fieldErrors on programmatic server calls (#3627)', async () => {
+    const dir = appWith({
+      'src/routes/actions.ts': `
+        import { action } from '@kayjs/kay/server'
+        export const reject = action(async (ctx) => ctx.deny(422, 'Already exists', { email: 'Taken' }))
+      `,
+      'src/routes/api/check.ts': `
+        import type { RequestContext } from '@kayjs/kay/server'
+        import { reject } from '../actions'
+        export async function GET(ctx: RequestContext) { return ctx.json(await reject()) }
+      `,
+      'src/routes/index.tsx': 'export default function Home() { return <p>Home</p> }\n',
+    })
+    const app = await testApp({ root: dir })
+    try {
+      expect(await (await app.get('/api/check')).json()).toEqual({
+        ok: false,
+        status: 422,
+        error: 'Already exists',
+        fieldErrors: { email: 'Taken' },
+      })
+    }
+    finally {
+      await app.app.dispose?.()
+    }
+  })
 })

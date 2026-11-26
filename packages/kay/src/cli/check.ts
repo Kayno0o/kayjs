@@ -148,6 +148,8 @@ function formatIslandIssue(issue: IslandIssue, root: string, sources: Map<string
       return formatDiagnostic(locOf(root, issue.file, sources, issue.serverOnly.offset), serverOnlyTagError(rel, issue.serverOnly).message)
     case 'special-interactive':
       return formatDiagnostic(locOf(root, issue.file, sources, issue.offset), `kay check: ${rel} uses browser interactivity (${issue.reason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`)
+    case 'interactive-action':
+      return formatDiagnostic(locOf(root, issue.file, sources, issue.offset), `kay check: ${rel} exports server action "${issue.name}" and also uses browser interactivity${issue.reason ? ` (${issue.reason})` : ''}: server action code would leak into the browser bundle. Move "${issue.name}" into a separate non-interactive file (e.g. a .ts actions module).`)
     case 'action-export': {
       const verb = issue.reexport ? 're-exports' : 'imports'
       return formatDiagnostic(locOf(root, issue.file, sources, issue.offset), `kay check: ${verb} non-action "${issue.name}" from server action file ${relPosix(root, issue.target)}. Move ${issue.name} into a module without actions.`)

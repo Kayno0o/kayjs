@@ -23,6 +23,7 @@ export type IslandIssue
   = | { kind: 'async-interactive', file: string, offset: number, reason: string | undefined }
     | { kind: 'server-only-tag', file: string, serverOnly: ServerOnlyInIsland }
     | { kind: 'special-interactive', file: string, offset: number, reason: string | undefined }
+    | { kind: 'interactive-action', file: string, name: string, offset: number, reason: string | undefined }
     | { kind: 'action-export', file: string, target: string, name: string, offset: number, reexport: boolean }
     | { kind: 'server-only-import', file: string, island: string, source: string, offset: number, reexport: boolean }
     | { kind: 'private-env', file: string, island: string, offset: number }
@@ -292,6 +293,9 @@ function walkIslandReach(
       continue
     if (file !== island && isStubbedActionFile(analysis))
       continue
+    // Already reported as `interactive-action`; skip reach checks so we don't emit a contradictory "Move server logic to a server action" error.
+    if (!inNodeModules && analysis.isInteractive && analysis.exportedActions.length > 0)
+      continue
 
     const checkFileLeaks = checkLeaks && !inNodeModules
     checkReachEdges(graph, load, file, island, analysis, checkFileLeaks, cssFiles, issues, enqueue)
@@ -347,6 +351,17 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
       issues.push({ kind: 'special-interactive', file, offset: page.offset ?? 0, reason: page.reason })
   }
 
+  // An interactive module ships to the browser, so co-locating `action()` in it would bundle server action code into the client.
+  for (const [file, analysis] of graph.analyses) {
+    if (NODE_MODULES_RE.test(file) || !analysis.isInteractive || analysis.exportedActions.length === 0)
+      continue
+    const name = analysis.exportedActions[0]!
+    const offset = analysis.bindings.find(b => b.name === name)?.start ?? 0
+    const reason = [...analysis.exports.values()].find(e => e.interactive)?.reason
+      ?? analysis.bindings.find(b => b.fact !== undefined)?.fact?.reason
+    issues.push({ kind: 'interactive-action', file, name, offset, reason })
+  }
+
   const rootFiles = new Set<string>([...targets.values()].map(t => t.file))
   if (options.includeAllInteractive) {
     for (const [file, analysis] of graph.analyses) {
@@ -370,6 +385,8 @@ export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[
       throw serverOnlyTagError(rel, issue.serverOnly)
     if (issue.kind === 'special-interactive')
       throw new Error(`kay build: ${rel} uses browser interactivity (${issue.reason}), but it renders on the server only. Move the interactive part into a component and render that component from ${rel}.`)
+    if (issue.kind === 'interactive-action')
+      throw new Error(`kay build: ${rel} exports server action "${issue.name}" and also uses browser interactivity${issue.reason ? ` (${issue.reason})` : ''}: server action code would leak into the browser bundle. Move "${issue.name}" into a separate non-interactive file (e.g. a .ts actions module).`)
     if (issue.kind === 'action-export') {
       const verb = issue.reexport ? 're-exports' : 'imports'
       throw new Error(`kay build: ${rel} runs in the browser and ${verb} ${issue.name} from ${relPosix(root, issue.target)}, a file of server actions: the browser only gets its actions. Move ${issue.name} into a module without actions.`)

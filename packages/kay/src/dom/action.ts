@@ -2,7 +2,7 @@
 
 import type { ReadonlySignal } from '../reactivity/index'
 import type { ActionResult, ServerAction } from '../server/action'
-import { signal } from '../reactivity/index'
+import { batch, signal } from '../reactivity/index'
 
 export interface ClientAction<Input, Output> {
   /** A FormData input is sent as multipart, so it can carry files. */
@@ -35,6 +35,9 @@ export interface ActionForm<Input, Output> {
   reset(): void
 }
 
+const errMsg = (e: unknown): string => e instanceof Error ? e.message : String(e)
+const fail = (status: number, error: string) => ({ ok: false as const, status, error })
+
 /** Reactive progressive-enhancement form controller for a Kay server `action()`. */
 export function useAction<Input, Output>(
   action: ClientAction<Input, Output> | ServerAction<Input, Output>,
@@ -45,35 +48,37 @@ export function useAction<Input, Output>(
   const fieldErrors = signal<Record<string, string>>({})
   const data = signal<Output | undefined>(undefined)
 
+  const set = (p: boolean, e = '', f: Record<string, string> = {}) => batch(() => {
+    pending.value = p
+    error.value = e
+    fieldErrors.value = f
+  })
+
   const submit = async (input: Input | FormData, formEl?: HTMLFormElement): Promise<ActionResult<Output> | undefined> => {
     if (pending.peek())
       return undefined
-    pending.value = true
-    error.value = ''
-    fieldErrors.value = {}
+    set(true)
     try {
       const res = await (action as ClientAction<Input, Output>)(input)
       if (!res.ok) {
-        fieldErrors.value = res.fieldErrors ?? {}
-        error.value = res.error
+        set(false, res.error, res.fieldErrors)
         options.onError?.(res)
         return res
       }
-      data.value = res.data
+      batch(() => {
+        data.value = res.data
+        pending.value = false
+      })
       if (options.reset && formEl)
         formEl.reset()
       await options.onSuccess?.(res.data, formEl)
       return res
     }
     catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      error.value = msg
-      const failed: Extract<ActionResult<Output>, { ok: false }> = { ok: false, status: 0, error: msg }
+      const failed = fail(0, errMsg(err))
+      set(false, failed.error)
       options.onError?.(failed)
       return failed
-    }
-    finally {
-      pending.value = false
     }
   }
 
@@ -88,13 +93,14 @@ export function useAction<Input, Output>(
     onSubmit(event) {
       event.preventDefault()
       const formEl = event.currentTarget
-      return submit(new FormData(formEl), formEl)
+      return submit(new FormData(formEl, event.submitter), formEl)
     },
     submit,
     reset() {
-      error.value = ''
-      fieldErrors.value = {}
-      data.value = undefined
+      batch(() => {
+        set(pending.peek())
+        data.value = undefined
+      })
     },
   }
 }
@@ -102,31 +108,49 @@ export function useAction<Input, Output>(
 export function actionStub<Input = unknown, Output = unknown>(url: string): ClientAction<Input, Output> {
   const call = (async (input: Input | FormData): Promise<ActionResult<Output>> => {
     const isForm = typeof FormData !== 'undefined' && input instanceof FormData
+    const headers: Record<string, string> = { 'accept': 'application/json', 'x-kay-action': '1' }
+    if (!isForm)
+      headers['content-type'] = 'application/json'
     let res: Response
     try {
       res = await fetch(url, {
         method: 'POST',
-        headers: isForm ? { accept: 'application/json' } : { 'content-type': 'application/json', 'accept': 'application/json' },
+        headers,
         body: isForm ? input : input === undefined ? '{}' : JSON.stringify(input),
+        redirect: 'manual',
       })
     }
-    catch (error) {
-      return { ok: false, status: 0, error: error instanceof Error ? error.message : String(error) }
+    catch (err) {
+      return fail(0, errMsg(err))
     }
 
-    // The action answered with a redirect: the page navigates there and the call never settles, so no caller acts on data it did not get.
-    if (res.redirected) {
-      if (typeof location !== 'undefined')
-        location.assign(res.url)
-      return new Promise<never>(() => {})
+    if (res.type === 'opaqueredirect')
+      return fail(0, 'Unexpected redirect')
+
+    const h = res.headers
+    const to = h.get('x-kay-redirect') || (res.status > 299 && res.status < 400 && h.get('location')) || (res.redirected && res.url)
+    if (to) {
+      if (typeof location !== 'undefined') {
+        location.assign(to)
+        return new Promise<never>(() => {})
+      }
+      return fail(res.status || 302, to)
     }
 
     try {
-      return await res.json() as ActionResult<Output>
+      const b = await res.json() as Record<string, unknown> | null
+      if (b && typeof b === 'object') {
+        if (b.ok === true)
+          return b as unknown as ActionResult<Output>
+        if (b.ok === false && typeof b.error === 'string')
+          return { ...b, status: typeof b.status === 'number' ? b.status : res.status } as ActionResult<Output>
+        const m = typeof b.error === 'string' ? b.error : typeof b.message === 'string' ? b.message : ''
+        if (m)
+          return fail(res.status, m)
+      }
     }
-    catch {
-      return { ok: false, status: res.status, error: res.statusText }
-    }
+    catch {}
+    return fail(res.status, res.statusText || `HTTP ${res.status}`)
   }) as unknown as ClientAction<Input, Output>
 
   Object.defineProperties(call, {

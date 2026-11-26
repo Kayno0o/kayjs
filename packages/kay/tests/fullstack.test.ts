@@ -706,3 +706,220 @@ describe('form posts parsed for an action schema', () => {
     expect(mod.getRuns()).toBe(2)
   })
 })
+
+describe('zero-JS action deny flash, RGPD filtering, and cookie lifecycle (#3627)', () => {
+  test('ctx.deny() flashes and 303-redirects for zero-JS forms, strips French RGPD sensitive fields, and preserves JSON & custom Responses', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-deny-flash-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/actions'), { recursive: true })
+
+      writeFileSync(join(dir, 'src/actions/account.ts'), `
+        import { action } from '@kayjs/kay/server'
+        const passAll = { '~standard': { version: 1 as const, vendor: 'test', validate: (v: unknown) => ({ value: v as Record<string, string> }) } }
+        export const register = action(passAll, async (_input, ctx) => ctx.deny(422, 'Email déjà utilisé', { email: 'Déjà pris' }))
+        export const forbidden = action(async (ctx) => ctx.deny(403, 'Accès refusé'))
+        export const customRedirect = action(async (ctx) => ctx.redirect('/thanks', 303))
+        export const download = action(async () => new Response('PDF-BYTES', { status: 200, headers: { 'content-type': 'application/pdf' } }))
+      `)
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+        import { getActionError } from '@kayjs/kay/server'
+        import type { PageProps } from '@kayjs/kay/server'
+        import { customRedirect, download, forbidden, register } from '../actions/account'
+        export default function Signup({ locals }: PageProps) {
+          const err = getActionError(locals)
+          return (
+            <main>
+              {err && <p class="flash">{err.error}|{err.fieldErrors?.email ?? ''}|{JSON.stringify(err.values ?? {})}</p>}
+              <form action={register} method="post"><button>Register</button></form>
+              <form action={forbidden} method="post"><button>Forbid</button></form>
+              <form action={customRedirect} method="post"><button>Go</button></form>
+              <form action={download} method="post"><button>DL</button></form>
+            </main>
+          )
+        }
+      `)
+
+      const app = await testApp({ root: dir })
+      const urlOf = (name: string) => app.manifest!.actions.find(a => a.exportName === name)!.url
+
+      // 1. Zero-JS form submit returning ctx.deny() -> 303 + flash cookie with French sensitive fields stripped, safe words kept
+      const fd = new FormData()
+      fd.set('email', 'alice@example.com')
+      fd.set('description', 'hello')
+      fd.set('subscribe', 'yes')
+      fd.set('article', 'news')
+      fd.set('souvenir', 'paris')
+      fd.set('avenir', 'bright')
+      fd.set('mot_de_passe', 's1')
+      fd.set('motDePasse', 's2')
+      fd.set('mdp', 's3')
+      fd.set('user_mdp', 's4')
+      fd.set('rib', 'FR76')
+      fd.set('mon_rib', 'FR76')
+      fd.set('nir', '1850175')
+      fd.set('numero_nir', '1850175')
+      fd.set('carte_bancaire', '4111')
+      fd.set('secu', '185')
+      fd.set('sécu', '185')
+      fd.set('cb', '4111')
+      fd.set('code_cb', '123')
+      fd.set('bic', 'BNPAFRPP')
+      fd.set('sepa', 'MANDAT')
+      fd.set('cle_api', 'k1')
+      fd.set('clé', 'k2')
+      fd.set('date_naissance', '1990-01-01')
+      fd.set('santé', 'private')
+
+      const denyFormRes = await app.fetch(new Request(`http://localhost${urlOf('register')}`, {
+        method: 'POST',
+        headers: { accept: 'text/html', origin: 'http://localhost', referer: 'http://localhost/' },
+        body: fd,
+      }))
+      expect(denyFormRes.status).toBe(303)
+      expect(denyFormRes.headers.get('location')).toBe('http://localhost/')
+
+      const pageHtml = await (await app.get('/')).text()
+      const flashMatch = /<p class="flash">([^<]+)<\/p>/.exec(pageHtml)
+      expect(flashMatch).not.toBeNull()
+      const [errText, fieldErr, valuesJson] = flashMatch![1]!.replaceAll('&quot;', '"').split('|')
+      expect(errText).toBe('Email déjà utilisé')
+      expect(fieldErr).toBe('Déjà pris')
+      expect(JSON.parse(valuesJson!)).toEqual({
+        email: 'alice@example.com',
+        description: 'hello',
+        subscribe: 'yes',
+        article: 'news',
+        souvenir: 'paris',
+        avenir: 'bright',
+      })
+
+      // 2. Schema-less action ctx.deny() on zero-JS form -> 303 + flash without fieldErrors
+      const forbidRes = await app.fetch(new Request(`http://localhost${urlOf('forbidden')}`, {
+        method: 'POST',
+        headers: { accept: 'text/html', origin: 'http://localhost', referer: 'http://localhost/' },
+      }))
+      expect(forbidRes.status).toBe(303)
+      expect(await (await app.get('/')).text()).toContain('Accès refusé||{}')
+
+      // 3. JSON client or missing Referer preserves ctx.deny() JSON response & status
+      const jsonDeny = await app.post(urlOf('register'), { email: 'a@b.com' })
+      expect(jsonDeny.status).toBe(422)
+      expect(await jsonDeny.json()).toEqual({ ok: false, status: 422, error: 'Email déjà utilisé', fieldErrors: { email: 'Déjà pris' } })
+
+      const noRefDeny = await app.fetch(new Request(`http://localhost${urlOf('forbidden')}`, {
+        method: 'POST',
+        headers: { accept: 'text/html', origin: 'http://localhost' },
+      }))
+      expect(noRefDeny.status).toBe(403)
+      expect(await noRefDeny.json()).toEqual({ ok: false, status: 403, error: 'Accès refusé' })
+
+      // 4. Custom non-deny Responses (redirects, downloads) pass through untouched
+      const redirRes = await app.fetch(new Request(`http://localhost${urlOf('customRedirect')}`, {
+        method: 'POST',
+        headers: { accept: 'text/html', origin: 'http://localhost', referer: 'http://localhost/' },
+      }))
+      expect(redirRes.status).toBe(303)
+      expect(redirRes.headers.get('location')).toBe('/thanks')
+
+      const dlRes = await app.fetch(new Request(`http://localhost${urlOf('download')}`, {
+        method: 'POST',
+        headers: { accept: 'text/html', origin: 'http://localhost', referer: 'http://localhost/' },
+      }))
+      expect(dlRes.status).toBe(200)
+      expect(dlRes.headers.get('content-type')).toBe('application/pdf')
+      expect(await dlRes.text()).toBe('PDF-BYTES')
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('__kay_action_err hydrates & clears on prerendered routes, and survives load() redirects and <Region> requests', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-flash-lifecycle-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/actions'), { recursive: true })
+
+      writeFileSync(join(dir, 'src/actions/contact.ts'), `
+        import { action } from '@kayjs/kay/server'
+        export const send = action(async (ctx) => ctx.deny(422, 'Contact failed'))
+      `)
+      writeFileSync(join(dir, 'src/routes/contact.tsx'), `
+        import { getActionError } from '@kayjs/kay/server'
+        import type { PageProps } from '@kayjs/kay/server'
+        import { send } from '../actions/contact'
+        export const prerender = true
+        export default function Contact({ locals }: PageProps) {
+          const err = getActionError(locals)
+          return <main><h1>Contact</h1>{err && <p class="err">{err.error}</p>}<form action={send} method="post"><button>Send</button></form></main>
+        }
+      `)
+      writeFileSync(join(dir, 'src/routes/about.tsx'), `
+        export const prerender = true
+        export default function About() { return <main><h1>About</h1></main> }
+      `)
+      writeFileSync(join(dir, 'src/routes/bounce.tsx'), `
+        import type { RequestContext } from '@kayjs/kay/server'
+        export function load(ctx: RequestContext) { return ctx.redirect('/target', 302) }
+        export default function Bounce() { return <p>unreachable</p> }
+      `)
+      writeFileSync(join(dir, 'src/routes/target.tsx'), `
+        import { Region } from '@kayjs/kay'
+        import { getActionError } from '@kayjs/kay/server'
+        import type { PageProps } from '@kayjs/kay/server'
+        export default function Target({ locals }: PageProps) {
+          const err = getActionError(locals)
+          return (
+            <main>
+              <Region name="side"><aside>Sidebar</aside></Region>
+              <p class="target-err">{err?.error ?? 'none'}</p>
+            </main>
+          )
+        }
+      `)
+
+      const app = await testApp({ root: dir })
+      const sendUrl = app.manifest!.actions.find(a => a.exportName === 'send')!.url
+      const triggerFlash = async (referer: string) => {
+        const res = await app.fetch(new Request(`http://localhost${sendUrl}`, {
+          method: 'POST',
+          headers: { accept: 'text/html', origin: 'http://localhost', referer },
+        }))
+        expect(res.status).toBe(303)
+      }
+
+      // 1. Prerendered page /contact displays flash error AND clears cookie so /target never sees a leaked error
+      await triggerFlash('http://localhost/contact')
+      const contactHtml = await (await app.get('/contact')).text()
+      expect(contactHtml).toContain('<p class="err">Contact failed</p>')
+      expect(await (await app.get('/target')).text()).toContain('<p class="target-err">none</p>')
+
+      // 2. Visiting an unrelated prerendered page /about still clears __kay_action_err (no leak to later dynamic /target)
+      await triggerFlash('http://localhost/about')
+      const aboutRes = await app.get('/about')
+      expect(aboutRes.status).toBe(200)
+      expect(await (await app.get('/target')).text()).toContain('<p class="target-err">none</p>')
+
+      // 3. load() redirect (/bounce -> /target) does NOT delete __kay_action_err before /target renders
+      await triggerFlash('http://localhost/bounce')
+      const bounceRes = await app.get('/bounce')
+      expect(bounceRes.status).toBe(302)
+      expect(bounceRes.headers.get('location')).toBe('/target')
+      expect(bounceRes.headers.getSetCookie().some(c => c.startsWith('__kay_action_err='))).toBe(false)
+
+      // 4. <Region> request to /target does NOT delete __kay_action_err either
+      const regionRes = await app.get('/target', { 'x-kay-region': 'side' })
+      expect(regionRes.status).toBe(200)
+      expect(await regionRes.text()).toBe('<aside>Sidebar</aside>')
+      expect(regionRes.headers.getSetCookie().some(c => c.startsWith('__kay_action_err='))).toBe(false)
+
+      // 5. Full page GET /target finally consumes & clears __kay_action_err
+      expect(await (await app.get('/target')).text()).toContain('<p class="target-err">Contact failed</p>')
+      expect(await (await app.get('/target')).text()).toContain('<p class="target-err">none</p>')
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})

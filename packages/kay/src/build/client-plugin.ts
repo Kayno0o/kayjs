@@ -80,7 +80,11 @@ export function clientPlugin(env: ClientPluginEnv): BunPlugin {
       })
       b.onLoad({ filter: TS_FILTER }, (args) => {
         const actions = actionsByFile.get(args.path)
-        if (actions !== undefined && !graph.analyses.get(args.path)?.isInteractive) {
+        if (actions !== undefined) {
+          if (graph.analyses.get(args.path)?.isInteractive) {
+            leaks.add(`${relPosix(root, args.path)} exports server actions and uses browser interactivity (move actions to a separate non-interactive file)`)
+            return undefined
+          }
           const lines = [`import { actionStub } from '@kayjs/kay/internal/action';`]
           for (const a of actions)
             lines.push(`export const ${a.exportName} = actionStub(${JSON.stringify(a.url)});`)

@@ -19,7 +19,48 @@ export const ACTION_ERROR_COOKIE = '__kay_action_err'
 
 const MAX_FLASH_COOKIE_BYTES = 3500
 const MAX_FLASH_FIELD_CHARS = 512
-const SENSITIVE_FIELD_RE = /password|passwd|pwd|secret|token|pin|cvv|cvc|iban|ssn|card|credit|auth|key|otp|code|routing|account|bank|tax/i
+// Substrings that are unambiguously sensitive even inside compound identifiers.
+const SENSITIVE_SUBSTRING_RE = /password|passwd|passphrase|passcode|motdepasse|secret|token|jeton|credit|debit|card|carte|iban|routing|account|compte|bank|banque|bancaire|securite|vitale|passeport|passport|fiscal|impot|crypto|sante|medical|health|biometr|credential|private|session|bearer|csrf|xsrf|naissance/i
+// Short acronyms/words matched only on token boundaries (after camelCase/punctuation/accent normalization) to avoid false positives like `subscribe`, `article`, `souvenir`, or `description`.
+const SENSITIVE_TOKEN_RE = /\b(?:mot de passe|mdp|pwd|pin|cvv|cvc|csc|ccv|rib|bic|sepa|cb|nir|secu|insee|cni|siret|siren|permis|ssn|sin|nin|tin|pan|otp|totp|mfa|2fa|auth|key|cle|code|tax|jwt)\b/i
+
+function isSensitiveField(name: string): boolean {
+  const normalized = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+  return SENSITIVE_SUBSTRING_RE.test(normalized) || SENSITIVE_TOKEN_RE.test(normalized)
+}
+
+/** Hydrates `ctx.locals.actionError` from `__kay_action_err` without clearing the cookie yet; returns true when the cookie was present. */
+export function hydrateActionErrorFlash(ctx: Pick<ActionContext, 'cookies' | 'locals'>): boolean {
+  const rawFlash = ctx.cookies.get(ACTION_ERROR_COOKIE)
+  if (rawFlash === undefined)
+    return false
+  try {
+    const parsed: unknown = JSON.parse(rawFlash)
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed))
+      ctx.locals.actionError = parsed as unknown as ActionErrorFlash
+  }
+  catch {}
+  return true
+}
+
+/** Converts 3xx action/middleware redirects into a 204 + `x-kay-redirect` header for `actionStub` (`x-kay-action: 1`), preventing double-fetch and cross-origin CORS failures in browsers. */
+export function finishActionRedirect(res: Response, request: Request): Response {
+  if (request.headers.get('x-kay-action') !== '1' || res.status < 300 || res.status >= 400)
+    return res
+  const location = res.headers.get('location')
+  if (location === null)
+    return res
+  const headers = new Headers()
+  for (const cookie of res.headers.getSetCookie())
+    headers.append('set-cookie', cookie)
+  headers.set('x-kay-redirect', location)
+  return new Response(null, { status: 204, headers })
+}
 
 export interface ActionOptions {
   /** Explicit allowlist of form field names permitted in the progressive-form validation error flash cookie. */
@@ -233,22 +274,26 @@ function encodedFlashSize(flash: ActionErrorFlash): number {
 
 function buildActionErrorFlash(
   actionUrl: string,
-  fieldErrors: Record<string, string>,
+  error: string,
+  fieldErrors: Record<string, string> | undefined,
   rawBody: unknown,
   flashFields?: readonly string[],
 ): string {
-  const safeErrors: Record<string, string> = {}
+  const trimmedError = error.length > 256 ? error.slice(0, 256) : error
   const base: ActionErrorFlash = {
     action: actionUrl,
-    error: 'Validation failed',
-    fieldErrors: safeErrors,
+    error: trimmedError,
   }
-  for (const [k, msg] of Object.entries(fieldErrors)) {
-    const trimmed = msg.length > 256 ? msg.slice(0, 256) : msg
-    safeErrors[k] = trimmed
-    if (encodedFlashSize(base) > MAX_FLASH_COOKIE_BYTES) {
-      delete safeErrors[k]
-      break
+  if (fieldErrors !== undefined) {
+    const safeErrors: Record<string, string> = {}
+    base.fieldErrors = safeErrors
+    for (const [k, msg] of Object.entries(fieldErrors)) {
+      const trimmed = msg.length > 256 ? msg.slice(0, 256) : msg
+      safeErrors[k] = trimmed
+      if (encodedFlashSize(base) > MAX_FLASH_COOKIE_BYTES) {
+        delete safeErrors[k]
+        break
+      }
     }
   }
 
@@ -262,7 +307,7 @@ function buildActionErrorFlash(
         if (!allowSet.has(k))
           continue
       }
-      else if (SENSITIVE_FIELD_RE.test(k)) {
+      else if (isSensitiveField(k)) {
         continue
       }
       values[k] = v
@@ -339,10 +384,21 @@ export async function executeAction(
   trustProxy: TrustProxy = false,
 ): Promise<Response> {
   const json = wantsJson(request)
+  const flashAndRedirect = (error: string, fieldErrors: Record<string, string> | undefined, rawBody: unknown): Response | undefined => {
+    const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy, ctx.url)
+    if (back === undefined)
+      return undefined
+    ctx.cookies.set(ACTION_ERROR_COOKIE, buildActionErrorFlash(act.url, error, fieldErrors, rawBody, act.flashFields), {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 60,
+    })
+    return new Response(null, { status: 303, headers: { location: back.href } })
+  }
 
+  let rawBody: unknown
   let input: unknown
   if (act.schema !== undefined) {
-    let rawBody: unknown
     try {
       rawBody = await parseActionBody(request)
     }
@@ -355,15 +411,9 @@ export async function executeAction(
       checked = await retryWithFormArrays(act.schema, rawBody as Record<string, unknown>, checked)
     if (!checked.ok) {
       // Zero-JS progressive HTML <form> submit: flash fieldErrors + safe submitted values (<4KB) and redirect 303 back to trusted Referer
-      const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy, ctx.url)
-      if (back !== undefined) {
-        ctx.cookies.set(ACTION_ERROR_COOKIE, buildActionErrorFlash(act.url, checked.fieldErrors, rawBody, act.flashFields), {
-          httpOnly: true,
-          sameSite: 'lax',
-          maxAge: 60,
-        })
-        return new Response(null, { status: 303, headers: { location: back.href } })
-      }
+      const redirected = flashAndRedirect('Validation failed', checked.fieldErrors, rawBody)
+      if (redirected !== undefined)
+        return redirected
       return Response.json(
         { ok: false, status: 400, error: 'Validation failed', fieldErrors: checked.fieldErrors, issues: checked.issues },
         { status: 400 },
@@ -372,9 +422,29 @@ export async function executeAction(
     input = checked.value
   }
 
-  const result = await act.handler(input as never, ctx)
-  if (result instanceof Response)
+  // Track exact Response instances produced by `ctx.deny()` so zero-JS form submits flash & 303-redirect while custom Responses (redirects, downloads, custom JSON) pass through untouched.
+  let deniedResponses: Map<Response, { message: string, fieldErrors?: Record<string, string> | undefined }> | undefined
+  const actionCtx: ActionContext = Object.create(ctx, {
+    deny: {
+      value: (status: number, message: string, fieldErrors?: Record<string, string>) => {
+        const res = ctx.deny(status, message, fieldErrors)
+        ;(deniedResponses ??= new Map()).set(res, { message, fieldErrors })
+        return res
+      },
+      enumerable: true,
+    },
+  })
+
+  const result = await act.handler(input as never, actionCtx)
+  if (result instanceof Response) {
+    const denied = deniedResponses?.get(result)
+    if (denied !== undefined) {
+      const redirected = flashAndRedirect(denied.message, denied.fieldErrors, rawBody)
+      if (redirected !== undefined)
+        return redirected
+    }
     return result
+  }
 
   const back = json ? undefined : trustedReferer(request, trustedOrigins, trustProxy, ctx.url)
   if (back !== undefined)
