@@ -137,6 +137,12 @@ describe('findIcons', () => {
     expect(findIcons(['zoom-out', 'sign', 'logout'], 'sign out')).toEqual(['logout', 'sign', 'zoom-out'])
   })
 
+  it('finds a word in a name holding its two halves, as `logout` in `log-out`', () => {
+    replaceTable({ signout: 'logout 83', sign: 'letter 31', out: 'o 28' })
+
+    expect(findIcons(['letter-o', 'log-out'], 'sign out')).toEqual(['log-out', 'letter-o'])
+  })
+
   it('lets a word strongly related to a joined reading answer both query words', () => {
     replaceTable({ checkmark: 'check 50 checks 28', mark: 'tick 30' })
 

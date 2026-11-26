@@ -18,6 +18,8 @@ export interface IconPage {
 interface Index {
   names: readonly string[]
   byWord: Map<string, string[]>
+  // Each two neighbouring words of a name joined, as `log-out` holds `logout`.
+  byJoined: Map<string, string[]>
   wordCount: Map<string, number>
   order: Map<string, number>
   // Each stem of the names' words to its plain form, made on the first word the names and the table both miss.
@@ -45,24 +47,23 @@ function indexOf(source: readonly string[] | IconifyNames): Index {
 
   const names = isNames(source) ? source : [...Object.keys(source.icons), ...Object.keys(source.aliases ?? {})]
   const byWord = new Map<string, string[]>()
+  const byJoined = new Map<string, string[]>()
   const wordCount = new Map<string, number>()
 
   for (const name of names) {
-    const words = new Set(nameWords(name))
+    const ordered = nameWords(name)
+    const words = new Set(ordered)
 
     wordCount.set(name, nameParts(name))
 
-    for (const word of words) {
-      const list = byWord.get(word)
+    for (const word of words)
+      listUnder(byWord, word, name)
 
-      if (list)
-        list.push(name)
-      else
-        byWord.set(word, [name])
-    }
+    for (let i = 1; i < ordered.length; i++)
+      listUnder(byJoined, ordered[i - 1]! + ordered[i]!, name)
   }
 
-  const index = { names, byWord, wordCount, order: new Map(names.map((name, i) => [name, i])) }
+  const index = { names, byWord, byJoined, wordCount, order: new Map(names.map((name, i) => [name, i])) }
 
   indexes.set(source, index)
 
@@ -71,6 +72,15 @@ function indexOf(source: readonly string[] | IconifyNames): Index {
 
 function isNames(source: readonly string[] | IconifyNames): source is readonly string[] {
   return Array.isArray(source)
+}
+
+function listUnder(lists: Map<string, string[]>, key: string, name: string): void {
+  const list = lists.get(key)
+
+  if (list)
+    list.push(name)
+  else
+    lists.set(key, [name])
 }
 
 // The bit of the query word at `at`, words past the 31st sharing the last bit a number holds.
@@ -191,8 +201,8 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
   const scores = new Map<string, { score: number, answered: number }>()
 
   // Weighting each word by how rare it is among the names was benched and lost the multi-word queries, as `off` is common yet is what `hide` means.
-  const credit = (word: string, weight: number, answering: number) => {
-    for (const name of index.byWord.get(word) ?? []) {
+  const creditNames = (holding: string[] | undefined, weight: number, answering: number) => {
+    for (const name of holding ?? []) {
       const gained = weight / index.wordCount.get(name)!
       const known = scores.get(name)
 
@@ -204,6 +214,10 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
         known.answered |= answering
       }
     }
+  }
+  const credit = (word: string, weight: number, answering: number) => {
+    creditNames(index.byWord.get(word), weight, answering)
+    creditNames(index.byJoined.get(word), weight, answering)
   }
 
   // Two neighbouring query words also stand for the word they make joined when it is known, as `sign out` for `signout`: it answers both through the names holding it and its strong relations, as `checkmark` means `check`, while a weak one, as `adduser` to `user`, only adds to the score.
