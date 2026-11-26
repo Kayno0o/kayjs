@@ -7,6 +7,7 @@
       "devDependencies": {
         "@happy-dom/global-registrator": "^21.0.4",
         "@kayjs/kay": "link:./packages/kay",
+        "@kaynooo/cli-kit": "^0.52.0",
         "@types/bun": "^1.4.4",
         "happy-dom": "^21.0.4",
         "mitata": "1.0.34",

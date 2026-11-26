@@ -1,0 +1,20 @@
+{
+  "bench-app": {
+    "/": 3694,
+    "/table": 6086
+  },
+  "examples/noticeboard": {
+    "/": 14154,
+    "/login": 8541,
+    "/notices/:id": 8541
+  },
+  "examples/showcase": {
+    "/account": 10247,
+    "/": 17344
+  },
+  "docs": {
+    "/docs/*slug": 10348,
+    "/grammars": 13797,
+    "/": 10348
+  }
+}

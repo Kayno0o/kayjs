@@ -4,7 +4,8 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { build } from '../src/build/index'
+import type { BuildManifest } from '../src/build/index'
+import { analyzeBundleWeights, build } from '../src/build/index'
 
 const dir = mkdtempSync(join(tmpdir(), 'kay-3598-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -47,7 +48,7 @@ write('src/routes/notes.tsx', `
   export default function Notes() { return <main><Counter /><NoteForm /></main> }
 `)
 
-async function buildOnce(i: number): Promise<{ report: string, homeJs: string }> {
+async function buildOnce(i: number): Promise<{ report: string, homeJs: string, manifest: BuildManifest }> {
   const outDir = `dist-${i}`
   const log = console.log
   let report = ''
@@ -56,7 +57,7 @@ async function buildOnce(i: number): Promise<{ report: string, homeJs: string }>
     const manifest = await build({ root: dir, outDir, minify: true, prerender: false, copyPublic: false, analyze: true })
     const home = manifest.routes.find(r => r.path === '/')!
     const homeJs = home.islandChunks.map(url => readFileSync(join(dir, outDir, 'client', url.replace(/^\/_kay\//, '')), 'utf8')).join('\n')
-    return { report, homeJs }
+    return { report, homeJs, manifest }
   }
   finally {
     console.log = log
@@ -72,4 +73,16 @@ describe('#3598 reproducible client chunks', () => {
     for (const run of runs)
       expect(run.homeJs).not.toContain('application/json')
   }, 60_000)
+})
+
+describe('#3574 weights without the metafile', () => {
+  test('a report from the built files alone counts the shared chunks a route\'s islands import, as the analyze report does', async () => {
+    const { report, manifest } = await buildOnce(9)
+    const fromFiles = analyzeBundleWeights(manifest, join(dir, 'dist-9', 'client'))
+    for (const route of fromFiles.routes) {
+      const line = report.split('\n').find(l => l.startsWith(`${route.path} `))!
+      expect(line).toContain(`${(route.jsGzip / 1024).toFixed(2)} KB`)
+      expect(line).toContain(` ${route.jsFiles}j/`)
+    }
+  })
 })

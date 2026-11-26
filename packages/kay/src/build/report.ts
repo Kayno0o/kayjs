@@ -1,11 +1,14 @@
-// The `--analyze` report and the `--max-js` budget: eager JS and CSS weight per route, from the manifest and the client metafile, and the islands behind it.
+// The `--analyze` report and the `--max-js` budget: eager JS and CSS weight per route, from the manifest and the client metafile (or the chunks' own imports), and the islands behind it.
 
 import type { ModuleGraph } from './graph'
 import type { IslandPlan } from './islands'
 import type { BuildManifest } from './manifest'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, posix } from 'node:path'
 import { relPosix } from './files'
+
+// A static `import ... from "./x.js"` or `import "./x.js"` of an emitted chunk; `import("./x.js")` stays lazy and is left out.
+const STATIC_CHUNK_IMPORT_RE = /\bimport\s*(?:[^"'();]*?\bfrom\s*)?["'](\.\.?\/[^"']+\.js)["']/g
 
 export interface IslandOrigin {
   /** The component's export name, `default` for a page or a default export. */
@@ -95,6 +98,17 @@ export function analyzeBundleWeights(
     }
   }
 
+  // Without the metafile, a chunk's static imports are read from the emitted file itself.
+  const depsOf = (url: string): readonly string[] => {
+    const known = jsDeps.get(url)
+    if (known !== undefined || metafile !== undefined || !url.startsWith(prefix))
+      return known ?? []
+    const abs = join(clientDir, url.slice(prefix.length))
+    const deps = existsSync(abs) ? [...readFileSync(abs, 'utf8').matchAll(STATIC_CHUNK_IMPORT_RE)].map(m => posix.join(posix.dirname(url), m[1]!)) : []
+    jsDeps.set(url, deps)
+    return deps
+  }
+
   const collectTransitiveJs = (urls: readonly string[]): Set<string> => {
     const seen = new Set<string>()
     const stack = [...urls]
@@ -103,7 +117,7 @@ export function analyzeBundleWeights(
       if (seen.has(cur))
         continue
       seen.add(cur)
-      for (const dep of jsDeps.get(cur) ?? [])
+      for (const dep of depsOf(cur))
         stack.push(dep)
     }
     return seen

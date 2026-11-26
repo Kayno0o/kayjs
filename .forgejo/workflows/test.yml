@@ -47,3 +47,6 @@ jobs:
           cd docs
           bun install --silent --prefer-offline
           bun run build
+
+      - name: Page weight against the baseline
+        run: bun run bench:weight --check
