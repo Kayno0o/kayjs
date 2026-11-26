@@ -15,11 +15,11 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
   return (await startBuiltApp(options)).app
 }
 
-/** The app and the entry it was assembled from, whose bundled modules `testApp().import()` and the prerender step read. */
-export async function startBuiltApp(options: ServerOptions): Promise<{ app: KayApp, entry?: ServerEntry | undefined }> {
+/** The app, the folder it was built into, and the entry it was assembled from, whose bundled modules `testApp().import()` and the prerender step read. */
+export async function startBuiltApp(options: ServerOptions): Promise<{ app: KayApp, outDir: string, entry?: ServerEntry | undefined }> {
   const built = await loadServerEntry(options)
   if (built.entry === undefined)
-    return { app: await serveStaticDir(options, built.root, built.outDir) }
+    return { app: await serveStaticDir(options, built.root, built.outDir), outDir: built.outDir }
   const { root, outDir, manifest, entry } = built
   const clientDir = join(outDir, 'client')
   const assets: Record<string, EmbeddedBody> = {}
@@ -72,7 +72,7 @@ export async function startBuiltApp(options: ServerOptions): Promise<{ app: KayA
     nodeEnv: options.nodeEnv,
     errorSink: options.errorSink,
   })
-  return { app, entry }
+  return { app, outDir, entry }
 }
 
 type BuiltOutput =

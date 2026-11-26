@@ -196,10 +196,9 @@ function startCommand(cwd: string): Commands[string] {
       const config = await failing('start', async () => loadConfig(root))
       const port = parsePort(values.port ?? (process.env.PORT || config.port), 3000)
       const hostname = values.host ?? (process.env.HOST || '127.0.0.1')
-      const { createServer } = await import('../server/index')
+      const { startServer } = await import('../server/start')
       const { handleSignals } = await import('../server/lifecycle')
-      const app = await failing('start', async () => createServer({ root }))
-      const server = app.serve(port, hostname)
+      const { app, server } = await failing('start', async () => startServer({ root, port, hostname }))
       handleSignals(app, server)
       console.log(`kay server listening on http://${hostname}:${server.port}`)
       return 0

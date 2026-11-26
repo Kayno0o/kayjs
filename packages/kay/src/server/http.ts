@@ -124,9 +124,13 @@ export type RouteContext<Path extends string = string> = RequestContext<ExtractR
 
 export type Middleware = (ctx: RequestContext, next: () => Promise<Response>) => Response | Promise<Response>
 
+export type KayServer = ReturnType<typeof Bun.serve>
+
 export interface KayApp {
   handle: (request: Request, remoteIp?: string) => Promise<Response>
-  serve: (port?: number, hostname?: string) => ReturnType<typeof Bun.serve>
+  serve: (port?: number, hostname?: string) => KayServer
+  /** @internal Swaps this app's handlers into a server another app started, with no dropped connection: `kay start` reloads a new build with it. */
+  reloadInto?: (server: KayServer) => void
   /** Closes active long-lived streams (such as SSE) before `server.stop()` drains normal in-flight HTTP requests. */
   closeStreams?: () => Promise<void>
   /** Runs plugin shutdown hooks and releases timers/resources (safe to call multiple times). */

@@ -1,5 +1,6 @@
 // A build writes into a stage folder and swaps it in only once every step passed, so a failure or a running `kay start` keeps the last dist/ (#3658).
 
+import type { Subprocess } from 'bun'
 import type { KayPlugin } from '../src/plugins/types'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -310,3 +311,162 @@ describe('testApp() leaves the app\'s dist/ alone (#3658)', () => {
     expect(existsSync(join(dir, 'dist'))).toBe(false)
   })
 })
+
+const kayCli = join(repoRoot, 'packages/kay/src/cli/index.ts')
+
+/** A `kay start` process on a free port, and its URL once it listens. */
+async function kayStart(dir: string): Promise<{ url: string, proc: Subprocess<'ignore', 'pipe', 'pipe'> }> {
+  const proc = Bun.spawn(['bun', kayCli, 'start', dir, '--port', '0'], { stdout: 'pipe', stderr: 'pipe' })
+  const reader = proc.stdout.getReader()
+  let out = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done)
+      throw new Error(`kay start exited before listening: ${out}${await new Response(proc.stderr).text()}`)
+    out += new TextDecoder().decode(value)
+    const match = /http:\/\/\S+:\d+/.exec(out)
+    if (match !== null) {
+      reader.releaseLock()
+      return { url: match[0], proc }
+    }
+  }
+}
+
+async function get(url: string): Promise<{ status: number, cache: string | null, body: string }> {
+  const res = await fetch(url, { headers: { 'accept-encoding': 'br, gzip' } })
+  return { status: res.status, cache: res.headers.get('cache-control'), body: await res.text() }
+}
+
+const PAGES = (version: string): Record<string, string> => ({
+  'src/routes/index.tsx': `import { Counter } from '../components/Counter'\nexport default function Home() { return <main><h1>${version}</h1><Counter /></main> }`,
+  'src/routes/about.tsx': `export const prerender = true\nexport default function About() { return <p>about ${version}</p> }`,
+  'public/robots.txt': `robots ${version}`,
+})
+
+describe('a running kay start serves the build kay build swaps in (#3660)', () => {
+  it('reloads the new build in-process: its pages, island chunks and public files, and none of the old chunks', async () => {
+    const dir = appWith(PAGES('v1'))
+    const first = await build({ root: dir })
+    const { url, proc } = await kayStart(dir)
+    try {
+      for (const [file, text] of Object.entries(PAGES('v2')))
+        write(dir, file, text)
+      write(dir, 'src/components/Counter.tsx', COUNTER.replace('signal(0)', 'signal(1)'))
+      const second = await build({ root: dir })
+
+      await untilServes(url, '<h1>v2</h1>')
+      const gone = first.assets.filter(rel => !second.assets.includes(rel))
+      const answers: Record<string, string> = {}
+      for (const path of ['/', '/about', '/robots.txt', ...second.assets.map(rel => `/_kay/${rel}`), ...gone.map(rel => `/_kay/${rel}`)]) {
+        const res = await get(`${url}${path}`)
+        answers[path] = `${res.status} ${res.body.includes('v2') ? 'v2' : res.body.includes('v1') ? 'v1' : ''}`.trim()
+      }
+
+      expect(gone.length).toBeGreaterThan(0)
+      expect(answers['/']).toBe('200 v2')
+      expect(answers['/about']).toBe('200 v2')
+      expect(answers['/robots.txt']).toBe('200 v2')
+      for (const rel of second.assets)
+        expect(answers[`/_kay/${rel}`]).toStartWith('200')
+      for (const rel of gone)
+        expect(answers[`/_kay/${rel}`]).toBe('404')
+    }
+    finally {
+      proc.kill('SIGTERM')
+      await proc.exited
+    }
+  })
+
+  it('holds a request sent once the swap landed until the new build answers it', async () => {
+    const dir = appWith(PAGES('v1'))
+    await build({ root: dir })
+    const { url, proc } = await kayStart(dir)
+    try {
+      for (const [file, text] of Object.entries(PAGES('v2')))
+        write(dir, file, text)
+      await build({ root: dir })
+      const sent = performance.now()
+
+      const html = await (await fetch(`${url}/`)).text()
+
+      expect(html).toContain('<h1>v2</h1>')
+      expect(performance.now() - sent).toBeLessThan(1500)
+    }
+    finally {
+      proc.kill('SIGTERM')
+      await proc.exited
+    }
+  })
+
+  it('answers 404 with no-store, never 200, for an asset whose file is gone, before and after a reload', async () => {
+    const dir = appWith({})
+    const first = await build({ root: dir })
+    const { url, proc } = await kayStart(dir)
+    const removeAsset = (rel: string): void => {
+      for (const ext of ['', '.br', '.gz'])
+        rmSync(join(dir, 'dist/client', `${rel}${ext}`), { force: true })
+    }
+    try {
+      const before = first.assets.find(rel => rel.endsWith('.js'))!
+      removeAsset(before)
+      const startup = await get(`${url}/_kay/${before}`)
+      write(dir, 'src/routes/index.tsx', PAGES('v2')['src/routes/index.tsx']!)
+      write(dir, 'src/components/Counter.tsx', COUNTER.replace('signal(0)', 'signal(1)'))
+      const second = await build({ root: dir })
+      await untilServes(url, '<h1>v2</h1>')
+      const after = second.assets.find(rel => rel.endsWith('.js') && !first.assets.includes(rel))!
+      removeAsset(after)
+      const reloaded = await get(`${url}/_kay/${after}`)
+
+      expect([startup.status, startup.cache]).toEqual([404, 'no-store'])
+      expect([reloaded.status, reloaded.cache]).toEqual([404, 'no-store'])
+    }
+    finally {
+      proc.kill('SIGTERM')
+      await proc.exited
+    }
+  })
+
+  it('reloads for a swap of dist/ only, not for another file beside it', async () => {
+    const dir = appWith({})
+    const ran = join(dir, 'server-hook-ran')
+    write(dir, 'kay.config.ts', `import { appendFileSync } from 'node:fs'\nexport default { plugins: [{ name: 'probe', server() { appendFileSync(${JSON.stringify(ran)}, 'x') } }] }`)
+    await build({ root: dir })
+    const { url, proc } = await kayStart(dir)
+    try {
+      write(dir, 'notes.txt', 'beside dist/')
+      write(dir, 'src/routes/index.tsx', PAGES('v2')['src/routes/index.tsx']!)
+      await build({ root: dir })
+      await untilServes(url, '<h1>v2</h1>')
+
+      expect(readFileSync(ran, 'utf8')).toBe('xx')
+    }
+    finally {
+      proc.kill('SIGTERM')
+      await proc.exited
+    }
+  })
+
+  it('keeps answering from the build it had when dist/ is deleted, and says so', async () => {
+    const dir = appWith({})
+    await build({ root: dir })
+    const { url, proc } = await kayStart(dir)
+    rmSync(join(dir, 'dist'), { recursive: true })
+
+    const page = await get(`${url}/`)
+    proc.kill('SIGTERM')
+    await proc.exited
+
+    expect([page.status, page.body.includes('<h1>v1</h1>')]).toEqual([200, true])
+    expect(await new Response(proc.stderr).text()).toContain('kay start: the build in dist/ failed to load, so the previous one keeps answering: dist/manifest.json is missing')
+  })
+})
+
+async function untilServes(url: string, text: string): Promise<void> {
+  const deadline = Date.now() + 5000
+  while (!(await get(`${url}/`)).body.includes(text)) {
+    if (Date.now() > deadline)
+      throw new Error(`${url}/ never served ${text}`)
+    await Bun.sleep(20)
+  }
+}

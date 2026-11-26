@@ -12,7 +12,7 @@ import type { ActionRegistry, RegisteredAction } from './action-registry'
 import type { NormalizedConsentConfig } from './consent'
 import type { CookieStore } from './cookies'
 import type { NotifyError } from './errors'
-import type { EmbeddedServerConfig, KayApp, Middleware, RequestContext } from './http'
+import type { EmbeddedServerConfig, KayApp, KayServer, Middleware, RequestContext } from './http'
 import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } from './page'
 import type { FastHandler } from './routing'
 import type { TrustProxy } from './security'
@@ -33,7 +33,8 @@ import { allowedMethodsHeader, mergedHeadTags, pickPageIslandProps, stripHeadBod
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
 import { hasRegionHeader, invalidRegionResponse, markPrerenderedRegionVary, requestedRegion, respondRegion, withRegionVary } from './region'
 import { Router } from './router'
-import { actionRoutePrefix, createAncestorMiddlewareLookup, createFastStaticPageHandler, decodeRequestPathname, inferRoutesServerPrefix, methodNotAllowed, toBunRouteKey } from './routing'
+import { actionRoutePrefix, createAncestorMiddlewareLookup, createFastStaticPageHandler, decodeRequestPathname, inferRoutesServerPrefix, methodNotAllowed } from './routing'
+import { hasActionErrorCookie, isPlainRead, isRead, serveHandlers } from './serve-handlers'
 import { buildSecurityHeaderEntries, resolveHstsValue, styleHashesOf, verifyOrigin } from './security'
 import { createStreamTracker, STREAM_TAIL_MARK, streamDocument } from './stream'
 
@@ -77,12 +78,10 @@ interface CompiledRoute {
   headStyleHashes: string[]
 }
 
-const isRead = (request: Request): boolean => request.method === 'GET' || request.method === 'HEAD'
 const isEventStream = (res: Response): boolean => (res.headers.get('content-type') ?? '').toLowerCase().includes('text/event-stream')
-const hasActionErrorCookie = (request: Request): boolean => (request.headers.get('cookie') ?? '').includes(`${ACTION_ERROR_COOKIE}=`)
-// A read the pre-rendered and fast static paths may answer: nothing to flash back to the page, and not a partial <Region> request.
-const isPlainRead = (request: Request): boolean => isRead(request) && !hasActionErrorCookie(request) && !hasRegionHeader(request)
 const makeServerError = (securityRecord: Record<string, string>) => (): Response => new Response('Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8', ...securityRecord } })
+// A file body Bun could not open: a build swapped in since this app loaded, or a file deleted by hand. Never cached.
+const makeFileGone = (securityRecord: Record<string, string>) => (): Response => new Response('Not Found', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', ...securityRecord } })
 
 function lookupPrerendered<T>(map: ReadonlyMap<string, T>, staticPath: string | undefined): T | undefined {
   if (staticPath === undefined)
@@ -234,6 +233,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   // The one way out of every response not built with the security headers already in place.
   const finish = (res: Response, request: Request, cookieStore?: CookieStore): Response => withHsts(finalizeResponse(res, cookieStore, securityEntries), request)
   const serverError = makeServerError(securityRecord)
+  const fileGone = makeFileGone(securityRecord)
   const navigation = createNavigation(config.navigation)
   const htmlHeaders = createHtmlHeaders(security, securityRecord, navigation)
   const streams = createStreamTracker()
@@ -634,52 +634,17 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     return runWithAppContext(serverAppCtx, () => handleInternal(request, remoteIp))
   }
 
+  const runRequest = (req: Request, remoteIp: string | undefined, disableTimeout: () => void): Promise<Response> => runWithAppContext(serverAppCtx, () => handleInternal(req, remoteIp, disableTimeout, true))
+  const runFast = (handler: FastHandler, req: Request, remoteIp: string | undefined): Response | Promise<Response> => runWithAppContext(serverAppCtx, () => handler(req, remoteIp))
+  const handlers = (server: () => KayServer | undefined) => serveHandlers(server, { files, fastPrerenderedMap, fastStaticPages, pluginRouter, runRequest, runFast, notifyError, serverError, fileGone })
+
   function serve(port = 3000, hostname = '127.0.0.1') {
-    let srvRef: ReturnType<typeof Bun.serve> | undefined
-    const ipOf = (req: Request) => srvRef?.requestIP(req)?.address
-    const fetchReq = (req: Request) => runWithAppContext(serverAppCtx, () => handleInternal(
-      req,
-      ipOf(req),
-      srvRef ? () => srvRef!.timeout(req, 0) : undefined,
-      true,
-    ))
-
-    const routes: Record<string, (req: Request) => Response | Promise<Response>> = {}
-    const registerServeRoute = (path: string, handler: (req: Request) => Response | Promise<Response>): void => {
-      const key = toBunRouteKey(path)
-      if (key !== undefined && !(key in routes))
-        routes[key] = handler
-    }
-
-    for (const [path, asset] of assetMap)
-      registerServeRoute(path, req => isRead(req) ? serveAsset(req, asset) : fetchReq(req))
-
-    for (const [path, pub] of publicMap) {
-      if (pluginRouter.match(path) === undefined)
-        registerServeRoute(path, req => isRead(req) ? servePublic(req, pub) : fetchReq(req))
-    }
-
-    for (const [path, pre] of fastPrerenderedMap)
-      registerServeRoute(path, req => isPlainRead(req) ? serveFile(req, pre) : fetchReq(req))
-
-    for (const [path, handler] of fastStaticPages)
-      registerServeRoute(path, req => isPlainRead(req) ? runWithAppContext(serverAppCtx, () => handler(req, ipOf(req))) : fetchReq(req))
-
-    srvRef = Bun.serve({
-      port,
-      hostname,
-      idleTimeout: 30,
-      maxRequestBodySize,
-      development: false,
-      routes,
-      fetch: fetchReq,
-      error(err) {
-        notifyError(err, new Request('http://localhost/'), 'route')
-        return serverError()
-      },
-    })
-    return srvRef
+    const server: KayServer = Bun.serve({ port, hostname, idleTimeout: 30, maxRequestBodySize, development: false, ...handlers(() => server) })
+    return server
   }
 
-  return { handle, serve, closeStreams: streams.closeAll, dispose: async () => { await streams.closeAll(); await pluginHost.dispose() } }
+  const reloadInto = (server: KayServer): void => {
+    server.reload(handlers(() => server))
+  }
+  return { handle, serve, reloadInto, closeStreams: streams.closeAll, dispose: async () => { await streams.closeAll(); await pluginHost.dispose() } }
 }

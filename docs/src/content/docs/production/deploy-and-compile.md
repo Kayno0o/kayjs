@@ -35,7 +35,9 @@ kay build --compile ./server
 
 ## How a build replaces `dist/`
 
-`kay build` writes into a folder beside `dist/` and renames it to `dist/` only once every step has passed: bundling, plugin hooks, prerendering and `--compile`. A build that fails leaves the previous `dist/` byte for byte, and a running `kay start` keeps serving it until the new one lands. Restart `kay start` after the build so it serves the new pages and assets.
+`kay build` writes into a folder beside `dist/` and renames it to `dist/` only once every step has passed: bundling, plugin hooks, prerendering and `--compile`. A build that fails leaves the previous `dist/` byte for byte, and a running `kay start` keeps serving it.
+
+When a build lands, a running `kay start` loads it in the same process, with no restart and no dropped connection. Requests that arrive while it loads wait for the new build, so no page links a script the new build removed. Each plugin's `server()` runs again for the new build, and the old build's `api.onShutdown()` hooks run once it stops answering. If the new build fails to load, the server logs why and keeps answering from the one it had. A new port, host or `maxRequestBodySize` still needs a restart. A file the server can no longer read answers `404` with `cache-control: no-store`, so no CDN keeps the failure.
 
 kay marks each folder it builds with a `.kay-output` file. It refuses to replace an `outDir` holding files it did not build, and names the folder, so a mistyped `outDir` never deletes your files. An empty folder, or a build from an older kay, is replaced as usual.
 
