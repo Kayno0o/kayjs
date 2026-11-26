@@ -491,4 +491,95 @@ export function isNodeCapableExpr(expr: Expression, jsxNodes?: WeakSet<Node>): b
   return isChildrenExpr || containsJsx(expr, jsxNodes) || mayReturnNode(expr)
 }
 
+export type HydrationMarker = 'none' | 'text-open' | 'text' | 'range-open' | 'range'
+
+export interface PlannedChildSlot {
+  child: JSXChild
+  slot: ChildSlotKind
+  marker: HydrationMarker
+  open: string
+  close: string
+  nodeCapable: boolean
+}
+
+export interface PlanChildSlotsOptions {
+  jsxNodes?: WeakSet<Node> | undefined
+  emitMarkers?: boolean | undefined
+  inFragment?: boolean | undefined
+}
+
+const MARKER_DELIMITERS: Record<HydrationMarker, readonly [open: string, close: string]> = {
+  'none': ['', ''],
+  'text-open': ['<!---->', ''],
+  'text': ['<!---->', '<!---->'],
+  'range-open': ['<!--k[-->', ''],
+  'range': ['<!--k[-->', '<!--k]-->'],
+}
+
+/**
+ * Single hydration-marker planner shared by SSR and DOM compilers.
+ * Computes each child slot's marker shape once so SSR markup and DOM hydration walks stay in lockstep.
+ */
+export function planChildSlots(children: readonly JSXChild[], options: PlanChildSlotsOptions = {}): PlannedChildSlot[] {
+  const { jsxNodes, emitMarkers = true, inFragment = false } = options
+  const rawSlots: { child: JSXChild, slot: ChildSlotKind }[] = []
+  for (const child of filterMeaningfulChildren(children)) {
+    const slot = classifyJsxChild(child, jsxNodes)
+    if (slot !== undefined)
+      rawSlots.push({ child, slot })
+  }
+
+  const hasSiblings = rawSlots.length > 1
+  // A fragment may sit inside another range, so its dynamic slots are bracketed even alone and always closed, for the markers to balance (#3596).
+  const bracketed = emitMarkers && (hasSiblings || inFragment)
+  const planned: PlannedChildSlot[] = []
+  let hadVariableRange = false
+
+  for (let i = 0; i < rawSlots.length; i++) {
+    const { child, slot } = rawSlots[i]!
+    const isLast = i === rawSlots.length - 1
+    let marker: HydrationMarker = 'none'
+    let nodeCapable = false
+
+    switch (slot.kind) {
+      case 'static-text':
+      case 'element':
+        break
+      case 'component':
+      case 'fragment':
+        if (emitMarkers && hasSiblings)
+          marker = !isLast || inFragment ? 'range' : 'range-open'
+        hadVariableRange = true
+        break
+      case 'loop':
+        if (emitMarkers && (inFragment || !isLast || hadVariableRange))
+          marker = 'range'
+        hadVariableRange = true
+        break
+      case 'and-show':
+      case 'ternary-show':
+        if (bracketed)
+          marker = 'range'
+        hadVariableRange = true
+        break
+      case 'expr':
+        nodeCapable = isNodeCapableExpr(slot.expr, jsxNodes)
+        if (nodeCapable) {
+          if (bracketed)
+            marker = !isLast || inFragment ? 'range' : 'range-open'
+          hadVariableRange = true
+        }
+        else if (bracketed) {
+          marker = !isLast || inFragment ? 'text' : 'text-open'
+        }
+        break
+    }
+
+    const [open, close] = MARKER_DELIMITERS[marker]
+    planned.push({ child, slot, marker, open, close, nodeCapable })
+  }
+
+  return planned
+}
+
 export type { Program }

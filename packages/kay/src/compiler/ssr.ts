@@ -14,7 +14,6 @@ import { walk } from './ast'
 import { mistake } from './mistakes'
 import { SourceEditor } from './patch'
 import {
-  classifyJsxChild,
   containsJsx,
   decodeHtmlEntities,
   escapeRawText,
@@ -25,10 +24,10 @@ import {
   isBlockedAttr,
   isComponentTag,
   isJsxNode,
-  isNodeCapableExpr,
   isStringBoolAttr,
   isUnsafeUrlAttr,
   jsxTagName,
+  planChildSlots,
   RAW_TEXT_ELEMENTS,
   staticLiteral,
   unwrapParens,
@@ -330,17 +329,9 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     slotMarkers = emitMarkers,
     inFragment = false,
   ): void {
-    const meaningful = filterMeaningfulChildren(children)
-    const slots = meaningful.map(c => ({ child: c, slot: classifyJsxChild(c, jsxNodes) })).filter(s => s.slot !== undefined)
-    const hasSiblings = slots.length > 1
-    // A fragment may sit inside another range, so its dynamic slots are bracketed even alone and always closed, for the markers to balance (#3596).
-    const bracketed = slotMarkers && (hasSiblings || inFragment)
-    let hadVariableRange = false
+    const planned = planChildSlots(children, { jsxNodes, emitMarkers: slotMarkers, inFragment })
 
-    for (let i = 0; i < slots.length; i++) {
-      const slot = slots[i]!.slot!
-      const isLast = i === slots.length - 1
-
+    for (const { child, slot, open, close } of planned) {
       if (slot.kind === 'static-text') {
         if (rawTextTag !== undefined)
           parts.pushStatic(escapeRawText(slot.text, rawTextTag))
@@ -350,9 +341,8 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       }
 
       if (rawTextTag !== undefined) {
-        const rawChild = slots[i]!.child
-        if (rawChild.type === 'JSXExpressionContainer' && rawChild.expression.type !== 'JSXEmptyExpression') {
-          const expr = rawChild.expression
+        if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression') {
+          const expr = child.expression
           if (expr.type === 'TemplateLiteral' && expr.expressions.length === 0 && expr.quasis.length === 1) {
             const cooked = expr.quasis[0]?.value.cooked
             if (typeof cooked === 'string') {
@@ -370,26 +360,14 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         continue
       }
 
+      if (open !== '')
+        parts.pushStatic(open)
+
       if (slot.kind === 'component' || slot.kind === 'fragment') {
-        if (slotMarkers && hasSiblings) {
-          parts.pushStatic('<!--k[-->')
-          emitIntoBuffer(slot.node, bufVar, parts, flushParts, pushStmt)
-          if (!isLast || inFragment)
-            parts.pushStatic('<!--k]-->')
-        }
-        else {
-          emitIntoBuffer(slot.node, bufVar, parts, flushParts, pushStmt)
-        }
-        hadVariableRange = true
-        continue
+        emitIntoBuffer(slot.node, bufVar, parts, flushParts, pushStmt)
       }
-
-      if (slot.kind === 'loop') {
+      else if (slot.kind === 'loop') {
         const { match } = slot
-        const needsBracket = slotMarkers && (inFragment || !isLast || hadVariableRange)
-        if (needsBracket)
-          parts.pushStatic('<!--k[-->')
-
         const itemParam = match.params[0]?.type === 'Identifier' ? match.params[0].name : undefined
         const idxParam = match.params[1]?.type === 'Identifier' ? match.params[1].name : undefined
 
@@ -422,68 +400,24 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         else {
           parts.pushExpr(`${use('esc')}(${compileSubExpression(match.call)})`)
         }
-
-        if (needsBracket)
-          parts.pushStatic('<!--k]-->')
-        hadVariableRange = true
-        continue
       }
-
-      if (slot.kind === 'and-show') {
+      else if (slot.kind === 'and-show') {
         const left = compileSubExpression(slot.expr.left)
         const right = compileJsxToStringExpr(slot.right)
-        if (bracketed) {
-          parts.pushStatic('<!--k[-->')
-          parts.pushExpr(`((${left}) ? (${right}) : "")`)
-          parts.pushStatic('<!--k]-->')
-        }
-        else {
-          parts.pushExpr(`((${left}) ? (${right}) : "")`)
-        }
-        hadVariableRange = true
-        continue
+        parts.pushExpr(`((${left}) ? (${right}) : "")`)
       }
-
-      if (slot.kind === 'ternary-show') {
+      else if (slot.kind === 'ternary-show') {
         const test = compileSubExpression(slot.expr.test)
         const cons = compileExpressionAsString(slot.cons)
         const alt = compileExpressionAsString(slot.alt)
-        if (bracketed) {
-          parts.pushStatic('<!--k[-->')
-          parts.pushExpr(`((${test}) ? (${cons}) : (${alt}))`)
-          parts.pushStatic('<!--k]-->')
-        }
-        else {
-          parts.pushExpr(`((${test}) ? (${cons}) : (${alt}))`)
-        }
-        hadVariableRange = true
-        continue
-      }
-
-      // Generic expression slot
-      const exprCode = compileSubExpression(slot.expr)
-      const rendered = `${use('esc')}(${exprCode})`
-      if (isNodeCapableExpr(slot.expr, jsxNodes)) {
-        if (bracketed) {
-          parts.pushStatic('<!--k[-->')
-          parts.pushExpr(rendered)
-          if (!isLast || inFragment)
-            parts.pushStatic('<!--k]-->')
-        }
-        else {
-          parts.pushExpr(rendered)
-        }
-        hadVariableRange = true
-      }
-      else if (bracketed) {
-        parts.pushStatic('<!---->')
-        parts.pushExpr(rendered)
-        if (!isLast || inFragment)
-          parts.pushStatic('<!---->')
+        parts.pushExpr(`((${test}) ? (${cons}) : (${alt}))`)
       }
       else {
-        parts.pushExpr(rendered)
+        parts.pushExpr(`${use('esc')}(${compileSubExpression(slot.expr)})`)
       }
+
+      if (close !== '')
+        parts.pushStatic(close)
     }
   }
 

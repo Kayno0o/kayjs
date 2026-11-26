@@ -18,8 +18,8 @@ import type { WalkItem } from './emit'
 import { DELEGATED_EVENTS, emitWalkStatements, moduleHeader, SVG_CHILD_TAGS } from './emit'
 import { createPropCompiler, isStaticPropExpr, withoutBindings } from './props'
 import { extractBlockKeyExpr, extractKeyExpr, literalArrayConsts, rewriteFreeIdentifiers } from './scope'
+import type { HydrationMarker } from './shared'
 import {
-  classifyJsxChild,
   cleanJsxText,
   containsJsx,
   decodeHtmlEntities,
@@ -32,10 +32,10 @@ import {
   isBlockedAttr,
   isComponentTag,
   isJsxNode,
-  isNodeCapableExpr,
   isStringBoolAttr,
   isUnsafeUrlAttr,
   jsxTagName,
+  planChildSlots,
   RAW_TEXT_ELEMENTS,
   staticLiteral,
   VOID_ELEMENTS,
@@ -309,12 +309,39 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       if (VOID_ELEMENTS.has(tag))
         return html
 
-      const meaningful = filterMeaningfulChildren(el.children)
-      const slots = meaningful.map(c => classifyJsxChild(c, jsxNodes)).filter(s => s !== undefined)
-      const hasSiblings = slots.length > 1
+      const planned = planChildSlots(el.children, { jsxNodes })
       let domIndex = 0
       let prevWasStaticText = false
-      let hadVariableRange = false
+
+      const claimRangeAnchor = (marker: HydrationMarker, open: string, close: string): string => {
+        if (marker !== 'range')
+          return 'null'
+        const v = requestChild(elVar, domIndex)
+        html += open + close
+        addRangeSlot(elVar, domIndex + 1)
+        domIndex += 2
+        return v
+      }
+
+      const emitInsert = (valueCode: string, marker: HydrationMarker, open: string, close: string): void => {
+        if (marker === 'none') {
+          ops.push(`${use('insert')}(${elVar}, () => ${valueCode}, null, null);`)
+        }
+        else if (marker === 'range-open') {
+          const startVar = requestChild(elVar, domIndex)
+          html += open
+          domIndex++
+          ops.push(`${use('insert')}(${elVar}, () => ${valueCode}, null, ${startVar});`)
+        }
+        else {
+          const startVar = requestChild(elVar, domIndex)
+          const endVar = requestChild(elVar, domIndex + 1)
+          html += open + close
+          addRangeSlot(elVar, domIndex + 1)
+          domIndex += 2
+          ops.push(`${use('insert')}(${elVar}, () => ${valueCode}, ${endVar}, ${startVar});`)
+        }
+      }
 
       const prevSvgDepth = svgDepth
       if (tag === 'svg')
@@ -323,10 +350,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         svgDepth = 0
 
       try {
-        for (let i = 0; i < slots.length; i++) {
-          const slot = slots[i]!
-          const isLast = i === slots.length - 1
-
+        for (const { slot, marker, open, close, nodeCapable } of planned) {
           if (slot.kind === 'static-text') {
             if (rawTextTag !== undefined)
               html += escapeRawText(slot.text, rawTextTag)
@@ -339,198 +363,134 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
             continue
           }
 
-        prevWasStaticText = false
+          prevWasStaticText = false
 
-        if (slot.kind === 'element') {
-          const subOpsBefore = ops.length
-          const subWalkBefore = walkPlan.length
-          const placeholderVar = `__SUB_${varCounter++}`
-          const subHtml = buildHtml(slot.node, placeholderVar)
-          const needed = ops.length > subOpsBefore || walkPlan.length > subWalkBefore
-          if (needed) {
-            const realVar = requestChild(elVar, domIndex)
-            for (let k = subOpsBefore; k < ops.length; k++)
-              ops[k] = ops[k]!.replaceAll(placeholderVar, realVar)
-            for (let k = subWalkBefore; k < walkPlan.length; k++) {
-              if (walkPlan[k]!.parentVar === placeholderVar)
-                walkPlan[k]!.parentVar = realVar
+          if (slot.kind === 'element') {
+            const subOpsBefore = ops.length
+            const subWalkBefore = walkPlan.length
+            const placeholderVar = `__SUB_${varCounter++}`
+            const subHtml = buildHtml(slot.node, placeholderVar)
+            const needed = ops.length > subOpsBefore || walkPlan.length > subWalkBefore
+            if (needed) {
+              const realVar = requestChild(elVar, domIndex)
+              for (let k = subOpsBefore; k < ops.length; k++)
+                ops[k] = ops[k]!.replaceAll(placeholderVar, realVar)
+              for (let k = subWalkBefore; k < walkPlan.length; k++) {
+                if (walkPlan[k]!.parentVar === placeholderVar)
+                  walkPlan[k]!.parentVar = realVar
+              }
+              const tSlots = textSlotsByParent.get(placeholderVar)
+              if (tSlots !== undefined) {
+                textSlotsByParent.delete(placeholderVar)
+                textSlotsByParent.set(realVar, tSlots)
+              }
+              const rSlots = rangeSlotsByParent.get(placeholderVar)
+              if (rSlots !== undefined) {
+                rangeSlotsByParent.delete(placeholderVar)
+                rangeSlotsByParent.set(realVar, rSlots)
+              }
             }
-            const tSlots = textSlotsByParent.get(placeholderVar)
-            if (tSlots !== undefined) {
-              textSlotsByParent.delete(placeholderVar)
-              textSlotsByParent.set(realVar, tSlots)
-            }
-            const rSlots = rangeSlotsByParent.get(placeholderVar)
-            if (rSlots !== undefined) {
-              rangeSlotsByParent.delete(placeholderVar)
-              rangeSlotsByParent.set(realVar, rSlots)
-            }
-          }
-          html += subHtml
-          domIndex++
-          continue
-        }
-
-        if (slot.kind === 'component' || slot.kind === 'fragment') {
-          const renderedCode = slot.kind === 'component'
-            ? compileComponentCall(slot.node, scopeRewrites)
-            : compileRootJsx(slot.node, scopeRewrites)
-          if (!hasSiblings) {
-            ops.push(`${use('insert')}(${elVar}, () => ${renderedCode}, null, null);`)
-          }
-          else if (isLast) {
-            const startVar = requestChild(elVar, domIndex)
-            html += '<!--k[-->'
+            html += subHtml
             domIndex++
-            ops.push(`${use('insert')}(${elVar}, () => ${renderedCode}, null, ${startVar});`)
-          }
-          else {
-            const startVar = requestChild(elVar, domIndex)
-            const endVar = requestChild(elVar, domIndex + 1)
-            html += '<!--k[--><!--k]-->'
-            addRangeSlot(elVar, domIndex + 1)
-            domIndex += 2
-            ops.push(`${use('insert')}(${elVar}, () => ${renderedCode}, ${endVar}, ${startVar});`)
-          }
-          hadVariableRange = true
-          continue
-        }
-
-        if (slot.kind === 'loop') {
-          const { match } = slot
-          const needsBracket = !isLast || hadVariableRange
-          let anchorVar: string
-          let skipArg = ''
-          if (needsBracket) {
-            anchorVar = requestChild(elVar, domIndex)
-            html += '<!--k[--><!--k]-->'
-            addRangeSlot(elVar, domIndex + 1)
-            domIndex += 2
-          }
-          else {
-            anchorVar = 'null'
-            if (domIndex > 0)
-              skipArg = `, ${domIndex}`
-          }
-
-          const eachCode = compileExpression(match.target, scopeRewrites)
-          const params = match.params
-          const firstParam = params[0]
-          const secondParam = params[1]
-          const idxParam = secondParam?.type === 'Identifier'
-            ? secondParam.name
-            : secondParam?.type === 'AssignmentPattern' && secondParam.left.type === 'Identifier'
-              ? secondParam.left.name
-              : undefined
-
-          // Fast path: a const array literal (e.g. `NAV.map(...)`) renders once through `eachStatic`.
-          const isStaticArr = match.target.type === 'Identifier' && staticArrays.has(match.target.name) && !scopeRewrites.has(match.target.name)
-          if (isStaticArr) {
-            const rawParams = params.map(p => code.slice(p.start, p.end)).join(', ')
-            const shadowed = withoutBindings(scopeRewrites, params)
-            const rowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, shadowed) : compileExpression(match.body, shadowed)
-            ops.push(`${use('eachStatic')}(${elVar}, ${anchorVar}, ${eachCode}, (${rawParams}) => ${rowBody}${skipArg});`)
-            hadVariableRange = true
             continue
           }
 
-          const keyAst = match.isJsxBody ? extractKeyExpr(match.body) : extractBlockKeyExpr(match.body as BlockStatement)
-          const rowSig = freshVar('_r')
-          const idxSig = idxParam !== undefined ? freshVar('_i') : undefined
-          const keyRewrites = withoutBindings(scopeRewrites, params)
-          const { keyFn, rowRewrites, prelude } = compileLoopRow({ firstParam, idxParam, keyAst, rowSig, scopeRewrites, keyRewrites })
-          if (idxParam !== undefined && idxSig !== undefined)
-            rowRewrites.set(idxParam, `${idxSig}.value`)
-
-          const rawRowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, rowRewrites) : compileExpression(match.body, rowRewrites)
-          const rowBody = withPrelude(rawRowBody, match.body, prelude)
-          const rowParams = idxSig !== undefined ? `${rowSig}, ${idxSig}` : rowSig
-          ops.push(`${use('loop')}(${elVar}, ${anchorVar}, () => ${eachCode}, ${keyFn}, (${rowParams}) => ${rowBody}${skipArg});`)
-          hadVariableRange = true
-          continue
-        }
-
-        if (slot.kind === 'and-show') {
-          let anchorVar = 'null'
-          if (hasSiblings) {
-            anchorVar = requestChild(elVar, domIndex)
-            html += '<!--k[--><!--k]-->'
-            addRangeSlot(elVar, domIndex + 1)
-            domIndex += 2
+          if (slot.kind === 'component' || slot.kind === 'fragment') {
+            const renderedCode = slot.kind === 'component'
+              ? compileComponentCall(slot.node, scopeRewrites)
+              : compileRootJsx(slot.node, scopeRewrites)
+            emitInsert(renderedCode, marker, open, close)
+            continue
           }
-          const whenCode = compileExpression(slot.expr.left, scopeRewrites)
-          const trueCode = compileRootJsx(slot.right, scopeRewrites)
-          ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode});`)
-          hadVariableRange = true
-          continue
-        }
 
-        if (slot.kind === 'ternary-show') {
-          let anchorVar = 'null'
-          if (hasSiblings) {
-            anchorVar = requestChild(elVar, domIndex)
-            html += '<!--k[--><!--k]-->'
-            addRangeSlot(elVar, domIndex + 1)
-            domIndex += 2
-          }
-          const whenCode = compileExpression(slot.expr.test, scopeRewrites)
-          const trueCode = isJsxNode(slot.cons)
-            ? compileRootJsx(slot.cons, scopeRewrites)
-            : compileExpression(slot.cons, scopeRewrites)
-          const falseCode = isJsxNode(slot.alt)
-            ? compileRootJsx(slot.alt, scopeRewrites)
-            : compileExpression(slot.alt, scopeRewrites)
-          ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode}, () => ${falseCode});`)
-          hadVariableRange = true
-          continue
-        }
+          if (slot.kind === 'loop') {
+            const { match } = slot
+            const anchorVar = claimRangeAnchor(marker, open, close)
+            const skipArg = marker === 'none' && domIndex > 0 ? `, ${domIndex}` : ''
 
-        // Generic expression slot
-        const exprCode = compileExpression(slot.expr, scopeRewrites)
-        if (isNodeCapableExpr(slot.expr, jsxNodes)) {
-          if (!hasSiblings) {
-            ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, null);`)
+            const eachCode = compileExpression(match.target, scopeRewrites)
+            const params = match.params
+            const firstParam = params[0]
+            const secondParam = params[1]
+            const idxParam = secondParam?.type === 'Identifier'
+              ? secondParam.name
+              : secondParam?.type === 'AssignmentPattern' && secondParam.left.type === 'Identifier'
+                ? secondParam.left.name
+                : undefined
+
+            // Fast path: a const array literal (e.g. `NAV.map(...)`) renders once through `eachStatic`.
+            const isStaticArr = match.target.type === 'Identifier' && staticArrays.has(match.target.name) && !scopeRewrites.has(match.target.name)
+            if (isStaticArr) {
+              const rawParams = params.map(p => code.slice(p.start, p.end)).join(', ')
+              const shadowed = withoutBindings(scopeRewrites, params)
+              const rowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, shadowed) : compileExpression(match.body, shadowed)
+              ops.push(`${use('eachStatic')}(${elVar}, ${anchorVar}, ${eachCode}, (${rawParams}) => ${rowBody}${skipArg});`)
+              continue
+            }
+
+            const keyAst = match.isJsxBody ? extractKeyExpr(match.body) : extractBlockKeyExpr(match.body as BlockStatement)
+            const rowSig = freshVar('_r')
+            const idxSig = idxParam !== undefined ? freshVar('_i') : undefined
+            const keyRewrites = withoutBindings(scopeRewrites, params)
+            const { keyFn, rowRewrites, prelude } = compileLoopRow({ firstParam, idxParam, keyAst, rowSig, scopeRewrites, keyRewrites })
+            if (idxParam !== undefined && idxSig !== undefined)
+              rowRewrites.set(idxParam, `${idxSig}.value`)
+
+            const rawRowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, rowRewrites) : compileExpression(match.body, rowRewrites)
+            const rowBody = withPrelude(rawRowBody, match.body, prelude)
+            const rowParams = idxSig !== undefined ? `${rowSig}, ${idxSig}` : rowSig
+            ops.push(`${use('loop')}(${elVar}, ${anchorVar}, () => ${eachCode}, ${keyFn}, (${rowParams}) => ${rowBody}${skipArg});`)
+            continue
           }
-          else if (isLast) {
-            const startVar = requestChild(elVar, domIndex)
-            html += '<!--k[-->'
-            domIndex++
-            ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, ${startVar});`)
+
+          if (slot.kind === 'and-show') {
+            const anchorVar = claimRangeAnchor(marker, open, close)
+            const whenCode = compileExpression(slot.expr.left, scopeRewrites)
+            const trueCode = compileRootJsx(slot.right, scopeRewrites)
+            ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode});`)
+            continue
+          }
+
+          if (slot.kind === 'ternary-show') {
+            const anchorVar = claimRangeAnchor(marker, open, close)
+            const whenCode = compileExpression(slot.expr.test, scopeRewrites)
+            const trueCode = isJsxNode(slot.cons)
+              ? compileRootJsx(slot.cons, scopeRewrites)
+              : compileExpression(slot.cons, scopeRewrites)
+            const falseCode = isJsxNode(slot.alt)
+              ? compileRootJsx(slot.alt, scopeRewrites)
+              : compileExpression(slot.alt, scopeRewrites)
+            ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode}, () => ${falseCode});`)
+            continue
+          }
+
+          // Generic expression slot
+          const exprCode = compileExpression(slot.expr, scopeRewrites)
+          if (nodeCapable) {
+            emitInsert(exprCode, marker, open, close)
           }
           else {
-            const startVar = requestChild(elVar, domIndex)
-            const endVar = requestChild(elVar, domIndex + 1)
-            html += '<!--k[--><!--k]-->'
-            addRangeSlot(elVar, domIndex + 1)
-            domIndex += 2
-            ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, ${endVar}, ${startVar});`)
+            const txtVar = freshVar('_txt')
+            if (marker === 'none') {
+              html += ' '
+              domIndex++
+              ops.push(`const ${txtVar} = ${use('firstText')}(${elVar});`)
+            }
+            else {
+              const markerVar = requestChild(elVar, domIndex)
+              if (marker === 'text') {
+                html += `${open} ${close}`
+                addTextSlot(elVar, domIndex + 1)
+                domIndex += 3
+              }
+              else {
+                html += `${open} `
+                domIndex += 2
+              }
+              ops.push(`const ${txtVar} = ${use('textAfter')}(${markerVar});`)
+            }
+            ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
           }
-          hadVariableRange = true
-        }
-        else if (!hasSiblings) {
-          // Sole dynamic child: 0 comment markers!
-          html += ' '
-          domIndex++
-          const txtVar = freshVar('_txt')
-          ops.push(`const ${txtVar} = ${use('firstText')}(${elVar});`)
-          ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
-        }
-        else {
-          // Sibling dynamic text: open comment + optional text (+ closing comment if followed by more siblings)
-          const markerVar = requestChild(elVar, domIndex)
-          if (isLast) {
-            html += '<!----> '
-            domIndex += 2
-          }
-          else {
-            html += '<!----> <!---->'
-            addTextSlot(elVar, domIndex + 1)
-            domIndex += 3
-          }
-          const txtVar = freshVar('_txt')
-          ops.push(`const ${txtVar} = ${use('textAfter')}(${markerVar});`)
-          ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
-        }
         }
       }
       finally {
@@ -557,31 +517,30 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   function compileRootJsx(node: JSXElement | JSXFragment, scopeRewrites: ReadonlyMap<string, string>): string {
     if (node.type === 'JSXFragment') {
-      const meaningful = filterMeaningfulChildren(node.children)
-      if (meaningful.length === 0)
+      const planned = planChildSlots(node.children, { jsxNodes, inFragment: true })
+      if (planned.length === 0)
         return 'null'
-      if (meaningful.length === 1) {
-        const only = meaningful[0]!
-        if (isJsxNode(only))
-          return compileRootJsx(only, scopeRewrites)
-        if (only.type === 'JSXText')
-          return `${use('fragText')}(${JSON.stringify(decodeHtmlEntities(cleanJsxText(only.value)))})`
-        if (only.type === 'JSXExpressionContainer' && only.expression.type !== 'JSXEmptyExpression')
-          return `${use('fragInsert')}(() => (${compileExpression(only.expression, scopeRewrites)}))`
+      if (planned.length === 1) {
+        const { child, slot } = planned[0]!
+        if (slot.kind === 'static-text')
+          return `${use('fragText')}(${JSON.stringify(slot.fromLiteral ? slot.text : decodeHtmlEntities(slot.text))})`
+        if (slot.kind === 'element' || slot.kind === 'component' || slot.kind === 'fragment')
+          return compileRootJsx(slot.node, scopeRewrites)
+        if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression')
+          return `${use('fragInsert')}(() => (${compileExpression(child.expression, scopeRewrites)}))`
       }
 
       // Each child claims its own SSR nodes while hydrating, so the siblings after a dynamic one keep theirs (#3596).
-      const items = meaningful.map((child) => {
-        if (isJsxNode(child)) {
-          // The server brackets a component or a nested fragment among siblings, so it claims that range like an expression.
-          const inPlace = child.type === 'JSXElement' && !isComponentTag(jsxTagName(child.openingElement.name))
-          return inPlace ? compileRootJsx(child, scopeRewrites) : `${use('fragInsert')}(() => ${compileRootJsx(child, scopeRewrites)})`
-        }
-        if (child.type === 'JSXText')
-          return `${use('fragText')}(${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value)))})`
+      const items = planned.map(({ child, slot, marker }) => {
+        if (slot.kind === 'static-text')
+          return `${use('fragText')}(${JSON.stringify(slot.fromLiteral ? slot.text : decodeHtmlEntities(slot.text))})`
+        if (slot.kind === 'element')
+          return compileRootJsx(slot.node, scopeRewrites)
+        if (slot.kind === 'component' || slot.kind === 'fragment')
+          return `${use('fragInsert')}(() => ${compileRootJsx(slot.node, scopeRewrites)})`
         if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression') {
           const exprCode = compileExpression(child.expression, scopeRewrites)
-          if (isNodeCapableExpr(child.expression, jsxNodes))
+          if (marker === 'range')
             return `${use('fragInsert')}(() => (${exprCode}))`
           return `(() => { const _t = ${use('fragText')}("", true); ${use('effect')}(() => ${use('setText')}(_t, (${exprCode}))); return _t; })()`
         }

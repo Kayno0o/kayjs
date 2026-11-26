@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import type { JSXElement, JSXFragment } from 'oxc-parser'
 import { analyzeModule, compileDom, compileSsr } from '../src/compiler/index'
 import { readsPrivateEnv } from '../src/compiler/server-only'
+import { planChildSlots } from '../src/compiler/shared'
 import { setInnerHtml } from '../src/dom/extras'
 import { raw, ssrRaw, ssrRawText } from '../src/ssr/index'
 
@@ -312,5 +314,103 @@ describe('islands per component, not per file (#3587)', () => {
     expect(analyzeModule('index.tsx', page).exports.get('default')).toEqual({ interactive: false })
     expect(() => analyzeModule('index.tsx', page.replace('<main>', '<main onClick={() => 1}>'))).toThrow(/async route component/)
     expect(() => analyzeModule('index.tsx', page.replace('async ', '').replace('<main>', '<main onClick={() => 1}>'))).toThrow('kay compiler: <Head> in an island in index.tsx: Home is an island because it uses onClick')
+  })
+})
+
+describe('shared hydration marker planner (#3600)', () => {
+  function planJsx(jsx: string, options?: { emitMarkers?: boolean }) {
+    const src = `export function C({ a, b, show, items, children, pick }: any) { return (${jsx}) }`
+    const analysis = analyzeModule('Plan.tsx', src)
+    const fn = analysis.program.body[0] as unknown as { declaration: { body: { body: [{ argument: { expression: JSXElement | JSXFragment } }] } } }
+    const root = fn.declaration.body.body[0].argument.expression
+    return planChildSlots(root.children, {
+      jsxNodes: analysis.jsxNodes,
+      emitMarkers: options?.emitMarkers,
+      inFragment: root.type === 'JSXFragment',
+    }).map(p => ({ kind: p.slot.kind, marker: p.marker, open: p.open, close: p.close, nodeCapable: p.nodeCapable }))
+  }
+
+  test('sole dynamic slots inside an element emit zero markers', () => {
+    for (const jsx of [
+      '<p>{a}</p>',
+      '<p>{children}</p>',
+      '<p><Kid /></p>',
+      '<p><>a</></p>',
+      '<ul>{items.map((x: any) => <li>{x}</li>)}</ul>',
+      '<div>{show && <span />}</div>',
+      '<div>{show ? <span /> : null}</div>',
+    ]) {
+      const [only] = planJsx(jsx)
+      expect(only?.marker).toBe('none')
+      expect(only?.open).toBe('')
+      expect(only?.close).toBe('')
+    }
+  })
+
+  test('tracks sibling ranges, open trailing markers, and loops after variable ranges', () => {
+    expect(planJsx('<div>{a}<span>mid</span>{b}</div>').map(s => [s.kind, s.marker])).toEqual([
+      ['expr', 'text'],
+      ['element', 'none'],
+      ['expr', 'text-open'],
+    ])
+
+    expect(planJsx('<div><Kid /><span>mid</span>{children}</div>').map(s => [s.kind, s.marker])).toEqual([
+      ['component', 'range'],
+      ['element', 'none'],
+      ['expr', 'range-open'],
+    ])
+
+    // Trailing loop after only static siblings needs no brackets; after a variable range it must be bracketed.
+    expect(planJsx('<ul><li>H</li>{items.map((x: any) => <li>{x}</li>)}</ul>').map(s => [s.kind, s.marker])).toEqual([
+      ['element', 'none'],
+      ['loop', 'none'],
+    ])
+    expect(planJsx('<ul>{show && <li>H</li>}{items.map((x: any) => <li>{x}</li>)}</ul>').map(s => [s.kind, s.marker])).toEqual([
+      ['and-show', 'range'],
+      ['loop', 'range'],
+    ])
+    expect(planJsx('<ul>{items.map((x: any) => <li>{x}</li>)}<li>F</li></ul>').map(s => [s.kind, s.marker])).toEqual([
+      ['loop', 'range'],
+      ['element', 'none'],
+    ])
+    expect(planJsx('<div><span>a</span>{show ? <b /> : "no"}</div>').map(s => [s.kind, s.marker])).toEqual([
+      ['element', 'none'],
+      ['ternary-show', 'range'],
+    ])
+  })
+
+  test('closes every dynamic slot inside a fragment and suppresses all markers when emitMarkers is false', () => {
+    expect(planJsx('<><Kid /></>').map(s => [s.kind, s.marker])).toEqual([['component', 'none']])
+    expect(planJsx('<>{show && <b />}</>').map(s => [s.kind, s.marker])).toEqual([['and-show', 'range']])
+    expect(planJsx('<>{a}</>').map(s => [s.kind, s.marker])).toEqual([['expr', 'text']])
+    expect(planJsx('<><span>s</span>{a}{pick()}<Kid /></>').map(s => [s.kind, s.marker])).toEqual([
+      ['element', 'none'],
+      ['expr', 'text'],
+      ['expr', 'range'],
+      ['component', 'range'],
+    ])
+
+    const disabled = planJsx('<><span>s</span>{a}{show && <b />}{items.map((x: any) => <i>{x}</i>)}<Kid /></>', { emitMarkers: false })
+    expect(disabled.every(s => s.marker === 'none' && s.open === '' && s.close === '')).toBe(true)
+  })
+
+  test('SSR and DOM emit matching markers for mixed conditionals, loops, and fragments', () => {
+    const src = `
+      export function Mix({ show, items, label }: any) {
+        return <div>{show && <p>hi</p>}{items.map((x: any) => <span>{x}</span>)}</div>
+      }
+      export function Frag({ label, show }: any) {
+        return <>{'static'}{label}{show && <b />}</>
+      }
+    `
+    const ssr = compileSsr('Mix.tsx', src, { isIsland: true }).code
+    const dom = compileDom('Mix.tsx', src).code
+
+    // Both SSR and DOM bracket the conditional AND the trailing loop that follows it.
+    expect(ssr).toContain('<!--k[-->')
+    expect(ssr).toContain('<!--k]-->')
+    expect(dom).toContain('__template("<div><!--k[--><!--k]--><!--k[--><!--k]--></div>")')
+    // Fragment static string literal emits plain text in both SSR and DOM (no comment markers).
+    expect(dom).toContain('__fragText("static")')
   })
 })
