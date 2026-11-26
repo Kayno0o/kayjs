@@ -9,6 +9,12 @@ import { iconData } from './icon-data'
 
 const FOUND_PER_SET = 10
 const ICON_SPEC_RE = /^~icons\/([^/]+)\/(.+)$/
+const SELF_CLOSING_RE = /<([a-z][\w:-]*)([^<>]*?)\s*\/>/gi
+
+// Spells `<path d="…"/>` as `<path d="…"></path>`, the way a browser serializes SVG, so hydrating an island finds the server's body unchanged and keeps its nodes.
+function withEndTags(body: string): string {
+  return body.replace(SELF_CLOSING_RE, '<$1$2></$1>')
+}
 
 function resolveIconSetFile(prefix: string, root: string): string {
   const pkgPath = `@iconify-json/${prefix}/icons.json`
@@ -31,7 +37,7 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
 
   return definePlugin({
     name: '@kayjs/icons',
-    bunPlugins: ({ root }): BunPlugin[] => [{
+    bunPlugins: ({ root, target }): BunPlugin[] => [{
       name: 'kayjs-icons',
       setup(b) {
         b.onResolve({ filter: ICON_SPEC_RE }, args => ({ path: args.path, namespace: 'kay-icon' }))
@@ -55,7 +61,7 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
             throw new Error(`@kayjs/icons: icon "${name}" not found in set "${prefix}"`)
 
           return {
-            contents: `export default ${JSON.stringify(data)};\n`,
+            contents: `export default ${JSON.stringify(target === 'client' ? { ...data, body: withEndTags(data.body) } : data)};\n`,
             loader: 'js',
           }
         })

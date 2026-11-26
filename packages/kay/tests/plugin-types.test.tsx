@@ -1,4 +1,5 @@
 import type { AuthUser, PublicUser } from '@kayjs/auth'
+import type { IconData } from '@kayjs/icons'
 import type { KayChild } from '@kayjs/kay'
 import type { KayLocals, RequestContext, StandardSchemaV1 } from '@kayjs/kay/server'
 import { afterAll, describe, expect, it } from 'bun:test'
@@ -7,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
 import { contentPlugin, defineCollection } from '../../plugin-content/src/index'
+import { Icon } from '../../plugin-icons/src/index'
 import { mcp, mcpTool } from '../../plugin-mcp/src/index'
 import { action } from '../src/server/action'
 import { testApp } from '../src/test/index'
@@ -287,5 +289,19 @@ describe('Plugin generics: @kayjs/auth, @kayjs/mcp, @kayjs/content (#3545)', () 
       ],
     })
     expect(plugin.name).toBe('@kayjs/content')
+  })
+})
+
+describe('<Icon> props (#3592)', () => {
+  it('takes the attributes of an <svg> and refuses a typo or a React spelling', () => {
+    const arrow: IconData = { viewBox: '0 0 24 24', width: '1em', height: '1em', body: '<path d="M5 12h14"/>' }
+    const elements = [
+      <Icon icon={arrow} class="size-4" stroke-width="2" aria-label="Next" data-test="1" />,
+      // @ts-expect-error Unknown attribute typo
+      <Icon icon={arrow} clas="size-4" />,
+      // @ts-expect-error React camelCase SVG attribute
+      <Icon icon={arrow} strokeWidth="2" />,
+    ]
+    expect(elements).toHaveLength(3)
   })
 })

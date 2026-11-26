@@ -1,25 +1,24 @@
 /** @jsxImportSource @kayjs/kay */
+import type { JSX } from '@kayjs/kay/jsx-runtime'
 import type { IconData } from './types'
 
-export interface IconComponentProps {
-  icon: IconData
-  class?: string | undefined
-  className?: string | undefined
-  style?: string | Record<string, string | number | undefined> | undefined
-  'aria-label'?: string | undefined
-  [attr: string]: unknown
+export type IconComponentProps = Omit<JSX.IntrinsicElements['svg'], 'children' | 'innerHTML'> & { icon: IconData }
+
+function isName(value: unknown): boolean {
+  return typeof value === 'string' && value.trim() !== ''
 }
 
-export function Icon({ icon, ...rest }: IconComponentProps) {
-  const hasLabel = rest['aria-label'] !== undefined
+// An icon is an image when the caller names it, and hidden from assistive tech otherwise.
+export function Icon({ icon, viewBox, width, height, role, 'aria-hidden': ariaHidden, ...rest }: IconComponentProps) {
+  const named = (): boolean => isName(rest['aria-label']) || isName(rest['aria-labelledby'])
   return (
     <svg
-      viewBox={icon.viewBox}
-      width={icon.width}
-      height={icon.height}
-      aria-hidden={hasLabel ? undefined : 'true'}
-      role={hasLabel ? 'img' : undefined}
       {...rest}
+      viewBox={viewBox ?? icon.viewBox}
+      width={width ?? icon.width}
+      height={height ?? icon.height}
+      role={role ?? (named() ? 'img' : undefined)}
+      aria-hidden={ariaHidden ?? (named() ? undefined : 'true')}
       innerHTML={icon.body}
     />
   )

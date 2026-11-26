@@ -61,6 +61,8 @@ import arrowRight from '~icons/tabler/arrow-right'
 <Icon icon={arrowRight} class="size-4" />
 ```
 
+`<Icon>` takes any SVG attribute. Your `width`, `height` and `viewBox` replace the icon's own. An icon given a non-blank `aria-label` or `aria-labelledby` gets `role="img"`; any other is `aria-hidden`.
+
 `kay icons-find garbage` prints the icons of the installed sets that match, such as `~icons/tabler/trash`, so an agent imports a name that exists. It also matches related words, typos and half-typed words. An app's own icon picker gets the same search from `findIcons(set, query, { limit, offset })` in `@kayjs/icons/search`. Call it on the server: it reads a 2 MB word table on first use.
 
 ## `@kayjs/tailwind`
