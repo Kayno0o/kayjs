@@ -8,7 +8,7 @@ import { join, posix } from 'node:path'
 import { relPosix } from './files'
 
 // A static `import ... from "./x.js"` or `import "./x.js"` of an emitted chunk; `import("./x.js")` stays lazy and is left out.
-const STATIC_CHUNK_IMPORT_RE = /\bimport\s*(?:[^"'();]*?\bfrom\s*)?["'](\.\.?\/[^"']+\.js)["']/g
+const STATIC_CHUNK_IMPORT_RE = /\b(?:import|export)\s*(?:[^"'();]*?\bfrom\s*)?["'](\.\.?\/[^"']+\.js)["']/g
 
 export interface IslandOrigin {
   /** The component's export name, `default` for a page or a default export. */

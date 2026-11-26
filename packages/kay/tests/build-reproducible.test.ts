@@ -85,4 +85,14 @@ describe('#3574 weights without the metafile', () => {
       expect(line).toContain(` ${route.jsFiles}j/`)
     }
   })
+
+  test('a chunk that re-exports another counts it', () => {
+    const client = join(dir, 'reexport')
+    mkdirSync(client, { recursive: true })
+    writeFileSync(join(client, 'island.js'), 'export{a}from"./shared.js";export*from"./more.js";')
+    writeFileSync(join(client, 'shared.js'), 'export const a=1;')
+    writeFileSync(join(client, 'more.js'), 'export const b=2;')
+    const manifest = { styles: [], assets: [], routes: [{ path: '/', islandChunks: ['/_kay/island.js'] }] } as unknown as BuildManifest
+    expect(analyzeBundleWeights(manifest, client).routes[0]!.jsFiles).toBe(3)
+  })
 })
