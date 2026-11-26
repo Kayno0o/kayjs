@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { tailwind } from '../../plugin-tailwind/src/index'
 import { build } from '../src/build/index'
 import { checkProject } from '../src/cli/check'
-import { parseIslandProps } from '../src/dom/island'
+import { parseIslandProps } from '../src/dom/revive'
 import { ssrIsland } from '../src/ssr/index'
 import { testApp } from '../src/test/index'
 

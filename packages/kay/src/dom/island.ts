@@ -1,44 +1,13 @@
-// Native <kay-island> Custom Element: dead-code-eliminates unused deferred/client strategies at build time.
+// Native <kay-island> Custom Element: the build defines which strategies an app uses, so the loader drops the code of the others.
 
 import { hydrate, mount } from './index'
+import { parseIslandProps } from './revive'
 
-declare const KAY_DEFERRED: boolean | undefined
+declare const KAY_VISIBLE: boolean | undefined
+declare const KAY_IDLE: boolean | undefined
+declare const KAY_INTERACTION: boolean | undefined
+declare const KAY_MEDIA: boolean | undefined
 declare const KAY_CLIENT_ONLY: boolean | undefined
-
-const UNDEF = Symbol()
-
-const REVIVERS: Record<string, (v: never) => unknown> = {
-  __proto__: null as never,
-  D: (v: string) => new Date(v),
-  S: (v: unknown[]) => new Set(v),
-  M: (v: [unknown, unknown][]) => new Map(v),
-  U: (v: string) => new URL(v),
-  R: ([src, flags]: [string, string]) => new RegExp(src, flags),
-  B: BigInt as (v: never) => unknown,
-  N: Number as (v: never) => unknown,
-  u: () => UNDEF,
-  O: Object.fromEntries as (v: never) => unknown,
-}
-
-export function parseIslandProps(raw: string): Record<string, unknown> {
-  if (!raw.includes('"__k":'))
-    return JSON.parse(raw) as Record<string, unknown>
-  return JSON.parse(raw, (_k, v: unknown) => {
-    if (Array.isArray(v)) {
-      for (let i = 0; i < v.length; i++) {
-        if (v[i] === UNDEF)
-          v[i] = undefined
-      }
-      return v
-    }
-    if (v !== null && typeof v === 'object' && '__k' in v && 'v' in v) {
-      const revive = REVIVERS[(v as { __k: string }).__k]
-      if (revive !== undefined)
-        return revive((v as { v: never }).v)
-    }
-    return v
-  }) as Record<string, unknown>
-}
 
 type IslandModule = { default: (props: Record<string, unknown>) => Node | DocumentFragment | null }
 
@@ -158,85 +127,83 @@ export function defineIslandElement(): void {
       const token = ++this._t
 
       const h = this.getAttribute('h')
-      if (typeof KAY_DEFERRED === 'undefined' || KAY_DEFERRED) {
-        if (h === 'visible') {
-          if (typeof IntersectionObserver === 'undefined') {
+      if ((typeof KAY_VISIBLE === 'undefined' || KAY_VISIBLE) && h === 'visible') {
+        if (typeof IntersectionObserver === 'undefined') {
+          void this._l(false, token)
+          return
+        }
+        const targets: Element[] = []
+        collectVisibleTargets(this, targets)
+        let restoreDisplay: (() => void) | undefined
+        if (targets.length === 0) {
+          const display = typeof getComputedStyle === 'function' ? getComputedStyle(this).display : 'contents'
+          if (display === 'contents' || display === '') {
+            const prev = this.style.display
+            this.style.display = 'inline'
+            restoreDisplay = () => { this.style.display = prev }
+          }
+          targets.push(this)
+        }
+        const io = new IntersectionObserver((entries) => {
+          if (entries.some(e => e.isIntersecting))
             void this._l(false, token)
-            return
+        }, { rootMargin: '200px' })
+        this._c = () => {
+          io.disconnect()
+          restoreDisplay?.()
+        }
+        for (const target of targets)
+          io.observe(target)
+        return
+      }
+      if ((typeof KAY_IDLE === 'undefined' || KAY_IDLE) && h === 'idle') {
+        const g = globalThis as { requestIdleCallback?: (cb: () => void) => number, cancelIdleCallback?: (id: number) => void }
+        const run = () => void this._l(false, token)
+        if (g.requestIdleCallback) {
+          const id = g.requestIdleCallback(run)
+          this._c = () => g.cancelIdleCallback?.(id)
+        }
+        else {
+          const id = setTimeout(run, 1)
+          this._c = () => clearTimeout(id)
+        }
+        return
+      }
+      if ((typeof KAY_INTERACTION === 'undefined' || KAY_INTERACTION) && h === 'interaction') {
+        const evs = ['pointerdown', 'click', 'focusin', 'keydown']
+        const queued: { ev: Event, target: EventTarget | null }[] = []
+        let loading = false
+        const stop = () => {
+          for (const e of evs) this.removeEventListener(e, go, true)
+        }
+        const go = (ev: Event) => {
+          queued.push({ ev, target: ev.target })
+          if (!loading) {
+            loading = true
+            void this._l(false, token, true, () => {
+              for (let i = 0; i < queued.length; i++)
+                replayEvent(this, queued[i]!.ev, queued[i]!.target)
+            })
           }
-          const targets: Element[] = []
-          collectVisibleTargets(this, targets)
-          let restoreDisplay: (() => void) | undefined
-          if (targets.length === 0) {
-            const display = typeof getComputedStyle === 'function' ? getComputedStyle(this).display : 'contents'
-            if (display === 'contents' || display === '') {
-              const prev = this.style.display
-              this.style.display = 'inline'
-              restoreDisplay = () => { this.style.display = prev }
-            }
-            targets.push(this)
-          }
-          const io = new IntersectionObserver((entries) => {
-            if (entries.some(e => e.isIntersecting))
+        }
+        for (const e of evs) this.addEventListener(e, go, true)
+        this._c = stop
+        return
+      }
+      if ((typeof KAY_MEDIA === 'undefined' || KAY_MEDIA) && h !== null && h.startsWith('media(')) {
+        const mq = matchMedia(h.slice(6, -1))
+        if (mq.matches) {
+          void this._l(false, token)
+        }
+        else {
+          const go = () => {
+            if (mq.matches)
               void this._l(false, token)
-          }, { rootMargin: '200px' })
-          this._c = () => {
-            io.disconnect()
-            restoreDisplay?.()
           }
-          for (const target of targets)
-            io.observe(target)
-          return
+          mq.addEventListener('change', go)
+          this._c = () => mq.removeEventListener('change', go)
         }
-        if (h === 'idle') {
-          const g = globalThis as { requestIdleCallback?: (cb: () => void) => number, cancelIdleCallback?: (id: number) => void }
-          const run = () => void this._l(false, token)
-          if (g.requestIdleCallback) {
-            const id = g.requestIdleCallback(run)
-            this._c = () => g.cancelIdleCallback?.(id)
-          }
-          else {
-            const id = setTimeout(run, 1)
-            this._c = () => clearTimeout(id)
-          }
-          return
-        }
-        if (h === 'interaction') {
-          const evs = ['pointerdown', 'click', 'focusin', 'keydown']
-          const queued: { ev: Event, target: EventTarget | null }[] = []
-          let loading = false
-          const stop = () => {
-            for (const e of evs) this.removeEventListener(e, go, true)
-          }
-          const go = (ev: Event) => {
-            queued.push({ ev, target: ev.target })
-            if (!loading) {
-              loading = true
-              void this._l(false, token, true, () => {
-                for (let i = 0; i < queued.length; i++)
-                  replayEvent(this, queued[i]!.ev, queued[i]!.target)
-              })
-            }
-          }
-          for (const e of evs) this.addEventListener(e, go, true)
-          this._c = stop
-          return
-        }
-        if (h !== null && h.startsWith('media(')) {
-          const mq = matchMedia(h.slice(6, -1))
-          if (mq.matches) {
-            void this._l(false, token)
-          }
-          else {
-            const go = () => {
-              if (mq.matches)
-                void this._l(false, token)
-            }
-            mq.addEventListener('change', go)
-            this._c = () => mq.removeEventListener('change', go)
-          }
-          return
-        }
+        return
       }
 
       void this._l(h === 'client', token)

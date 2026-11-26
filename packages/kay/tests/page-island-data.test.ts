@@ -189,7 +189,7 @@ export default function ExplicitPage({ data }: { data: { count: number, note?: s
           Node: win.Node,
           customElements: win.customElements,
         })
-        const { parseIslandProps } = await import('../src/dom/island')
+        const { parseIslandProps } = await import('../src/dom/revive')
         win.document.body.innerHTML = homeHtml
         const islandEl = win.document.querySelector('kay-island')!
         const scriptEl = islandEl.lastElementChild!

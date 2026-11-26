@@ -441,7 +441,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const renderedIslands = resolveRenderedIslands(rctx, body)
     const isStreamed = rctx.pending.length > 0
     const hasIslands = renderedIslands.hasIslands || (isStreamed && entry.islandChunks.length > 0)
-    const preloadChunks = isStreamed ? entry.islandChunks : renderedIslands.eagerChunks
+    // A streamed page preloads before its boundaries render, so it takes the route's eager islands: a lazy one loads when its strategy fires.
+    const preloadChunks = isStreamed ? entry.eagerIslandChunks ?? entry.islandChunks : renderedIslands.eagerChunks
     const hasRegions = rctx.regionNames.size > 0
 
     const trustedStyleHashes = mergeStyleHashes(route.headStyleHashes, docHead.styleHashes, styleHashesOf(rctx.inlineStyles))

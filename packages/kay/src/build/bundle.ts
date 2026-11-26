@@ -152,6 +152,23 @@ export interface ClientBuild {
   metafile: Bun.BuildOutput['metafile']
 }
 
+/** The lazy strategies some island of the app hydrates with, so the loader keeps only theirs. A mode computed at runtime (`*`) may be any of them. */
+function hydrateStrategies(analyses: Iterable<{ defaultHydrate?: string | undefined, hydrateModes: Set<string> }>): { strategies: Record<'visible' | 'idle' | 'interaction' | 'media', boolean>, hasClientOnlyHydrate: boolean } {
+  const strategies = { visible: false, idle: false, interaction: false, media: false }
+  let hasClientOnlyHydrate = false
+  for (const analysis of analyses) {
+    for (const mode of [analysis.defaultHydrate, ...analysis.hydrateModes]) {
+      const any = mode === '*'
+      hasClientOnlyHydrate ||= any || mode === 'client'
+      strategies.visible ||= any || mode === 'visible'
+      strategies.idle ||= any || mode === 'idle'
+      strategies.interaction ||= any || mode === 'interaction'
+      strategies.media ||= any || (mode?.startsWith('media(') ?? false)
+    }
+  }
+  return { strategies, hasClientOnlyHydrate }
+}
+
 function publicEnvDefines(): Record<string, string> {
   const defines: Record<string, string> = {}
   for (const [key, value] of Object.entries(process.env)) {
@@ -235,17 +252,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   }
 
   const transforms = pluginTransforms(env.plugins)
-  // A mode computed at runtime may be any of them, so it keeps both loaders.
-  let hasDeferredHydrate = false
-  let hasClientOnlyHydrate = false
-  for (const analysis of graph.analyses.values()) {
-    for (const mode of [analysis.defaultHydrate, ...analysis.hydrateModes]) {
-      if (mode === 'client' || mode === '*')
-        hasClientOnlyHydrate = true
-      if (mode !== undefined && mode !== 'load' && mode !== 'client')
-        hasDeferredHydrate = true
-    }
-  }
+  const { strategies, hasClientOnlyHydrate } = hydrateStrategies(graph.analyses.values())
 
   const envDefines = publicEnvDefines()
   const clientSignature = cache !== undefined
@@ -254,7 +261,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
         assetPrefix,
         isDev: env.isDev,
         transforms: transforms.key,
-        hasDeferredHydrate,
+        strategies,
         hasClientOnlyHydrate,
         pluginClientEntries,
         regionClientEntries,
@@ -316,7 +323,10 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     metafile: true,
     naming: '[name]-[hash].[ext]',
     define: {
-      KAY_DEFERRED: hasDeferredHydrate ? 'true' : 'false',
+      KAY_VISIBLE: String(strategies.visible),
+      KAY_IDLE: String(strategies.idle),
+      KAY_INTERACTION: String(strategies.interaction),
+      KAY_MEDIA: String(strategies.media),
       KAY_CLIENT_ONLY: hasClientOnlyHydrate ? 'true' : 'false',
       KAY_BROWSER: 'true',
       'process.env.NODE_ENV': JSON.stringify(env.nodeEnv ?? (env.isDev ? 'development' : 'production')),

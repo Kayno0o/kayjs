@@ -431,6 +431,43 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       expect([marker, richPage.includes(marker), counterPage.includes(marker)]).toEqual([marker, true, false])
   })
 
+  test('a streamed page preloads its eager islands only, as a buffered page does (#3662)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-stream-preload-'))
+    tempDirs.push(dir)
+    mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
+    symlinkSync(resolve(import.meta.dir, '..'), join(dir, 'node_modules/@kayjs/kay'))
+    const files: Record<string, string> = {
+      'src/components/Now.tsx': `import { signal } from '@kayjs/kay'\nexport function Now() { const n = signal(0); return <button onClick={() => { n.value++ }}>now {n.value}</button> }`,
+      'src/components/Later.tsx': `import { signal } from '@kayjs/kay'\nexport function Later() { const n = signal(0); return <button onClick={() => { n.value++ }}>later {n.value}</button> }`,
+      'src/routes/index.tsx': `
+        import { Suspense } from '@kayjs/kay'
+        import { Later } from '../components/Later'
+        import { Now } from '../components/Now'
+        async function Slow() { await Bun.sleep(5); return <p>slow</p> }
+        export default function Home() {
+          return <main><Now /><Later $hydrate="visible" /><Suspense fallback={<p>wait</p>}><Slow /></Suspense></main>
+        }`,
+    }
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(join(dir, file, '..'), { recursive: true })
+      writeFileSync(join(dir, file), text)
+    }
+    const manifest = await build({ root: dir, minify: true, prerender: false })
+    const route = manifest.routes.find(r => r.path === '/')!
+    const app = await createServer({ root: dir })
+    try {
+      const html = await (await app.handle(new Request('http://localhost/'))).text()
+      const preloaded = [...html.matchAll(/<link rel="modulepreload" href="([^"]+)">/g)].map(m => m[1])
+
+      expect(html).toContain('<p>slow</p>')
+      expect(route.islandChunks.length).toBe(2)
+      expect(preloaded).toEqual(route.eagerIslandChunks!)
+    }
+    finally {
+      await app.dispose?.()
+    }
+  })
+
   test('only names rendered as tags become islands, including a namespace member tag', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-island-tags-'))
     try {
@@ -489,13 +526,18 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     }
   })
 
-  // The deferred loader waits on an IntersectionObserver; the client-only one mounts instead of hydrating.
+  // Each lazy loader is kept only when some island can use it (#3662): visible waits on an IntersectionObserver, idle on requestIdleCallback, interaction on a pointerdown, media on matchMedia; the client-only one mounts instead of hydrating.
+  const none = { visible: false, idle: false, interaction: false, media: false, clientOnly: false }
+  const all = { visible: true, idle: true, interaction: true, media: true, clientOnly: true }
   test.each([
-    ['a string', `$hydrate="visible"`, { deferred: true, clientOnly: false }],
-    ['a string in braces', `$hydrate={'client'}`, { deferred: false, clientOnly: true }],
-    ['a template', `$hydrate={\`idle\`}`, { deferred: true, clientOnly: false }],
-    ['a ternary', `$hydrate={wide ? 'visible' : 'idle'}`, { deferred: true, clientOnly: true }],
-    ['a variable', `$hydrate={mode}`, { deferred: true, clientOnly: true }],
+    ['a string', `$hydrate="visible"`, { ...none, visible: true }],
+    ['a string in braces', `$hydrate={'client'}`, { ...none, clientOnly: true }],
+    ['a template', `$hydrate={\`idle\`}`, { ...none, idle: true }],
+    ['interaction', `$hydrate="interaction"`, { ...none, interaction: true }],
+    ['a media query', `$hydrate="media(max-width: 40em)"`, { ...none, media: true }],
+    ['load', `$hydrate="load"`, none],
+    ['a ternary', `$hydrate={wide ? 'visible' : 'idle'}`, all],
+    ['a variable', `$hydrate={mode}`, all],
   ])('a $hydrate written as %s keeps the loaders its mode can need in the runtime', async (_, attr, loaders) => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-hydrate-ast-'))
     try {
@@ -513,7 +555,13 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       `)
       const manifest = await build({ root: dir, minify: false })
       const runtime = readFileSync(join(dir, 'dist/client', manifest.runtimeScript!.replace('/_kay/', '')), 'utf8')
-      expect({ deferred: runtime.includes('IntersectionObserver'), clientOnly: runtime.includes('clientOnly ?') }).toEqual(loaders)
+      expect({
+        visible: runtime.includes('IntersectionObserver'),
+        idle: runtime.includes('requestIdleCallback'),
+        interaction: runtime.includes('pointerdown'),
+        media: runtime.includes('matchMedia'),
+        clientOnly: runtime.includes('clientOnly ?'),
+      }).toEqual(loaders)
     }
     finally {
       rmSync(dir, { recursive: true, force: true })

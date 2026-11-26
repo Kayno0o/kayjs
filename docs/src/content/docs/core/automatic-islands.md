@@ -68,6 +68,8 @@ Control when an island downloads and hydrates using `$hydrate` at the call site,
 | `$hydrate="media(max-width: 768px)"` | When the CSS media query matches | Mobile-only drawers or nav toggles |
 | `$hydrate="client"` | Skips SSR and mounts client-side only | Browser-only canvas or WebGL widgets |
 
+The code that waits for a strategy ships only when an island of the app can use it, so an app hydrating everything on `load` ships none of it. A streamed page preloads the JS of its `load` islands only; the others download when their strategy fires.
+
 ## Props across the island boundary
 
 Props passed from server code into an island are serialized into HTML and restored in the browser.
