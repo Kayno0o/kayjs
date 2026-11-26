@@ -322,3 +322,30 @@ describe('#3631 island props script, serialization, <kay-slot>, and $hydrate edg
     }
   })
 })
+
+describe('island chunk URLs (#3654)', () => {
+  it('loads a chunk only from this origin, refusing // and /\\ before any import', async () => {
+    GlobalRegistrator.register()
+    const log = spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      defineIslandElement()
+      const triesToLoad = async (chunk: string): Promise<boolean> => {
+        log.mockClear()
+        const island = document.createElement('kay-island')
+        island.setAttribute('c', chunk)
+        island.setAttribute('h', 'client')
+        document.body.appendChild(island)
+        await new Promise(resolve => setTimeout(resolve, 30))
+        island.remove()
+        return log.mock.calls.length > 0
+      }
+      expect(await triesToLoad('/_kay/missing-chunk.js')).toBe(true)
+      expect(await triesToLoad('//evil.example/x.js')).toBe(false)
+      expect(await triesToLoad('/\\evil.example/x.js')).toBe(false)
+    }
+    finally {
+      log.mockRestore()
+      await GlobalRegistrator.unregister()
+    }
+  })
+})

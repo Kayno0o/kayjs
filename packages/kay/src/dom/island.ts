@@ -117,10 +117,9 @@ function replayEvent(root: Element, ev: Event, target: EventTarget | null): void
 }
 
 function isAllowedChunkUrl(chunk: string): boolean {
-  if (chunk.startsWith('//'))
-    return false
-  if (chunk.startsWith('/'))
-    return true
+  // A browser reads `//host` and `/\host` as another site.
+  if (chunk[0] === '/')
+    return chunk[1] !== '/' && chunk[1] !== '\\'
   if (typeof location !== 'undefined' && location.origin && location.origin !== 'null') {
     try {
       const parsed = new URL(chunk, location.href)

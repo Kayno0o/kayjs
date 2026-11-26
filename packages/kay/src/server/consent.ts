@@ -121,8 +121,11 @@ function isTruthyFormValue(value: FormDataEntryValue | null): boolean {
   return norm !== '' && norm !== 'false' && norm !== '0' && norm !== 'off' && norm !== 'no'
 }
 
+// A browser reads `//host` and `/\host` as another site, and CR, LF or NUL would split the Location header.
+const OFF_SITE_OR_SPLIT_RE = /^\/[/\\]|[\r\n\0]/
+
 function isSafeRelativeRedirect(target: string): boolean {
-  return target.startsWith('/') && !target.startsWith('//') && !target.includes('\r') && !target.includes('\n')
+  return target.startsWith('/') && !OFF_SITE_OR_SPLIT_RE.test(target)
 }
 
 function resolveConsentRedirect(
@@ -138,8 +141,9 @@ function resolveConsentRedirect(
   if (referer !== null) {
     try {
       const refUrl = new URL(referer)
-      if (isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy, url))
-        return `${refUrl.pathname}${refUrl.search}`
+      const target = `${refUrl.pathname}${refUrl.search}`
+      if (isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy, url) && isSafeRelativeRedirect(target))
+        return target
     }
     catch {
       return '/'

@@ -439,3 +439,27 @@ describe('One-declaration CNIL/RGPD consent gating (#3573)', () => {
     expect(app.cookies.get('yt_pref')).toBeUndefined()
   })
 })
+
+test('the consent redirect stays on the site, from the form field and from the Referer (#3654)', async () => {
+  const dir = makeTemp('kay-consent-redirect-')
+  mkdirSync(join(dir, 'src/routes'), { recursive: true })
+  writeFileSync(join(dir, 'kay.config.ts'), `export default { consent: { categories: { analytics: 'Audience' } }, compliance: { legalNotice: false } }`)
+  writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>home</p> }')
+  const app = await testApp({ root: dir })
+  const locationAfter = async (fields: Record<string, string>, referer: string): Promise<string | null> => {
+    const res = await app.fetch(new Request('http://localhost/_kay/consent', {
+      method: 'POST',
+      headers: { 'origin': 'http://localhost', referer, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ action: 'reject-all', ...fields }),
+    }))
+    return res.headers.get('location')
+  }
+
+  expect(await locationAfter({ redirect: '/a' }, 'http://localhost/')).toBe('/a')
+  expect(await locationAfter({ redirect: '/\\evil.example/x' }, 'http://localhost/')).toBe('/')
+  expect(await locationAfter({ redirect: '//evil.example/x' }, 'http://localhost/')).toBe('/')
+  expect(await locationAfter({ redirect: '/a\r\nset-cookie: x=1' }, 'http://localhost/')).toBe('/')
+  expect(await locationAfter({}, 'http://localhost/b?c=1')).toBe('/b?c=1')
+  expect(await locationAfter({}, 'http://localhost//evil.example/x')).toBe('/')
+  expect(await locationAfter({}, 'http://localhost/\\evil.example/x')).toBe('/')
+})
