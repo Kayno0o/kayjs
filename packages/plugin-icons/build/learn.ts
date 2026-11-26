@@ -160,9 +160,9 @@ export async function modelWords(): Promise<string[]> {
 }
 
 // Each key word to its nearest candidate words by meaning, scaled so `floor` similarity counts 0 and identical counts 1.
-// Cached on disk by its inputs, as comparing every key with every candidate takes minutes.
+// Cached on disk by its inputs and the code of `nearest`, as comparing every key with every candidate takes minutes.
 export async function fromMeaning(keys: string[], candidates: string[], keep: number, floor: number): Promise<Related> {
-  const file = Bun.file(`${CACHE}/meaning-${Bun.hash(JSON.stringify([MODEL, PROMPT, [...NO_MEANING], keys, candidates, keep, floor])).toString(36)}.json`)
+  const file = Bun.file(`${CACHE}/meaning-${Bun.hash(JSON.stringify([MODEL, PROMPT, [...NO_MEANING], nearest.toString(), keys, candidates, keep, floor])).toString(36)}.json`)
 
   if (await file.exists())
     return new Map(Object.entries(await file.json() as Record<string, [string, number][]>).map(([key, row]) => [key, new Map(row)]))
