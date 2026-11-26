@@ -30,6 +30,8 @@ const BOUNDARY = /[^a-z0-9]/
 const OWN_WEIGHT = 2
 const COMPLETION_WEIGHT = 0.7
 const RESPELLING_WEIGHT = 0.8
+// How strongly a joined word must relate to a word for that word to answer both typed words.
+const JOINED_ANSWERS = 0.5
 const PAGE_REFUSAL = '@kayjs/icons: findIcons pages from a whole offset of 0 or more, by a whole limit of 1 or more: clamp the page a request asks for before searching.'
 
 // One index per names array or set object, so a set imported once is indexed once.
@@ -86,7 +88,7 @@ function ones(bits: number): number {
 }
 
 
-// What a typed word stands for, with its weight: itself when the names or the table know it, else the three most used of its completions and the three closest of its respellings, the most used first among equals.
+// What a typed word stands for, with its weight: itself when the names or the table know it, else the names' or the table's form of its stem, the three most used of its completions and the three closest of its respellings, the most used first among equals.
 // The table's side of a typed word is read once for every set; a word reached both ways keeps the larger weight.
 function readings(word: string, index: Index): Map<string, number> {
   if (index.byWord.has(word) || relatedWords(word).length > 0)
@@ -95,18 +97,12 @@ function readings(word: string, index: Index): Map<string, number> {
   index.stems ??= byStem(index.byWord.keys())
   const form = index.stems.get(stem(word)) ?? tableForm(word)
 
-  if (form !== undefined)
-    return new Map([[form, 1]])
 
   const uses = (candidate: string) => index.byWord.get(candidate)?.length ?? 0
-  // A word of the names comes first, by how many hold it; a word only the table knows, by how many names its related words reach.
+  // Ranking the table-only completions by the names their related words reach was benched and lost half a point of prefix recall to the shortest first.
   const completed = [...new Set([...completions(word, index.byWord.keys()), ...tableCompletions(word)])]
-    .map(candidate => index.byWord.has(candidate)
-      ? { candidate, named: 1, reached: uses(candidate) }
-      : { candidate, named: 0, reached: relatedWords(candidate).reduce((reached, [related]) => reached + uses(related), 0) })
-    .sort((a, b) => b.named - a.named || b.reached - a.reached || a.candidate.length - b.candidate.length)
+    .sort((a, b) => uses(b) - uses(a) || a.length - b.length)
     .slice(0, MOST)
-    .map(({ candidate }) => candidate)
   const respelled = [...new Map([...tableRespellings(word), ...respellings(word, index.byWord.keys())])]
     .sort((a, b) => a[1] - b[1] || uses(b[0]) - uses(a[0]) || (a[0] < b[0] ? -1 : 1))
     .slice(0, MOST)
@@ -114,6 +110,8 @@ function readings(word: string, index: Index): Map<string, number> {
 
   for (const candidate of completed)
     found.set(candidate, Math.max(found.get(candidate) ?? 0, COMPLETION_WEIGHT))
+  if (form !== undefined)
+    found.set(form, 1)
 
   return found
 }
@@ -191,9 +189,8 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
   const literals = byHeld.slice(0, Held.InsideWord).flat()
   // Each credited name's score, and the query words it answers as one bit each, so a word counts once however many readings reach it.
   const scores = new Map<string, { score: number, answered: number }>()
-  let answering = 0
 
-  const credit = (word: string, weight: number) => {
+  const credit = (word: string, weight: number, answering: number) => {
     for (const name of index.byWord.get(word) ?? []) {
       const gained = weight / index.wordCount.get(name)!
       const known = scores.get(name)
@@ -208,22 +205,18 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
     }
   }
 
-  // Two neighbouring query words also stand for the word they make joined when it is known, as `sign out` for `signout`, answering both; its related words leave out those two, which answer one word only.
-  const apart = typedWords.map((typed, i) => ({ typed, bits: bit(i), parts: [] as string[] }))
+  // Two neighbouring query words also stand for the word they make joined when it is known, as `sign out` for `signout`: it answers both through the names holding it and its strong relations, as `checkmark` means `check`, while a weak one, as `adduser` to `user`, only adds to the score.
+  const apart = typedWords.map((typed, i) => ({ typed, bits: bit(i), floor: 0 }))
   const joined = typedWords.slice(1)
-    .map((word, i) => ({ typed: typedWords[i]! + word, bits: bit(i) | bit(i + 1), parts: [typedWords[i]!, word] }))
+    .map((word, i) => ({ typed: typedWords[i]! + word, bits: bit(i) | bit(i + 1), floor: JOINED_ANSWERS }))
     .filter(({ typed }) => index.byWord.has(typed) || relatedWords(typed).length > 0)
 
-  for (const { typed, bits, parts } of [...apart, ...joined]) {
-    answering = bits
-
+  for (const { typed, bits, floor } of [...apart, ...joined]) {
     for (const [reading, weight] of readings(typed, index)) {
-      credit(reading, weight * OWN_WEIGHT)
+      credit(reading, weight * OWN_WEIGHT, bits)
 
-      for (const [related, strength] of relatedWords(reading)) {
-        if (!parts.includes(related))
-          credit(related, weight * strength)
-      }
+      for (const [related, strength] of relatedWords(reading))
+        credit(related, weight * strength, strength >= floor ? bits : 0)
     }
   }
 

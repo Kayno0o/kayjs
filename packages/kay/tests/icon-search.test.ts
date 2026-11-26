@@ -137,12 +137,16 @@ describe('findIcons', () => {
     expect(findIcons(['zoom-out', 'sign', 'logout'], 'sign out')).toEqual(['logout', 'sign', 'zoom-out'])
   })
 
-  it('leaves out the words a joined reading is made of from its related words', () => {
-    replaceTable({ signout: 'logout 100 sign 50' })
+  it('lets a word strongly related to a joined reading answer both query words', () => {
+    replaceTable({ checkmark: 'check 50 checks 28', mark: 'tick 30' })
 
-    expect(findIcons(['direction-sign', 'logout'], 'sign out')).toEqual(['logout', 'direction-sign'])
-    replaceTable({ signout: 'logout 100 out 50' })
-    expect(findIcons(['sign', 'zoom-out', 'logout'], 'sign out')).toEqual(['logout', 'sign', 'zoom-out'])
+    expect(findIcons(['checks', 'check-tick', 'check', 'mark'], 'check mark')).toEqual(['check', 'check-tick', 'mark', 'checks'])
+  })
+
+  it('lets a word weakly related to a joined reading add to its score only', () => {
+    replaceTable({ adduser: 'user 12', add: 'plus 80' })
+
+    expect(findIcons(['user', 'user-plus'], 'add user')).toEqual(['user-plus', 'user'])
   })
 
   it('reads two query words joined when only the names know the joined word', () => {
@@ -177,11 +181,6 @@ describe('findIcons', () => {
     expect(findIcons(['magnifier', 'file'], 'saving')).toEqual([])
   })
 
-  it('completes a word into the table words reaching the most names', () => {
-    replaceTable({ trace: 'pen 50', track: 'road 50', trade: 'coin 50', transport: 'car 50 bus 50' })
-
-    expect(findIcons(['car', 'bus', 'pen'], 'tra')).toEqual(['car', 'bus', 'pen'])
-  })
 
   it('completes a word into the names\' own words before the table\'s', () => {
     replaceTable({ trace: 'pen 50 bus 50', track: 'pen 50 bus 50', trade: 'pen 50 bus 50' })
