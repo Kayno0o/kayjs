@@ -5,7 +5,7 @@ import type { Owner } from '../reactivity/index'
 import { DOM_PROPS } from '../attrs'
 import { batch, createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, untrack } from '../reactivity/index'
 import { assertRenderable } from '../unrenderable'
-import { claimInsert, isBlockedAttr, setAttr, setClass, setProp, setStyle, skipRange } from './index'
+import { claimInsert, claimRange, isBlockedAttr, setAttr, setClass, setProp, setStyle, skipRange } from './index'
 
 const RAW_HTML = Symbol.for('kay.html')
 
@@ -218,6 +218,8 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
     }
     const next = res.result
     const ssrNodes = res.nodes
+    // An insert born in a fragment follows its marker into the parent the fragment was appended to.
+    const host = marker?.parentNode ?? parent
 
     if (next == null && ssrNodes !== undefined) {
       current = ssrNodes
@@ -251,7 +253,7 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
           if (ssrNodes !== undefined)
             clearInserted(ssrNodes)
           textNode = document.createTextNode(str)
-          parent.insertBefore(textNode, marker)
+          host.insertBefore(textNode, marker)
         }
       }
       else if (textNode.data !== str) {
@@ -274,7 +276,7 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
     if (next instanceof Node) {
       if (current === next)
         return
-      if (current === null && next.parentNode === parent) {
+      if (current === null && next.parentNode === host) {
         if (ssrNodes !== undefined)
           clearInserted(ssrNodes.filter(n => n !== next))
         current = next
@@ -285,11 +287,11 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
         clearInserted(ssrNodes)
       if (next.nodeType === 11) {
         const nodes = Array.from(next.childNodes)
-        parent.insertBefore(next, marker)
+        host.insertBefore(next, marker)
         current = nodes
       }
       else {
-        parent.insertBefore(next, marker)
+        host.insertBefore(next, marker)
         current = next
       }
       return
@@ -301,9 +303,22 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
         const kept = new Set(next)
         clearInserted(ssrNodes.filter(n => !kept.has(n)))
       }
-      current = insertAll(parent, marker, next)
+      current = insertAll(host, marker, next)
     }
   })
+}
+
+// A dynamic child of a root fragment: hydrates against its SSR range, or renders before a comment anchor that travels with the fragment.
+export function fragInsert(value: () => unknown): Node | null {
+  const start = claimRange()
+  if (start !== null) {
+    insert(start.parentNode!, value, start)
+    return null
+  }
+  const f = document.createDocumentFragment()
+  const anchor = f.appendChild(document.createComment(''))
+  insert(f, value, anchor)
+  return f
 }
 
 export function show(

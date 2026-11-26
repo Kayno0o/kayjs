@@ -1102,23 +1102,22 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         if (isJsxNode(only))
           return compileRootJsx(only, scopeRewrites)
         if (only.type === 'JSXText')
-          return `document.createTextNode(${JSON.stringify(decodeHtmlEntities(cleanJsxText(only.value)))})`
-        if (only.type === 'JSXExpressionContainer' && only.expression.type !== 'JSXEmptyExpression') {
-          const exprCode = compileExpression(only.expression, scopeRewrites)
-          return `(() => { const _f = document.createDocumentFragment(); ${use('insert')}(_f, () => (${exprCode}), null, null); return _f; })()`
-        }
+          return `${use('fragText')}(${JSON.stringify(decodeHtmlEntities(cleanJsxText(only.value)))})`
+        if (only.type === 'JSXExpressionContainer' && only.expression.type !== 'JSXEmptyExpression')
+          return `${use('fragInsert')}(() => (${compileExpression(only.expression, scopeRewrites)}))`
       }
 
+      // Each child claims its own SSR nodes while hydrating, so the siblings after a dynamic one keep theirs (#3596).
       const items = meaningful.map((child) => {
         if (isJsxNode(child))
           return compileRootJsx(child, scopeRewrites)
         if (child.type === 'JSXText')
-          return `document.createTextNode(${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value)))})`
+          return `${use('fragText')}(${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value)))})`
         if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression') {
           const exprCode = compileExpression(child.expression, scopeRewrites)
           if (isNodeCapableExpr(child.expression, jsxNodes))
-            return `(() => { const _f = document.createDocumentFragment(); ${use('insert')}(_f, () => (${exprCode}), null, null); return _f; })()`
-          return `(() => { const _t = document.createTextNode(""); ${use('effect')}(() => ${use('setText')}(_t, (${exprCode}))); return _t; })()`
+            return `${use('fragInsert')}(() => (${exprCode}))`
+          return `(() => { const _t = ${use('fragText')}("", true); ${use('effect')}(() => ${use('setText')}(_t, (${exprCode}))); return _t; })()`
         }
         return 'document.createTextNode("")'
       })
@@ -1267,7 +1266,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   if (used.size > 0) {
     const hasLoop = used.delete('loop')
-    const EXTRA_HELPERS = ['insert', 'mergeProps', 'omit', 'setInnerHtml', 'show', 'spread']
+    const EXTRA_HELPERS = ['fragInsert', 'insert', 'mergeProps', 'omit', 'setInnerHtml', 'show', 'spread']
     const usedExtras: string[] = []
     for (const name of EXTRA_HELPERS) {
       if (used.delete(name))

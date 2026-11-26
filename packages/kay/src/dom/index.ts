@@ -188,6 +188,30 @@ export function template(html: string, isSvg?: boolean): () => Node {
   }
 }
 
+// Moves the hydration cursor past the SSR range of a root fragment's dynamic child (`<!--k[-->...<!--k]-->` or `<!---->text<!---->`) and returns its opening marker; null when not hydrating.
+export function claimRange(): Node | null {
+  const start = hydrating ? hydrateNode : null
+  if (start === null || start.nodeType !== 8)
+    return null
+  hydrateNode = skipRange(start)?.nextSibling ?? null
+  return start
+}
+
+// A text child of a root fragment, claimed from the SSR markup while hydrating; a dynamic one sits between `<!---->` markers.
+export function fragText(data: string, dynamic?: boolean): Text {
+  if (dynamic) {
+    const start = claimRange()
+    if (start !== null)
+      return textAfter(start)
+  }
+  else if (hydrating && hydrateNode !== null && hydrateNode.nodeType === 3) {
+    const text = hydrateNode as Text
+    hydrateNode = text.nextSibling
+    return text
+  }
+  return document.createTextNode(data)
+}
+
 export function frag(...nodes: Node[]): Node | null {
   if (hydrating)
     return null
