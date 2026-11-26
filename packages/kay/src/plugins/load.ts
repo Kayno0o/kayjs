@@ -9,21 +9,26 @@ import { createAppContext, getAppContext, runWithAppContext } from './context'
 let configReloadSeq = 0
 
 // In dev the query follows the file content: a save elsewhere reuses the loaded config and its plugin instances instead of re-running every factory.
-function configSpecifier(configPath: string, fresh: boolean): string {
+function configSpecifier(configPath: string, fresh: boolean, isDev: boolean): string {
   if (fresh)
     return `${configPath}?v=fresh-${++configReloadSeq}`
-  if (process.env.KAY_DEV === '1')
+  if (isDev)
     return `${configPath}?v=${Bun.hash(readFileSync(configPath)).toString(36)}`
   return configPath
 }
 
-export async function loadConfig(root: string, options?: { fresh?: boolean, appContext?: AppRuntimeContext }): Promise<KayConfig> {
+export async function loadConfig(
+  root: string,
+  options?: { fresh?: boolean | undefined, dev?: boolean | undefined, nodeEnv?: string | undefined, appContext?: AppRuntimeContext | undefined },
+): Promise<KayConfig> {
   const absRoot = resolve(root)
   const configPath = join(absRoot, 'kay.config.ts')
   if (!existsSync(configPath))
     return {}
-  const spec = configSpecifier(configPath, options?.fresh === true)
   const active = options?.appContext ?? getAppContext()
+  const isDev = options?.dev ?? active?.dev ?? (process.env.KAY_DEV === '1')
+  const resolvedNodeEnv = options?.nodeEnv ?? active?.nodeEnv
+  const spec = configSpecifier(configPath, options?.fresh === true, isDev)
   const ctx = active !== undefined && active.root === absRoot
     ? active
     : createAppContext({
@@ -31,7 +36,8 @@ export async function loadConfig(root: string, options?: { fresh?: boolean, appC
         outDir: join(absRoot, 'dist'),
         publicDir: join(absRoot, 'dist', 'public'),
         assetPrefix: '/_kay',
-        dev: process.env.KAY_DEV === '1',
+        dev: isDev,
+        nodeEnv: resolvedNodeEnv,
       })
   let mod: { default?: KayConfig }
   try {

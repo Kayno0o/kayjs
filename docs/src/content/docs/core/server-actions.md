@@ -60,7 +60,7 @@ export default function SettingsPage({ locals }: { locals: Record<string, unknow
 
 No client JavaScript is shipped. Form fields are parsed, validated, and executed on the server.
 
-- **Array fields**: A field your schema declares as an array always arrives as one — including a checkbox group with zero or one box checked, or a multi-select with a single choice.
+- **Array fields**: A field your schema declares as an array always arrives as one — including a checkbox group with zero or one box checked, or a multi-select with a single choice. When a non-JSON form submit fails with a top-level array or missing-field mismatch, Kay retries validation once with those fields wrapped as arrays, so keep async schema refinements side-effect free if the same form also contains array fields.
 - **Validation error flash**: When a plain HTML form fails validation, Kay stores `fieldErrors` and safe submitted `values` in a short-lived `HttpOnly` cookie and responds with a `303` redirect back to the trusted `Referer`. Read and clear it on the next render with `getActionError(locals)`.
 - **Sensitive fields**: Password, token, secret, card, and similar fields are stripped from flashed values automatically. Pass `{ flashFields: ['project', 'target'] }` as the third argument to `action()` to specify an explicit allowlist.
 

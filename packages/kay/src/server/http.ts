@@ -94,6 +94,7 @@ export interface ServerOptions extends ServerRuntimeConfig {
   outDir?: string | undefined
   port?: number | undefined
   dev?: boolean | undefined
+  nodeEnv?: string | undefined
   /** @internal Imports a built server module by absolute path; `kay dev` passes one that keeps unchanged modules loaded. */
   importModule?: ((path: string) => Promise<Record<string, unknown>>) | undefined
   /** @internal Hears every unhandled route, action and plugin error; `testApp().errors` fills from it. */
@@ -141,6 +142,7 @@ export interface EmbeddedServerConfig extends ServerRuntimeConfig {
   outDir?: string | undefined
   publicDir?: string | undefined
   dev?: boolean | undefined
+  nodeEnv?: string | undefined
   errorSink?: ((info: ServerErrorInfo) => void) | undefined
 }
 

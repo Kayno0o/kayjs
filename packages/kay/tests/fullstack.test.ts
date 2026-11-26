@@ -629,6 +629,28 @@ describe('form posts parsed for an action schema', () => {
       } } })
       export const members = action(shape({ constructor: 'string', __proto__: 'string', hasOwnProperty: 'string', toString: 'string' }), input => input)
       export const choices = action(shape({ title: 'long', tags: 'array', pick: 'array' }), input => input)
+      let validateRuns = 0
+      export function resetRuns() { validateRuns = 0 }
+      export function getRuns() { return validateRuns }
+      const countedSchema = {
+        '~standard': {
+          version: 1 as const,
+          vendor: 'test',
+          async validate(raw: unknown) {
+            validateRuns++
+            const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+            const issues: Array<{ message: string, path: string[], code?: string, expected?: string }> = []
+            if (typeof o.email !== 'string' || !o.email.includes('@'))
+              issues.push({ message: 'Invalid email', path: ['email'], code: 'invalid_string' })
+            if (o.tags !== undefined && !Array.isArray(o.tags))
+              issues.push({ message: 'Expected array, received string', path: ['tags'], code: 'invalid_type', expected: 'array' })
+            else if (!Object.prototype.hasOwnProperty.call(o, 'tags'))
+              issues.push({ message: 'Required', path: ['tags'], code: 'invalid_type', expected: 'array' })
+            return issues.length > 0 ? { issues } : { value: o }
+          },
+        },
+      }
+      export const signup = action(countedSchema, input => input)
     `)
     app = await testApp({ root: dir })
     url = app.manifest!.actions.find(a => a.exportName === 'members')!.url
@@ -659,5 +681,28 @@ describe('form posts parsed for an action schema', () => {
   test('a JSON body is taken as sent, a single value staying a single value', async () => {
     url = app.manifest!.actions.find(a => a.exportName === 'choices')!.url
     expect((await (await app.post(url, { title: 'Tea', tags: 'a', pick: ['x'] })).json() as { fieldErrors: unknown }).fieldErrors).toEqual({ tags: 'tags must be array' })
+  })
+
+  test('#3606: invalid non-array form fields run schema validation once, and mixed array retries run at most twice', async () => {
+    const mod = await app.import('src/routes/form.ts') as { resetRuns: () => void, getRuns: () => number }
+    url = app.manifest!.actions.find(a => a.exportName === 'signup')!.url
+
+    // Non-array validation failure (tags already an array of 2 values, email invalid): runs ONCE.
+    mod.resetRuns()
+    const badEmail = await post([['email', 'nope'], ['tags', 'a'], ['tags', 'b']])
+    expect(badEmail.fieldErrors).toEqual({ email: 'Invalid email' })
+    expect(mod.getRuns()).toBe(1)
+
+    // Missing array field (0 boxes checked) + invalid email: retries only `tags` once (2 runs total, never 3).
+    mod.resetRuns()
+    const missingArrayAndBadEmail = await post([['email', 'nope']])
+    expect(missingArrayAndBadEmail.fieldErrors).toEqual({ email: 'Invalid email' })
+    expect(mod.getRuns()).toBe(2)
+
+    // Valid email + 0 boxes checked (Zod-like `expected: 'array', message: 'Required'`): succeeds in 2 runs with tags=[].
+    mod.resetRuns()
+    const okZero = await post([['email', 'a@b.com']])
+    expect(okZero).toEqual({ ok: true, data: { email: 'a@b.com', tags: [] } })
+    expect(mod.getRuns()).toBe(2)
   })
 })

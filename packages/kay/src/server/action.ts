@@ -172,13 +172,37 @@ function setField(target: Record<string, unknown>, key: string, value: unknown):
   Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true })
 }
 
-// A form sends one checked box as a single value and none as nothing, so a field the schema wants as an array fails. Each failing top-level field is retried as an array, and the array is kept only where it clears that field's issue.
+const ARRAY_WORD_RE = /\barray\b/i
+const MISSING_WORD_RE = /\b(?:required|missing|undefined)\b/i
+const NON_ARRAY_TYPE_RE = /\b(?:string|number|boolean|object|file|date|bigint|symbol)\b/i
+
+function looksLikeFormArrayMismatch(issue: StandardSchemaIssue, body: Record<string, unknown>, key: string): boolean {
+  const meta = issue as { code?: unknown, expected?: unknown, type?: unknown }
+  if (typeof meta.expected === 'string')
+    return ARRAY_WORD_RE.test(meta.expected)
+  if (typeof meta.type === 'string') {
+    if (meta.type.toLowerCase() === 'array')
+      return true
+    if (NON_ARRAY_TYPE_RE.test(meta.type))
+      return false
+  }
+  if (typeof meta.code === 'string' && meta.code !== 'invalid_type')
+    return false
+  if (ARRAY_WORD_RE.test(issue.message))
+    return true
+  // An unchecked checkbox group is omitted from FormData; generic "Required"/"missing" messages without a non-array type may be expecting [].
+  return !Object.hasOwn(body, key) && MISSING_WORD_RE.test(issue.message) && !NON_ARRAY_TYPE_RE.test(issue.message)
+}
+
+// A form sends one checked box as a single value and none as nothing, so a field the schema wants as an array fails. Each failing top-level field whose issue looks like a missing/non-array type mismatch is retried as an array, and the array is kept only where it clears that field's issue.
 async function retryWithFormArrays(schema: StandardSchemaV1, body: Record<string, unknown>, failed: ValidationFailure): Promise<ValidationResult<unknown>> {
   const retried = { ...body }
   const wrapped: string[] = []
   for (const issue of failed.issues) {
     const key = topLevelKey(issue)
     if (key === undefined || Array.isArray(retried[key]) || wrapped.includes(key))
+      continue
+    if (!looksLikeFormArrayMismatch(issue, body, key))
       continue
     setField(retried, key, Object.hasOwn(body, key) ? [body[key]] : [])
     wrapped.push(key)

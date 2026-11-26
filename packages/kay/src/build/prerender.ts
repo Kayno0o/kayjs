@@ -35,6 +35,7 @@ export interface PrerenderOptions {
   /** Plugins passed to `build()` itself, which the app runs with in place of its bundled config's. */
   pluginOverride?: KayPlugin[] | undefined
   isDev: boolean
+  nodeEnv?: string | undefined
   isStatic: boolean
   /** Where the HTML lands: the static stage dir, or `<outDir>/prerendered`. */
   prerenderDir: string
@@ -46,7 +47,7 @@ export async function prerender(options: PrerenderOptions) {
   const { root, outDir, prerenderDir, isStatic } = options
   // Pages render with the runtime's own plugin instances, from the bundled config; `options.plugins` are the build's native ones.
   const { startBuiltApp } = await import('../server/loader')
-  const { app, entry } = await startBuiltApp({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, site: options.site, plugins: options.pluginOverride, dev: options.isDev })
+  const { app, entry } = await startBuiltApp({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, site: options.site, plugins: options.pluginOverride, dev: options.isDev, nodeEnv: options.nodeEnv })
   mkdirSync(prerenderDir, { recursive: true })
 
   for (const route of options.routes) {

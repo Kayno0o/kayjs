@@ -59,6 +59,8 @@ export interface BuildOptions {
   compile?: string | boolean | undefined
   /** Run in development mode (keeps NODE_ENV as development and skips production client asset precompression; auto-detected via KAY_DEV=1). */
   dev?: boolean | undefined
+  /** Explicit NODE_ENV threaded through AppRuntimeContext and client defines without mutating process.env. */
+  nodeEnv?: string | undefined
 }
 
 /** Everything one build run needs, resolved once from the options and `kay.config.ts`. */
@@ -77,6 +79,7 @@ interface BuildRun {
   site: string | undefined
   minify: boolean
   isDev: boolean
+  nodeEnv: string | undefined
   appCtx: AppRuntimeContext
   publicFiles: PublicFiles
 }
@@ -87,14 +90,15 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   }
 
   const root = resolve(options.root)
-  const fileConfig = await loadConfig(root)
+  const isDev = options.dev ?? (process.env.KAY_DEV === '1')
+  const effectiveNodeEnv = options.nodeEnv ?? (isDev ? undefined : (process.env.NODE_ENV ?? 'production'))
+  const fileConfig = await loadConfig(root, { dev: isDev, nodeEnv: effectiveNodeEnv })
   const routesDir = resolve(root, options.routesDir ?? fileConfig.routesDir ?? 'src/routes')
   const finalOutDir = resolve(root, options.outDir ?? fileConfig.outDir ?? 'dist')
   const publicDir = resolve(root, options.publicDir ?? fileConfig.publicDir ?? 'public')
 
   assertSafeOutDir(root, finalOutDir, routesDir, publicDir)
 
-  const isDev = options.dev ?? (process.env.KAY_DEV === '1')
   const cacheBaseDir = join(root, '.kay-cache')
   const cacheExisted = existsSync(cacheBaseDir)
   const stageSuffix = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -110,12 +114,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     assetPrefix,
     site,
     dev: isDev,
+    nodeEnv: effectiveNodeEnv,
     onRegisterPublicFile: publicFiles.register,
   })
-
-  const prevNodeEnv = process.env.NODE_ENV
-  if (!isDev)
-    process.env.NODE_ENV ??= 'production'
 
   try {
     return await runWithAppContext(appCtx, () => runBuild({
@@ -132,17 +133,12 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       site,
       minify: options.minify ?? true,
       isDev,
+      nodeEnv: effectiveNodeEnv,
       appCtx,
       publicFiles,
     }))
   }
   finally {
-    if (!isDev) {
-      if (prevNodeEnv !== undefined)
-        process.env.NODE_ENV = prevNodeEnv
-      else
-        delete process.env.NODE_ENV
-    }
     if (options.static) {
       if (staticStageDir !== undefined)
         rmSync(staticStageDir, { recursive: true, force: true })
@@ -213,7 +209,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     .flatMap(p => p.css ?? [])
     .map(c => resolve(root, c))
     .filter(c => existsSync(c))
-  const env = { root, outDir, clientDir, serverDir, assetPrefix, minify: run.minify, isDev, analyze: options.analyze === true || options.maxJs !== undefined, graph, cache: options.cache, plugins, actionsByFile, islands }
+  const env = { root, outDir, clientDir, serverDir, assetPrefix, minify: run.minify, isDev, nodeEnv: run.nodeEnv, analyze: options.analyze === true || options.maxJs !== undefined, graph, cache: options.cache, plugins, actionsByFile, islands }
 
   const routeEntryFiles = new Set([...specialFiles, ...pageFiles])
   const standaloneActionFiles = [...actionsByFile.keys()].filter(f => !routeEntryFiles.has(f))
@@ -367,7 +363,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const prerenderRoutes = options.prerender !== false || isStatic ? routes.filter(r => r.prerender) : []
   const prerenderDir = isStatic ? run.staticStageDir! : join(outDir, 'prerendered')
   const app = prerenderRoutes.length > 0 || isStatic
-    ? await prerender({ root, outDir, assetPrefix, site: run.site, plugins, pluginOverride: options.plugins, isDev, isStatic, prerenderDir, routes: prerenderRoutes })
+    ? await prerender({ root, outDir, assetPrefix, site: run.site, plugins, pluginOverride: options.plugins, isDev, nodeEnv: run.nodeEnv, isStatic, prerenderDir, routes: prerenderRoutes })
     : undefined
 
   try {

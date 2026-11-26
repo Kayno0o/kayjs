@@ -24,6 +24,7 @@ export interface BundleEnv {
   assetPrefix: string
   minify: boolean
   isDev: boolean
+  nodeEnv?: string | undefined
   analyze?: boolean | undefined
   graph: ModuleGraph
   cache: BuildCache | undefined
@@ -268,7 +269,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
         KAY_DEFERRED: hasDeferredHydrate ? 'true' : 'false',
         KAY_CLIENT_ONLY: hasClientOnlyHydrate ? 'true' : 'false',
         KAY_BROWSER: 'true',
-        'process.env.NODE_ENV': JSON.stringify(env.isDev ? 'development' : 'production'),
+        'process.env.NODE_ENV': JSON.stringify(env.nodeEnv ?? (env.isDev ? 'development' : 'production')),
         ...envDefines,
       },
       plugins: [plugin, ...pluginBunPlugins(env, 'client')],

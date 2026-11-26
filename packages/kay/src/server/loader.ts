@@ -69,6 +69,7 @@ export async function startBuiltApp(options: ServerOptions): Promise<{ app: KayA
     outDir,
     publicDir: join(outDir, 'public'),
     dev: options.dev ?? (process.env.KAY_DEV === '1'),
+    nodeEnv: options.nodeEnv,
     errorSink: options.errorSink,
   })
   return { app, entry }
@@ -84,7 +85,7 @@ async function loadServerEntry(options: ServerOptions): Promise<BuiltOutput> {
   let outDir = resolve(root, options.outDir ?? 'dist')
   // kay.config.ts is read natively only to find an `outDir` it moved; the app itself runs from its bundled copy.
   if (options.outDir === undefined && !existsSync(join(outDir, 'manifest.json')))
-    outDir = resolve(root, (await loadConfig(root)).outDir ?? 'dist')
+    outDir = resolve(root, (await loadConfig(root, { dev: options.dev, nodeEnv: options.nodeEnv })).outDir ?? 'dist')
   const manifestPath = join(outDir, 'manifest.json')
   if (!existsSync(manifestPath)) {
     if (existsSync(outDir) && readdirSync(outDir).length > 0)
@@ -102,7 +103,7 @@ async function loadServerEntry(options: ServerOptions): Promise<BuiltOutput> {
 }
 
 async function serveStaticDir(options: ServerOptions, root: string, outDir: string): Promise<KayApp> {
-  const config = await loadConfig(root)
+  const config = await loadConfig(root, { dev: options.dev, nodeEnv: options.nodeEnv })
   return createStaticDirServer(
     outDir,
     options.assetPrefix ?? config.assetPrefix ?? '/_kay',

@@ -37,6 +37,8 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     assetPrefix: options.assetPrefix,
     site: options.site,
     plugins: options.plugins,
+    dev: options.dev,
+    nodeEnv: options.nodeEnv,
   })
 
   const errors: string[] = []
@@ -44,6 +46,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     root: options.root,
     outDir: options.outDir,
     dev: options.dev,
+    nodeEnv: options.nodeEnv,
     ...resolveServerConfig(undefined, options),
     errorSink: ({ error, request, source }) => {
       errors.push(`${source} ${request.method} ${new URL(request.url).pathname}: ${error instanceof Error ? error.message : String(error)}`)

@@ -123,7 +123,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     publicDir: serverPublicDir,
     assetPrefix,
     site,
-    dev: isDev,
+    dev: isDev, nodeEnv: config.nodeEnv ?? parentAppCtx?.nodeEnv,
     onRegisterPublicFile: (rel) => {
       parentAppCtx?.registerPublicFile(rel)
       files.registerPublicFromDisk(serverPublicDir, rel)

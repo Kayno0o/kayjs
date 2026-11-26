@@ -164,24 +164,9 @@ export async function devServer(options: DevServerOptions): Promise<{
   rebuild: () => Promise<void>
   stats: () => BuildCacheStats
 }> {
-  const prevKayDev = process.env.KAY_DEV
-  const restoreKayDev = (): void => {
-    if (prevKayDev === undefined)
-      delete process.env.KAY_DEV
-    else
-      process.env.KAY_DEV = prevKayDev
-  }
-  process.env.KAY_DEV = '1'
   const root = resolve(options.root)
   const devRoot = join(root, '.kay-dev')
-  let initialCfg: Awaited<ReturnType<typeof loadConfig>>
-  try {
-    initialCfg = await loadConfig(root)
-  }
-  catch (error) {
-    restoreKayDev()
-    throw error
-  }
+  const initialCfg = await loadConfig(root, { dev: true })
   const assetPrefix = (initialCfg.assetPrefix ?? '/_kay').replace(/\/$/, '')
   let reloadAssets = makeDevReloadAssets(assetPrefix)
   const srcDir = resolve(root, 'src')
@@ -311,7 +296,7 @@ export async function devServer(options: DevServerOptions): Promise<{
     try {
       if (resetCache) {
         clearBuildCache(buildCache)
-        const freshCfg = await loadConfig(root, { fresh: true })
+        const freshCfg = await loadConfig(root, { fresh: true, dev: true })
         activeAssetPrefix = (freshCfg.assetPrefix ?? '/_kay').replace(/\/$/, '')
         reloadAssets = makeDevReloadAssets(activeAssetPrefix)
         refreshPluginWatchers(freshCfg)
@@ -548,7 +533,6 @@ export async function devServer(options: DevServerOptions): Promise<{
       server.stop(true)
       void currentApp?.dispose?.()
       rmSync(devRoot, { recursive: true, force: true })
-      restoreKayDev()
     },
   }
 }

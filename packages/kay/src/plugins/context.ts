@@ -10,6 +10,7 @@ export interface AppRuntimeContext {
   readonly assetPrefix: string
   readonly site?: string | undefined
   readonly dev: boolean
+  readonly nodeEnv?: string | undefined
   provide<T>(key: ServiceKey<T>, value: T): void
   inject<T>(key: ServiceKey<T>): T | undefined
   registerPublicFile(relPath: string): void
@@ -22,6 +23,7 @@ export interface CreateAppContextOptions {
   assetPrefix: string
   site?: string | undefined
   dev: boolean
+  nodeEnv?: string | undefined
   onRegisterPublicFile?: ((relPath: string) => void) | undefined
 }
 
@@ -41,6 +43,7 @@ export function createAppContext(options: CreateAppContextOptions): AppRuntimeCo
     assetPrefix: options.assetPrefix,
     ...(site !== undefined && site !== '' ? { site } : {}),
     dev: options.dev,
+    ...(options.nodeEnv !== undefined ? { nodeEnv: options.nodeEnv } : {}),
     // Keyed by name: the natively loaded config and the bundled app each hold their own key object.
     provide<T>(key: ServiceKey<T>, value: T): void {
       services.set(key.name, value)

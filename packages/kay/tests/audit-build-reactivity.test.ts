@@ -258,10 +258,11 @@ describe('audit #3526 — Box 34: NODE_ENV=production during kay build client bu
       }
     `)
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { nodeEnv } from '@kayjs/kay/server'
       import { EnvWidget } from '../components/EnvWidget'
       export const prerender = true
       export default function Home() {
-        return <main data-env={process.env.NODE_ENV ?? 'unset'}><EnvWidget /></main>
+        return <main data-env={nodeEnv() ?? 'unset'} data-raw-env={process.env.NODE_ENV ?? 'unset'}><EnvWidget /></main>
       }
     `)
 
@@ -271,12 +272,13 @@ describe('audit #3526 — Box 34: NODE_ENV=production during kay build client bu
     try {
       // Production build
       const prodManifest = await build({ root: dir, outDir: 'dist-prod', minify: false })
-      // NODE_ENV restored after build
+      // process.env.NODE_ENV is never mutated during or after build (#3606)
       expect(process.env.NODE_ENV).toBeUndefined()
 
-      // Prerendered HTML saw NODE_ENV=production
+      // Prerendered HTML saw nodeEnv() === 'production' via AppRuntimeContext without mutating process.env.NODE_ENV
       const prerenderedHtml = readFileSync(join(dir, 'dist-prod/prerendered/index.html'), 'utf8')
       expect(prerenderedHtml).toContain('data-env="production"')
+      expect(prerenderedHtml).toContain('data-raw-env="unset"')
 
       // Client island chunk inlined "production" and did not leave raw process.env.NODE_ENV
       const widgetUrl = Object.values(prodManifest.islands)[0]!
@@ -297,6 +299,65 @@ describe('audit #3526 — Box 34: NODE_ENV=production during kay build client bu
         process.env.NODE_ENV = prevEnv
       else
         delete process.env.NODE_ENV
+    }
+  })
+
+  test('#3606: concurrent production build(), dev build(), and devServer() do not mutate process.env or race', async () => {
+    const { devServer } = await import('../src/dev/index')
+    const prodDir = makeTempProject('kay-concurrent-prod-')
+    const devDir = makeTempProject('kay-concurrent-dev-')
+    const srvDir = makeTempProject('kay-concurrent-srv-')
+    for (const d of [prodDir, devDir, srvDir]) {
+      mkdirSync(join(d, 'src/routes'), { recursive: true })
+      writeFileSync(join(d, 'src/routes/index.tsx'), `
+        import { nodeEnv } from '@kayjs/kay/server'
+        export const prerender = true
+        export default function Home() {
+          return <p data-env={nodeEnv() ?? 'unset'} data-raw-env={process.env.NODE_ENV ?? 'unset'} data-kay-dev={process.env.KAY_DEV ?? 'unset'}>ok</p>
+        }
+      `)
+    }
+
+    const prevNodeEnv = process.env.NODE_ENV
+    const prevKayDev = process.env.KAY_DEV
+    delete process.env.NODE_ENV
+    delete process.env.KAY_DEV
+
+    let srv: Awaited<ReturnType<typeof devServer>> | undefined
+    try {
+      const [, , started] = await Promise.all([
+        build({ root: prodDir, outDir: 'dist', minify: false }),
+        build({ root: devDir, outDir: 'dist', minify: false, dev: true }),
+        devServer({ root: srvDir, port: 0 }),
+      ])
+      srv = started
+
+      expect(process.env.NODE_ENV).toBeUndefined()
+      expect(process.env.KAY_DEV).toBeUndefined()
+
+      const prodHtml = readFileSync(join(prodDir, 'dist/prerendered/index.html'), 'utf8')
+      expect(prodHtml).toContain('data-env="production"')
+      expect(prodHtml).toContain('data-raw-env="unset"')
+      expect(prodHtml).toContain('data-kay-dev="unset"')
+
+      const devHtml = readFileSync(join(devDir, 'dist/prerendered/index.html'), 'utf8')
+      expect(devHtml).toContain('data-env="unset"')
+      expect(devHtml).toContain('data-kay-dev="unset"')
+
+      const srvHtml = await (await fetch(srv.url)).text()
+      expect(srvHtml).toContain('data-env="unset"')
+      expect(srvHtml).toContain('data-kay-dev="unset"')
+    }
+    finally {
+      srv?.stop()
+      if (prevNodeEnv !== undefined)
+        process.env.NODE_ENV = prevNodeEnv
+      else
+        delete process.env.NODE_ENV
+      if (prevKayDev !== undefined)
+        process.env.KAY_DEV = prevKayDev
+      else
+        delete process.env.KAY_DEV
     }
   })
 })
