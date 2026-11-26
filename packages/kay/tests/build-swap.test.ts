@@ -183,10 +183,10 @@ describe('kay only replaces a folder it marked as its own output (#3658)', () =>
 
   it('removes the stage a killed build left, and keeps one a running build owns', async () => {
     const dir = appWith({})
-    const dead = [join(dir, '.dist.stage-999999999-1-a'), join(dir, '.dist.prev-999999999-1-a')]
+    const dead = [join(dir, '.dist.stage-999999999-1-a'), join(dir, '.dist.prev-999999999-1-a'), join(dir, '.kay-cache/.static-stage-999999999-1-a')]
     const live = join(dir, `.dist.prev-${process.ppid}-1-a`)
     for (const folder of [...dead, live])
-      mkdirSync(folder)
+      mkdirSync(folder, { recursive: true })
 
     await build({ root: dir, minify: false })
 

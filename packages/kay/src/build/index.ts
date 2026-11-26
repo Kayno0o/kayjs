@@ -24,7 +24,7 @@ import { renderProblems } from './render-rules'
 import { planIslands } from './islands'
 import { buildActionEntries, buildRouteEntries } from './manifest'
 import { createPluginHost, createPublicFiles } from './plugin-host'
-import { assertOwnOutDir, processSuffix, removeStaleStages, stageDirFor, swapStage } from './output'
+import { assertOwnOutDir, processSuffix, removeDeadProcessDirs, removeStaleStages, stageDirFor, swapStage } from './output'
 import { prerender } from './prerender'
 import { analyzeBundleWeights, checkJsBudget, formatBundleReport, formatBundleReportJson, islandOrigins } from './report'
 import { SERVER_ENTRY_FILE, serverEntrySource } from './server-entry'
@@ -101,6 +101,9 @@ function recordCachedPluginAssets(cache: BuildCache | undefined, clientDir: stri
     cachedPluginAssets.delete(cache)
 }
 
+/** The server build a static export renders its pages from, under `.kay-cache/`. */
+const STATIC_STAGE_PREFIX = '.static-stage-'
+
 /** Everything one build run needs, resolved once from the options and `kay.config.ts`. */
 interface BuildRun {
   options: BuildOptions
@@ -143,10 +146,11 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const cacheExisted = existsSync(cacheBaseDir)
   const stageSuffix = processSuffix()
   const stageDir = stageDirFor(finalOutDir, stageSuffix)
-  const outDir = options.static ? join(cacheBaseDir, `.static-stage-${stageSuffix}`) : stageDir
+  const outDir = options.static ? join(cacheBaseDir, `${STATIC_STAGE_PREFIX}${stageSuffix}`) : stageDir
   const assetPrefix = (options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay').replace(/\/$/, '')
   assertOwnOutDir(root, finalOutDir, assetPrefix)
   removeStaleStages(finalOutDir)
+  removeDeadProcessDirs(cacheBaseDir, STATIC_STAGE_PREFIX)
   const site = (options.site ?? fileConfig.site)?.replace(/\/$/, '') || undefined
   const publicFiles = createPublicFiles()
   const appCtx = createAppContext({
