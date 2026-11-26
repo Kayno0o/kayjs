@@ -21,7 +21,21 @@ order: 4
 | `kay mcp-footprint` | Print `@kayjs/mcp` tool sizes in bytes and estimated tokens |
 | `kay i18n-check` | List missing translation keys across `@kayjs/i18n` locales |
 
-Plugins can register additional commands via `KayPlugin.commands`.
+Plugins can register additional commands via `KayPlugin.commands`. They are read from `kay.config.ts` only when the first word is not a built-in command, and they take `--root <dir>` to name the app folder.
+
+## Help, completion and exit codes
+
+Every command answers `--help` with its options and its exit codes. A mistyped command or option names the one you meant (`kay chekc` suggests `check`).
+
+Print a shell completion script with `kay --completions fish` (also `bash` and `zsh`), for example `kay --completions fish > ~/.config/fish/completions/kay.fish`.
+
+| Code | Meaning |
+| :--- | :--- |
+| `0` | The command did what was asked |
+| `1` | A finding or a failure: `kay check` found an error, `kay upgrade` has steps left to do by hand, a build failed or a route is over `--max-js` |
+| `2` | A usage error: an unknown command or option, a bad `--port` or `--max-js`, a missing argument |
+
+The CLI does not write a usage log: it runs on `@kaynooo/cli-kit` with that turned off.
 
 ## In-process testing (`@kayjs/kay/test`)
 

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -325,7 +325,13 @@ describe('kay dev with a broken kay.config.ts (#3584)', () => {
   it('fails with the syntax error and its position, from the CLI too', async () => {
     const dir = appWithConfig('export default {\n  port: 3000\n  lang: \'fr\',\n}\n')
     const lines: string[] = []
-    expect(await runCli(['dev', dir, '--port', '0'], { stdout: line => lines.push(line), stderr: line => lines.push(line) })).toBe(1)
-    expect(lines).toEqual(['kay: kay.config.ts:3:3: Expected "}" but found "lang"'])
+    const err = spyOn(process.stderr, 'write').mockImplementation((text: string | Uint8Array) => { lines.push(String(text)); return true })
+    try {
+      expect(await runCli(['dev', dir, '--port', '0'])).toBe(1)
+    }
+    finally {
+      err.mockRestore()
+    }
+    expect(lines.join('')).toContain('kay dev: kay.config.ts:3:3: Expected "}" but found "lang"')
   })
 })

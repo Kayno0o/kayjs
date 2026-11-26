@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -102,7 +102,13 @@ describe('kay upgrade moves an app onto @kayjs/kay (#3591)', () => {
     symlinkSync(join(import.meta.dir, '..'), join(dir, 'node_modules/@kayjs/kay'), 'dir')
 
     const lines: string[] = []
-    expect(await runCli(['upgrade', dir, '--no-install'], { stdout: line => lines.push(line), stderr: line => lines.push(line) })).toBe(0)
+    const log = spyOn(console, 'log').mockImplementation((line: string) => lines.push(line))
+    try {
+      expect(await runCli(['upgrade', dir, '--no-install'])).toBe(0)
+    }
+    finally {
+      log.mockRestore()
+    }
     expect(lines).toEqual(['  kay.config.ts', '  package.json', '  src/actions/notes.ts', '  src/routes/index.tsx', 'kay upgrade rewrote 4 files', 'Next: kay check'])
     expect(await checkProject(dir, { skipTypecheck: true })).toMatchObject({ ok: true, errors: [] })
   })

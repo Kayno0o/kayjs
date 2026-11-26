@@ -38,6 +38,7 @@
     "directory": "packages/kay"
   },
   "dependencies": {
+    "@kaynooo/cli-kit": "^0.52.0",
     "oxc-parser": "^0.155.0"
   }
 }
