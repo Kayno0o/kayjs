@@ -10,6 +10,8 @@ export type Related = Map<string, Map<string, number>>
 const DIMENSIONS = 384
 const BATCH = 512
 const MODEL = 'Xenova/bge-small-en-v1.5'
+// Each word is embedded in this sentence: it keeps opposites apart (`close` no longer neighbours `open`) and lifts single-word tag recall by about a point on the bench.
+const PROMPT = 'an icon of '
 const CACHE = `${import.meta.dir}/.cache`
 const MODULES = `${import.meta.dir}/node_modules`
 const WHOLE_WORD = /^[a-z]{3,}$/
@@ -18,6 +20,8 @@ const KEPT = 12
 const WEAKEST = 0.05
 // The words icon sets name a drawing style with, which say nothing of what an icon shows.
 const STYLES = new Set(['bold', 'duotone', 'fill', 'filled', 'line', 'outline', 'outlined', 'regular', 'round', 'rounded', 'sharp', 'solid', 'thin', 'twotone'])
+// Words no search means by meaning, which the prompt draws close to every word: function words, and the prompt's own `icon`.
+const NO_MEANING = new Set('a about above after again against all am an and any are as at be because been before being below between both but by can did do does doing down during each few for from further had has have having he her here hers herself him himself his how i icon icons if in into is it its itself just me more most my myself no nor not now of off on once only or other our ours ourselves out over own same she should so some such than that the their theirs them themselves then there these they this those through to too under until up very was we were what when where which while who whom why will with you your yours yourself yourselves'.split(' '))
 
 export async function tablerTags(): Promise<Tagged> {
   const icons = await Bun.file(`${MODULES}/@tabler/icons/icons.json`).json() as Record<string, { name: string, tags: (string | number)[] }>
@@ -123,9 +127,9 @@ export function fromTags(sets: Tagged[]): Related {
 
 let extractor: FeatureExtractionPipeline | undefined
 
-// Each word's bge-small vector, cached on disk by word so a rebuild embeds only new words.
+// Each word's bge-small vector, cached on disk by word and prompt so a rebuild embeds only new words.
 export async function vectors(words: string[]): Promise<Map<string, Float32Array>> {
-  const file = Bun.file(`${CACHE}/vectors.json`)
+  const file = Bun.file(`${CACHE}/vectors-${Bun.hash(MODEL + PROMPT).toString(36)}.json`)
   const cached = new Map<string, number[]>(await file.exists() ? Object.entries(await file.json() as Record<string, number[]>) : [])
   const missing = words.filter(word => !cached.has(word))
 
@@ -134,7 +138,7 @@ export async function vectors(words: string[]): Promise<Map<string, Float32Array
 
     for (let i = 0; i < missing.length; i += BATCH) {
       const batch = missing.slice(i, i + BATCH)
-      const tensor = await extractor(batch, { pooling: 'cls', normalize: true })
+      const tensor = await extractor(batch.map(word => PROMPT + word), { pooling: 'cls', normalize: true })
       const data = tensor.data as Float32Array
 
       for (const [j, word] of batch.entries())
@@ -158,7 +162,7 @@ export async function modelWords(): Promise<string[]> {
 // Each key word to its nearest candidate words by meaning, scaled so `floor` similarity counts 0 and identical counts 1.
 // Cached on disk by its inputs, as comparing every key with every candidate takes minutes.
 export async function fromMeaning(keys: string[], candidates: string[], keep: number, floor: number): Promise<Related> {
-  const file = Bun.file(`${CACHE}/meaning-${Bun.hash(JSON.stringify([MODEL, keys, candidates, keep, floor])).toString(36)}.json`)
+  const file = Bun.file(`${CACHE}/meaning-${Bun.hash(JSON.stringify([MODEL, PROMPT, [...NO_MEANING], keys, candidates, keep, floor])).toString(36)}.json`)
 
   if (await file.exists())
     return new Map(Object.entries(await file.json() as Record<string, [string, number][]>).map(([key, row]) => [key, new Map(row)]))
@@ -170,7 +174,8 @@ export async function fromMeaning(keys: string[], candidates: string[], keep: nu
   return related
 }
 
-async function nearest(keys: string[], candidates: string[], keep: number, floor: number): Promise<Related> {
+async function nearest(keys: string[], allCandidates: string[], keep: number, floor: number): Promise<Related> {
+  const candidates = allCandidates.filter(word => !NO_MEANING.has(word))
   const all = await vectors([...new Set([...keys, ...candidates])])
   // One flat matrix, as a loop over a single typed array is several times faster than one array per word.
   const matrix = new Float32Array(candidates.length * DIMENSIONS)
