@@ -84,7 +84,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       editor.replace(node.start, node.end, 'undefined')
   }
 
-  const { patternReads, extractDestructuredParam, buildCompiledFunction, processFunction } = createPropCompiler({
+  const { compileLoopRow, withPrelude, extractDestructuredParam, buildCompiledFunction, processFunction } = createPropCompiler({
     code,
     editor,
     jsxNodes,
@@ -437,29 +437,13 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           const keyAst = match.isJsxBody ? extractKeyExpr(match.body) : extractBlockKeyExpr(match.body as BlockStatement)
           const rowSig = freshVar('_r')
           const idxSig = idxParam !== undefined ? freshVar('_i') : undefined
-          const rowRewrites = new Map(scopeRewrites)
           const keyRewrites = withoutBindings(scopeRewrites, params)
-          let keyFn: string
-
-          if (firstParam !== undefined && firstParam.type !== 'Identifier') {
-            const patCode = code.slice(firstParam.start, firstParam.end)
-            keyFn = keyAst !== undefined
-              ? `(${patCode}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
-              : `(_item) => _item`
-            for (const [name, read] of patternReads(firstParam, `${rowSig}.value`, scopeRewrites))
-              rowRewrites.set(name, read)
-          }
-          else {
-            const itemParam = firstParam?.type === 'Identifier' ? firstParam.name : '_item'
-            keyFn = keyAst !== undefined
-              ? `(${itemParam}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
-              : `(${itemParam}) => ${itemParam}`
-            rowRewrites.set(itemParam, `${rowSig}.value`)
-          }
+          const { keyFn, rowRewrites, prelude } = compileLoopRow({ firstParam, idxParam, keyAst, rowSig, scopeRewrites, keyRewrites })
           if (idxParam !== undefined && idxSig !== undefined)
             rowRewrites.set(idxParam, `${idxSig}.value`)
 
-          const rowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, rowRewrites) : compileExpression(match.body, rowRewrites)
+          const rawRowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, rowRewrites) : compileExpression(match.body, rowRewrites)
+          const rowBody = withPrelude(rawRowBody, match.body, prelude)
           const rowParams = idxSig !== undefined ? `${rowSig}, ${idxSig}` : rowSig
           ops.push(`${use('loop')}(${elVar}, ${anchorVar}, () => ${eachCode}, ${keyFn}, (${rowParams}) => ${rowBody}${skipArg});`)
           hadVariableRange = true

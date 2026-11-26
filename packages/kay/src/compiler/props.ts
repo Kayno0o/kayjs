@@ -62,7 +62,16 @@ export interface PropCompilerContext {
 }
 
 export interface PropCompiler {
-  patternReads: (pattern: Node, source: string, outerRewrites: ReadonlyMap<string, string>) => Map<string, string>
+  patternReads: (pattern: Node, source: string, outerRewrites: ReadonlyMap<string, string>, hoisted?: string[]) => Map<string, string>
+  compileLoopRow: (opts: {
+    firstParam: ParamPattern | undefined
+    idxParam: string | undefined
+    keyAst: Node | undefined
+    rowSig: string
+    scopeRewrites: ReadonlyMap<string, string>
+    keyRewrites: ReadonlyMap<string, string>
+  }) => { keyFn: string, rowRewrites: Map<string, string>, prelude: string }
+  withPrelude: (compiledBody: string, body: Node, prelude: string) => string
   extractDestructuredParam: (firstParam: ParamPattern | undefined) => DestructuredParam | undefined
   buildCompiledFunction: (fn: ArrowFunctionExpression | OxcFunction, outerRewrites: ReadonlyMap<string, string>) => string
   processFunction: (fn: ArrowFunctionExpression | OxcFunction) => void
@@ -72,7 +81,7 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
   const { code, editor, jsxNodes, use, freshVar, compileExpression } = ctx
 
   // How each name a destructuring pattern binds is read from `source` on every access, so reads stay reactive.
-  // With `hoisted`, a default and a nested pattern's getter become statements for the start of the component body (evaluated once per call) instead of running on every read.
+  // With `hoisted`, a default (at any nesting depth) and a nested pattern's getter become statements for the start of the body (evaluated once per call/row) instead of running on every read.
   function patternReads(pattern: Node, source: string, outerRewrites: ReadonlyMap<string, string>, hoisted?: string[]): Map<string, string> {
     const reads = new Map<string, string>()
     const running = new Map(outerRewrites)
@@ -81,27 +90,78 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
       hoisted!.push(`const ${name} = ${init};`)
       return name
     }
-    if (pattern.type === 'ObjectPattern') {
-      for (const prop of pattern.properties) {
-        if (prop.type !== 'Property' || prop.computed || prop.key.type !== 'Identifier')
-          continue
-        const read = `${source}.${prop.key.name}`
-        if (prop.value.type === 'Identifier') {
-          reads.set(prop.value.name, read)
-          running.set(prop.value.name, read)
+
+    function bindPattern(pat: Node, src: string): void {
+      if (pat.type === 'Identifier') {
+        reads.set(pat.name, src)
+        running.set(pat.name, src)
+        return
+      }
+      if (pat.type === 'AssignmentPattern') {
+        const defExpr = compileExpression(pat.right, running)
+        const simpleDef = pat.right.type === 'Literal' || pat.right.type === 'Identifier'
+        let fallback = simpleDef ? defExpr : `(${defExpr})`
+        if (!simpleDef && hoisted !== undefined)
+          fallback = `${hoist(`${use('propDefault')}(() => (${defExpr}), ${src} === undefined)`)}()`
+        let nextSrc: string
+        if (pat.left.type !== 'Identifier' && hoisted !== undefined) {
+          const v = freshVar('__v')
+          nextSrc = `${hoist(`() => { const ${v} = ${src}; return ${v} === undefined ? ${fallback} : ${v}; }`)}()`
         }
-        else if (prop.value.type === 'AssignmentPattern' && prop.value.left.type === 'Identifier') {
-          const defExpr = compileExpression(prop.value.right, running)
-          const simpleDef = prop.value.right.type === 'Literal' || prop.value.right.type === 'Identifier'
-          let fallback = simpleDef ? defExpr : `(${defExpr})`
-          if (!simpleDef && hoisted !== undefined)
-            fallback = `${hoist(`${use('propDefault')}(() => (${defExpr}), ${read} === undefined)`)}()`
-          const expr = `(${read} === undefined ? ${fallback} : ${read})`
-          reads.set(prop.value.left.name, expr)
-          running.set(prop.value.left.name, expr)
+        else {
+          nextSrc = `(${src} === undefined ? ${fallback} : ${src})`
+        }
+        bindPattern(pat.left, nextSrc)
+        return
+      }
+      if (pat.type === 'ObjectPattern') {
+        const staticKeys: string[] = []
+        let allStaticKeys = true
+        for (const prop of pat.properties) {
+          if (prop.type === 'RestElement') {
+            if (hoisted !== undefined && prop.argument.type === 'Identifier' && allStaticKeys) {
+              const restRead = `${use('omit')}(${src}, ${JSON.stringify(staticKeys)})`
+              reads.set(prop.argument.name, restRead)
+              running.set(prop.argument.name, restRead)
+            }
+            continue
+          }
+          let propSrc: string | undefined
+          if (!prop.computed && prop.key.type === 'Identifier') {
+            staticKeys.push(prop.key.name)
+            propSrc = `${src}.${prop.key.name}`
+          }
+          else if (!prop.computed && prop.key.type === 'Literal' && (typeof prop.key.value === 'string' || typeof prop.key.value === 'number')) {
+            staticKeys.push(String(prop.key.value))
+            propSrc = `${src}[${JSON.stringify(prop.key.value)}]`
+          }
+          else {
+            allStaticKeys = false
+            if (prop.computed && hoisted !== undefined) {
+              const keyVar = hoist(compileExpression(prop.key, running))
+              propSrc = `${src}[${keyVar}]`
+            }
+          }
+          if (propSrc !== undefined)
+            bindPattern(prop.value, propSrc)
+        }
+        return
+      }
+      if (pat.type === 'ArrayPattern') {
+        for (let i = 0; i < pat.elements.length; i++) {
+          const el = pat.elements[i]
+          if (el == null)
+            continue
+          if (el.type === 'RestElement')
+            bindPattern(el.argument, `Array.from(${src}).slice(${i})`)
+          else
+            bindPattern(el, `${src}[${i}]`)
         }
       }
     }
+
+    bindPattern(pattern, source)
+
     const names = new Set<string>()
     collectPatternNames(pattern, names)
     // The pattern a read runs: only the property binding `name`, so another property's default does not run on this read.
@@ -116,33 +176,13 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
       }
       return code.slice(pattern.start, pattern.end)
     }
-    // A component's `...rest` is read through `omit` instead (see computePropRewrites).
-    const omitted = hoisted !== undefined && pattern.type === 'ObjectPattern' ? omittedRest(pattern as ObjectPattern) : undefined
     for (const name of names) {
-      if (reads.has(name) || name === omitted?.restName)
+      if (reads.has(name))
         continue
       const getter = `(${patternFor(name)}) => ${name}`
       reads.set(name, hoisted === undefined ? `(${getter})(${source})` : `${hoist(getter)}(${source})`)
     }
     return reads
-  }
-
-  // The keys a `...rest` leaves out, when every key of the pattern is a plain name or string.
-  function omittedRest(pattern: ObjectPattern): { restName: string | undefined, keys: string[] | undefined } {
-    const keys: string[] = []
-    let restName: string | undefined
-    let isStatic = true
-    for (const prop of pattern.properties) {
-      if (prop.type === 'RestElement')
-        restName = prop.argument.type === 'Identifier' ? prop.argument.name : undefined
-      else if (!prop.computed && prop.key.type === 'Identifier')
-        keys.push(prop.key.name)
-      else if (!prop.computed && prop.key.type === 'Literal' && typeof prop.key.value === 'string')
-        keys.push(prop.key.value)
-      else
-        isStatic = false
-    }
-    return isStatic && restName !== undefined ? { restName, keys } : { restName: undefined, keys: undefined }
   }
 
   function extractDestructuredParam(firstParam: ParamPattern | undefined): {
@@ -175,10 +215,6 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
     const hoisted: string[] = []
     for (const [name, read] of patternReads(destructured.pattern, pVar, outerRewrites, hoisted))
       rewrites.set(name, read)
-
-    const { restName, keys } = omittedRest(destructured.pattern)
-    if (restName !== undefined)
-      rewrites.set(restName, `${use('omit')}(${pVar}, ${JSON.stringify(keys)})`)
     return { rewrites, prelude: hoisted.join(' ') }
   }
 
@@ -257,5 +293,41 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
     }
   }
 
-  return { patternReads, extractDestructuredParam, buildCompiledFunction, processFunction }
+  function compileLoopRow(opts: {
+    firstParam: ParamPattern | undefined
+    idxParam: string | undefined
+    keyAst: Node | undefined
+    rowSig: string
+    scopeRewrites: ReadonlyMap<string, string>
+    keyRewrites: ReadonlyMap<string, string>
+  }): { keyFn: string, rowRewrites: Map<string, string>, prelude: string } {
+    const { firstParam, idxParam, keyAst, rowSig, scopeRewrites, keyRewrites } = opts
+    const rowRewrites = new Map(scopeRewrites)
+    const hoisted: string[] = []
+    let keyFn: string
+    if (firstParam !== undefined && firstParam.type !== 'Identifier') {
+      if (keyAst !== undefined) {
+        const keyItem = freshVar('_item')
+        const keyScope = new Map(keyRewrites)
+        for (const [name, read] of patternReads(firstParam, keyItem, scopeRewrites))
+          keyScope.set(name, read)
+        keyFn = `(${keyItem}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyScope)}`
+      }
+      else {
+        keyFn = `(_item) => _item`
+      }
+      for (const [name, read] of patternReads(firstParam, `${rowSig}.value`, scopeRewrites, hoisted))
+        rowRewrites.set(name, read)
+    }
+    else {
+      const itemParam = firstParam?.type === 'Identifier' ? firstParam.name : '_item'
+      keyFn = keyAst !== undefined
+        ? `(${itemParam}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
+        : `(${itemParam}) => ${itemParam}`
+      rowRewrites.set(itemParam, `${rowSig}.value`)
+    }
+    return { keyFn, rowRewrites, prelude: hoisted.join(' ') }
+  }
+
+  return { patternReads, compileLoopRow, withPrelude, extractDestructuredParam, buildCompiledFunction, processFunction }
 }

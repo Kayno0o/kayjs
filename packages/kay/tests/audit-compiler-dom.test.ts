@@ -876,6 +876,102 @@ describe('destructured loop rows and component props in an island', () => {
         dispose()
       })
     })
+
+    test('a loop row non-literal default runs once per row and keeps one reference across reads (#3620)', async () => {
+      await withDom(() => {
+        const seen: unknown[] = []
+        const rows = signal<Array<{ tags?: string[] }>>([{}])
+        const { dispose } = mountIsland(
+          'export function List({ rows }) { return <ul>{rows.value.map(({ tags = [] }) => <li>{(seen.push(tags), seen.push(tags), tags.length)}</li>)}</ul> }',
+          'List',
+          { rows },
+          { seen },
+        )
+        expect(seen).toHaveLength(2)
+        expect(Object.is(seen[0], seen[1])).toBe(true)
+        dispose()
+      })
+
+      await withDom(() => {
+        let calls = 0
+        const make = (): string[] => [`t${++calls}`]
+        const rows = signal<Array<{ id: number, tags?: string[] }>>([{ id: 1 }, { id: 2 }])
+        const { host, dispose } = mountIsland(
+          'export function List({ rows }) { return <ul>{rows.value.map(({ id, tags = make() }) => <li key={id}>{tags.join(",")}:{tags.length}</li>)}</ul> }',
+          'List',
+          { rows },
+          { make },
+        )
+        const text = (): string => host.querySelector('ul')!.textContent!
+        expect(text()).toBe('t1:1t2:1')
+        expect(calls).toBe(2)
+        rows.value = [{ id: 1, tags: ['a', 'b'] }, { id: 2 }]
+        expect(text()).toBe('a,b:2t2:1')
+        expect(calls).toBe(2)
+        rows.value = [{ id: 1 }, { id: 2 }]
+        expect(text()).toBe('t1:1t2:1')
+        expect(calls).toBe(2)
+        dispose()
+      })
+
+      await withDom(() => {
+        const seen: unknown[] = []
+        const rows = signal<Array<[string, string[]?]>>([['a']])
+        const { dispose } = mountIsland(
+          'export function List({ rows }) { return <ul>{rows.value.map(([k, tags = []]) => <li key={k}>{(seen.push(tags), seen.push(tags), tags.length)}</li>)}</ul> }',
+          'List',
+          { rows },
+          { seen },
+        )
+        expect(seen).toHaveLength(2)
+        expect(Object.is(seen[0], seen[1])).toBe(true)
+        dispose()
+      })
+    })
+
+    test('a nested destructured default runs once per component call (#3620)', async () => {
+      await withDom(() => {
+        const seen: unknown[] = []
+        const { dispose } = mountIsland(
+          'export function F({ a: { b = [] } }) { return <p>{(seen.push(b), seen.push(b), b.length)}</p> }',
+          'F',
+          { a: {} },
+          { seen },
+        )
+        expect(seen).toHaveLength(2)
+        expect(Object.is(seen[0], seen[1])).toBe(true)
+        dispose()
+      })
+
+      await withDom(() => {
+        let callsA = 0
+        let callsB = 0
+        const makeA = (): { b?: string[] } => { callsA++; return {} }
+        const makeB = (): string[] => [`b${++callsB}`]
+        const { props, set } = reactiveProps({ a: { b: ['x'] } })
+        const { host, dispose } = mountIsland(
+          'export function F({ a: { b = makeB() } = makeA() }) { return <p>{b.join(",")}:{b.length}</p> }',
+          'F',
+          props,
+          { makeA, makeB },
+        )
+        const text = (): string => host.querySelector('p')!.textContent!
+        expect(text()).toBe('x:1')
+        expect([callsA, callsB]).toEqual([0, 0])
+        set({ a: {} })
+        expect(text()).toBe('b1:1')
+        expect([callsA, callsB]).toEqual([0, 1])
+        set({})
+        expect(text()).toBe('b1:1')
+        expect([callsA, callsB]).toEqual([1, 1])
+        set({ a: { b: ['y', 'z'] } })
+        expect(text()).toBe('y,z:2')
+        set({})
+        expect(text()).toBe('b1:1')
+        expect([callsA, callsB]).toEqual([1, 1])
+        dispose()
+      })
+    })
   })
 
   test.each([
