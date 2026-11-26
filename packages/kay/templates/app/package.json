@@ -6,7 +6,8 @@
     "dev": "kay dev",
     "build": "kay build",
     "start": "kay start",
-    "check": "kay check"
+    "check": "kay check",
+    "test": "bun test"
   },
   "dependencies": {
     "@kayjs/kay": "__KAY_VERSION__",

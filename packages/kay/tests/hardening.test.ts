@@ -326,12 +326,20 @@ describe('Milestone 4: kay new scaffolder & kay check validator', () => {
 
       expect(await checkProject(dir, { skipTypecheck: true })).toMatchObject({ ok: true, errors: [], warnings: [] })
       expect((await build({ root: dir })).routes.map(r => r.path)).toContain('/')
-      const json = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
+      const json = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name: string, scripts: Record<string, string>, dependencies: Record<string, string>, devDependencies: Record<string, string> }
       expect(json.name).toBe('my-app')
+      expect(json.scripts.test).toBe('bun test')
       expect(Object.values(json.dependencies)).toEqual(Object.keys(json.dependencies).map(() => `^${pkg.version}`))
       expect(json.devDependencies.typescript).toBe(rootPkg.devDependencies.typescript)
       expect(files).toContain('tsconfig.json')
       expect(files.filter(file => readFileSync(join(dir, file), 'utf8').includes('__'))).toEqual([])
+
+      if (template === 'fullstack' || template === 'app') {
+        expect(files).toContain('tests/app.test.ts')
+        const testRun = Bun.spawnSync([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+        if (testRun.exitCode !== 0)
+          throw new Error(`${template} starter tests failed:\n${testRun.stdout.toString()}\n${testRun.stderr.toString()}`)
+      }
     })
   }
 
