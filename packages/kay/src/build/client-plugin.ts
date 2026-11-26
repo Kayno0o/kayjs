@@ -6,6 +6,7 @@ import type { ActionsByFile } from './islands'
 import { parseSync } from 'oxc-parser'
 import { compileDom } from '../compiler/index'
 import { SERVER_ONLY_FILTER } from '../compiler/server-only'
+import { pruneForClient } from './client-prune'
 import { isInNodeModules, relPosix } from './files'
 import { resolveKaySpecifier } from './resolve'
 
@@ -29,6 +30,23 @@ export interface ClientPluginEnv {
   transforms: ClientTransforms
   /** Collects each server-only import a browser file makes, reported once the build ends. */
   leaks: Set<string>
+  /** Per file, the `export { … }` statement naming the islands it does not export itself. */
+  localExports: ReadonlyMap<string, string>
+  /** Per file the browser loads only for its own islands, the top-level names its client copy keeps. */
+  clientKeep: ReadonlyMap<string, ReadonlySet<string>>
+}
+
+/** The `export { … }` statement each file needs so the client entry can import the islands the file does not export. */
+export function localIslandExports(targets: Iterable<{ file: string, exportName: string, local?: string | undefined }>): Map<string, string> {
+  const names = new Map<string, string[]>()
+  for (const t of targets) {
+    if (t.local === undefined)
+      continue
+    const list = names.get(t.file) ?? []
+    list.push(t.local === t.exportName ? t.local : `${t.local} as ${t.exportName}`)
+    names.set(t.file, list)
+  }
+  return new Map([...names].map(([file, list]) => [file, `\nexport { ${list.join(', ')} };\n`]))
 }
 
 /**
@@ -96,7 +114,7 @@ export function directKayImports(code: string, graph: ModuleGraph, filename = 'm
 }
 
 export function clientPlugin(env: ClientPluginEnv): BunPlugin {
-  const { root, graph, cache, actionsByFile, transforms, leaks } = env
+  const { root, graph, cache, actionsByFile, transforms, leaks, localExports, clientKeep } = env
   return {
     name: 'kay-v2-client',
     setup(b) {
@@ -131,12 +149,19 @@ export function clientPlugin(env: ClientPluginEnv): BunPlugin {
         }
 
         const stamp = graph.stamp(args.path)
+        const extraExports = localExports.get(args.path) ?? ''
+        const keep = clientKeep.get(args.path)
+        const key = `${transforms.key}${extraExports}${keep === undefined ? '' : `|keep=${[...keep].sort().join(',')}`}`
         const cachedDom = stamp !== undefined ? cache?.domCompiled.get(args.path) : undefined
-        if (cachedDom !== undefined && cachedDom.mtimeMs === stamp!.mtimeMs && cachedDom.size === stamp!.size && (cachedDom.key ?? '') === transforms.key)
+        if (cachedDom !== undefined && cachedDom.mtimeMs === stamp!.mtimeMs && cachedDom.size === stamp!.size && (cachedDom.key ?? '') === key)
           return { contents: cachedDom.code, loader: 'tsx' }
-        const compiled = directKayImports(transforms.apply(compileDom(args.path, graph.source(args.path), { analysis: graph.analyses.get(args.path) }).code, args.path, 'client'), graph, args.path)
+        const analysis = graph.analyses.get(args.path)
+        const source = graph.source(args.path)
+        const clientSource = keep === undefined || analysis === undefined ? source : pruneForClient(source, analysis.program, keep)
+        const dom = compileDom(args.path, clientSource, clientSource === source ? { analysis } : {})
+        const compiled = directKayImports(transforms.apply(dom.code, args.path, 'client'), graph, args.path) + extraExports
         if (cache !== undefined && stamp !== undefined)
-          cache.domCompiled.set(args.path, { mtimeMs: stamp.mtimeMs, size: stamp.size, key: transforms.key, code: compiled })
+          cache.domCompiled.set(args.path, { mtimeMs: stamp.mtimeMs, size: stamp.size, key, code: compiled })
         return { contents: compiled, loader: 'tsx' }
       })
     },

@@ -49,8 +49,11 @@ export function islandOrigins(islands: IslandPlan, islandChunks: Map<string, str
   const origins = new Map<string, IslandOrigin>()
   for (const [key, target] of islands.targets) {
     const url = islandChunks.get(key)
-    if (url !== undefined)
-      origins.set(url, { name: target.exportName, file: relPosix(root, target.file), reason: graph.load(target.file).exports.get(target.exportName)?.reason ?? 'is interactive' })
+    if (url === undefined)
+      continue
+    const analysis = graph.load(target.file)
+    const reason = target.local === undefined ? analysis.exports.get(target.exportName)?.reason : analysis.localIslands.get(target.local)?.reason
+    origins.set(url, { name: target.local ?? target.exportName, file: relPosix(root, target.file), reason: reason ?? 'is interactive' })
   }
   return origins
 }

@@ -10,7 +10,7 @@ import { copyFileSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSyn
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { compileSsr } from '../compiler/index'
 import { readsPrivateEnv } from '../compiler/server-only'
-import { clientPlugin, KAY_SPECIFIER_FILTER, TS_FILTER } from './client-plugin'
+import { clientPlugin, KAY_SPECIFIER_FILTER, localIslandExports, TS_FILTER } from './client-plugin'
 import { formatBunBuildLogs, isInNodeModules, isOutsideRoot, isTsFile, relPosix } from './files'
 import { stampFiles, stampsMatch } from './graph'
 import { clientLeakError, islandKey } from './islands'
@@ -299,7 +299,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
 
   const clientLeaks = new Set<string>()
   const inlinedEnvKey = (key: string): boolean => key === 'NODE_ENV' || `process.env.${key}` in envDefines
-  const plugin = clientPlugin({ root, graph, cache, actionsByFile, transforms, leaks: clientLeaks })
+  const plugin = clientPlugin({ root, graph, cache, actionsByFile, transforms, leaks: clientLeaks, localExports: localIslandExports(islands.targets.values()), clientKeep: islands.clientKeep })
 
   const clientResult = await runBunBuild('client', env.root, () => {
     if (clientLeaks.size > 0)
@@ -548,9 +548,10 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
         const analysis = graph.analyses.get(args.path)
         const rawBindings = islands.pageBindings.get(args.path)
         const isInteractive = analysis?.isInteractive === true
-        const emitMarkers = isInteractive || islands.reach.has(args.path)
+        // Island code of another module may render any component of a module it imports; in its own module, only the code an island reaches.
+        const emitMarkers = islands.reach.has(args.path) || (isInteractive && analysis.browserSpans)
         let islandMap: Map<string, IslandBinding> | undefined
-        let key = `${isInteractive ? '1' : '0'}:${emitMarkers ? '1' : '0'}|t=${transforms.key}`
+        let key = `${isInteractive ? '1' : '0'}:${emitMarkers === true ? '1' : emitMarkers === false ? '0' : 's'}|t=${transforms.key}`
         if (rawBindings !== undefined) {
           islandMap = new Map()
           for (const [localName, target] of rawBindings) {

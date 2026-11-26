@@ -9,6 +9,7 @@ import { findCrossFileServerOnly, withStateReads } from '../compiler/interactivi
 import { collectMistakes, serverOnlyTagError } from '../compiler/mistakes'
 import { findPrivateEnv, isServerOnlyModule } from '../compiler/server-only'
 import { checkBareSignals } from '../compiler/signal-reads'
+import { clientNeeds, clientView } from './client-prune'
 import { isInNodeModules, isTsFile, relPosix } from './files'
 
 /** A component that is not an island, as a module renders it. */
@@ -18,6 +19,8 @@ export interface IslandTarget {
   id: string
   file: string
   exportName: string
+  /** A component of the file it does not export under `exportName`: the client build adds `export { local as exportName }`. */
+  local?: string | undefined
   defaultHydrate: string | undefined
 }
 
@@ -42,8 +45,10 @@ export interface IslandPlan {
   staticTags: Map<string, Map<string, StaticTag>>
   /** CSS files imported (transitively) by an island: bundled with it, not as standalone styles. */
   cssFiles: Set<string>
-  /** Modules the client compiles for an island, whose SSR must emit hydration markers too. */
+  /** Modules island code imports from another module, whose SSR emits hydration markers everywhere. */
   reach: Set<string>
+  /** Per module the browser loads only for the islands declared in it, the top-level names its client copy keeps (`pruneForClient`). */
+  clientKeep: Map<string, Set<string>>
   /** Island and reachability issues found during analysis. */
   issues: IslandIssue[]
 }
@@ -177,14 +182,14 @@ function collectExportedSignals(graph: ModuleGraph, load: LoadModule, file: stri
   }
 }
 
-function interactivityChanged(prev: ModuleAnalysis, next: { isInteractive: boolean, exports: Map<string, { interactive: boolean }> }): boolean {
+function interactivityChanged(prev: ModuleAnalysis, next: { isInteractive: boolean, exports: Map<string, { interactive: boolean }>, localIslands: Map<string, unknown> }): boolean {
   if (prev.isInteractive !== next.isInteractive)
     return true
   for (const [name, fact] of next.exports) {
     if (prev.exports.get(name)?.interactive !== fact.interactive)
       return true
   }
-  return false
+  return next.localIslands.size !== prev.localIslands.size || [...next.localIslands.keys()].some(name => !prev.localIslands.has(name))
 }
 
 function createPromoter(graph: ModuleGraph, load: LoadModule, issues: IslandIssue[]): { promoteAll: () => void, loadPromoted: LoadModule } {
@@ -325,7 +330,7 @@ function discoverBindings(
   load: LoadModule,
   loadPromoted: LoadModule,
   pageSet: ReadonlySet<string>,
-  registerIsland: (file: string, exportName: string) => IslandTarget,
+  registerIsland: (file: string, exportName: string, local?: string) => IslandTarget,
 ): Pick<IslandPlan, 'pageBindings' | 'staticTags'> {
   const pageBindings = new Map<string, Map<string, IslandTarget>>()
   const staticTags = new Map<string, Map<string, StaticTag>>()
@@ -363,6 +368,14 @@ function discoverBindings(
             statics.set(tag, { async: component.asyncLocals.has(component.exportLocals.get(target.exportName) ?? target.exportName) })
         }
       }
+    }
+    // A component of the same file that runs in the browser, rendered as a tag from its server code, is an island of its own.
+    for (const local of analysis.localIslands.keys()) {
+      const exportName = [...analysis.exportLocals].find(([, l]) => l === local)?.[0]
+      if (exportName !== undefined)
+        bindings.set(local, registerIsland(file, exportName))
+      else
+        bindings.set(local, registerIsland(file, analysis.exportLocals.has(local) ? `${local}$island` : local, local))
     }
     if (bindings.size > 0)
       pageBindings.set(file, bindings)
@@ -446,10 +459,12 @@ function checkReachEdges(
     visitEdge(dyn.source, dyn.start, false, [])
 }
 
+/** Walks what the browser loads from the island roots. A root no other island code imports is walked as its client copy, the code its islands reach, so the server code beside them stays out. */
 function walkIslandReach(
   graph: ModuleGraph,
   load: LoadModule,
   roots: readonly string[],
+  clientKeep: Map<string, Set<string>>,
   checkLeaks: boolean,
   issues: IslandIssue[],
 ): { reach: Set<string>, cssFiles: Set<string> } {
@@ -459,6 +474,15 @@ function walkIslandReach(
   const queue: { file: string, island: string }[] = []
 
   const enqueue = (file: string, island: string): void => {
+    if (file !== island) {
+      if (file.endsWith('.tsx'))
+        reach.add(file)
+      // Imported by other island code, the module ships whole: walk it again if only its client copy was.
+      if (clientKeep.delete(file) && visited.has(file)) {
+        queue.push({ file, island })
+        return
+      }
+    }
     if (visited.has(file))
       return
     visited.add(file)
@@ -470,10 +494,10 @@ function walkIslandReach(
 
   for (let i = 0; i < queue.length; i++) {
     const { file, island } = queue[i]!
-    if (file.endsWith('.tsx'))
-      reach.add(file)
     const inNodeModules = isInNodeModules(file)
-    const analysis = inNodeModules ? graph.analyses.get(file) : load(file)
+    const keep = clientKeep.get(file)
+    const full = inNodeModules ? graph.analyses.get(file) : load(file)
+    const analysis = keep === undefined || full === undefined ? full : clientView(full, graph.source(file), keep)
     if (analysis === undefined)
       continue
     if (file !== island && isStubbedActionFile(analysis))
@@ -504,7 +528,7 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
   const usedIds = new Set<string>(['runtime'])
   const pageSet = new Set(pageFiles)
 
-  function registerIsland(file: string, exportName: string): IslandTarget {
+  function registerIsland(file: string, exportName: string, local?: string): IslandTarget {
     const key = islandKey({ file, exportName })
     const existing = targets.get(key)
     if (existing !== undefined)
@@ -519,7 +543,7 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
     while (usedIds.has(id))
       id = `${id}-${suffix++}`
     usedIds.add(id)
-    const target: IslandTarget = { id, file, exportName, defaultHydrate: load(file)?.defaultHydrate }
+    const target: IslandTarget = { id, file, exportName, local, defaultHydrate: load(file)?.defaultHydrate }
     targets.set(key, target)
     return target
   }
@@ -551,15 +575,38 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
   }
 
   const rootFiles = new Set<string>([...targets.values()].map(t => t.file))
+  const clientKeep = clientKeepOf(targets.values(), load)
   if (options.includeAllInteractive) {
+    // A module no route renders yet is walked as the client copy its islands would get.
     for (const [file, analysis] of graph.analyses) {
-      if (analysis.isInteractive)
-        rootFiles.add(file)
+      if (!analysis.isInteractive || rootFiles.has(file))
+        continue
+      rootFiles.add(file)
+      if (!isInNodeModules(file)) {
+        const exported = [...analysis.exports].filter(([, e]) => e.interactive).map(([name]) => analysis.exportLocals.get(name) ?? name)
+        clientKeep.set(file, clientNeeds(analysis, [...exported, ...analysis.localIslands.keys()]))
+      }
     }
   }
 
-  const { reach, cssFiles } = walkIslandReach(graph, load, [...rootFiles], options.checkLeaks === true, issues)
-  return { targets, pageBindings, staticTags, cssFiles, reach, issues }
+  const { reach, cssFiles } = walkIslandReach(graph, load, [...rootFiles], clientKeep, options.checkLeaks === true, issues)
+  return { targets, pageBindings, staticTags, cssFiles, reach, clientKeep, issues }
+}
+
+function clientKeepOf(targets: Iterable<IslandTarget>, load: LoadModule): Map<string, Set<string>> {
+  const locals = new Map<string, string[]>()
+  for (const t of targets) {
+    const list = locals.get(t.file) ?? []
+    list.push(t.local ?? load(t.file)?.exportLocals.get(t.exportName) ?? t.exportName)
+    locals.set(t.file, list)
+  }
+  const keep = new Map<string, Set<string>>()
+  for (const [file, names] of locals) {
+    const analysis = load(file)
+    if (analysis !== undefined && !isInNodeModules(file))
+      keep.set(file, clientNeeds(analysis, names))
+  }
+  return keep
 }
 
 export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[], specialFiles: string[]): IslandPlan {

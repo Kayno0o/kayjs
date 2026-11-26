@@ -277,7 +277,7 @@ describe('islands per component, not per file (#3587)', () => {
     })
   })
 
-  test('a local helper with state or handlers makes each component calling or rendering it an island, and only those', () => {
+  test('a local helper with state or handlers makes each component calling it an island, and a local component rendered as a tag is an island of its own (#3661)', () => {
     const code = `
       function renderDialog(title: string) { return <dialog><button onClick={() => 1}>{title}</button></dialog> }
       const Frame = () => <div>{renderDialog('x')}</div>
@@ -287,9 +287,41 @@ describe('islands per component, not per file (#3587)', () => {
     `
     expect(facts(code)).toEqual({
       Dialog: { interactive: true, reason: 'uses renderDialog, which uses onClick', offset: code.indexOf('renderDialog(\'Dialog\')') },
-      Sheet: { interactive: true, reason: 'uses Frame, which uses renderDialog, which uses onClick', offset: code.indexOf('<Frame />') },
+      Sheet: { interactive: false },
       Badge: { interactive: false },
     })
+    expect(Object.fromEntries(analyzeModule('ui.tsx', code).localIslands)).toEqual({
+      Frame: { reason: 'uses renderDialog, which uses onClick', offset: code.indexOf('renderDialog(\'x\')') },
+    })
+  })
+
+  test('a page rendering a same-file widget stays static, async included, and only the widget is an island (#3661)', () => {
+    const code = `
+      import { signal } from '@kayjs/kay'
+      function Counter() { const n = signal(0); return <button onClick={() => n.value++}>{n.value}</button> }
+      function Section({ title }: { title: string }) { return <section><h2>{title}</h2><Counter /></section> }
+      export default async function Home() { return <main>{[1, 2].map(i => <Section title={String(i)} />)}</main> }
+    `
+    const analysis = analyzeModule('index.tsx', code)
+    expect(Object.fromEntries(analysis.exports)).toEqual({ default: { interactive: false } })
+    expect([...analysis.localIslands.keys()]).toEqual(['Counter'])
+    expect(analysis.staticJsxTags).toEqual(new Set(['Section', 'Counter']))
+  })
+
+  test('a widget rendered only inside another island of the file is part of that island, and one used as a value still spreads (#3661)', () => {
+    const code = `
+      import { signal } from '@kayjs/kay'
+      function Counter() { const n = signal(0); return <button onClick={() => n.value++}>{n.value}</button> }
+      function Panel() { const open = signal(false); return <div onClick={() => open.value = true}><Counter /></div> }
+      export function Pick() { return <>{[Counter].map(C => <C />)}<Counter /></> }
+      export default function Home() { return <main><Panel /><Pick /></main> }
+    `
+    const analysis = analyzeModule('index.tsx', code)
+    expect(Object.fromEntries(analysis.exports)).toEqual({
+      Pick: { interactive: true, reason: 'uses Counter, which uses signal', offset: code.indexOf('[Counter]') + 1 },
+      default: { interactive: false },
+    })
+    expect([...analysis.localIslands.keys()]).toEqual(['Panel', 'Pick'])
   })
 
   test('module-level code that needs the browser makes every component an island', () => {

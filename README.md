@@ -23,7 +23,7 @@ Static UI compiles to `0 KB` HTML strings; interactive components automatically 
 ## Quick Example
 
 ### Interactive Island (`src/components/Counter.tsx`)
-No directives needed — using `signal` or an event handler automatically marks the component as an island:
+No directives needed — using `signal` or an event handler automatically marks the component as an island. kay decides per component, not per file: a page can declare `Counter` itself and stay static, shipping only the counter.
 
 ```tsx
 import { signal } from '@kayjs/kay'

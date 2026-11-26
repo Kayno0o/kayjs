@@ -47,13 +47,18 @@ export interface IslandBinding {
 export interface CompileSsrOptions {
   islands?: ReadonlyMap<string, IslandBinding> | undefined
   isIsland?: boolean | undefined
-  emitMarkers?: boolean | undefined
+  /** Hydration markers everywhere, nowhere, or only inside these source spans. */
+  emitMarkers?: boolean | readonly (readonly [number, number])[] | undefined
   analysis?: ModuleAnalysis | undefined
 }
 
 export interface CompileResult {
   code: string
   analysis: ModuleAnalysis
+}
+
+function markerTest(markers: NonNullable<CompileSsrOptions['emitMarkers']>): (offset: number) => boolean {
+  return typeof markers === 'boolean' ? () => markers : offset => markers.some(([start, end]) => offset >= start && offset < end)
 }
 
 export function compileSsr(filename: string, code: string, options: CompileSsrOptions = {}): CompileResult {
@@ -74,7 +79,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   }
 
   const islands = options.islands
-  const emitMarkers = options.emitMarkers ?? options.isIsland ?? analysis.isInteractive
+  const markersAt = markerTest(options.emitMarkers ?? options.isIsland ?? analysis.isInteractive)
   const jsxNodes = analysis.jsxNodes
   const exprContext = createExprContext(program, jsxNodes)
   const { directAwaitNodes, dynamicChildNodes } = precomputeSsrSubtreeFlags(program)
@@ -95,7 +100,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     return sub.toString()
   }
 
-  function compileChildrenListToStringExpr(children: readonly JSXChild[], slotMarkers = emitMarkers, inFragment = false, rawTextTag?: 'style' | 'script'): string {
+  function compileChildrenListToStringExpr(children: readonly JSXChild[], slotMarkers = markersAt(children[0]?.start ?? 0), inFragment = false, rawTextTag?: 'style' | 'script'): string {
     const bufVar = `_o${loopCounter++}`
     const stmts: string[] = []
     const parts = new StringParts()
@@ -118,7 +123,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   // Emits JSX directly into a string accumulator variable `_out` (zero closures on nested `.map()` loops!)
   function emitIntoBuffer(node: JSXElement | JSXFragment, bufVar: string, parts: StringParts, flushParts: () => void, pushStmt: (stmt: string) => void): void {
     if (node.type === 'JSXFragment') {
-      emitChildrenIntoBuffer(node.children, bufVar, parts, flushParts, pushStmt, undefined, emitMarkers, true)
+      emitChildrenIntoBuffer(node.children, bufVar, parts, flushParts, pushStmt, undefined, markersAt(node.start), true)
       return
     }
 
@@ -183,7 +188,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     flushParts: () => void,
     pushStmt: (stmt: string) => void,
     rawTextTag?: 'style' | 'script',
-    slotMarkers = emitMarkers,
+    slotMarkers = markersAt(children[0]?.start ?? 0),
     inFragment = false,
   ): void {
     const planned = planChildSlots(children, { jsxNodes, exprContext, emitMarkers: slotMarkers, inFragment })
@@ -336,7 +341,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       throw mistake(`$hydrate on <${tag}>`, filename, `${tag} is not an island, so it never hydrates; drop $hydrate, or give ${tag} state or handlers`)
 
     const childrenHaveAwait = hasChildren && childNodes.some(c => directAwaitNodes.has(c))
-    const childMarkers = islandInfo === undefined && emitMarkers
+    const childMarkers = islandInfo === undefined && markersAt(node.start)
     const childExpr = hasChildren ? compileChildrenListToStringExpr(childNodes, childMarkers, childMarkers && meaningfulChildren.length > 1) : '""'
 
     if (islandInfo !== undefined) {
@@ -354,7 +359,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
       // Compile-time static island props fast path (only when not inside an island-reachable component and children don't contain direct `await`):
       // 0 JSON.stringify / Object.keys / escAttr at runtime, while still recording rendered islands & island ID scope!
-      if (!emitMarkers && !childrenHaveAwait && safeStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
+      if (!markersAt(node.start) && !childrenHaveAwait && safeStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
         const pAttr = Object.keys(staticPropsObj).length > 0
           ? ` p="${escapeStaticAttr(JSON.stringify(staticPropsObj))}"`
           : ''
