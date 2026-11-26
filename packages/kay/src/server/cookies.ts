@@ -8,6 +8,8 @@ export interface CookieOptions {
   httpOnly?: boolean | undefined
   secure?: boolean | undefined
   sameSite?: 'strict' | 'lax' | 'none' | undefined
+  /** Consent category required before setting this cookie (omit or `'essential'` for strictly necessary cookies). */
+  category?: string | undefined
 }
 
 export interface Cookies {
@@ -87,10 +89,12 @@ export class CookieStore implements Cookies {
   #values: Map<string, string> | undefined
   readonly #headers = new Map<string, string>()
   readonly #isHttps: boolean
+  readonly #isConsentGranted: ((category: string) => boolean) | undefined
 
-  constructor(cookieHeader: string | null, isHttps = false) {
+  constructor(cookieHeader: string | null, isHttps = false, isConsentGranted?: (category: string) => boolean) {
     this.#rawHeader = cookieHeader
     this.#isHttps = isHttps
+    this.#isConsentGranted = isConsentGranted
   }
 
   #ensureValues(): Map<string, string> {
@@ -106,6 +110,10 @@ export class CookieStore implements Cookies {
   }
 
   set(name: string, value: string, options?: CookieOptions): void {
+    if (options?.category !== undefined && options.category !== 'essential') {
+      if (this.#isConsentGranted === undefined || !this.#isConsentGranted(options.category))
+        return
+    }
     const serialized = serializeCookie(name, value, options, this.#isHttps)
     this.#ensureValues().set(name, value)
     this.#headers.set(cookieKey(name, options), serialized)

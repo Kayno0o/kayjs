@@ -6,14 +6,12 @@ import { computeJsxNodes, walk } from './ast'
 import type { BindingFacts, Interactivity } from './interactivity'
 import type { CompilerWarning } from './mistakes'
 import { analyzeDefaultDataKeys } from './data-keys'
+import { checkCompliance } from './compliance'
 import { resolveInteractivity } from './interactivity'
 import { assertScopedKayImport, checkExportHydrate, checkHabits, checkHydrateMode, checkMistakes, guarded, islandRemoved, KayMistake, mistake, serverOnlyTagError, staticStringValue } from './mistakes'
 import { walkScoped } from './scope'
 import { calleeName, EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, resolveKayTag, unwrapTsExpr } from './shared'
 import { checkBareSignals } from './signal-reads'
-
-export { computeJsxNodes } from './ast'
-
 
 const REACTIVE_IMPORTS = new Set(['signal', 'computed', 'effect', 'onMount', 'onCleanup', 'selector', 'store', 'useAction'])
 // Primitives whose result is reactive state another module can import and read.
@@ -21,8 +19,8 @@ const STATE_PRIMITIVES = new Set(['signal', 'computed', 'selector', 'store'])
 const KAY_SOURCES = new Set(['@kayjs/kay'])
 const KAY_SSR_SOURCES = new Set(['@kayjs/kay', '@kayjs/kay/internal/ssr'])
 const KAY_SERVER_SOURCES = new Set(['@kayjs/kay/server'])
-const RENDER_CONTEXT_IMPORTS = new Set(['Head', 'Region', 'Suspense', 'createContext', 'provideContext', 'useContext', 'useId'])
-const SERVER_ONLY_TAGS = new Set(['Head', 'Region', 'Suspense'])
+const RENDER_CONTEXT_IMPORTS = new Set(['Head', 'Region', 'Suspense', 'ConsentGate', 'createContext', 'provideContext', 'useContext', 'useId'])
+const SERVER_ONLY_TAGS = new Set(['Head', 'Region', 'Suspense', 'ConsentGate'])
 
 export interface ImportInfo {
   source: string
@@ -547,6 +545,8 @@ export function analyzeModule(filename: string, code: string, program: Program =
   const loadNodes = loadDeclarations(program)
   const body = scanBody(program, filename, code, imports, decls, warnings, new Set(loadNodes))
   checkBareSignals(program, imports.signalCallees, filename)
+  if (body.hasJsx)
+    checkCompliance(program, filename, code, warnings, tag => resolveKayTag(tag, imports.imports))
 
   for (const [name, init] of decls.localInits) {
     if (isAsyncFunction(init))

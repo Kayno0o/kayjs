@@ -3,9 +3,11 @@
 import type { BuildManifest } from '../build/index'
 import type { KayChild } from '../jsx-runtime'
 import type { ServerErrorInfo, ServerRuntimeConfig } from '../plugins/index'
+import type { NormalizedConsentConfig, RequestConsent } from './consent'
 import type { Cookies } from './cookies'
 import type { KayLocals } from './index'
 import type { TrustProxy } from './security'
+import { createRequestConsent } from './consent'
 import { CookieStore } from './cookies'
 import { nodeEnv } from './env'
 import { requestedRegion } from './region'
@@ -106,6 +108,7 @@ export interface RequestContext<Params = Record<string, string>> {
   url: URL
   params: Params
   cookies: Cookies
+  consent: RequestConsent
   locals: KayLocals
   ip?: string | undefined
   /** The region a `data-kay-target` link or form asked for alone (`x-kay-region`): `load()` can skip the data the others show. */
@@ -197,6 +200,7 @@ export interface RequestContextOptions {
   remoteIp?: string | undefined
   /** The parsed `request.url`, when the caller already has it. */
   url?: URL | undefined
+  consent?: NormalizedConsentConfig | undefined
 }
 
 // None of these read the request, so every context shares them.
@@ -243,7 +247,17 @@ export function makeRequestContext(
 ): { ctx: RequestContext, cookieStore: CookieStore } {
   const trustProxy = opts?.trustProxy ?? false
   const remoteIp = opts?.remoteIp
-  const cookieStore = new CookieStore(request.headers.get('cookie'), isHttpsRequest(request, trustProxy))
+  const consentConfig = opts?.consent
+  let cachedConsent: RequestConsent | undefined
+  const cookieStore = new CookieStore(
+    request.headers.get('cookie'),
+    isHttpsRequest(request, trustProxy),
+    category => getConsent().has(category),
+  )
+  const getConsent = (): RequestConsent => {
+    cachedConsent ??= createRequestConsent(consentConfig !== undefined ? cookieStore.get(consentConfig.cookieName) : undefined, consentConfig)
+    return cachedConsent
+  }
   let cachedIp: string | undefined
   let ipComputed = false
   const ctx: RequestContext = {
@@ -251,6 +265,9 @@ export function makeRequestContext(
     url: opts?.url ?? new URL(request.url),
     params,
     cookies: cookieStore,
+    get consent() {
+      return getConsent()
+    },
     locals: {},
     get ip() {
       if (!ipComputed) {

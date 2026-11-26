@@ -3,6 +3,7 @@
 // - Builds client (1 pass, minimal runtime + island chunks + action stubs) and server (1 pass)
 // - Supports hybrid prerender, --static export, and --compile single-executable builds
 
+import type { ComplianceConfig } from '../compiler/compliance'
 import type { AppRuntimeContext } from '../plugins/context'
 import type { KayPlugin } from '../plugins/index'
 import type { BuildCache } from './graph'
@@ -11,6 +12,8 @@ import type { BuildManifest } from './manifest'
 import type { PublicFiles } from './plugin-host'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
+import { collectProjectComplianceWarnings, shouldEmitWarning } from '../compiler/compliance'
+import { formatDiagnostic, formatLoc } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { actionHash } from '../server/action'
 import { buildClient, buildServer, linkOrCopyFile, pluginBunPlugins, standaloneCssFiles } from './bundle'
@@ -110,6 +113,7 @@ interface BuildRun {
   stageSuffix: string
   assetPrefix: string
   site: string | undefined
+  compliance: ComplianceConfig | undefined
   minify: boolean
   isDev: boolean
   nodeEnv: string | undefined
@@ -164,6 +168,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       stageSuffix,
       assetPrefix,
       site,
+      compliance: fileConfig.compliance,
       minify: options.minify ?? true,
       isDev,
       nodeEnv: effectiveNodeEnv,
@@ -179,6 +184,31 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       if (!cacheExisted && existsSync(cacheBaseDir) && readdirSync(cacheBaseDir).length === 0)
         rmSync(cacheBaseDir, { recursive: true, force: true })
     }
+  }
+}
+
+function emitBuildWarnings(run: BuildRun, graph: ModuleGraph, routeFiles: readonly string[]): void {
+  for (const [file, analysis] of graph.analyses) {
+    const rel = relPosix(run.root, file)
+    for (const warning of analysis.warnings) {
+      if (!shouldEmitWarning(warning, run.compliance, run.site))
+        continue
+      const loc = formatLoc(rel, graph.source(file), warning.start)
+      console.warn(formatDiagnostic(loc, warning.message.replaceAll(file, rel), 'warning'))
+    }
+  }
+  if (!run.isDev) {
+    const projectWarnings = collectProjectComplianceWarnings({
+      root: run.root,
+      srcDir: join(run.root, 'src'),
+      routesDir: run.routesDir,
+      routeFiles,
+      analyses: graph.analyses,
+      compliance: run.compliance,
+      site: run.site,
+    })
+    for (const warning of projectWarnings)
+      console.warn(warning)
   }
 }
 
@@ -205,10 +235,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   const graph = new ModuleGraph(root, options.cache)
   for (const f of [...specialFiles, ...candidateFiles, ...(hasConfigFile ? [configSrc] : [])])
     graph.load(f)
-  for (const analysis of graph.analyses.values()) {
-    for (const warning of analysis.warnings)
-      console.warn(warning.message)
-  }
+  emitBuildWarnings(run, graph, allRouteFiles)
 
   const routesRel = relPosix(root, routesDir)
   for (const f of [...specialFiles, ...candidateFiles]) {

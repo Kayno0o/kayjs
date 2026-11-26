@@ -2,6 +2,7 @@
 
 export { action, getActionError } from './action'
 export type { ActionContext, ActionErrorFlash, ActionOptions, ActionResult, ServerAction } from './action'
+export type { ConsentConfig, RequestConsent } from './consent'
 export type { CookieOptions, Cookies } from './cookies'
 export { defineEnv, nodeEnv } from './env'
 export { notFound } from './http'

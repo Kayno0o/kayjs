@@ -1,6 +1,7 @@
 // Per-request SSR context for <Head> metadata, streaming <Suspense>, rendered island tracking,
 // universal createContext/useContext, and deterministic hydration-safe useId().
 
+import type { ConsentGateProps } from '../context'
 import type { Html, KayChild } from '../jsx-runtime'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { registerServerContextBridge } from '../context'
@@ -48,6 +49,8 @@ export interface RenderContext {
   inTarget: boolean
   /** Compiler-emitted inline `<style>` contents rendered during this request, for CSP hashing. */
   inlineStyles: string[] | undefined
+  /** Request consent state used by `<ConsentGate>`. */
+  consent: { has(category: string): boolean } | undefined
 }
 
 interface RenderScope {
@@ -114,6 +117,9 @@ registerServerContextBridge({
   region(props) {
     return Region(props)
   },
+  consentGate(props) {
+    return ConsentGate(props)
+  },
   head(props) {
     return Head(props)
   },
@@ -122,7 +128,11 @@ registerServerContextBridge({
   },
 })
 
-export function createRenderContext(region?: string, ancestors: ReadonlySet<string> = new Set()): RenderContext {
+export function createRenderContext(
+  region?: string,
+  ancestors: ReadonlySet<string> = new Set(),
+  consent?: { has(category: string): boolean },
+): RenderContext {
   return {
     headParts: [],
     title: undefined,
@@ -144,6 +154,7 @@ export function createRenderContext(region?: string, ancestors: ReadonlySet<stri
     regionAncestors: ancestors,
     inTarget: false,
     inlineStyles: undefined,
+    consent,
   }
 }
 
@@ -181,6 +192,13 @@ export function currentRenderContext(): RenderContext | undefined {
 
 const TITLE_RE = /<title\b[^>]*>([\s\S]*?)<\/title>/gi
 
+/** Renders `children` only when consent for `category` is granted; otherwise renders `fallback`. */
+export function ConsentGate(props: ConsentGateProps): Html {
+  const ctx = renderStorage.getStore()
+  const granted = props.category === 'essential' || ctx?.consent?.has(props.category) === true
+  return raw(ssrChild(granted ? props.children : props.fallback))
+}
+
 /** Collects document <head> tags during SSR; innermost <title> wins. */
 export function Head(props: { children?: KayChild }): Html {
   const ctx = renderStorage.getStore()
@@ -200,13 +218,6 @@ export function Head(props: { children?: KayChild }): Html {
     ctx.headParts.push(html)
 
   return raw('')
-}
-
-export function renderCollectedHead(ctx: RenderContext): string {
-  let out = ctx.title ?? ''
-  for (let i = 0; i < ctx.headParts.length; i++)
-    out += ctx.headParts[i]
-  return out
 }
 
 /**

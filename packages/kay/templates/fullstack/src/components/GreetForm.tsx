@@ -15,6 +15,7 @@ export function GreetForm() {
     <form class="greet-form" action={greet.url} method="post" onSubmit={onSubmit}>
       <input
         name="name"
+        aria-label="Your name"
         placeholder="Your name"
         value={name.value}
         onInput={(e) => { name.value = (e.target as HTMLInputElement).value }}

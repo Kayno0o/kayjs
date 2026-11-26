@@ -13,8 +13,17 @@ export interface RegionProps {
   [attribute: string]: unknown
 }
 
+export interface ConsentGateProps {
+  /** Consent category required to render `children` (e.g. `'analytics'`, `'media'`). */
+  category: string
+  /** Rendered when consent for `category` has not been granted. */
+  fallback?: KayChild
+  children?: KayChild
+}
+
 export interface ServerContextBridge {
   region(props: RegionProps): KayChild
+  consentGate(props: ConsentGateProps): KayChild
   getContext(key: symbol): { found: true, value: unknown } | undefined
   runWithContext<T>(key: symbol, value: unknown, fn: () => T): T
   nextId(): string | undefined
@@ -51,6 +60,12 @@ export function Suspense(props: { fallback?: KayChild, error?: KayChild | ((erro
 export function Region(props: RegionProps): KayChild {
   const bridge = getServerBridge()
   return bridge !== undefined ? bridge.region(props) : null
+}
+
+/** Renders `children` on the server only when consent for `category` has been granted; otherwise renders `fallback`. Server-only, 0 KB browser JS. */
+export function ConsentGate(props: ConsentGateProps): KayChild {
+  const bridge = getServerBridge()
+  return bridge !== undefined ? bridge.consentGate(props) : (props.fallback ?? null)
 }
 
 export interface Context<T> {

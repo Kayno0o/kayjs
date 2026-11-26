@@ -6,11 +6,11 @@ export function defineConfig(config: KayConfig): KayConfig {
   return config
 }
 
-/** Forwards every runtime key from `kay.config.ts`, stripping build/CLI-only keys (`routesDir`, `outDir`, `publicDir`, `port`). */
+/** Forwards every runtime key from `kay.config.ts`, stripping build/CLI-only keys (`routesDir`, `outDir`, `publicDir`, `port`, `compliance`). */
 export function pickRuntimeConfig(config: KayConfig | undefined): ServerRuntimeConfig {
   if (config === undefined)
     return {}
-  const { routesDir: _r, outDir: _o, publicDir: _p, port: _pt, ...runtime } = config
+  const { routesDir: _r, outDir: _o, publicDir: _p, port: _pt, compliance: _c, ...runtime } = config
   return runtime
 }
 
@@ -24,6 +24,7 @@ const RUNTIME_CONFIG_KEYS: readonly (keyof ServerRuntimeConfig)[] = [
   'maxRequestBodySize',
   'navigation',
   'streamTimeout',
+  'consent',
   'compress',
   'onError',
   'plugins',

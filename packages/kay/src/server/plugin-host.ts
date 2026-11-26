@@ -6,6 +6,7 @@ import type { KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerPluginAPI 
 import type { EmbeddedServerConfig, Middleware, RequestContext } from './http'
 import type { TrustProxy } from './security'
 import { runWithAppContext } from '../plugins/context'
+import { normalizeConsentConfig, registerConsentRoute } from './consent'
 import { Router } from './router'
 
 export interface PluginRouteDef {
@@ -108,6 +109,10 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
       trustProxy: routeOptions?.trustProxy ?? trustProxy,
     })
   }
+
+  const consentConfig = normalizeConsentConfig(config.consent)
+  if (consentConfig !== undefined)
+    registerConsentRoute(registerRouteFor('kay:consent'), consentConfig, trustedOrigins, trustProxy)
 
   const {
     manifest: _m,

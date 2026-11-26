@@ -1,5 +1,7 @@
 export { analyzeModule, parseTsx } from './analyze'
 export type { ImportInfo, ModuleAnalysis } from './analyze'
+export { checkCompliance, checkCssCompliance, checkRouteCompliance, collectProjectComplianceWarnings, isRuleIgnored, shouldEmitWarning } from './compliance'
+export type { ComplianceConfig, ComplianceRule } from './compliance'
 export { compileDom } from './dom'
 export type { CompileDomOptions, CompileDomResult } from './dom'
 export { compileSsr } from './ssr'

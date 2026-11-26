@@ -1,6 +1,7 @@
 // Refuses JSX that compiles but does the wrong thing, mostly habits from React, Solid and Astro, with an error naming the fix.
 
 import type { JSXAttribute, JSXAttributeItem, JSXElement, Node } from 'oxc-parser'
+import type { ComplianceRule } from './compliance'
 import type { ServerOnlyInIsland } from './interactivity'
 import { URL_ATTRS } from '../attrs'
 import { walk } from './ast'
@@ -57,6 +58,8 @@ export class KayMistake extends Error {
 export interface CompilerWarning {
   message: string
   start: number
+  rule?: ComplianceRule | undefined
+  urlOrigin?: string | undefined
 }
 
 export function mistake(what: string, filename: string, fix: string): KayMistake {

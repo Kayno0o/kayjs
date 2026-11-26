@@ -335,21 +335,21 @@ export interface KayTagBinding {
   specifiers: readonly { local: string, imported: string }[]
 }
 
-const KAY_SERVER_TAGS = new Set(['Head', 'Region', 'Suspense'])
+const KAY_SERVER_TAGS = new Set(['Head', 'Region', 'Suspense', 'ConsentGate'])
 
-/** Resolves a JSX tag (direct, aliased, or namespaced via `@kayjs/kay`) to its canonical Kay tag (`Head` | `Region` | `Suspense`). */
-export function resolveKayTag(tag: string, imports: readonly KayTagBinding[]): 'Head' | 'Region' | 'Suspense' | undefined {
+/** Resolves a JSX tag (direct, aliased, or namespaced via `@kayjs/kay`) to its canonical Kay tag (`Head` | `Region` | `Suspense` | `ConsentGate`). */
+export function resolveKayTag(tag: string, imports: readonly KayTagBinding[]): 'Head' | 'Region' | 'Suspense' | 'ConsentGate' | undefined {
   let boundElsewhere = false
   for (const imp of imports) {
     const isKay = imp.source === '@kayjs/kay'
     for (const spec of imp.specifiers) {
       if (isKay) {
         if (spec.local === tag && KAY_SERVER_TAGS.has(spec.imported))
-          return spec.imported as 'Head' | 'Region' | 'Suspense'
+          return spec.imported as 'Head' | 'Region' | 'Suspense' | 'ConsentGate'
         if (spec.imported === '*' && tag.startsWith(`${spec.local}.`)) {
           const member = tag.slice(spec.local.length + 1)
           if (KAY_SERVER_TAGS.has(member))
-            return member as 'Head' | 'Region' | 'Suspense'
+            return member as 'Head' | 'Region' | 'Suspense' | 'ConsentGate'
         }
       }
       else if (spec.local === tag) {
@@ -358,7 +358,7 @@ export function resolveKayTag(tag: string, imports: readonly KayTagBinding[]): '
     }
   }
   if (!boundElsewhere && KAY_SERVER_TAGS.has(tag))
-    return tag as 'Head' | 'Region' | 'Suspense'
+    return tag as 'Head' | 'Region' | 'Suspense' | 'ConsentGate'
   return undefined
 }
 

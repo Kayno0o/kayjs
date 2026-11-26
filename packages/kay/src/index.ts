@@ -1,5 +1,5 @@
-export { createContext, Head, provideContext, Region, Suspense, useContext, useId } from './context'
-export type { Context } from './context'
+export { ConsentGate, createContext, Head, provideContext, Region, Suspense, useContext, useId } from './context'
+export type { ConsentGateProps, Context, RegionProps } from './context'
 export {
   batch,
   computed,
@@ -18,5 +18,5 @@ export { snapshot, store } from './reactivity/store'
 export { useAction } from './dom/action'
 export type { ActionForm, ClientAction, UseActionOptions } from './dom/action'
 export type { Component, Html, HydrateStrategy, KayChild } from './jsx-runtime'
-export type { ExtractRouteParams, KayLocals, LayoutProps, LoaderData, LoaderFn, NotFoundResult, PageProps, RouteContext } from './server/index'
+export type { ExtractRouteParams, KayLocals, LayoutProps, LoaderData, LoaderFn, NotFoundResult, PageProps, RequestConsent, RouteContext } from './server/index'
 

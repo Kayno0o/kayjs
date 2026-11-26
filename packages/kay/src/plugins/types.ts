@@ -2,6 +2,8 @@
 
 import type { BunPlugin } from 'bun'
 import type { RouteManifestEntry } from '../build/index'
+import type { ComplianceConfig } from '../compiler/compliance'
+import type { ConsentConfig } from '../server/consent'
 import type { Middleware, RequestContext } from '../server/index'
 import type { SecurityHeadersOptions, TrustProxy } from '../server/security'
 import type { NavigationConfig } from '../ssr/navigation'
@@ -187,6 +189,8 @@ export interface ServerRuntimeConfig {
   navigation?: NavigationConfig | undefined
   /** Milliseconds a streamed `<Suspense>` boundary may take before it renders its error and the response ends (default 30000). */
   streamTimeout?: number | undefined
+  /** CNIL/RGPD consent categories, cookie name, retention, and POST endpoint. */
+  consent?: ConsentConfig | undefined
   compress?: boolean | undefined
   onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
@@ -197,4 +201,6 @@ export interface KayConfig extends ServerRuntimeConfig {
   routesDir?: string | undefined
   outDir?: string | undefined
   publicDir?: string | undefined
+  /** French web law compliance checks (RGAA, RGPD, LCEN) configuration and rule silencing. */
+  compliance?: ComplianceConfig | undefined
 }

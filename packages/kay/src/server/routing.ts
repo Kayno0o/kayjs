@@ -6,6 +6,7 @@ import type { DocumentOptions } from '../ssr/index'
 import type { RenderContext } from '../ssr/context'
 import type { ActionRegistry } from './action-registry'
 import type { CompressionCache } from './compress'
+import type { NormalizedConsentConfig } from './consent'
 import type { CookieStore } from './cookies'
 import type { HtmlHeaders } from './document'
 import type { NotifyError } from './errors'
@@ -215,6 +216,7 @@ export interface FastStaticPageOptions {
   hasIslands: boolean
   hasLoad: boolean
   trustProxy: TrustProxy
+  consent?: NormalizedConsentConfig | undefined
   htmlHeaders: HtmlHeaders
   compressCache: CompressionCache | undefined
   actions: ActionRegistry
@@ -235,6 +237,7 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
     hasIslands,
     hasLoad,
     trustProxy,
+    consent,
     htmlHeaders,
     compressCache,
     actions,
@@ -324,7 +327,7 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
   }
 
   return (request, remoteIp, url = new URL(request.url)) => {
-    const { ctx, cookieStore } = makeRequestContext(request, {}, { trustProxy, remoteIp, url })
+    const { ctx, cookieStore } = makeRequestContext(request, {}, { trustProxy, remoteIp, url, consent })
     if (request.method === 'HEAD' && typeof mod.HEAD === 'function') {
       return actions.run(ctx, async () => {
         try {
@@ -335,7 +338,7 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
         }
       })
     }
-    const rctx = createRenderContext()
+    const rctx = createRenderContext(undefined, undefined, ctx.consent)
     try {
       if (!hasLoad)
         return actions.run(ctx, () => runWithRenderContext(rctx, () => renderPage(undefined, request, url, ctx.locals, rctx, cookieStore, ctx)))

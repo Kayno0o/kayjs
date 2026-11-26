@@ -59,10 +59,10 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
 
   test('onChange on a text field warns, since it fires on commit rather than per keystroke', () => {
     const warningsOf = (jsx: string): string[] => analyzeModule('Page.tsx', `export default function Page() { const fn = () => {}; return ${jsx} }`).warnings.map(w => w.message)
-    expect(warningsOf('<input onChange={fn} />')).toEqual(['kay compiler: onChange on <input> in Page.tsx fires when the field loses focus, not per keystroke; write onInput={...} for every keystroke.'])
-    expect(warningsOf('<textarea onChange={fn} />')).toHaveLength(1)
-    expect(warningsOf('<input type="checkbox" onChange={fn} />')).toEqual([])
-    expect(warningsOf('<select onChange={fn} />')).toEqual([])
+    expect(warningsOf('<input aria-label="x" onChange={fn} />')).toEqual(['kay compiler: onChange on <input> in Page.tsx fires when the field loses focus, not per keystroke; write onInput={...} for every keystroke.'])
+    expect(warningsOf('<textarea aria-label="x" onChange={fn} />')).toHaveLength(1)
+    expect(warningsOf('<input type="checkbox" aria-label="x" onChange={fn} />')).toEqual([])
+    expect(warningsOf('<select aria-label="x" onChange={fn} />')).toEqual([])
   })
 
   test('React\'s dangerouslySetInnerHTML, which would print [object Object] as an attribute', () => {
@@ -184,7 +184,7 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     expect(urlWarnings('<a href="javascript:alert(1)">x</a>')).toEqual([expect.stringContaining('unsafe URL in href on <a>')])
     expect(urlWarnings('<iframe src="data:text/html,<script>1</script>" />')).toEqual([expect.stringContaining('unsafe URL in src on <iframe>')])
     expect(urlWarnings('<link rel="icon" href="data:image/svg+xml,%3Csvg/%3E" />')).toEqual([])
-    expect(urlWarnings('<img src="data:image/svg+xml,%3Csvg/%3E" />')).toEqual([])
+    expect(urlWarnings('<img src="data:image/svg+xml,%3Csvg/%3E" alt="" />')).toEqual([])
     accepts('<svg viewBox="0 0 1 1" preserveAspectRatio="none"><linearGradient gradientUnits="userSpaceOnUse" /></svg>')
     accepts('<input readOnly tabIndex={0} autoComplete="off" />')
   })

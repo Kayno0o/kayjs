@@ -9,6 +9,7 @@ import type { BuildManifest, RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
 import type { DocumentOptions } from '../ssr/index'
 import type { ActionRegistry, RegisteredAction } from './action-registry'
+import type { NormalizedConsentConfig } from './consent'
 import type { CookieStore } from './cookies'
 import type { NotifyError } from './errors'
 import type { EmbeddedServerConfig, KayApp, Middleware, RequestContext } from './http'
@@ -24,6 +25,7 @@ import { ACTION_ERROR_COOKIE, executeAction, finishActionRedirect, hydrateAction
 import { createActionRegistry } from './action-registry'
 import { createAssets } from './assets'
 import { CompressionCache, compressedHtmlResponse, markCompressionHandled, maybeCompressResponse } from './compress'
+import { normalizeConsentConfig } from './consent'
 import { addedInlineStyleHashes, createDocumentHooks, createHtmlHeaders, headTagStyleHashes, mergeStyleHashes, resolveRenderedIslands, withPluginHtmlCsp } from './document'
 import { createErrorNotifier, createFallbackPages, devErrorResponse } from './errors'
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
@@ -42,11 +44,12 @@ import { createStreamTracker, STREAM_TAIL_MARK, streamDocument } from './stream'
 export interface KayLocals {}
 
 export { CONTENT_IMAGE_RESOLVER_SERVICE, createAppContext, defineConfig, definePlugin, getAppContext, I18N_CONFIG_SERVICE, loadConfig, pickRuntimeConfig, resolvePlugins, resolveServerConfig, runWithAppContext } from '../plugins/index'
-export type { ActiveI18nConfig, AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, ContentImageResolver, ContentImageResult, CreateAppContextOptions, DocumentHeadContext, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI, ServerRuntimeConfig } from '../plugins/index'
+export type { ActiveI18nConfig, AppRuntimeContext, BuildPluginContext, BuildPluginTarget, CheckPluginContext, ComplianceConfig, ComplianceRule, ConsentConfig, ContentImageResolver, ContentImageResult, CreateAppContextOptions, DocumentHeadContext, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI, ServerRuntimeConfig } from '../plugins/index'
 export { action, getActionError } from './action'
 export type { ActionContext, ActionErrorFlash, ActionOptions, ActionResult, ServerAction } from './action'
 export { CompressionCache, isCompressibleType, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
 export type { CompressionEncoding, PrecompressedEncoding } from './compress'
+export type { RequestConsent } from './consent'
 export type { CookieOptions, Cookies } from './cookies'
 export { defineEnv, nodeEnv } from './env'
 export { DEFAULT_MAX_REQUEST_BODY_SIZE, notFound } from './http'
@@ -126,6 +129,7 @@ interface ActionDispatcherDeps {
   rewrites: readonly ((pathname: string, ctx: RequestContext) => string | undefined)[]
   trustedOrigins: Set<string> | undefined
   trustProxy: TrustProxy
+  consent: NormalizedConsentConfig | undefined
   refuseCrossSite: (request: Request, reason: string, cookieStore?: CookieStore) => Response
   checkBodyLimit: (request: Request, bodyLimited: boolean, cookieStore?: CookieStore) => Promise<Request | Response>
   finish: (res: Response, request: Request, cookieStore?: CookieStore) => Response
@@ -134,7 +138,7 @@ interface ActionDispatcherDeps {
 }
 
 function createActionDispatcher(deps: ActionDispatcherDeps) {
-  const { actions, rewrites, trustedOrigins, trustProxy, refuseCrossSite, checkBodyLimit, finish, notifyError, renderError } = deps
+  const { actions, rewrites, trustedOrigins, trustProxy, consent, refuseCrossSite, checkBodyLimit, finish, notifyError, renderError } = deps
   return async (
     registeredAction: RegisteredAction,
     request: Request,
@@ -156,7 +160,7 @@ function createActionDispatcher(deps: ActionDispatcherDeps) {
       req = checked
     }
     const { act, middlewares } = registeredAction
-    const { ctx, cookieStore } = existing ?? makeRequestContext(req, {}, { trustProxy, remoteIp, url })
+    const { ctx, cookieStore } = existing ?? makeRequestContext(req, {}, { trustProxy, remoteIp, url, consent })
     ctx.request = req
     if (existing === undefined && rewrites.length > 0) {
       for (const rewrite of rewrites)
@@ -208,6 +212,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const trustedOriginsList = config.trustedOrigins ?? []
   const trustedOrigins = trustedOriginsList.length > 0 ? new Set(trustedOriginsList) : undefined
   const trustProxy = config.trustProxy ?? false
+  const consent = normalizeConsentConfig(config.consent)
   const maxRequestBodySize = config.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE
   const streamTimeout = config.streamTimeout ?? DEFAULT_STREAM_TIMEOUT
   const isDev = config.dev ?? (process.env.KAY_DEV === '1')
@@ -353,7 +358,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
     if (canFastPath) {
       fastStaticPages.set(entry.path, createFastStaticPageHandler({
-        entry, mod, layouts, doc, hasIslands, hasLoad, trustProxy, htmlHeaders, compressCache,
+        entry, mod, layouts, doc, hasIslands, hasLoad, trustProxy, consent, htmlHeaders, compressCache,
         actions, buildNotFoundResponse, renderError, notifyError, finish, withHsts,
       }))
     }
@@ -428,7 +433,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       )
     }
 
-    const rctx = createRenderContext()
+    const rctx = createRenderContext(undefined, undefined, ctx.consent)
     const body = await runWithRenderContext(rctx, () => renderRouteBody(route, data, pageProps, ctx))
     if (hasFlash)
       ctx.cookies.delete(ACTION_ERROR_COOKIE)
@@ -461,15 +466,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   }
 
   const dispatchAction = createActionDispatcher({
-    actions,
-    rewrites: pluginHost.rewrites,
-    trustedOrigins,
-    trustProxy,
-    refuseCrossSite,
-    checkBodyLimit,
-    finish,
-    notifyError,
-    renderError,
+    actions, rewrites: pluginHost.rewrites, trustedOrigins, trustProxy, consent, refuseCrossSite, checkBodyLimit, finish, notifyError, renderError,
   })
 
   // `bodyLimited` is set under `serve()`, where Bun.serve already enforces maxRequestBodySize on every body, chunked ones included.
@@ -516,7 +513,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
 
       // 5. Full Router + Plugin Rewrites + Plugin Routes + Middleware + Streaming/Head/Error pipeline
-      const { ctx, cookieStore } = makeRequestContext(request, {}, { trustProxy, remoteIp, url })
+      const { ctx, cookieStore } = makeRequestContext(request, {}, { trustProxy, remoteIp, url, consent })
 
       // Apply plugin URL rewrites (e.g. @kayjs/i18n stripping /fr prefix and setting ctx.locals.locale)
       let effectivePath = rawPathname

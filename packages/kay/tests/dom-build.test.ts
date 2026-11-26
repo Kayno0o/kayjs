@@ -19,7 +19,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     const manifest = await build({ root: BENCH_ROOT, minify: true })
 
     expect(manifest.runtimeScript).toBeDefined()
-    expect(manifest.routes.map(r => r.path)).toEqual(['/', '/table'])
+    expect(manifest.routes.map(r => r.path)).toEqual(['/', '/regions', '/table'])
 
     const app = await createServer({ root: BENCH_ROOT })
 

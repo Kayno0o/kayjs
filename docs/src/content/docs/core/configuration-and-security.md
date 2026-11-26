@@ -38,6 +38,8 @@ export default defineConfig({
 | `trustProxy` | `false` | Reverse proxies in front of Kay: `true` for 1 hop, a number for `N` hops (e.g. `2` for CDN + nginx). |
 | `maxRequestBodySize` | `1048576` (1 MiB) | Maximum request body size before returning `413 Payload Too Large`. |
 | `navigation` | `{ viewTransitions: true, prefetch: 'moderate', prerender: false }` | How a change from one page to the next feels, with no client JS: see [Page changes](/core/routing-and-layouts#page-changes). |
+| `consent` | `undefined` | One-declaration CNIL/RGPD consent categories, cookie name (`'kay_consent'`), retention (`15552000` s = 180 days), and `POST` endpoint (`'/_kay/consent'`). |
+| `compliance` | `undefined` | French web law check overrides: `{ ignore?, publicBody?, legalNotice? }`. |
 | `streamTimeout` | `30000` | Milliseconds a `<Suspense>` boundary may wait before failing. |
 | `compress` | `true` in prod, `false` in dev | On-the-fly and sidecar Brotli/Gzip response compression. |
 | `onError` | `undefined` | Hook called on unhandled errors in routes, actions, or plugins (`source: 'route' \| 'action' \| 'plugin'`). A hook that throws is logged with its owner, and the other hooks still run. |
@@ -79,6 +81,93 @@ const theme = ctx.cookies.get('theme')
 ctx.cookies.set('theme', 'dark', { httpOnly: true, sameSite: 'lax', path: '/' })
 ctx.cookies.delete('theme')
 ```
+
+Pass `category` for any non-essential cookie (for example, `{ category: 'analytics' }`). Kay refuses to set it unless the visitor has granted consent for that category. Essential cookies (no `category` or `category: 'essential'`) always work.
+
+## French Web Law & Consent (RGPD, CNIL, RGAA, LCEN)
+
+`kay check` and production `kay build` check French web law rules by default and emit actionable warnings (never hard compile errors; pass `kay check --strict` in CI to fail on warnings):
+
+| Rule | What it checks |
+| :--- | :--- |
+| `rgaa/img-alt` | `<img>` missing an `alt` attribute (`alt=""` is accepted for decorative images). |
+| `rgaa/form-label` | `<input>` (except `hidden`/`submit`/`reset`/`button`/`image`), `<select>`, or `<textarea>` without an enclosing `<label>`, matching `<label for>`, `aria-label`, `aria-labelledby`, or `title`. |
+| `rgaa/accessible-name` | Empty or icon-only `<button>` or `<a>` with no visible text, `aria-label`, `aria-labelledby`, `title`, or labelled child image/icon. |
+| `rgpd/third-party-url` | Third-party URL on `<script src>`, `<link rel="stylesheet\|preload\|preconnect\|dns-prefetch">`, `<iframe src>`, or CSS `@import`/`url(...)` outside `<ConsentGate>` (same-origin `site` and `localhost` are excluded). |
+| `lcen/legal-notice` | Page app missing a legal notice route (`/mentions-legales`, `/legal`, `/legal-notice`, `/imprint`, `/impressum`, `/cgu`, `/cgv`, or custom `compliance.legalNotice`). Skipped for API-only apps. |
+| `rgaa/accessibility-statement` | When `compliance: { publicBody: true }` is set, missing an accessibility statement route (`/accessibilite`, `/accessibility`, `/declaration-accessibilite`, or `/accessibility-statement`). |
+
+### Silencing warnings
+
+Silence a specific rule explicitly in `kay.config.ts` or inline with a comment naming the rule:
+
+```ts
+// kay.config.ts
+export default defineConfig({
+  compliance: {
+    publicBody: false,
+    legalNotice: '/mentions-legales', // or false to disable lcen/legal-notice
+    ignore: ['rgaa/img-alt'],
+  },
+})
+```
+
+```tsx
+{/* kay-ignore rgaa/img-alt */}
+<img src="/generated.png" />
+
+// Or at the top of a file:
+// kay-ignore-file rgpd/third-party-url
+```
+
+### One-declaration consent gating (`consent` & `<ConsentGate>`)
+
+Declare your non-essential categories once in `kay.config.ts`. Kay automatically wires a CSRF-protected `POST /_kay/consent` endpoint (supporting both zero-JS HTML forms and JSON), sets an `HttpOnly; SameSite=Lax` cookie (`kay_consent`, 180-day CNIL max-age by default), exposes `ctx.consent` (`decided`, `categories`, `has(cat)`, `all()`), gates `ctx.cookies.set(..., { category })`, and provides server-only `<ConsentGate>` with **0 KB of browser JS**:
+
+```ts
+// kay.config.ts
+import { defineConfig } from '@kayjs/kay/config'
+
+export default defineConfig({
+  consent: {
+    categories: {
+      analytics: 'Audience measurement',
+      media: 'External video embeds',
+    },
+  },
+})
+```
+
+```tsx
+// src/routes/index.tsx
+import type { PageProps, RouteContext } from '@kayjs/kay'
+import { ConsentGate } from '@kayjs/kay'
+
+export function load(ctx: RouteContext) {
+  // Refused until the visitor grants 'analytics' consent
+  ctx.cookies.set('visitor_id', 'v_123', { category: 'analytics' })
+  return { decided: ctx.consent.decided }
+}
+
+export default function Home({ data }: PageProps<typeof load>) {
+  return (
+    <main>
+      <ConsentGate category="media" fallback={<p>Accept media cookies to load this video.</p>}>
+        <iframe src="https://video.example.com/embed/demo" title="Demo video" />
+      </ConsentGate>
+
+      {!data.decided && (
+        <form method="post" action="/_kay/consent">
+          <button type="submit" name="action" value="accept-all">Accept all</button>
+          <button type="submit" name="action" value="reject-all">Reject all</button>
+        </form>
+      )}
+    </main>
+  )
+}
+```
+
+Granular checkboxes (`<input type="checkbox" name="analytics" />`) work with the same zero-JS form, or send JSON `POST /_kay/consent` with `{ categories: { analytics: true, media: false } }`, `{ acceptAll: true }`, or `{ rejectAll: true }`.
 
 ## Typed environment variables (`defineEnv` & `nodeEnv`)
 

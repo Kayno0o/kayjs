@@ -139,7 +139,7 @@ describe('Compile, check, and build error locations & code frames (#3546)', () =
     expect(at).toContain('src/routes/index.tsx:10:13')
     expect(at).toContain('src/routes/index.tsx:11:12')
     expect(res.errors.some(e => e.startsWith('src/routes/index.tsx:1:') && e.includes('node:fs'))).toBe(true)
-    expect(res.warnings).toEqual([expect.stringMatching(/^src\/routes\/index\.tsx:12:24: warning: kay compiler: onChange on <input> in src\/routes\/index\.tsx fires/)])
+    expect(res.warnings).toContainEqual(expect.stringMatching(/^src\/routes\/index\.tsx:12:24: warning: kay compiler: onChange on <input> in src\/routes\/index\.tsx fires/))
   })
 
   it('preserves exact line:col offsets and fix hints for island(), async interactive, and <Head> in island errors (#3630)', async () => {

@@ -206,6 +206,7 @@ describe('kay check and kay build decide islands per component (#3587)', () => {
         'export function Live() { return <div onClick={() => 1}><Clicker /></div> }',
         'export function Shell() { return <section><Frame /></section> }',
       ].join('\n'),
+      'kay.config.ts': 'export default { compliance: { legalNotice: false } }\n',
       'src/routes/index.tsx': 'import { Label } from \'../ui/Count\'\nexport default function Home() { return <main><Label /></main> }\n',
       'src/routes/counter.tsx': 'import { Label, Total } from \'../ui/Count\'\nexport default function Counter() { return <main><Label /><Total /></main> }\n',
       'src/routes/panel.tsx': 'import { Live, Shell } from \'../ui/Panel\'\nexport default function Panel() { return <main><Live /><Shell /></main> }\n',

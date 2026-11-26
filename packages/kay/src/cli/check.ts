@@ -3,6 +3,7 @@
 import type { Node } from 'oxc-parser'
 import type { IslandIssue } from '../build/islands'
 import type { ModuleAnalysis } from '../compiler/analyze'
+import type { ComplianceConfig } from '../compiler/compliance'
 import type { CheckPluginContext, KayPlugin } from '../plugins/index'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
@@ -13,6 +14,7 @@ import { analyzeIslands } from '../build/islands'
 import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExportProblemLocation, routeFileProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
 import { analyzeModule } from '../compiler/analyze'
 import { walk } from '../compiler/ast'
+import { collectProjectComplianceWarnings, shouldEmitWarning } from '../compiler/compliance'
 import { collectMistakes, KayMistake, mistake, serverOnlyTagError } from '../compiler/mistakes'
 import { collectPatternNames, DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
@@ -161,6 +163,8 @@ function loadCheckedModule(
   unparsable: Set<string>,
   errors: string[],
   warnings: string[],
+  compliance?: ComplianceConfig | undefined,
+  site?: string | undefined,
 ): ModuleAnalysis | undefined {
   const existing = analyses.get(file)
   if (existing !== undefined)
@@ -173,8 +177,10 @@ function loadCheckedModule(
     errors.push(formatDiagnostic(locOf(root, file, sources, m.start), m.message.replaceAll(file, rel)))
   if (value !== undefined) {
     analyses.set(file, value)
-    for (const w of value.warnings)
-      warnings.push(formatDiagnostic(locOf(root, file, sources, w.start), w.message.replaceAll(file, rel), 'warning'))
+    for (const w of value.warnings) {
+      if (shouldEmitWarning(w, compliance, site))
+        warnings.push(formatDiagnostic(locOf(root, file, sources, w.start), w.message.replaceAll(file, rel), 'warning'))
+    }
     return value
   }
   unparsable.add(file)
@@ -331,10 +337,14 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   let routesDir = resolve(root, 'src/routes')
   let outDir = resolve(root, 'dist')
   let assetPrefix = '/_kay'
+  let site: string | undefined
+  let compliance: ComplianceConfig | undefined
   let plugins: Awaited<ReturnType<typeof loadConfig>>['plugins'] = []
   try {
     const cfg = await loadConfig(root)
     plugins = resolvePlugins(cfg.plugins)
+    site = cfg.site
+    compliance = cfg.compliance
     if (cfg.routesDir !== undefined)
       routesDir = resolve(root, cfg.routesDir)
     if (cfg.outDir !== undefined)
@@ -370,7 +380,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   const unparsable = new Set<string>()
   const warnings: string[] = []
   const load = (file: string): ModuleAnalysis | undefined =>
-    loadCheckedModule(file, root, analyses, sources, unparsable, errors, warnings)
+    loadCheckedModule(file, root, analyses, sources, unparsable, errors, warnings, compliance, site)
 
   for (const file of files)
     load(file)
@@ -432,7 +442,10 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     }
   }
 
-  // 3c. Plugin check(ctx) hooks
+  // 3c. French web law compliance checks (CSS third-party URLs, LCEN legal notice, RGAA accessibility statement)
+  warnings.push(...collectProjectComplianceWarnings({ root, srcDir, routesDir, routeFiles, analyses, compliance, site }))
+
+  // 3d. Plugin check(ctx) hooks
   await runPluginChecks(plugins, { root, routesDir, outDir, assetPrefix }, errors, warnings)
 
   // 4. Run TypeScript check (`bun check` preferred, fallback to `tsgo` then `tsc`) when tsconfig.json exists
