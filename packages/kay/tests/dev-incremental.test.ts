@@ -1,8 +1,10 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { build, createBuildCache } from '../src/build/index'
 import { devServer } from '../src/dev/index'
+import { images } from '../../plugin-images/src/plugin'
 
 const tempDirs: string[] = []
 function makeTemp(prefix: string): string {
@@ -224,4 +226,108 @@ describe('kay dev incremental client/server split, build-driven watch set, strea
       srv.stop()
     }
   }, 30_000)
+
+  it('#3633: preserves plugin-emitted client assets across cache.lastClient skips and guards @kayjs/images pruneCache in dev mode', async () => {
+    const dir = makeTemp('kay-3633-plugin-assets-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    mkdirSync(join(dir, 'src/assets'), { recursive: true })
+
+    // 1x1 valid PNG bytes
+    const pngBytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    )
+    writeFileSync(join(dir, 'src/assets/a.png'), pngBytes)
+    writeFileSync(join(dir, 'src/assets/b.png'), pngBytes)
+
+    // Pre-seed a stale-looking image cache file to verify pruneCache is skipped in dev mode
+    const imgCacheDir = join(dir, '.kay-cache/images')
+    mkdirSync(imgCacheDir, { recursive: true })
+    const otherCachedVariant = join(imgCacheDir, 'unloaded-variant-320w.webp')
+    writeFileSync(otherCachedVariant, 'cached-variant')
+
+    writeFileSync(join(dir, 'src/components/Photo.tsx'), `
+      import { signal } from '@kayjs/kay'
+      import photo from '../assets/a.png'
+      export default function Photo() {
+        const n = signal(0)
+        return <button type="button" onClick={() => n.value++}><img src={photo.src} width={photo.width} height={photo.height} alt="" />{n.value}</button>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import Photo from '../components/Photo'
+      export default function Home() {
+        return <main><h1>v1</h1><Photo /></main>
+      }
+    `)
+
+    // Plugin simulating bunPlugins collecting an asset on client pass only and emitting it in build(ctx)
+    const clientOnlyAssetPlugin = (() => {
+      let pending: Uint8Array | undefined
+      return {
+        name: 'test-client-asset',
+        bunPlugins: ({ target }: { target: string }) => target !== 'client'
+          ? []
+          : [{
+              name: 'capture-on-client',
+              setup(b: import('bun').PluginBuilder) {
+                b.onStart(() => {
+                  pending = new TextEncoder().encode('client-only-emitted-ok')
+                })
+              },
+            }],
+        build(ctx: import('../src/plugins/index').BuildPluginContext) {
+          if (pending !== undefined) {
+            ctx.emitAsset('extra/client-only.txt', pending)
+            pending = undefined
+          }
+        },
+      }
+    })()
+
+    const cache = createBuildCache()
+    const imgPlugin = images({ widths: [320], formats: ['webp'] })
+    const m1 = await build({
+      root: dir,
+      outDir: '.dev-b1',
+      dev: true,
+      minify: false,
+      prerender: false,
+      copyPublic: false,
+      cache,
+      plugins: [imgPlugin, clientOnlyAssetPlugin],
+    })
+    expect(m1.assets).toContain('extra/client-only.txt')
+    expect(existsSync(join(dir, '.dev-b1/client/extra/client-only.txt'))).toBe(true)
+    // pruneCache MUST NOT delete unloaded variants in dev mode
+    expect(existsSync(otherCachedVariant)).toBe(true)
+
+    // Server-only edit: hits cache.lastClient so client bunPlugins does NOT re-run
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import Photo from '../components/Photo'
+      export default function Home() {
+        return <main><h1>v2-server-only</h1><Photo /></main>
+      }
+    `)
+    const m2 = await build({
+      root: dir,
+      outDir: '.dev-b2',
+      dev: true,
+      minify: false,
+      prerender: false,
+      copyPublic: false,
+      cache,
+      plugins: [imgPlugin, clientOnlyAssetPlugin],
+    })
+    expect(cache.stats.clientSkips).toBe(1)
+    expect(m2.assets).toContain('extra/client-only.txt')
+    expect(existsSync(join(dir, '.dev-b2/client/extra/client-only.txt'))).toBe(true)
+    const imgAssets = m2.assets.filter(a => a.startsWith('img/'))
+    expect(imgAssets.length).toBeGreaterThan(0)
+    for (const rel of imgAssets)
+      expect(existsSync(join(dir, '.dev-b2/client', rel))).toBe(true)
+    expect(existsSync(otherCachedVariant)).toBe(true)
+  })
 })

@@ -470,7 +470,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       }))
       for (const [rel, bytes] of emittedAssets)
         ctx.emitAsset(rel, bytes)
-      if (pruneCache && lastCacheRoot !== undefined && activeCacheFiles.size > 0 && existsSync(lastCacheRoot)) {
+      if (pruneCache && !ctx.dev && lastCacheRoot !== undefined && activeCacheFiles.size > 0 && existsSync(lastCacheRoot)) {
         for (const entry of readdirSync(lastCacheRoot)) {
           if (entry.startsWith('og-') || entry.startsWith('md-'))
             continue

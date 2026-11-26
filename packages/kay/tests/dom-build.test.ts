@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { build } from '../src/build/index'
@@ -610,5 +610,231 @@ describe('chunk names', () => {
     finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('#3633 bundler, prerender, and --static regressions', () => {
+  test('reserves the runtime island ID and avoids runtime- prefix collision with Runtime.tsx and runtime-widget.tsx', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3633-runtime-'))
+    tempDirs.push(dir)
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+
+    writeFileSync(join(dir, 'src/components/Runtime.tsx'), `
+      import { signal } from '@kayjs/kay'
+      export default function Runtime() {
+        const n = signal(0)
+        return <button id="rt-btn" type="button" onClick={() => n.value++}>rt:{n.value}</button>
+      }
+    `)
+    writeFileSync(join(dir, 'src/components/runtime-widget.tsx'), `
+      import { signal } from '@kayjs/kay'
+      export default function RuntimeWidget() {
+        const n = signal(10)
+        return <button id="rtw-btn" type="button" onClick={() => n.value++}>rtw:{n.value}</button>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import Runtime from '../components/Runtime'
+      import RuntimeWidget from '../components/runtime-widget'
+      export default function Page() {
+        return <main><Runtime /><RuntimeWidget /></main>
+      }
+    `)
+
+    const manifest = await build({ root: dir, minify: false })
+    const runtimeUrl = manifest.runtimeScript!
+    const rtIslandUrl = manifest.islands[join(dir, 'src/components/Runtime.tsx#default')]!
+    const rtwIslandUrl = manifest.islands[join(dir, 'src/components/runtime-widget.tsx#default')]!
+
+    expect(runtimeUrl).toBeDefined()
+    expect(rtIslandUrl).toBeDefined()
+    expect(rtwIslandUrl).toBeDefined()
+    expect(runtimeUrl).not.toBe(rtIslandUrl)
+    expect(runtimeUrl).not.toBe(rtwIslandUrl)
+
+    const runtimeCode = readFileSync(join(dir, 'dist/client', runtimeUrl.replace('/_kay/', '')), 'utf8')
+    expect(runtimeCode).toContain('hydrate')
+    expect(runtimeCode).not.toContain('rtw:')
+
+    const app = await createServer({ root: dir })
+    const html = await (await app.handle(new Request('http://localhost/'))).text()
+    const ssrFragments = [...html.matchAll(/<kay-island[^>]*>([\s\S]*?)<\/kay-island>/g)].map(m => m[1]!)
+    expect(ssrFragments.length).toBe(2)
+
+    GlobalRegistrator.register({ settings: { handleDisabledFileLoadingAsSuccess: true } })
+    try {
+      const { hydrate } = await import(join(dir, 'dist/client', runtimeUrl.replace('/_kay/', ''))) as { hydrate: (el: Element, fn: () => Node | null) => () => void }
+      const RuntimeMod = (await import(join(dir, 'dist/client', rtIslandUrl.replace('/_kay/', '')))).default as () => Node | null
+      const host = document.createElement('div')
+      host.innerHTML = ssrFragments[0]!
+      document.body.appendChild(host)
+      const dispose = hydrate(host, () => RuntimeMod())
+      const btn = host.querySelector('#rt-btn') as HTMLButtonElement
+      expect(btn.textContent).toBe('rt:0')
+      btn.click()
+      expect(btn.textContent).toBe('rt:1')
+      dispose()
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+    }
+  })
+
+  test('reachesTsx handles diamond DAGs and cycles when bundling external packages for SSR', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3633-diamond-'))
+    const pkgDir = mkdtempSync(join(tmpdir(), 'kay-3633-diamond-pkg-'))
+    tempDirs.push(dir, pkgDir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'node_modules'), { recursive: true })
+    mkdirSync(join(pkgDir, 'src'), { recursive: true })
+
+    writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ name: 'diamond-ui', main: './src/index.ts' }))
+    writeFileSync(join(pkgDir, 'src/index.ts'), `export { aVal } from './a'\nexport { Badge } from './b'\n`)
+    writeFileSync(join(pkgDir, 'src/a.ts'), `import { shared } from './shared'\nexport const aVal = shared\n`)
+    writeFileSync(join(pkgDir, 'src/shared.ts'), `import { aVal } from './a'\nexport const shared = 'ok'\nexport const ref = () => aVal\n`)
+    writeFileSync(join(pkgDir, 'src/b.ts'), `export { shared } from './shared'\nexport { Badge } from './Badge'\n`)
+    writeFileSync(join(pkgDir, 'src/Badge.tsx'), `export function Badge() { return <span class="diamond-badge">diamond-ok</span> }\n`)
+    symlinkSync(pkgDir, join(dir, 'node_modules/diamond-ui'), 'dir')
+
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { aVal, Badge } from 'diamond-ui'
+      export default function Page() { return <main data-a={aVal}><Badge /></main> }
+    `)
+
+    await build({ root: dir, minify: false })
+    const app = await createServer({ root: dir })
+    const res = await app.handle(new Request('http://localhost/'))
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('<span class="diamond-badge">diamond-ok</span>')
+  })
+
+  test('does not duplicate CSS re-exported through a barrel reachable from an island', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3633-reexport-css-'))
+    tempDirs.push(dir)
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+
+    writeFileSync(join(dir, 'src/components/widget.css'), '.widget { color: tomato; }\n')
+    writeFileSync(join(dir, 'src/components/styles.ts'), `export * from './widget.css'\n`)
+    writeFileSync(join(dir, 'src/components/Widget.tsx'), `
+      import { signal } from '@kayjs/kay'
+      import './styles'
+      export function Widget() {
+        const n = signal(0)
+        return <button class="widget" type="button" onClick={() => n.value++}>{n.value}</button>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { Widget } from '../components/Widget'
+      export default function Page() { return <main><Widget /></main> }
+    `)
+
+    const manifest = await build({ root: dir, minify: false })
+    expect(manifest.styles.length).toBe(1)
+    expect(manifest.routes.find(r => r.path === '/')?.styles?.length).toBe(1)
+  })
+
+  test('prerender uses site origin, preserves non-HTML extensions, records empty paths(), and normalizes trailing slashes', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3633-prerender-'))
+    tempDirs.push(dir)
+    mkdirSync(join(dir, 'src/routes/items'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes/docs'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes/posts'), { recursive: true })
+
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      export const prerender = true
+      export default function Home({ url }: { url: URL }) {
+        return <main data-origin={url.origin}>home</main>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/feed.xml.ts'), `
+      export const prerender = true
+      export function GET() {
+        return new Response('<rss />', { headers: { 'content-type': 'application/xml; charset=utf-8' } })
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/data.json.ts'), `
+      export const prerender = true
+      export function GET() {
+        return Response.json({ ok: true })
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/posts/[slug].tsx'), `
+      export const prerender = true
+      export function paths() { return ['/posts/v1.0'] }
+      export default function Post({ params }: { params: { slug: string } }) {
+        return <article>{params.slug}</article>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/docs/[slug].tsx'), `
+      export const prerender = true
+      export function paths() { return ['/docs/intro/'] }
+      export default function Doc({ params }: { params: { slug: string } }) {
+        return <article>doc:{params.slug}</article>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/items/[id].tsx'), `
+      export const prerender = true
+      export function paths() { return [] }
+      export default function Item({ params }: { params: { id: string } }) {
+        return <article>item:{params.id}</article>
+      }
+    `)
+
+    const manifest = await build({ root: dir, site: 'https://shop.example.com' })
+
+    // 1. site origin used during prerender
+    const homeHtml = readFileSync(join(dir, 'dist/prerendered/index.html'), 'utf8')
+    expect(homeHtml).toContain('data-origin="https://shop.example.com"')
+
+    // 2. non-HTML extensions preserved directly; HTML slugs with dots keep /index.html
+    expect(existsSync(join(dir, 'dist/prerendered/feed.xml'))).toBe(true)
+    expect(existsSync(join(dir, 'dist/prerendered/feed.xml/index.html'))).toBe(false)
+    expect(readFileSync(join(dir, 'dist/prerendered/feed.xml'), 'utf8')).toBe('<rss />')
+    expect(existsSync(join(dir, 'dist/prerendered/data.json'))).toBe(true)
+    expect(readFileSync(join(dir, 'dist/prerendered/data.json'), 'utf8')).toContain('"ok":true')
+    expect(existsSync(join(dir, 'dist/prerendered/posts/v1.0/index.html'))).toBe(true)
+
+    // 3. trailing slash normalized and empty paths() records route.prerendered = {}
+    const docsRoute = manifest.routes.find(r => r.path === '/docs/:slug')!
+    expect(docsRoute.prerendered).toEqual({ '/docs/intro': 'prerendered/docs/intro/index.html' })
+    const itemsRoute = manifest.routes.find(r => r.path === '/items/:id')!
+    expect(itemsRoute.prerendered).toEqual({})
+
+    const app = await createServer({ root: dir })
+    expect((await app.handle(new Request('http://localhost/docs/intro'))).status).toBe(200)
+    expect((await app.handle(new Request('http://localhost/docs/intro/'))).status).toBe(200)
+    expect((await app.handle(new Request('http://localhost/items/anything'))).status).toBe(404)
+  })
+
+  test('--static renders 404.html directly from _404.tsx even when a root [...slug].tsx catch-all exists', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3633-static-404-'))
+    tempDirs.push(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+
+    writeFileSync(join(dir, 'src/routes/_layout.tsx'), `
+      export default function Layout({ children }: { children: unknown }) {
+        return <div class="shell">{children}</div>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/_404.tsx'), `
+      export default function NotFound() {
+        return <h1>Custom 404 Page</h1>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/[...slug].tsx'), `
+      export function paths() { return ['/hello'] }
+      export default function CatchAll({ params }: { params: { slug: string } }) {
+        return <h1>CatchAll:{params.slug}</h1>
+      }
+    `)
+
+    await build({ root: dir, static: true })
+    const html404 = readFileSync(join(dir, 'dist/404.html'), 'utf8')
+    expect(html404).toContain('Custom 404 Page')
+    expect(html404).toContain('class="shell"')
+    expect(html404).not.toContain('CatchAll')
+    expect(readFileSync(join(dir, 'dist/hello/index.html'), 'utf8')).toContain('CatchAll:hello')
   })
 })

@@ -112,4 +112,79 @@ export default {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  test('#3633: --compile forwards site override, guards missing outDir/public files, and brackets IPv6 hosts in --health', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3633-compile-'))
+    const binPath = join(dir, 'server-bin')
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'public'), { recursive: true })
+      writeFileSync(join(dir, 'public/note.txt'), 'not copied when copyPublic is false')
+      writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>ok</p> }\n')
+      writeFileSync(join(dir, 'kay.config.ts'), `
+export default {
+  site: 'https://config.example',
+  plugins: [
+    {
+      name: 'inspect-site',
+      server(api) {
+        api.route('GET', '/__site', () => Response.json({ site: api.site }))
+      },
+    },
+  ],
+}
+`)
+
+      // copyPublic: false leaves dist/public missing; site override must win over kay.config.ts
+      await build({ root: dir, copyPublic: false, site: 'https://override.example/', compile: binPath })
+
+      const proc = Bun.spawn([binPath], {
+        cwd: dir,
+        env: { ...process.env, PORT: '0', HOST: '::1' },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      })
+      try {
+        const reader = proc.stdout.getReader()
+        const decoder = new TextDecoder()
+        let out = ''
+        let url = ''
+        const deadline = Date.now() + 10_000
+        while (Date.now() < deadline) {
+          const { value, done } = await reader.read()
+          if (done)
+            break
+          out += decoder.decode(value)
+          const match = /http:\/\/[^\s]+/.exec(out)
+          if (match) {
+            url = match[0]
+            break
+          }
+        }
+        reader.releaseLock()
+        expect(url).toMatch(/^http:\/\/\[::1\]:\d+$/)
+        const port = new URL(url).port
+
+        const res = await fetch(`${url}/__site`)
+        expect(res.status).toBe(200)
+        expect(await res.json()).toEqual({ site: 'https://override.example' })
+
+        // --health probe must bracket IPv6 HOST=::1 -> http://[::1]:<port>/
+        const health = Bun.spawnSync([binPath, '--health'], {
+          cwd: dir,
+          env: { ...process.env, PORT: port, HOST: '::1' },
+          stdout: 'pipe',
+          stderr: 'pipe',
+        })
+        expect(health.exitCode).toBe(0)
+      }
+      finally {
+        proc.kill()
+        await proc.exited
+      }
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })

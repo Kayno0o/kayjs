@@ -13,7 +13,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync, rmSync,
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
 import { actionHash } from '../server/action'
-import { buildClient, buildServer, pluginBunPlugins, standaloneCssFiles } from './bundle'
+import { buildClient, buildServer, linkOrCopyFile, pluginBunPlugins, standaloneCssFiles } from './bundle'
 import { compileExecutable } from './compile'
 import { assertSafeOutDir, fileSize, relPosix, walkAllFiles, walkRoutes } from './files'
 import { ModuleGraph } from './graph'
@@ -61,6 +61,37 @@ export interface BuildOptions {
   dev?: boolean | undefined
   /** Explicit NODE_ENV threaded through AppRuntimeContext and client defines without mutating process.env. */
   nodeEnv?: string | undefined
+}
+
+const cachedPluginAssets = new WeakMap<BuildCache, { clientDir: string, files: string[] }>()
+
+function restoreCachedPluginAssets(cache: BuildCache | undefined, clientDir: string, assets: string[], anyPassSkipped: boolean): void {
+  if (cache === undefined || !anyPassSkipped)
+    return
+  const prev = cachedPluginAssets.get(cache)
+  if (prev === undefined || prev.clientDir === clientDir)
+    return
+  const existing = new Set(assets)
+  for (const rel of prev.files) {
+    if (existing.has(rel))
+      continue
+    const from = join(prev.clientDir, rel)
+    if (!existsSync(from))
+      continue
+    linkOrCopyFile(from, join(clientDir, rel))
+    existing.add(rel)
+    assets.push(rel)
+  }
+}
+
+function recordCachedPluginAssets(cache: BuildCache | undefined, clientDir: string, assets: readonly string[], builtClientAssets: ReadonlySet<string>): void {
+  if (cache === undefined)
+    return
+  const files = assets.filter(rel => !builtClientAssets.has(rel))
+  if (files.length > 0)
+    cachedPluginAssets.set(cache, { clientDir, files })
+  else
+    cachedPluginAssets.delete(cache)
 }
 
 /** Everything one build run needs, resolved once from the options and `kay.config.ts`. */
@@ -230,6 +261,8 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     throw new Error(`kay build: ${relPosix(root, serverEntry.file)} is the path of kay's server entry; rename that file.`)
 
   // The server compiles against the island chunk URLs, so islands build first; without islands both passes run in parallel.
+  const clientSkipsBefore = options.cache?.stats.clientSkips ?? 0
+  const serverSkipsBefore = options.cache?.stats.serverSkips ?? 0
   const clientPass = () => buildClient(env, standaloneCssFiles(graph, pluginCssFiles, islands.cssFiles))
   let client: Awaited<ReturnType<typeof clientPass>>
   if (islands.targets.size === 0) {
@@ -240,6 +273,8 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     client = await clientPass()
     await buildServer(env, serverEntries, serverRoot, client.islandChunks, serverEntry)
   }
+  const anyPassSkipped = options.cache !== undefined
+    && (options.cache.stats.clientSkips > clientSkipsBefore || options.cache.stats.serverSkips > serverSkipsBefore)
 
   if (options.cache !== undefined) {
     const watched = options.cache.watchedFiles
@@ -288,6 +323,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     else if (size !== undefined)
       assets.push(rel)
   }
+  const builtClientAssets = new Set(assets)
 
   const { routes, globalStyles } = buildRouteEntries({
     graph,
@@ -331,6 +367,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     globalStyles,
   })
   await host.runBuild()
+  restoreCachedPluginAssets(options.cache, clientDir, assets, anyPassSkipped)
   host.precompressAssets()
 
   const manifest: BuildManifest = {
@@ -362,12 +399,13 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   // Hybrid prerendering / static export (skipped in `kay dev`, where routes render on-demand)
   const prerenderRoutes = options.prerender !== false || isStatic ? routes.filter(r => r.prerender) : []
   const prerenderDir = isStatic ? run.staticStageDir! : join(outDir, 'prerendered')
-  const app = prerenderRoutes.length > 0 || isStatic
+  const prerendered = prerenderRoutes.length > 0 || isStatic
     ? await prerender({ root, outDir, assetPrefix, site: run.site, plugins, pluginOverride: options.plugins, isDev, nodeEnv: run.nodeEnv, isStatic, prerenderDir, routes: prerenderRoutes })
     : undefined
 
   try {
     const ranAfterPrerender = await host.runAfterPrerender()
+    recordCachedPluginAssets(options.cache, clientDir, assets, builtClientAssets)
     host.precompressAssets()
     if (Object.keys(host.pluginData).length > 0)
       manifest.pluginData = host.pluginData
@@ -379,9 +417,14 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
         outDir,
         clientDir,
         assetPrefix,
+        site: run.site,
+        isDev,
+        manifest,
+        entry: prerendered?.entry,
+        pluginOverride: options.plugins,
         assets,
         publicFiles,
-        app,
+        app: prerendered?.app,
         hasNotFoundFile,
         stageSuffix: run.stageSuffix,
       })
@@ -391,7 +434,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     }
   }
   finally {
-    await app?.dispose?.()
+    await prerendered?.app?.dispose?.()
   }
 
   if (options.compile) {
@@ -401,6 +444,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
       clientDir,
       manifest,
       assetPrefix,
+      site: options.site !== undefined ? run.site : undefined,
       outfile: typeof options.compile === 'string' ? resolve(root, options.compile) : join(outDir, 'server-bin'),
 
       resolveKaySpecifier,

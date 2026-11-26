@@ -247,7 +247,13 @@ function checkReachEdges(
       continue
     }
     const target = graph.resolve(file, re.source)
-    if (target === undefined || !isTsFile(target))
+    if (target === undefined)
+      continue
+    if (target.endsWith('.css')) {
+      cssFiles.add(target)
+      continue
+    }
+    if (!isTsFile(target))
       continue
     const targetAnalysis = loadTarget(target)
     if (isStubbedActionFile(targetAnalysis)) {
@@ -315,7 +321,8 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
   const load: LoadModule = options.load ?? (file => graph.load(file))
   const issues: IslandIssue[] = []
   const targets = new Map<string, IslandTarget>()
-  const usedIds = new Set<string>()
+  // Reserve 'runtime' so an island named Runtime.tsx never overwrites entriesDir/runtime.ts.
+  const usedIds = new Set<string>(['runtime'])
   const pageSet = new Set(pageFiles)
 
   function registerIsland(file: string, exportName: string): IslandTarget {
@@ -326,9 +333,12 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
     const baseName = basename(file, extname(file)).toLowerCase()
     const expLower = exportName.toLowerCase()
     let id = exportName === 'default' || expLower === baseName ? baseName : `${baseName}-${expLower}`
-    // The id names the entry file and the chunk: two islands sharing a basename keep it readable and add a hash of their path.
+    // The id names the entry file and the chunk: two islands sharing a basename (or 'runtime') keep it readable and add a hash of their path.
     if (usedIds.has(id))
       id = `${id}-${Bun.hash(relPosix(root, key)).toString(36).slice(0, 6)}`
+    let suffix = 2
+    while (usedIds.has(id))
+      id = `${id}-${suffix++}`
     usedIds.add(id)
     const target: IslandTarget = { id, file, exportName, defaultHydrate: load(file)?.defaultHydrate }
     targets.set(key, target)

@@ -14,13 +14,14 @@ export interface CompileExecutableOptions {
   clientDir: string
   manifest: BuildManifest
   assetPrefix: string
+  site?: string | undefined
   outfile: string
   resolveKaySpecifier: (specifier: string) => string | undefined
   bunPlugins?: BunPlugin[] | undefined
 }
 
 export async function compileExecutable(opts: CompileExecutableOptions): Promise<void> {
-  const { root, outDir, clientDir, manifest, assetPrefix, outfile, resolveKaySpecifier, bunPlugins = [] } = opts
+  const { root, outDir, clientDir, manifest, assetPrefix, site, outfile, resolveKaySpecifier, bunPlugins = [] } = opts
   const entryPath = join(outDir, '__compile_entry.ts')
   const prodEnvPath = join(outDir, '__compile_prod_env.ts')
   // Evaluated first via ESM static import order so `kay.config.ts` and route modules see NODE_ENV=production!
@@ -34,6 +35,8 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   let assetIdx = 0
   for (const rel of manifest.assets) {
     const abs = join(clientDir, rel)
+    if (!existsSync(abs))
+      continue
     const v = `_a${assetIdx++}`
     imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
     embeddedAssets.push(`${JSON.stringify(rel)}: ${v}`)
@@ -51,6 +54,8 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   let pubIdx = 0
   for (const rel of manifest.publicFiles) {
     const abs = join(outDir, 'public', rel)
+    if (!existsSync(abs))
+      continue
     const v = `_p${pubIdx++}`
     const etag = `W/"${Bun.hash(readFileSync(abs)).toString(36)}"`
     imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
@@ -63,6 +68,8 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     if (r.prerendered) {
       for (const [, relHtml] of Object.entries(r.prerendered)) {
         const abs = join(outDir, relHtml)
+        if (!existsSync(abs))
+          continue
         const v = `_r${preIdx++}`
         imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
         embeddedPrerenderedFiles.push(`${JSON.stringify(relHtml)}: ${v}`)
@@ -70,6 +77,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     }
   }
 
+  const siteProp = site !== undefined ? ` site: ${JSON.stringify(site)},` : ''
   const code = [
     ...imports,
     `const manifest = ${JSON.stringify(manifest)};`,
@@ -79,11 +87,12 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     `const prerenderedFiles = { ${embeddedPrerenderedFiles.join(', ')} };`,
     `const port = Number(process.env.PORT || kayConfig.port || 3000);`,
     `const hostname = process.env.HOST || undefined;`,
-    `if (Bun.argv.includes('--health')) { const probeHost = !hostname || hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname; const r = await fetch(\`http://\${probeHost}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
-    `const app = await createApp({ assetPrefix: ${JSON.stringify(assetPrefix)}, manifest, assets, publicAssets, publicEtags, prerenderedFiles });`,
+    `const formatHost = (h: string) => h.includes(':') && !h.startsWith('[') ? \`[\${h}]\` : h;`,
+    `if (Bun.argv.includes('--health')) { const rawHost = !hostname || hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname; const r = await fetch(\`http://\${formatHost(rawHost)}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
+    `const app = await createApp({ assetPrefix: ${JSON.stringify(assetPrefix)},${siteProp} manifest, assets, publicAssets, publicEtags, prerenderedFiles });`,
     `const server = app.serve(port, hostname);`,
     `handleSignals(app, server);`,
-    `console.log(\`kay server listening on http://\${hostname ?? 'localhost'}:\${server.port}\`);`,
+    `console.log(\`kay server listening on http://\${formatHost(hostname ?? 'localhost')}:\${server.port}\`);`,
   ].join('\n')
 
   writeFileSync(entryPath, code)

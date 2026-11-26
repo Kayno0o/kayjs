@@ -33,7 +33,7 @@ export interface BundleEnv {
   islands: IslandPlan
 }
 
-function linkOrCopyFile(src: string, dst: string): void {
+export function linkOrCopyFile(src: string, dst: string): void {
   mkdirSync(dirname(dst), { recursive: true })
   try {
     linkSync(src, dst)
@@ -101,8 +101,8 @@ function pluginTransforms(plugins: KayPlugin[]): ClientTransforms {
 export function standaloneCssFiles(graph: ModuleGraph, pluginCss: string[], islandCss: Set<string>): string[] {
   const out = new Set(pluginCss)
   for (const [file, analysis] of graph.analyses) {
-    for (const imp of analysis.imports) {
-      const target = graph.resolve(file, imp.source)
+    for (const { source } of [...analysis.imports, ...analysis.reexports]) {
+      const target = graph.resolve(file, source)
       if (target !== undefined && target.endsWith('.css') && !islandCss.has(target))
         out.add(target)
     }
@@ -219,6 +219,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   }
   const entryPoints: string[] = []
   const islandEntryToKey = new Map<string, string>()
+  let runtimeEntryPath: string | undefined
 
   if (islands.targets.size > 0 || pluginClientEntries.length > 0) {
     const runtimeLines: string[] = []
@@ -229,7 +230,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     }
     for (const pe of pluginClientEntries)
       runtimeLines.push(`import ${JSON.stringify(pe)};`)
-    const runtimeEntryPath = join(entriesDir, 'runtime.ts')
+    runtimeEntryPath = join(entriesDir, 'runtime.ts')
     writeEntry(runtimeEntryPath, `${runtimeLines.join('\n')}\n`)
     entryPoints.push(runtimeEntryPath)
   }
@@ -293,7 +294,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     let abs = metaPaths.get(p)
     if (abs === undefined) {
       const fromCwd = resolve(process.cwd(), p)
-      abs = existsSync(fromCwd) || islandEntryToKey.has(fromCwd) ? fromCwd : resolve(clientDir, p)
+      abs = existsSync(fromCwd) || islandEntryToKey.has(fromCwd) || fromCwd === runtimeEntryPath ? fromCwd : resolve(clientDir, p)
       metaPaths.set(p, abs)
     }
     return abs
@@ -326,6 +327,8 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     const relOut = outKey.replace(LEADING_DOT_SLASH_RE, '')
     const url = `${assetPrefix}/${relOut}`
     const entry = info.entryPoint === undefined ? undefined : resolveMetaPath(info.entryPoint)
+    if (entry !== undefined && entry === runtimeEntryPath && relOut.endsWith('.js'))
+      result.runtimeScript = url
     const entryKey = entry === undefined ? undefined : islandEntryToKey.get(entry)
     if (entryKey !== undefined && relOut.endsWith('.js'))
       result.islandChunks.set(entryKey, url)
@@ -345,11 +348,8 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   for (const output of clientResult.outputs) {
     const relFile = relPosix(clientDir, output.path)
     result.assetFiles.push(relFile)
-    const url = `${assetPrefix}/${relFile}`
     if (relFile.endsWith('.css'))
-      result.styleUrls.push(url)
-    else if (output.kind === 'entry-point' && relFile.startsWith('runtime-'))
-      result.runtimeScript = url
+      result.styleUrls.push(`${assetPrefix}/${relFile}`)
   }
 
   if (cache !== undefined) {
@@ -415,20 +415,31 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
 
   // Whether a file renders components, directly or through what it imports: such packages are bundled so Kay's SSR compiler transforms them.
   const tsxReach = new Map<string, boolean>()
-  const reachesTsx = (file: string, visiting = new Set<string>()): boolean => {
-    const known = tsxReach.get(file)
+  const reachesTsx = (start: string): boolean => {
+    const known = tsxReach.get(start)
     if (known !== undefined)
       return known
-    if (file.endsWith('.tsx'))
+    if (start.endsWith('.tsx')) {
+      tsxReach.set(start, true)
       return true
-    if (visiting.has(file))
-      return false
-    visiting.add(file)
-    const reaches = graph.localDeps(file).some(dep => reachesTsx(dep, visiting))
-    // Only memoize at the top-level walk (when no cycle ancestor could have truncated a branch).
-    if (reaches || visiting.size === 1)
-      tsxReach.set(file, reaches)
-    return reaches
+    }
+    const seen = new Set<string>([start])
+    const stack = [start]
+    while (stack.length > 0) {
+      for (const dep of graph.localDeps(stack.pop()!)) {
+        if (dep.endsWith('.tsx') || tsxReach.get(dep) === true) {
+          tsxReach.set(start, true)
+          return true
+        }
+        if (tsxReach.get(dep) === false || seen.has(dep))
+          continue
+        seen.add(dep)
+        stack.push(dep)
+      }
+    }
+    for (const node of seen)
+      tsxReach.set(node, false)
+    return false
   }
 
   const serverPlugin: BunPlugin = {

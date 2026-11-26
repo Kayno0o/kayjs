@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { BuildManifest } from '../src/build/index'
 import { analyzeBundleWeights, build } from '../src/build/index'
+import { directKayImports } from '../src/build/client-plugin'
+import { ModuleGraph } from '../src/build/graph'
 
 const dir = mkdtempSync(join(tmpdir(), 'kay-3598-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -94,5 +96,31 @@ describe('#3574 weights without the metafile', () => {
     writeFileSync(join(client, 'more.js'), 'export const b=2;')
     const manifest = { styles: [], assets: [], routes: [{ path: '/', islandChunks: ['/_kay/island.js'] }] } as unknown as BuildManifest
     expect(analyzeBundleWeights(manifest, client).routes[0]!.jsFiles).toBe(3)
+  })
+})
+
+describe('#3633 AST-aware directKayImports', () => {
+  test('leaves @kayjs/kay inside string/template literals untouched and rewrites commented/typed top-level imports', () => {
+    const graph = new ModuleGraph(dir)
+    const src = [
+      `// café 🚀 multi-byte comment before import`,
+      `import { /* lead */ signal, type KayChild, effect as runEffect } from '@kayjs/kay'`,
+      `export const docs = \``,
+      `import { signal } from '@kayjs/kay'`,
+      `\``,
+      `export const snippet = "import { effect } from '@kayjs/kay'"`,
+      `export const s = signal(1)`,
+      `export const e = runEffect`,
+    ].join('\n')
+
+    const rewritten = directKayImports(src, graph, 'sample.tsx')
+    // Top-level value imports rewritten away from the barrel despite inline comment
+    expect(rewritten).toContain('import { signal, effect as runEffect } from ')
+    expect(rewritten).toContain(`import { type KayChild } from '@kayjs/kay';`)
+    // String & template literals remain verbatim (no absolute machine paths injected!)
+    expect(rewritten).toContain("export const docs = `\nimport { signal } from '@kayjs/kay'\n`")
+    expect(rewritten).toContain(`export const snippet = "import { effect } from '@kayjs/kay'"`)
+    // Line count preserved
+    expect(rewritten.split('\n').length).toBe(src.split('\n').length)
   })
 })

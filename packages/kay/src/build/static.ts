@@ -1,9 +1,16 @@
 // `kay build --static`: gathers the prerendered pages, client assets and public files into one folder and swaps it in as the output directory.
 
+import type { KayPlugin } from '../plugins/index'
+import type { ServerEntry } from '../server/app-entry'
 import type { KayApp } from '../server/index'
+import type { BuildManifest } from './manifest'
 import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative } from 'node:path'
+import { resolvePlugins } from '../plugins/index'
+import { createDocumentHooks, createHtmlHeaders } from '../server/document'
+import { createFallbackPages } from '../server/errors'
 import { precompressFile, walkAllFiles } from './files'
+import { prerenderOrigin } from './prerender'
 
 const LEADING_SLASH_RE = /^\//
 
@@ -15,9 +22,14 @@ export interface StaticExportOptions {
   outDir: string
   clientDir: string
   assetPrefix: string
+  site?: string | undefined
+  isDev?: boolean | undefined
+  manifest: BuildManifest
+  entry: ServerEntry | undefined
+  pluginOverride?: KayPlugin[] | undefined
   assets: string[]
   publicFiles: { files: string[], register: (relPath: string) => string }
-  /** The server the pages were prerendered with, used to render `_404` when the app has one. */
+  /** The server the pages were prerendered with, fallback if `entry` is absent. */
   app: KayApp | undefined
   hasNotFoundFile: boolean
   stageSuffix: string
@@ -29,14 +41,47 @@ function copyInto(dstRoot: string, rel: string, src: string): void {
   copyFileSync(src, dst)
 }
 
-export async function exportStatic(options: StaticExportOptions): Promise<void> {
-  const { stageDir, finalOutDir, outDir, clientDir, publicFiles } = options
-  if (options.hasNotFoundFile && options.app !== undefined) {
-    const res = await options.app.handle(new Request('http://localhost/__kay_404__'))
+async function renderStaticNotFound(options: StaticExportOptions): Promise<string> {
+  const origin = prerenderOrigin(options.site)
+  if (options.entry !== undefined) {
+    const plugins = resolvePlugins(options.pluginOverride ?? options.entry.kayConfig.plugins)
+    const lang = options.entry.kayConfig.lang ?? 'en'
+    const trustProxy = options.entry.kayConfig.trustProxy ?? false
+    let renderError: unknown
+    const notifyError = (err: unknown): void => {
+      renderError ??= err
+    }
+    const document = createDocumentHooks({ plugins, lang, trustProxy, notifyError })
+    const htmlHeaders = createHtmlHeaders(options.entry.kayConfig.security, {})
+    const { buildNotFoundResponse } = createFallbackPages({
+      manifest: options.manifest,
+      modules: options.entry.modules,
+      lang,
+      alwaysLoadRuntime: plugins.some(p => Boolean(p.clientEntry)),
+      dev: options.isDev === true,
+      document,
+      htmlHeaders,
+      notifyError,
+      finish: res => res,
+    })
+    const url = new URL('/404', origin)
+    const res = await buildNotFoundResponse(url, new Request(url))
+    if (renderError !== undefined)
+      throw new Error(`kay build --static: _404 page failed to render: ${renderError instanceof Error ? renderError.message : String(renderError)}`)
     if (res.status >= 500)
       throw new Error(`kay build --static: _404 page returned HTTP ${res.status}.`)
-    writeFileSync(join(stageDir, '404.html'), await res.text())
+    return await res.text()
   }
+  const res = await options.app!.handle(new Request(`${origin}/__kay_404__`))
+  if (res.status >= 500)
+    throw new Error(`kay build --static: _404 page returned HTTP ${res.status}.`)
+  return await res.text()
+}
+
+export async function exportStatic(options: StaticExportOptions): Promise<void> {
+  const { stageDir, finalOutDir, outDir, clientDir, publicFiles } = options
+  if (options.hasNotFoundFile && (options.entry !== undefined || options.app !== undefined))
+    writeFileSync(join(stageDir, '404.html'), await renderStaticNotFound(options))
 
   // Client assets go to <stage>/_kay/..., public files to <stage>/...
   const assetDir = join(stageDir, options.assetPrefix.replace(LEADING_SLASH_RE, ''))

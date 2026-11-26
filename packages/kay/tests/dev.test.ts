@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { build, createBuildCache } from '../src/build/index'
@@ -333,5 +333,127 @@ describe('kay dev with a broken kay.config.ts (#3584)', () => {
       err.mockRestore()
     }
     expect(lines.join('')).toContain('kay dev: kay.config.ts:3:3: Expected "}" but found "lang"')
+  })
+})
+
+describe('#3633 kay dev config propagation, cleanup, shutdown race, and dynamic watchers', () => {
+  it('forwards maxRequestBodySize to createServer and cleans stale .kay-dev on startup', async () => {
+    const dir = makeTemp('kay-3633-dev-body-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, '.kay-dev/stale-b99'), { recursive: true })
+    writeFileSync(join(dir, '.kay-dev/stale-b99/old.txt'), 'stale')
+    writeFileSync(join(dir, 'src/routes/upload.ts'), `
+      export const csrf = false
+      export async function POST({ request }: { request: Request }) {
+        const text = await request.text()
+        return Response.json({ bytes: text.length })
+      }
+    `)
+
+    // > 1 MB limit forwarded to createServer (default is 1 MB; would 413 without forwarding!)
+    const srv = await devServer({ root: dir, port: 0, maxRequestBodySize: 2 * 1024 * 1024 })
+    try {
+      expect(existsSync(join(dir, '.kay-dev/stale-b99'))).toBe(false)
+      const bigBody = 'x'.repeat(1_200_000)
+      const res = await fetch(`${srv.url}/upload`, { method: 'POST', body: bigBody })
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ bytes: 1_200_000 })
+    }
+    finally {
+      await srv.stop()
+    }
+    expect(existsSync(join(dir, '.kay-dev'))).toBe(false)
+  })
+
+  it('awaits in-flight rebuild and currentApp.dispose() before removing .kay-dev on stop()', async () => {
+    const dir = makeTemp('kay-3633-dev-stop-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    const disposeFlag = join(dir, 'disposed.flag')
+    writeFileSync(join(dir, 'kay.config.ts'), `
+      import { writeFileSync } from 'node:fs'
+      export default {
+        plugins: [{
+          name: 'slow-dispose',
+          server(api) {
+            api.onShutdown(async () => {
+              await Bun.sleep(40)
+              writeFileSync(${JSON.stringify(disposeFlag)}, 'ok')
+            })
+          },
+        }],
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>v1</p> }\n')
+
+    const srv = await devServer({ root: dir, port: 0 })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>v2</p> }\n')
+    const rebuildPromise = srv.rebuild()
+    await srv.stop()
+    await rebuildPromise
+
+    expect(existsSync(disposeFlag)).toBe(true)
+    expect(existsSync(join(dir, '.kay-dev'))).toBe(false)
+  })
+
+  it('attaches watchers when public/ is created after startup and when kay.config.ts changes routesDir', async () => {
+    const dir = makeTemp('kay-3633-dev-watchers-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>orig</p> }\n')
+    writeFileSync(join(dir, 'kay.config.ts'), 'export default {}\n')
+
+    const srv = await devServer({ root: dir, port: 0 })
+    try {
+      // 1. Create public/ after startup and write a file inside it
+      await Bun.sleep(60)
+      mkdirSync(join(dir, 'public'), { recursive: true })
+      writeFileSync(join(dir, 'public/hello.txt'), 'pub-v1')
+
+      let pubText = ''
+      const deadline1 = Date.now() + 4000
+      while (Date.now() < deadline1) {
+        const res = await fetch(`${srv.url}/hello.txt`)
+        if (res.status === 200) {
+          pubText = await res.text()
+          if (pubText === 'pub-v1')
+            break
+        }
+        await Bun.sleep(40)
+      }
+      expect(pubText).toBe('pub-v1')
+
+      // 2. Change routesDir in kay.config.ts -> subsequent edits in new routesDir auto-rebuild
+      mkdirSync(join(dir, 'pages'), { recursive: true })
+      const altIndex = join(dir, 'pages/index.tsx')
+      writeFileSync(altIndex, 'export default function Alt() { return <p>alt-v1</p> }\n')
+      await Bun.sleep(60)
+      writeFileSync(join(dir, 'kay.config.ts'), `export default { routesDir: 'pages' }\n`)
+
+      let html = ''
+      const deadline2 = Date.now() + 4000
+      while (Date.now() < deadline2) {
+        html = await (await fetch(srv.url)).text()
+        if (html.includes('alt-v1'))
+          break
+        await Bun.sleep(40)
+      }
+      expect(html).toContain('alt-v1')
+
+      await Bun.sleep(60)
+      writeFileSync(altIndex, 'export default function Alt() { return <p>alt-v2</p> }\n')
+      const deadline3 = Date.now() + 4000
+      while (Date.now() < deadline3) {
+        html = await (await fetch(srv.url)).text()
+        if (html.includes('alt-v2'))
+          break
+        await Bun.sleep(40)
+      }
+      expect(html).toContain('alt-v2')
+    }
+    finally {
+      await srv.stop()
+    }
   })
 })

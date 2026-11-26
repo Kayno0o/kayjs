@@ -160,24 +160,27 @@ function createModuleStore(storeRoot: string) {
 
 export async function devServer(options: DevServerOptions): Promise<{
   url: string
-  stop: () => void
+  stop: () => Promise<void>
   rebuild: () => Promise<void>
   stats: () => BuildCacheStats
 }> {
   const root = resolve(options.root)
   const devRoot = join(root, '.kay-dev')
   const initialCfg = await loadConfig(root, { dev: true })
+  // Clean stale `.kay-dev/` left behind by a previously killed dev process.
+  rmSync(devRoot, { recursive: true, force: true })
+  let activeCfg = initialCfg
   const assetPrefix = (initialCfg.assetPrefix ?? '/_kay').replace(/\/$/, '')
   let reloadAssets = makeDevReloadAssets(assetPrefix)
   const srcDir = resolve(root, 'src')
-  const routesDir = resolve(root, options.routesDir ?? initialCfg.routesDir ?? 'src/routes')
-  const publicDir = resolve(root, initialCfg.publicDir ?? 'public')
+  let activeRoutesDir = resolve(root, options.routesDir ?? initialCfg.routesDir ?? 'src/routes')
+  let activePublicDir = resolve(root, initialCfg.publicDir ?? 'public')
   const port = options.port ?? initialCfg.port ?? 3000
   const hostname = options.hostname ?? '127.0.0.1'
   const buildCache = createBuildCache()
   const modules = createModuleStore(join(devRoot, 'server'))
   const watchers: FSWatcher[] = []
-  const watchedDirs = new Set<string>()
+  const dirWatchers = new Map<string, FSWatcher>()
   const pluginWatchers: FSWatcher[] = []
   const graphWatchers = new Map<string, FSWatcher>()
   let activeAssetPrefix = assetPrefix
@@ -188,7 +191,7 @@ export async function devServer(options: DevServerOptions): Promise<{
   function isCoveredByStaticWatchers(dir: string): boolean {
     if (dir === root)
       return false
-    for (const base of watchedDirs) {
+    for (const base of dirWatchers.keys()) {
       if (isInsideDir(base, dir))
         return true
     }
@@ -240,8 +243,8 @@ export async function devServer(options: DevServerOptions): Promise<{
     for (const w of pluginWatchers)
       w.close()
     pluginWatchers.length = 0
-    const seen = new Set<string>(watchedDirs)
-    const watchCtx = createAppContext({ root, outDir: devRoot, publicDir, assetPrefix: activeAssetPrefix, site: cfg.site, dev: true })
+    const seen = new Set<string>(dirWatchers.keys())
+    const watchCtx = createAppContext({ root, outDir: devRoot, publicDir: activePublicDir, assetPrefix: activeAssetPrefix, site: cfg.site, dev: true })
     for (const plugin of resolvePlugins(cfg.plugins)) {
       const paths = runWithAppContext(watchCtx, () =>
         typeof plugin.watchPaths === 'function' ? plugin.watchPaths(root) : (plugin.watchPaths ?? []))
@@ -253,6 +256,31 @@ export async function devServer(options: DevServerOptions): Promise<{
         const isDir = statSync(abs).isDirectory()
         pluginWatchers.push(watch(abs, isDir ? { recursive: true } : {}, () => scheduleRebuild('full')))
       }
+    }
+  }
+
+  function syncStaticWatchers(cfg: Awaited<ReturnType<typeof loadConfig>>): void {
+    activeRoutesDir = resolve(root, options.routesDir ?? cfg.routesDir ?? 'src/routes')
+    activePublicDir = resolve(root, cfg.publicDir ?? 'public')
+    const desired = new Map<string, (filename: string) => void>()
+    if (existsSync(srcDir))
+      desired.set(srcDir, name => scheduleRebuild(srcChangeKind(name)))
+    if (!isInsideDir(srcDir, activeRoutesDir) && existsSync(activeRoutesDir))
+      desired.set(activeRoutesDir, name => scheduleRebuild(srcChangeKind(name)))
+    if (existsSync(activePublicDir))
+      desired.set(activePublicDir, () => scheduleRebuild('full'))
+    for (const [dir, w] of dirWatchers) {
+      if (!desired.has(dir)) {
+        w.close()
+        dirWatchers.delete(dir)
+      }
+    }
+    for (const [dir, handler] of desired) {
+      if (dirWatchers.has(dir))
+        continue
+      dirWatchers.set(dir, watch(dir, { recursive: true }, (_ev, filename) => {
+        handler(typeof filename === 'string' ? filename : '')
+      }))
     }
   }
 
@@ -297,8 +325,10 @@ export async function devServer(options: DevServerOptions): Promise<{
       if (resetCache) {
         clearBuildCache(buildCache)
         const freshCfg = await loadConfig(root, { fresh: true, dev: true })
+        activeCfg = freshCfg
         activeAssetPrefix = (freshCfg.assetPrefix ?? '/_kay').replace(/\/$/, '')
         reloadAssets = makeDevReloadAssets(activeAssetPrefix)
+        syncStaticWatchers(freshCfg)
         refreshPluginWatchers(freshCfg)
       }
       if (reloadAll)
@@ -324,6 +354,7 @@ export async function devServer(options: DevServerOptions): Promise<{
         outDir,
         dev: true,
         compress: false,
+        ...(options.maxRequestBodySize !== undefined ? { maxRequestBodySize: options.maxRequestBodySize } : {}),
         importModule: modules.importFrom(serverDir),
       })
       if (stopped) {
@@ -405,25 +436,22 @@ export async function devServer(options: DevServerOptions): Promise<{
     }, 40)
   }
 
-  const addDirWatch = (dir: string, handler: (filename: string) => void) => {
-    if (watchedDirs.has(dir) || !existsSync(dir))
-      return
-    watchedDirs.add(dir)
-    watchers.push(watch(dir, { recursive: true }, (_ev, filename) => {
-      handler(typeof filename === 'string' ? filename : '')
-    }))
-  }
+  syncStaticWatchers(initialCfg)
 
-  addDirWatch(srcDir, name => scheduleRebuild(srcChangeKind(name)))
-  // If routesDir sits outside src/, watch it too!
-  if (!routesDir.startsWith(`${srcDir}/`) && !routesDir.startsWith(`${srcDir}\\`) && routesDir !== srcDir)
-    addDirWatch(routesDir, name => scheduleRebuild(srcChangeKind(name)))
-  addDirWatch(publicDir, () => scheduleRebuild('full'))
-
-  // Watch root (non-recursive) for kay.config.ts so atomic editor saves (temp + rename) still fire events.
+  // Watch root (non-recursive) for kay.config.ts and newly created publicDir/routesDir/srcDir.
   watchers.push(watch(root, (_ev, filename) => {
-    if (filename === 'kay.config.ts')
+    if (filename === 'kay.config.ts') {
       scheduleRebuild('config')
+      return
+    }
+    const changed = typeof filename === 'string' && filename !== '' ? resolve(root, filename) : undefined
+    for (const dir of [activePublicDir, activeRoutesDir, srcDir]) {
+      if (!dirWatchers.has(dir) && existsSync(dir) && (changed === undefined || isInsideDir(changed, dir))) {
+        syncStaticWatchers(activeCfg)
+        scheduleRebuild(dir === activePublicDir ? 'full' : 'code')
+        break
+      }
+    }
   }))
 
   // Watch plugin-declared extra paths (e.g. content/ or messages/ directories); refreshed on kay.config.ts edits.
@@ -492,7 +520,8 @@ export async function devServer(options: DevServerOptions): Promise<{
       const remoteIp = srv.requestIP(request)?.address
       const res = await currentApp!.handle(request, remoteIp)
       const ct = res.headers.get('content-type') ?? ''
-      if (ct.includes('text/event-stream'))
+      const isStreamedHtml = ct.includes('text/html') && request.method !== 'HEAD' && res.body !== null && !res.headers.has('content-length')
+      if (ct.includes('text/event-stream') || isStreamedHtml)
         srv.timeout(request, 0)
       if (ct.includes('text/html') && request.method !== 'HEAD' && res.body !== null && !res.headers.has('content-encoding')) {
         const headers = new Headers(res.headers)
@@ -509,6 +538,7 @@ export async function devServer(options: DevServerOptions): Promise<{
   const displayHost = hostname === '0.0.0.0' ? '127.0.0.1' : hostname
   const url = `http://${displayHost}:${server.port}`
   console.log(`[kay dev] listening on ${url}`)
+  let stopPromise: Promise<void> | undefined
 
   return {
     url,
@@ -520,19 +550,34 @@ export async function devServer(options: DevServerOptions): Promise<{
       return { ...buildCache.stats }
     },
     stop() {
+      if (stopPromise !== undefined)
+        return stopPromise
       stopped = true
       clearTimeout(timer)
       clearInterval(pingInterval)
       for (const w of watchers)
         w.close()
+      for (const w of dirWatchers.values())
+        w.close()
+      dirWatchers.clear()
       for (const w of pluginWatchers)
         w.close()
       for (const w of graphWatchers.values())
         w.close()
       graphWatchers.clear()
       server.stop(true)
-      void currentApp?.dispose?.()
-      rmSync(devRoot, { recursive: true, force: true })
+      stopPromise = (async () => {
+        try {
+          await inFlight
+        }
+        catch {}
+        try {
+          await currentApp?.dispose?.()
+        }
+        catch {}
+        rmSync(devRoot, { recursive: true, force: true })
+      })()
+      return stopPromise
     },
   }
 }
