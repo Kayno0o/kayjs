@@ -119,7 +119,7 @@ cd examples/noticeboard && bun run dev
 bunx @kayjs/kay@beta new my-app [--template minimal|fullstack|blog|app]  # Scaffold a new project
 kay check [--no-typecheck]             # Validate routes, compiler rules, plugin checks & types
 kay dev [--port 3000] [--host [addr]]  # Fast rebuild + live reload (127.0.0.1 by default)
-kay build [--analyze]                  # Production client + server build (optional bundle report)
+kay build [--analyze] [--max-js 40kb] # Production build; per-route islands report, or a JS budget
 kay build --static                     # Pure static HTML export
 kay build --compile [out]              # Single standalone executable
 kay start [--port 3000] [--host [addr]] # Serve built production app

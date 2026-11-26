@@ -33,6 +33,19 @@ export function Counter({ initial = 0 }: { initial?: number }) {
 }
 ```
 
+## Why a route ships JS
+
+`kay build --analyze` lists, under each route, the islands it loads and why each became one:
+
+```text
+/                                    3.74 KB       0.00 KB     5j/0c
+  island: Clicker (src/components/Clicker.tsx) uses onClick
+  island, deferred: Later (src/components/Later.tsx) uses onClick
+  island: Total (src/components/Total.tsx) reads count from '../stores/count'
+```
+
+A deferred island hydrates later (any mode but `load`), so its JS is not counted in the route's eager weight. `kay build --max-js 40kb` fails the build when a route's gzipped eager JS is over 40 KB, and names the route and its eager islands.
+
 ## Hydration strategies (`$hydrate`)
 
 Control when an island downloads and hydrates using `$hydrate` at the call site, or set the default for every call site with `export const hydrate = 'visible'` in the component's file. Unknown modes and `$hydrate` on non-islands fail compilation.

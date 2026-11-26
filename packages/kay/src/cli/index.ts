@@ -15,14 +15,15 @@ import { upgradeProject } from './upgrade'
 const BUILTIN_COMMANDS = new Set(['new', 'check', 'build', 'start', 'dev', 'upgrade'])
 const VALID_TEMPLATES = new Set(['minimal', 'fullstack', 'blog', 'app'])
 
-const VALUE_FLAGS = new Set(['--port', '--host', '--template', '--root'])
+const VALUE_FLAGS = new Set(['--port', '--host', '--template', '--root', '--max-js'])
+const SIZE_RE = /^(\d+(?:\.\d+)?)\s*(kb)?$/i
 const OPTIONAL_VALUE_FLAGS = new Set(['--compile'])
 const BOOLEAN_FLAGS = new Set(['--static', '--analyze', '--force', '--no-typecheck', '--no-install', '--help', '-h'])
 
 const ALLOWED_FLAGS_BY_CMD: Record<string, ReadonlySet<string>> = {
   new: new Set(['--template', '--force', '--root', '--help', '-h']),
   check: new Set(['--no-typecheck', '--root', '--help', '-h']),
-  build: new Set(['--static', '--analyze', '--compile', '--root', '--help', '-h']),
+  build: new Set(['--static', '--analyze', '--compile', '--max-js', '--root', '--help', '-h']),
   start: new Set(['--port', '--host', '--root', '--help', '-h']),
   dev: new Set(['--port', '--host', '--root', '--help', '-h']),
   upgrade: new Set(['--no-install', '--root', '--help', '-h']),
@@ -200,6 +201,14 @@ function resolveHostname(flags: ReadonlyMap<string, string | true>): string {
   return process.env.HOST || '127.0.0.1'
 }
 
+// `--max-js 40kb`, `--max-js 40KB` or `--max-js 40960` (bytes).
+function parseSize(raw: string): number | undefined {
+  const match = SIZE_RE.exec(raw.trim())
+  if (match === null)
+    return undefined
+  return Math.round(Number(match[1]) * (match[2] === undefined ? 1 : 1024))
+}
+
 function parsePort(raw: string | number | true | undefined, fallback: number): { ok: true, port: number } | { ok: false, error: string } {
   if (raw === undefined || raw === '' || raw === true)
     return { ok: true, port: fallback }
@@ -213,7 +222,7 @@ const USAGE_TEXT = `Usage:
   kay new <dir> [--template minimal|fullstack|blog|app] [--force]
   kay check [dir] [--no-typecheck]
   kay dev [dir] [--port 3000] [--host [addr]]
-  kay build [dir] [--static] [--compile [out]] [--analyze]
+  kay build [dir] [--static] [--compile [out]] [--analyze] [--max-js 40kb]
   kay start [dir] [--port 3000] [--host [addr]]
   kay upgrade [dir] [--no-install]`
 
@@ -290,8 +299,14 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
     const analyze = flags.has('--analyze')
     const compileVal = flags.get('--compile')
     const compile = compileVal === undefined ? undefined : (compileVal === true || compileVal === '' ? true : compileVal)
+    const maxJsVal = flags.get('--max-js')
+    const maxJs = maxJsVal === undefined ? undefined : parseSize(String(maxJsVal))
+    if (maxJsVal !== undefined && maxJs === undefined) {
+      err(`kay: invalid --max-js "${maxJsVal}": give the gzipped size of a route's eager JS in bytes or KB, e.g. --max-js 40kb`)
+      return 1
+    }
     const t0 = performance.now()
-    const manifest = await build({ root, static: isStatic, compile, analyze })
+    const manifest = await build({ root, static: isStatic, compile, analyze, maxJs })
     const ms = (performance.now() - t0).toFixed(1)
     out(`kay build done in ${ms} ms (${manifest.routes.length} routes, ${manifest.assets.length} client assets, ${manifest.actions.length} actions)`)
     return 0

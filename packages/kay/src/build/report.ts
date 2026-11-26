@@ -1,8 +1,25 @@
-// The `--analyze` report: eager JS and CSS weight per route, from the manifest and the client metafile.
+// The `--analyze` report and the `--max-js` budget: eager JS and CSS weight per route, from the manifest and the client metafile, and the islands behind it.
 
+import type { ModuleGraph } from './graph'
+import type { IslandPlan } from './islands'
 import type { BuildManifest } from './manifest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { relPosix } from './files'
+
+export interface IslandOrigin {
+  /** The component's export name, `default` for a page or a default export. */
+  name: string
+  /** Root-relative source file. */
+  file: string
+  /** Why kay runs it in the browser, e.g. `uses onClick`. */
+  reason: string
+}
+
+export interface RouteIsland extends IslandOrigin {
+  /** Loaded with the page, so counted in the route's eager JS. */
+  eager: boolean
+}
 
 export interface RouteBundleMetrics {
   path: string
@@ -12,6 +29,25 @@ export interface RouteBundleMetrics {
   cssGzip: number
   jsFiles: number
   cssFiles: number
+  islands: RouteIsland[]
+}
+
+export interface BundleReport {
+  routes: RouteBundleMetrics[]
+  totalJsGzip: number
+  totalCssGzip: number
+  topModules: { path: string, bytes: number }[]
+}
+
+/** Each island chunk URL, mapped to the component it hydrates and why that component became an island. */
+export function islandOrigins(islands: IslandPlan, islandChunks: Map<string, string>, graph: ModuleGraph, root: string): Map<string, IslandOrigin> {
+  const origins = new Map<string, IslandOrigin>()
+  for (const [key, target] of islands.targets) {
+    const url = islandChunks.get(key)
+    if (url !== undefined)
+      origins.set(url, { name: target.exportName, file: relPosix(root, target.file), reason: graph.load(target.file).interactiveReason ?? 'is interactive' })
+  }
+  return origins
 }
 
 export function analyzeBundleWeights(
@@ -19,7 +55,8 @@ export function analyzeBundleWeights(
   clientDir: string,
   assetPrefix = '/_kay',
   metafile?: Bun.BuildOutput['metafile'],
-): { routes: RouteBundleMetrics[], totalJsGzip: number, totalCssGzip: number, topModules: { path: string, bytes: number }[] } {
+  origins = new Map<string, IslandOrigin>(),
+): BundleReport {
   const prefix = `${assetPrefix.replace(/\/$/, '')}/`
   const sizeCache = new Map<string, { raw: number, gzip: number }>()
 
@@ -76,8 +113,15 @@ export function analyzeBundleWeights(
     const eagerJsRoots: string[] = []
     if (r.islandChunks.length > 0 && manifest.runtimeScript !== undefined)
       eagerJsRoots.push(manifest.runtimeScript)
-    for (const c of r.eagerIslandChunks ?? r.islandChunks)
+    const eager = r.eagerIslandChunks ?? r.islandChunks
+    for (const c of eager)
       eagerJsRoots.push(c)
+    const islands: RouteIsland[] = []
+    for (const chunk of r.islandChunks) {
+      const origin = origins.get(chunk)
+      if (origin !== undefined)
+        islands.push({ ...origin, eager: eager.includes(chunk) })
+    }
 
     const jsSet = collectTransitiveJs(eagerJsRoots)
     let jsRaw = 0
@@ -105,6 +149,7 @@ export function analyzeBundleWeights(
       cssGzip,
       jsFiles: jsSet.size,
       cssFiles: cssList.length,
+      islands,
     }
   })
 
@@ -126,14 +171,10 @@ export function analyzeBundleWeights(
   return { routes, totalJsGzip, totalCssGzip, topModules }
 }
 
-export function formatBundleReport(
-  manifest: BuildManifest,
-  clientDir: string,
-  assetPrefix = '/_kay',
-  metafile?: Bun.BuildOutput['metafile'],
-): string {
-  const report = analyzeBundleWeights(manifest, clientDir, assetPrefix, metafile)
-  const kb = (b: number) => `${(b / 1024).toFixed(2)} KB`
+const kb = (b: number): string => `${(b / 1024).toFixed(2)} KB`
+const islandLine = (island: RouteIsland): string => `${island.name} (${island.file}) ${island.reason}`
+
+export function formatBundleReport(report: BundleReport): string {
   const lines = [
     '\n=== KAY BUNDLE WEIGHT REPORT ===',
     `Total emitted: JS ${kb(report.totalJsGzip)} gz | CSS ${kb(report.totalCssGzip)} gz`,
@@ -147,6 +188,8 @@ export function formatBundleReport(
       + kb(r.cssGzip).padStart(14)
       + `${r.jsFiles}j/${r.cssFiles}c`.padStart(10),
     )
+    for (const island of r.islands)
+      lines.push(`  ${island.eager ? 'island' : 'island, deferred'}: ${islandLine(island)}`)
   }
   if (report.topModules.length > 0) {
     lines.push('', 'Top modules (minified output bytes):')
@@ -154,4 +197,16 @@ export function formatBundleReport(
       lines.push(`  ${kb(m.bytes).padStart(9)}  ${m.path}`)
   }
   return lines.join('\n')
+}
+
+/** Throws naming each route whose eager JS, gzipped, is over `maxBytes`, with the islands it loads with the page. */
+export function checkJsBudget(report: BundleReport, maxBytes: number): void {
+  const over = report.routes.filter(r => r.jsGzip > maxBytes)
+  if (over.length === 0)
+    return
+  const lines = over.map((r) => {
+    const eager = r.islands.filter(island => island.eager).map(islandLine)
+    return `  ${r.path} ships ${kb(r.jsGzip)} of eager JS: ${eager.length > 0 ? eager.join('; ') : 'the kay runtime alone'}`
+  })
+  throw new Error(`kay build: eager JS over --max-js ${kb(maxBytes)} (gzip) on ${over.length === 1 ? 'one route' : `${over.length} routes`}:\n${lines.join('\n')}\nDefer an island with export const hydrate = 'visible', move its state into fewer components, or raise --max-js.`)
 }

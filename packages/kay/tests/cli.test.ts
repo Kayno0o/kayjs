@@ -1,9 +1,11 @@
 // In-process CLI boundary & dev config regression tests for #3568.
 
-import { describe, expect, test } from 'bun:test'
+import type { BundleReport } from '../src/build/report'
+import { describe, expect, spyOn, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { checkJsBudget } from '../src/build/report'
 import { parseCliArgs, runCli } from '../src/cli/index'
 import { devServer } from '../src/dev/index'
 
@@ -167,5 +169,64 @@ export default {
     finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('kay build names the islands behind each route\'s JS (#3585)', () => {
+  const app: Record<string, string> = {
+    'src/stores/count.ts': 'import { signal } from \'@kayjs/kay\'\nexport const count = signal(0)\n',
+    'src/components/Clicker.tsx': 'import { count } from \'../stores/count\'\nexport function Clicker() { return <button type="button" onClick={() => count.value++}>Add</button> }\n',
+    'src/components/Total.tsx': 'import { count } from \'../stores/count\'\nexport function Total() { return <output>{count.value}</output> }\n',
+    'src/components/Later.tsx': 'export const hydrate = \'visible\'\nexport function Later() { return <button type="button" onClick={() => alert(1)}>Later</button> }\n',
+    'src/routes/index.tsx': 'import { Clicker } from \'../components/Clicker\'\nimport { Later } from \'../components/Later\'\nimport { Total } from \'../components/Total\'\nexport default function Home() { return <main><Clicker /><Total /><Later /></main> }\n',
+    'src/routes/about.tsx': 'export default function About() { return <p>About</p> }\n',
+  }
+
+  test('--analyze lists each island with why it is one, and --max-js fails a route over the size, naming its eager islands', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3585-'))
+    const errs: string[] = []
+    const io = { cwd: dir, stdout: () => {}, stderr: (line: string) => errs.push(line) }
+    const logs: string[] = []
+    const log = spyOn(console, 'log').mockImplementation((line: string) => logs.push(line))
+    try {
+      for (const [file, text] of Object.entries(app)) {
+        mkdirSync(join(dir, file, '..'), { recursive: true })
+        writeFileSync(join(dir, file), text)
+      }
+      mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
+      symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/@kayjs/kay'), 'dir')
+
+      await expect(runCli(['build', '--analyze', '--max-js', '1000'], io)).rejects.toThrow(/^kay build: eager JS over --max-js 0\.98 KB \(gzip\) on one route:\n {2}\/ ships \d+\.\d\d KB of eager JS: Clicker \(src\/components\/Clicker\.tsx\) uses onClick; Total \(src\/components\/Total\.tsx\) reads count from '\.\.\/stores\/count'\nDefer an island/)
+      const report = logs.join('\n').split('\n')
+      expect(report.filter(line => line.startsWith('  island'))).toEqual([
+        '  island: Clicker (src/components/Clicker.tsx) uses onClick',
+        '  island, deferred: Later (src/components/Later.tsx) uses onClick',
+        '  island: Total (src/components/Total.tsx) reads count from \'../stores/count\'',
+      ])
+
+      expect(await runCli(['build', '--max-js', '100KB'], io)).toBe(0)
+      expect(await runCli(['build', '--max-js', 'lots'], io)).toBe(1)
+      expect(errs).toEqual(['kay: invalid --max-js "lots": give the gzipped size of a route\'s eager JS in bytes or KB, e.g. --max-js 40kb'])
+    }
+    finally {
+      log.mockRestore()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a route at the size passes, one byte over fails, and a route with no eager island names the runtime', () => {
+    const route = (path: string, jsGzip: number, islands: BundleReport['routes'][number]['islands']) => ({ path, jsGzip, jsRaw: 0, cssRaw: 0, cssGzip: 0, jsFiles: 1, cssFiles: 0, islands })
+    const report = (jsGzip: number): BundleReport => ({
+      routes: [
+        route('/', 2048, [{ name: 'Clicker', file: 'src/Clicker.tsx', reason: 'uses onClick', eager: true }]),
+        route('/later', jsGzip, [{ name: 'Later', file: 'src/Later.tsx', reason: 'uses onClick', eager: false }]),
+      ],
+      totalJsGzip: 0,
+      totalCssGzip: 0,
+      topModules: [],
+    })
+
+    expect(() => checkJsBudget(report(1024), 2048)).not.toThrow()
+    expect(() => checkJsBudget(report(4096), 2047)).toThrow('kay build: eager JS over --max-js 2.00 KB (gzip) on 2 routes:\n  / ships 2.00 KB of eager JS: Clicker (src/Clicker.tsx) uses onClick\n  /later ships 4.00 KB of eager JS: the kay runtime alone\nDefer an island with export const hydrate = \'visible\', move its state into fewer components, or raise --max-js.')
   })
 })
