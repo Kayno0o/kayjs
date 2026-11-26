@@ -1,7 +1,8 @@
 // `kay upgrade` for #3579: a stateful plugin is registered as the handle its `createX()` returns, and two factories took the `createX()`/`x()` names.
 
-import type { AstNode } from '../compiler/analyze'
-import { parseTsx, walk } from '../compiler/analyze'
+import type { AstNode } from '../compiler/ast'
+import { parseTsx } from '../compiler/analyze'
+import { walk } from '../compiler/ast'
 import { SourceEditor } from '../compiler/patch'
 
 const RENAMED_FACTORIES = new Map([

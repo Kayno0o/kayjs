@@ -175,11 +175,10 @@ export default {
 describe('kay build names the islands behind each route\'s JS (#3585)', () => {
   const app: Record<string, string> = {
     'src/stores/count.ts': 'import { signal } from \'@kayjs/kay\'\nexport const count = signal(0)\n',
-    'src/components/Clicker.tsx': 'import { count } from \'../stores/count\'\nexport function Clicker() { return <button type="button" onClick={() => count.value++}>Add</button> }\n',
-    'src/components/Total.tsx': 'import { count } from \'../stores/count\'\nexport function Total() { return <output>{count.value}</output> }\n',
+    'src/components/Count.tsx': 'import { count } from \'../stores/count\'\nexport function Clicker() { return <button type="button" onClick={() => count.value++}>Add</button> }\nexport function Total() { return <output>{count.value}</output> }\nexport function Label() { return <span>Count</span> }\n',
     'src/components/Later.tsx': 'export const hydrate = \'visible\'\nexport function Later() { return <button type="button" onClick={() => alert(1)}>Later</button> }\n',
-    'src/routes/index.tsx': 'import { Clicker } from \'../components/Clicker\'\nimport { Later } from \'../components/Later\'\nimport { Total } from \'../components/Total\'\nexport default function Home() { return <main><Clicker /><Total /><Later /></main> }\n',
-    'src/routes/about.tsx': 'export default function About() { return <p>About</p> }\n',
+    'src/routes/index.tsx': 'import { Clicker, Total } from \'../components/Count\'\nimport { Later } from \'../components/Later\'\nexport default function Home() { return <main><Clicker /><Total /><Later /></main> }\n',
+    'src/routes/about.tsx': 'import { Label } from \'../components/Count\'\nexport default function About() { return <p><Label /></p> }\n',
   }
 
   test('--analyze lists each island with why it is one, and --max-js fails a route over the size, naming its eager islands', async () => {
@@ -196,12 +195,12 @@ describe('kay build names the islands behind each route\'s JS (#3585)', () => {
       mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
       symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/@kayjs/kay'), 'dir')
 
-      await expect(runCli(['build', '--analyze', '--max-js', '1000'], io)).rejects.toThrow(/^kay build: eager JS over --max-js 0\.98 KB \(gzip\) on one route:\n {2}\/ ships \d+\.\d\d KB of eager JS: Clicker \(src\/components\/Clicker\.tsx\) uses onClick; Total \(src\/components\/Total\.tsx\) reads count from '\.\.\/stores\/count'\nDefer an island/)
+      await expect(runCli(['build', '--analyze', '--max-js', '1000'], io)).rejects.toThrow(/^kay build: eager JS over --max-js 0\.98 KB \(gzip\) on one route:\n {2}\/ ships \d+\.\d\d KB of eager JS: Clicker \(src\/components\/Count\.tsx\) uses onClick; Total \(src\/components\/Count\.tsx\) reads count from '\.\.\/stores\/count'\nDefer an island/)
       const report = logs.join('\n').split('\n')
       expect(report.filter(line => line.startsWith('  island'))).toEqual([
-        '  island: Clicker (src/components/Clicker.tsx) uses onClick',
+        '  island: Clicker (src/components/Count.tsx) uses onClick',
+        '  island: Total (src/components/Count.tsx) reads count from \'../stores/count\'',
         '  island, deferred: Later (src/components/Later.tsx) uses onClick',
-        '  island: Total (src/components/Total.tsx) reads count from \'../stores/count\'',
       ])
 
       expect(await runCli(['build', '--max-js', '100KB'], io)).toBe(0)

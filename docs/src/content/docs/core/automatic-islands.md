@@ -11,9 +11,11 @@ Kay analyzes every `.tsx` file at build time using `oxc-parser`. Static componen
 
 You never write `'use client'` or `client:load`. A component becomes an island automatically when it uses any of:
 
-- Reactive primitives: `signal`, `computed`, `effect`, `onMount`, `store`, `selector`
+- A call to a reactive primitive: `signal`, `computed`, `effect`, `onMount`, `store`, `selector`
 - DOM interactivity: `on*` event handlers (`onClick`, `onInput`, etc.) or `ref` on an HTML or SVG element (on a component tag they are plain props)
 - Reactive state imported from another module, such as `export const cart = store([])` in `src/state.ts`
+
+kay decides this for each component, not for each file. A static component exported beside an island stays static and ships no JS. A helper or component of the same file that needs the browser makes every component calling or rendering it an island. Code at the top of a file that calls a primitive, such as `effect(...)`, makes every component of that file an island.
 
 <Callout title="Zero-JS guarantee" tone="tip">
 When a route renders only static components and native HTML forms, Kay omits the client runtime completely. Zero `<script>` tags are emitted in the HTML.
@@ -38,11 +40,14 @@ export function Counter({ initial = 0 }: { initial?: number }) {
 `kay build --analyze` lists, under each route, the islands it loads and why each became one:
 
 ```text
-/                                    3.74 KB       0.00 KB     5j/0c
-  island: Clicker (src/components/Clicker.tsx) uses onClick
+/about                               0.00 KB       0.00 KB     0j/0c
+/                                    3.68 KB       0.00 KB     5j/0c
+  island: Clicker (src/components/Count.tsx) uses onClick
+  island: Total (src/components/Count.tsx) reads count from '../stores/count'
   island, deferred: Later (src/components/Later.tsx) uses onClick
-  island: Total (src/components/Total.tsx) reads count from '../stores/count'
 ```
+
+Here `/about` renders `Label`, a static component of `Count.tsx`, and ships no JS.
 
 A deferred island hydrates later (any mode but `load`), so its JS is not counted in the route's eager weight. `kay build --max-js 40kb` fails the build when a route's gzipped eager JS is over 40 KB, and names the route and its eager islands.
 

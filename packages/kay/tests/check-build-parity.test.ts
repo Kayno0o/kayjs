@@ -122,8 +122,8 @@ describe('kay check and kay build graph/route parity (#3567)', () => {
       'src/ui/Title.tsx': 'import { Head } from \'@kayjs/kay\'\nimport { count } from \'../state\'\nexport function Title() { return <Head><title>{String(count.value)}</title></Head> }\n',
       'src/routes/index.tsx': 'import { Title } from \'../ui/Title\'\nexport default function Home() { return <main><Title /></main> }\n',
     })
-    const message = 'kay compiler: <Head> in an island in src/ui/Title.tsx: the module is an island because it reads count from \'../state\'; move <Head> to the page or a layout, outside any component with state or handlers.'
-    expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([`src/ui/Title.tsx:2:1: error: ${message}`])
+    const message = 'kay compiler: <Head> in an island in src/ui/Title.tsx: Title is an island because it reads count from \'../state\'; move <Head> to the page or a layout, outside any component with state or handlers.'
+    expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([`src/ui/Title.tsx:3:55: error: ${message}`])
     await expect(build({ root: dir, minify: false })).rejects.toThrow(message)
   })
 
@@ -182,5 +182,53 @@ describe('kay check and kay build graph/route parity (#3567)', () => {
     const checked = await checkProject(dir, { skipTypecheck: true })
     expect(checked.ok).toBe(false)
     expect(checked.errors.some(e => e.includes('cannot pass function prop "onDone"'))).toBe(true)
+  })
+})
+
+describe('kay check and kay build decide islands per component (#3587)', () => {
+  const count = {
+    'src/state.ts': 'import { signal } from \'@kayjs/kay\'\nexport const count = signal(0)\n',
+    'src/ui/Count.tsx': [
+      'import { count } from \'../state\'',
+      'export function Label() { return <span>Count</span> }',
+      'export function Total() { return <output>{count.value}</output> }',
+      'export function Clicker() { return <button type="button" onClick={() => count.value++}>Add</button> }',
+      'export default async function Summary() { return <p>Summary</p> }',
+    ].join('\n'),
+  }
+
+  it('ships no JS for a page rendering only the static component of a file that also exports islands', async () => {
+    const dir = appWith('kay-3587-build-', {
+      ...count,
+      'src/ui/Panel.tsx': [
+        'import { Clicker, Total } from \'./Count\'',
+        'const Frame = () => <Total />',
+        'export function Live() { return <div onClick={() => 1}><Clicker /></div> }',
+        'export function Shell() { return <section><Frame /></section> }',
+      ].join('\n'),
+      'src/routes/index.tsx': 'import { Label } from \'../ui/Count\'\nexport default function Home() { return <main><Label /></main> }\n',
+      'src/routes/counter.tsx': 'import { Label, Total } from \'../ui/Count\'\nexport default function Counter() { return <main><Label /><Total /></main> }\n',
+      'src/routes/panel.tsx': 'import { Live, Shell } from \'../ui/Panel\'\nexport default function Panel() { return <main><Live /><Shell /></main> }\n',
+    })
+    expect(await checkProject(dir, { skipTypecheck: true })).toMatchObject({ errors: [], warnings: [] })
+    const manifest = await build({ root: dir, minify: false })
+    expect(Object.keys(manifest.islands).map(key => key.slice(dir.length)).sort()).toEqual(['/src/ui/Count.tsx#Total', '/src/ui/Panel.tsx#Live'])
+    const chunks = Object.fromEntries(manifest.routes.map(route => [route.path, route.islandChunks.length]))
+    expect(chunks).toEqual({ '/': 0, '/counter': 1, '/panel': 2 })
+  })
+
+  it('refuses a function prop into an island from a static component, and accepts it from an island of the same file', async () => {
+    const dir = appWith('kay-3587-props-', {
+      ...count,
+      'src/ui/Panel.tsx': [
+        'import { Clicker, Label } from \'./Count\'',
+        'export function Live() { return <div onClick={() => 1}><Clicker onDone={() => 2} /></div> }',
+        'export function Shell() { return <section><Clicker onDone={() => 3} /><Label onPick={() => 4} /></section> }',
+      ].join('\n'),
+      'src/routes/index.tsx': 'import { Live, Shell } from \'../ui/Panel\'\nexport default function Home() { return <main><Live /><Shell /></main> }\n',
+    })
+    expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([
+      'src/ui/Panel.tsx:3:52: error: kay check: cannot pass function prop "onDone" from a server component into island <Clicker>. Define the handler inside the island or pass serializable data.',
+    ])
   })
 })

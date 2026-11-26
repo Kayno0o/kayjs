@@ -2,7 +2,7 @@
 
 import type { ArrowFunctionExpression, Function as OxcFunction, Node, Program } from 'oxc-parser'
 import { visitorKeys } from 'oxc-parser'
-import { walk } from './analyze'
+import { walk } from './ast'
 import { unwrapTsExpr } from './shared'
 function staticPropKey(prop: Node): string | undefined {
   if (prop.type !== 'Property')

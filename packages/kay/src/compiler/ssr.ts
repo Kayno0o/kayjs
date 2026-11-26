@@ -9,7 +9,8 @@ import type {
   Node,
 } from 'oxc-parser'
 import type { ModuleAnalysis } from './analyze'
-import { analyzeModule, parseTsx, walk } from './analyze'
+import { analyzeModule, parseTsx } from './analyze'
+import { walk } from './ast'
 import { mistake } from './mistakes'
 import { SourceEditor } from './patch'
 import {
