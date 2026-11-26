@@ -34,6 +34,9 @@ jobs:
       - name: Install project deps
         run: bun install --silent --frozen-lockfile
 
+      - name: Install jscpd for duplication check
+        run: command -v jscpd >/dev/null || bun add -g jscpd || true
+
       - name: Install Chromium & ImageMagick
         run: |
           apk add --no-cache chromium ttf-freefont imagemagick imagemagick-webp imagemagick-heic imagemagick-svg

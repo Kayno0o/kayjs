@@ -1,0 +1,26 @@
+{
+  "emptyCatches": {
+    "packages/kay/src/build/bundle.ts": 1,
+    "packages/kay/src/build/graph.ts": 1,
+    "packages/kay/src/build/index.ts": 1,
+    "packages/kay/src/build/prerender.ts": 1,
+    "packages/kay/src/build/static.ts": 1,
+    "packages/kay/src/cli/inspect.ts": 2,
+    "packages/kay/src/dev/index.ts": 5,
+    "packages/kay/src/dom/action.ts": 1,
+    "packages/kay/src/server/action-registry.ts": 2,
+    "packages/kay/src/server/action.ts": 2,
+    "packages/kay/src/server/http.ts": 1,
+    "packages/kay/src/server/page.ts": 1,
+    "packages/plugin-auth/src/index.ts": 2,
+    "packages/plugin-auth/src/routes.ts": 1,
+    "packages/plugin-content/src/collection.ts": 1,
+    "packages/plugin-content/src/components.ts": 1,
+    "packages/plugin-live/src/client.ts": 1,
+    "packages/plugin-live/src/index.ts": 1,
+    "packages/plugin-mcp/src/format.ts": 2,
+    "packages/plugin-mcp/src/schema.ts": 2,
+    "packages/plugin-spa/src/client.ts": 2,
+    "packages/plugin-tailwind/src/index.ts": 1
+  }
+}
