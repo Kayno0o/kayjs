@@ -190,6 +190,7 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
   // Each credited name's score, and the query words it answers as one bit each, so a word counts once however many readings reach it.
   const scores = new Map<string, { score: number, answered: number }>()
 
+  // Weighting each word by how rare it is among the names was benched and lost the multi-word queries, as `off` is common yet is what `hide` means.
   const credit = (word: string, weight: number, answering: number) => {
     for (const name of index.byWord.get(word) ?? []) {
       const gained = weight / index.wordCount.get(name)!
