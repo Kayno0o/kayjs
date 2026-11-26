@@ -46,13 +46,21 @@ export function closeWords(word: string, vocabulary: Iterable<string>): string[]
   return respellings(word, vocabulary).sort((a, b) => a[1] - b[1]).slice(0, MOST).map(([candidate]) => candidate)
 }
 
+// Three rows reused by every distance, as one is measured against each of some 25,000 words per typed word.
+let rows = [new Int32Array(64), new Int32Array(64), new Int32Array(64)]
+
 // Damerau-Levenshtein distance (optimal string alignment), giving up past `most` once a whole row is above it.
 export function distance(a: string, b: string, most = Infinity): number {
-  let before: number[] = []
-  let previous = Array.from({ length: b.length + 1 }, (_, j) => j)
+  if (rows[0]!.length <= b.length)
+    rows = [new Int32Array(b.length * 2), new Int32Array(b.length * 2), new Int32Array(b.length * 2)]
+
+  let [before, previous, row] = rows as [Int32Array, Int32Array, Int32Array]
+
+  for (let j = 0; j <= b.length; j++)
+    previous[j] = j
 
   for (let i = 1; i <= a.length; i++) {
-    const row = [i]
+    row[0] = i
     let lowest = i
 
     for (let j = 1; j <= b.length; j++) {
@@ -62,15 +70,14 @@ export function distance(a: string, b: string, most = Infinity): number {
       if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1])
         value = Math.min(value, before[j - 2]! + 1)
 
-      row.push(value)
+      row[j] = value
       lowest = Math.min(lowest, value)
     }
 
     if (lowest > most)
       return lowest
 
-    before = previous
-    previous = row
+    ;[before, previous, row] = [previous, row, before]
   }
 
   return previous[b.length]!
