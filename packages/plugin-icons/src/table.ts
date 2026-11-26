@@ -1,8 +1,15 @@
-// words.json maps a word to its related icon-name words as `word percent word percent`, built by build/table.ts; read on the first search, as it weighs about 2 MB.
+// words.json relates a word to icon-name words, built by build/table.ts and read on the first search: `lines` maps a word to `index percent index percent`, each index in base 36 into the words of `targets`.
 import { byStem, stem } from './name-words'
 import { completions, respellings } from './spelling'
 
-let table: Record<string, string> | undefined
+export interface PackedTable {
+  targets: string
+  lines: Record<string, string>
+}
+
+let table: PackedTable | undefined
+let replaced: Record<string, string> | undefined
+let targets: string[] | undefined
 let words: string[] | undefined
 let stems: Map<string, string> | undefined
 const decoded = new Map<string, [string, number][]>()
@@ -11,17 +18,40 @@ const completed = new Map<string, string[]>()
 const respelled = new Map<string, [string, number][]>()
 const REMEMBERED = 1000
 const PERCENT = 100
+const BASE = 36
 
-function load(): Record<string, string> {
+function load(): PackedTable {
   // A synchronous lazy load keeps findIcons synchronous.
-  table ??= require('./words.json') as Record<string, string>
+  table ??= replaced ? packTable(replaced) : require('./words.json') as PackedTable
 
   return table
 }
 
+// Packs `word: 'related percent related percent'` lines into the shape words.json holds.
+export function packTable(plain: Record<string, string>): PackedTable {
+  const all: string[] = []
+  const at = new Map<string, number>()
+  const lines: Record<string, string> = {}
+
+  for (const [word, line] of Object.entries(plain)) {
+    const parts = line === '' ? [] : line.split(' ')
+
+    for (let i = 0; i < parts.length; i += 2) {
+      if (!at.has(parts[i]!))
+        at.set(parts[i]!, all.push(parts[i]!) - 1)
+      parts[i] = at.get(parts[i]!)!.toString(BASE)
+    }
+    lines[word] = parts.join(' ')
+  }
+
+  return { targets: all.join(' '), lines }
+}
+
 // Swaps the table for one built in memory, as the bench scores tables learned without the set they are tested on.
 export function replaceTable(next: Record<string, string>): void {
-  table = next
+  replaced = next
+  table = undefined
+  targets = undefined
   words = undefined
   stems = undefined
   decoded.clear()
@@ -45,7 +75,7 @@ function remember<T>(cache: Map<string, T>, word: string, read: () => T): T {
 
 // The words the table knows, each a word a search may be typed with.
 export function tableWords(): string[] {
-  words ??= Object.keys(load())
+  words ??= Object.keys(load().lines)
 
   return words
 }
@@ -74,12 +104,14 @@ export function relatedWords(word: string): [string, number][] {
   if (known)
     return known
 
-  const line = Object.hasOwn(load(), word) ? load()[word]! : ''
+  const { lines } = load()
+  const line = Object.hasOwn(lines, word) ? lines[word]! : ''
   const parts = line === '' ? [] : line.split(' ')
   const related: [string, number][] = []
 
+  targets ??= load().targets.split(' ')
   for (let i = 0; i + 1 < parts.length; i += 2)
-    related.push([parts[i]!, Number(parts[i + 1]) / PERCENT])
+    related.push([targets[Number.parseInt(parts[i]!, BASE)]!, Number(parts[i + 1]) / PERCENT])
 
   decoded.set(word, related)
 

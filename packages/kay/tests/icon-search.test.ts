@@ -92,7 +92,7 @@ describe('findIcons', () => {
     expect(findIcons(['home', 'star'], '', { limit: 1 })).toEqual(['home'])
   })
 
-  // `dog` holds no name, so only the readings of `hous` answer: `house` by completion and respelling, `hour` by respelling.
+  // `dog` holds no name, so only the readings of `dair` answer: `dairy` by completion and respelling, `hair` by respelling.
   it('credits a word reached by both a completion and a respelling once', () => {
     expect(findIcons(['hair', 'dairy'], 'dair dog')).toEqual(['hair', 'dairy'])
   })
