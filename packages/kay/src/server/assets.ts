@@ -5,7 +5,7 @@ import type { CompressionCache } from './compress'
 import type { EmbeddedBody } from './http'
 import { existsSync, statSync } from 'node:fs'
 import { extname, join } from 'node:path'
-import { isCompressibleType, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
+import { isCompressibleType, markCompressionHandled, pickEncoding, pickPrecompressedEncoding, toWeakEtag } from './compress'
 import { etagMatches, MIME } from './http'
 
 const textEncoder = new TextEncoder()
@@ -150,16 +150,16 @@ export function createAssets(options: AssetsOptions) {
 
   async function serveFile(request: Request, file: ServedFile): Promise<Response> {
     if (request.method === 'HEAD')
-      return withHsts(new Response(null, { status: 200, headers: file.headers }), request)
+      return markCompressionHandled(withHsts(new Response(null, { status: 200, headers: file.headers }), request))
     if (file.compressedHeaders !== undefined && compressCache !== undefined) {
       const enc = pickEncoding(request.headers.get('accept-encoding'))
       if (enc !== undefined) {
         const compressed = await compressCache.file(file.key, enc, file.read)
         if (compressed !== undefined)
-          return withHsts(new Response(compressed, { status: 200, headers: { ...file.compressedHeaders, 'content-encoding': enc } }), request)
+          return markCompressionHandled(withHsts(new Response(compressed, { status: 200, headers: { ...file.compressedHeaders, 'content-encoding': enc } }), request))
       }
     }
-    return withHsts(new Response(file.body, { status: 200, headers: file.headers }), request)
+    return markCompressionHandled(withHsts(new Response(file.body, { status: 200, headers: file.headers }), request))
   }
 
   async function serveAsset(request: Request, asset: AssetEntry): Promise<Response> {
@@ -167,7 +167,7 @@ export function createAssets(options: AssetsOptions) {
       const preEnc = pickPrecompressedEncoding(request.headers.get('accept-encoding'), { br: asset.br !== undefined, gz: asset.gz !== undefined })
       if (preEnc !== undefined) {
         const sidecar = preEnc === 'br' ? asset.br! : asset.gz!
-        return withHsts(new Response(sidecar.body, { status: 200, headers: sidecar.headers }), request)
+        return markCompressionHandled(withHsts(new Response(sidecar.body, { status: 200, headers: sidecar.headers }), request))
       }
     }
     return serveFile(request, asset.file)

@@ -60,7 +60,7 @@ describe('regions: the server renders only the requested region (#3597)', () => 
     expect(seen.__regionHeavy).toBe(1)
   })
 
-  it('fails with the fix when the route has no such region or two share a name', async () => {
+  it('returns 404 without onError when the route has no such region, 400 on empty header, and 500 when two share a name', async () => {
     const dir = appWith({
       'src/routes/index.tsx': `
         import { Region } from '@kayjs/kay'
@@ -74,11 +74,13 @@ describe('regions: the server renders only the requested region (#3597)', () => 
     })
     const errors: string[] = []
     const app = await testApp({ root: dir, onError: (info: { error: unknown }) => { errors.push((info.error as Error).message) } })
-    expect((await app.get('/', { 'x-kay-region': 'nope' })).status).toBe(500)
+    const missing = await app.get('/', { 'x-kay-region': 'nope' })
+    expect(missing.status).toBe(404)
+    expect(await missing.text()).toContain('kay: the route / does not render <Region name="nope">')
+    expect((await app.get('/', { 'x-kay-region': '' })).status).toBe(400)
     expect((await app.get('/twice')).status).toBe(500)
 
     expect(errors).toEqual([
-      expect.stringContaining('kay: the route / does not render <Region name="nope">'),
       expect.stringContaining('kay: two <Region name="a"> on one page'),
     ])
   })

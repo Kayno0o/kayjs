@@ -50,34 +50,60 @@ export interface RenderContext {
   inlineStyles: string[] | undefined
 }
 
+interface RenderScope {
+  owner: RenderContext
+  contexts: ReadonlyMap<symbol, unknown>
+  outerContexts: ReadonlyMap<symbol, unknown> | undefined
+  island: string | undefined
+  inTarget: boolean
+}
+
 const STORAGE_KEY = Symbol.for('kay.render.storage')
+const SCOPE_STORAGE_KEY = Symbol.for('kay.render.scope.storage')
 const renderStorage: AsyncLocalStorage<RenderContext> = ((globalThis as Record<symbol, AsyncLocalStorage<RenderContext> | undefined>)[STORAGE_KEY] ??= new AsyncLocalStorage<RenderContext>())
+const scopeStorage: AsyncLocalStorage<RenderScope> = ((globalThis as Record<symbol, AsyncLocalStorage<RenderScope> | undefined>)[SCOPE_STORAGE_KEY] ??= new AsyncLocalStorage<RenderScope>())
+
+function activeScope(ctx: RenderContext): RenderScope {
+  const scope = scopeStorage.getStore()
+  if (scope !== undefined && scope.owner === ctx)
+    return scope
+  return {
+    owner: ctx,
+    contexts: ctx.contexts,
+    outerContexts: ctx.outerContexts,
+    island: ctx.island,
+    inTarget: ctx.inTarget,
+  }
+}
+
+export function isInTarget(ctx: RenderContext): boolean {
+  return activeScope(ctx).inTarget
+}
+
+export function runInTarget<T>(ctx: RenderContext, fn: () => T): T {
+  return scopeStorage.run({ ...activeScope(ctx), inTarget: true }, fn)
+}
 
 registerServerContextBridge({
   getContext(key: symbol) {
     const ctx = renderStorage.getStore()
-    if (ctx !== undefined && ctx.contexts.has(key))
-      return { found: true, value: ctx.contexts.get(key) }
-    if (ctx?.outerContexts?.has(key) === true)
-      throw new Error(`kay: <${ctx.island}> reads a context provided outside the island, which the browser never sees; pass its value as a prop.`)
+    if (ctx === undefined)
+      return undefined
+    const scope = activeScope(ctx)
+    if (scope.contexts.has(key))
+      return { found: true, value: scope.contexts.get(key) }
+    if (scope.outerContexts?.has(key) === true)
+      throw new Error(`kay: <${scope.island}> reads a context provided outside the island, which the browser never sees; pass its value as a prop.`)
     return undefined
   },
   runWithContext<T>(key: symbol, value: unknown, fn: () => T): T {
     const ctx = renderStorage.getStore()
     if (ctx === undefined)
       return fn()
-    const had = ctx.contexts.has(key)
-    const prev = ctx.contexts.get(key)
-    ctx.contexts.set(key, value)
-    try {
-      return fn()
-    }
-    finally {
-      if (had)
-        ctx.contexts.set(key, prev)
-      else
-        ctx.contexts.delete(key)
-    }
+    const cur = activeScope(ctx)
+    const next = new Map(cur.contexts)
+    next.set(key, value)
+    return scopeStorage.run({ ...cur, contexts: next }, fn)
   },
   nextId() {
     const ctx = renderStorage.getStore()
@@ -140,18 +166,8 @@ export function ssrStyleBlock(css: string): string {
 
 // An island sees only the contexts provided inside it, as in the browser.
 export function renderIsland(ctx: RenderContext, name: string, render: () => string): string {
-  const outer = ctx.contexts
-  ctx.contexts = new Map()
-  ctx.outerContexts = outer
-  ctx.island = name
-  try {
-    return render()
-  }
-  finally {
-    ctx.contexts = outer
-    ctx.outerContexts = undefined
-    ctx.island = undefined
-  }
+  const cur = activeScope(ctx)
+  return scopeStorage.run({ ...cur, contexts: new Map(), outerContexts: cur.contexts, island: name }, render)
 }
 
 
@@ -208,25 +224,26 @@ export function Suspense(props: { fallback?: KayChild, error?: KayChild | ((erro
     return raw(ssrChild(props.fallback))
 
   const id = ctx.nextId++
-  // Capture RenderContext so timeout / error fallback renders still run inside the request context.
+  const scope = activeScope(ctx)
+  // Capture RenderContext and RenderScope so timeout / error fallback renders still see outer Context.Provider and <Region> state.
   const renderError = (error: unknown): string => {
     try {
-      return runWithRenderContext(ctx, () => ssrChild(typeof props.error === 'function' ? props.error(error) : props.error))
+      return runWithRenderContext(ctx, () => scopeStorage.run(scope, () => ssrChild(typeof props.error === 'function' ? props.error(error) : props.error)))
     }
     catch {
       return ''
     }
   }
-  ctx.pending.push({ id, settled: settle(ctx, child, renderError), renderError })
+  ctx.pending.push({ id, settled: settle(ctx, scope, child, renderError), renderError })
 
   const fallbackHtml = ssrChild(props.fallback)
   return raw(`<kay-s id="k-s-${id}">${fallbackHtml}</kay-s>`)
 }
 
-async function settle(ctx: RenderContext, child: Promise<KayChild>, renderError: (error: unknown) => string): Promise<SettledChunk> {
+async function settle(ctx: RenderContext, scope: RenderScope, child: Promise<KayChild>, renderError: (error: unknown) => string): Promise<SettledChunk> {
   try {
     const resolved = await child
-    return { html: runWithRenderContext(ctx, () => ssrChild(resolved)) }
+    return { html: runWithRenderContext(ctx, () => scopeStorage.run(scope, () => ssrChild(resolved))) }
   }
   catch (error) {
     return { html: renderError(error), error }

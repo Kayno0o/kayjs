@@ -4,6 +4,7 @@ import type { DocumentHeadContext, KayPlugin, ServerErrorInfo } from '../plugins
 import type { RenderContext } from '../ssr/context'
 import type { RequestContext } from './http'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
+import { readBufferedOrPassThrough } from './compress'
 import { extractRenderedIslands, makeRequestContext } from './http'
 import { inlineStyleHashes, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, resolveCspPolicy, withCspHashes } from './security'
 
@@ -101,11 +102,26 @@ export function addedInlineStyleHashes(before: string, after: string): string[] 
   return afterHashes.filter(h => !beforeSet.has(h))
 }
 
+function withBaseCsp(res: Response, htmlHeaders: HtmlHeaders): Response {
+  const csp = htmlHeaders(false, false, true)['content-security-policy']
+  if (csp === undefined)
+    return res
+  const headers = new Headers(res.headers)
+  headers.set('content-security-policy', csp)
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+}
+
 /** A plugin's HTML page without a CSP of its own gets the app's, its `<style>` blocks hashed like a rendered page's. */
 export async function withPluginHtmlCsp(res: Response, htmlHeaders: HtmlHeaders): Promise<Response> {
-  if (res.body === null || res.headers.has('content-security-policy') || !(res.headers.get('content-type') ?? '').startsWith('text/html'))
+  if (res.body === null || res.headers.has('content-security-policy') || !(res.headers.get('content-type') ?? '').trim().toLowerCase().startsWith('text/html'))
     return res
-  const html = await res.text()
+  // Never decode pre-compressed bytes as UTF-8; attach base CSP without touching the body.
+  if (res.headers.has('content-encoding'))
+    return withBaseCsp(res, htmlHeaders)
+  const probed = await readBufferedOrPassThrough(res)
+  if ('passthrough' in probed)
+    return withBaseCsp(probed.passthrough, htmlHeaders)
+  const html = new TextDecoder().decode(probed.buffered)
   const headers = new Headers(res.headers)
   const csp = htmlHeaders(false, false, true, inlineStyleHashes(html))['content-security-policy']
   if (csp !== undefined)

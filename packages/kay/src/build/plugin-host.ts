@@ -93,8 +93,14 @@ export function createPluginHost(options: PluginHostOptions) {
     }
   }
 
-  const setDataFor = (pluginName: string) => (data: Record<string, unknown>): void => {
-    pluginData[pluginName] = { ...pluginData[pluginName], ...data }
+  const pluginDataOwners = new Map<string, KayPlugin>()
+  const setDataFor = (plugin: KayPlugin) => (data: Record<string, unknown>): void => {
+    const existingOwner = pluginDataOwners.get(plugin.name)
+    if (existingOwner !== undefined && existingOwner !== plugin) {
+      throw new Error(`kay: duplicate pluginData key "${plugin.name}": two plugin instances share the name "${plugin.name}" and both call setData(). Give each plugin instance a distinct name.`)
+    }
+    pluginDataOwners.set(plugin.name, plugin)
+    pluginData[plugin.name] = { ...pluginData[plugin.name], ...data }
   }
 
   const shared = {
@@ -152,7 +158,7 @@ export function createPluginHost(options: PluginHostOptions) {
     async runBuild(): Promise<void> {
       for (const plugin of plugins) {
         if (plugin.build !== undefined) {
-          const ctx: BuildPluginContext = { ...buildCtx, setData: setDataFor(plugin.name) }
+          const ctx: BuildPluginContext = { ...buildCtx, setData: setDataFor(plugin) }
           await plugin.build(ctx)
         }
       }
@@ -164,7 +170,7 @@ export function createPluginHost(options: PluginHostOptions) {
       for (const plugin of plugins) {
         if (plugin.afterPrerender !== undefined) {
           ran = true
-          const ctx: FinalizeBuildContext = { ...shared, publicFiles: options.publicFiles.files, setData: setDataFor(plugin.name) }
+          const ctx: FinalizeBuildContext = { ...shared, publicFiles: options.publicFiles.files, setData: setDataFor(plugin) }
           await plugin.afterPrerender(ctx)
         }
       }

@@ -4,19 +4,72 @@ import type { KayApp } from './http'
 
 const SIGNALS = ['SIGTERM', 'SIGINT', 'SIGHUP'] as const
 
-// On the first signal the server stops taking connections and the app's onShutdown hooks run; the process exits 0 once the open requests finish, or 1 after `timeoutMs`, which closes what is left.
-export function handleSignals(app: KayApp, server: ReturnType<KayApp['serve']>, { timeoutMs = 10_000 } = {}): void {
+export interface HandleSignalsOptions {
+  timeoutMs?: number | undefined
+  /** @internal Exit callback (defaults to `process.exit`). */
+  exit?: ((code: number) => void) | undefined
+}
+
+// On the first signal the server stops taking connections, ends long-lived streams, waits for open requests to drain, then runs onShutdown hooks; exits 0 when done, or 1 after `timeoutMs`.
+export function handleSignals(
+  app: KayApp,
+  server: ReturnType<KayApp['serve']>,
+  { timeoutMs = 10_000, exit = (code: number) => process.exit(code) }: HandleSignalsOptions = {},
+): () => void {
+  let stopping = false
+  const listeners: [typeof SIGNALS[number], () => void][] = []
+
   const stop = async (): Promise<void> => {
+    if (stopping)
+      return
+    stopping = true
+    let timedOut = false
     const forced = setTimeout(() => {
+      timedOut = true
       console.error(`kay: requests still open after ${timeoutMs} ms; closing them`)
-      process.exit(1)
+      exit(1)
     }, timeoutMs)
-    const drained = server.stop()
-    await app.dispose?.()
-    await drained
-    clearTimeout(forced)
-    process.exit(0)
+    let exitCode = 0
+    try {
+      const drained = server.stop()
+      try {
+        await app.closeStreams?.()
+      }
+      catch (error) {
+        exitCode = 1
+        console.error('kay: error closing streams during shutdown:', error)
+      }
+      await drained
+    }
+    catch (error) {
+      exitCode = 1
+      console.error('kay: error draining server during shutdown:', error)
+    }
+    finally {
+      try {
+        await app.dispose?.()
+      }
+      catch (error) {
+        exitCode = 1
+        console.error('kay: error disposing app during shutdown:', error)
+      }
+      clearTimeout(forced)
+    }
+    if (!timedOut)
+      exit(exitCode)
   }
-  for (const signal of SIGNALS)
-    process.once(signal, () => void stop())
+
+  for (const signal of SIGNALS) {
+    const listener = () => {
+      void stop()
+    }
+    listeners.push([signal, listener])
+    process.on(signal, listener)
+  }
+
+  return () => {
+    for (const [signal, listener] of listeners)
+      process.off(signal, listener)
+    listeners.length = 0
+  }
 }

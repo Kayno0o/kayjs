@@ -91,6 +91,13 @@ function hasNoTransform(cacheControl: string | null | undefined): boolean {
 const PENDING: unique symbol = Symbol('pending')
 const MAX_BUFFERED_PROBE_CHUNKS = 32
 const MAX_BUFFERED_PROBE_BYTES = 4 * 1024 * 1024
+const compressionHandled = new WeakSet<Response>()
+
+/** Marks a `Response` as already processed for compression (compressed, too small, unshrinkable, or intentionally streamed). */
+export function markCompressionHandled(res: Response): Response {
+  compressionHandled.add(res)
+  return res
+}
 
 function concatChunks(chunks: readonly Uint8Array[], totalBytes: number): Uint8Array<ArrayBuffer> {
   if (chunks.length === 1) {
@@ -109,7 +116,7 @@ function concatChunks(chunks: readonly Uint8Array[], totalBytes: number): Uint8A
 
 // Microtask-only probe: buffered bodies (string, TypedArray, JSON, closed streams) settle all chunks
 // within microtasks and can be compressed; open streams stay pending and pass straight through unbuffered.
-async function readBufferedOrPassThrough(
+export async function readBufferedOrPassThrough(
   res: Response,
 ): Promise<{ buffered: Uint8Array<ArrayBuffer> } | { passthrough: Response }> {
   const te = res.headers.get('transfer-encoding')
@@ -125,6 +132,7 @@ async function readBufferedOrPassThrough(
 
   while (true) {
     const readPromise = reader.read()
+    void readPromise.catch(() => undefined)
     const tick = Promise.resolve().then(() => Promise.resolve()).then((): typeof PENDING => PENDING)
     const outcome = await Promise.race([readPromise, tick])
     if (outcome === PENDING) {
@@ -157,6 +165,7 @@ async function readBufferedOrPassThrough(
         controller.enqueue(value)
     },
     cancel(reason) {
+      pendingRead = undefined
       return reader.cancel(reason)
     },
   })
@@ -307,14 +316,44 @@ export class CompressionCache {
   }
 }
 
+export function mergeVaryValue(existing: string | null | undefined, token: string): string {
+  if (!existing)
+    return token
+  const lowerToken = token.toLowerCase()
+  const parts = existing.split(',').map(p => p.trim()).filter(Boolean)
+  if (parts.some(p => p.toLowerCase() === lowerToken))
+    return parts.join(', ')
+  return `${parts.join(', ')}, ${token}`
+}
+
 function appendVaryAcceptEncoding(headers: Headers): void {
-  const existing = headers.get('vary')
-  if (!existing) {
-    headers.set('vary', 'Accept-Encoding')
+  headers.set('vary', mergeVaryValue(headers.get('vary'), 'Accept-Encoding'))
+}
+
+function tryAppendVaryAcceptEncoding(res: Response): Response {
+  try {
+    appendVaryAcceptEncoding(res.headers)
+    return res
   }
-  else if (!existing.toLowerCase().includes('accept-encoding')) {
-    headers.set('vary', `${existing}, Accept-Encoding`)
+  catch {
+    const headers = new Headers(res.headers)
+    appendVaryAcceptEncoding(headers)
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
   }
+}
+
+function withVaryAcceptEncoding(baseHeaders: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...baseHeaders }
+  let existing: string | undefined
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === 'vary') {
+      existing = existing !== undefined ? `${existing}, ${headers[key]}` : headers[key]
+      if (key !== 'vary')
+        delete headers[key]
+    }
+  }
+  headers.vary = mergeVaryValue(existing, 'Accept-Encoding')
+  return headers
 }
 
 /** `reuse` keeps the compressed page by content hash, for routes whose HTML holds nothing per visitor. */
@@ -335,28 +374,41 @@ export function compressedHtmlResponse(
       if (compressed === undefined)
         compressed = cache.compress(encoder.encode(html), enc, staticKey)
       if (compressed !== undefined) {
-        const headers: Record<string, string> = { ...baseHeaders, 'content-encoding': enc, 'vary': 'Accept-Encoding' }
+        const headers = withVaryAcceptEncoding(baseHeaders)
+        headers['content-encoding'] = enc
         const etag = headers.etag ?? headers.ETag
         if (etag !== undefined) {
           delete headers.ETag
           headers.etag = toWeakEtag(etag)
         }
-        return new Response(compressed, { status, headers })
+        return markCompressionHandled(new Response(compressed, { status, headers }))
       }
     }
   }
-  return new Response(request.method === 'HEAD' ? null : html, {
+  return markCompressionHandled(new Response(request.method === 'HEAD' ? null : html, {
     status,
-    headers: cache !== undefined && !noTransform ? { ...baseHeaders, vary: 'Accept-Encoding' } : baseHeaders,
-  })
+    headers: cache !== undefined && !noTransform ? withVaryAcceptEncoding(baseHeaders) : baseHeaders,
+  }))
+}
+
+function compressedResponseFrom(res: Response, compressed: Uint8Array<ArrayBuffer>, enc: CompressionEncoding): Response {
+  const headers = new Headers(res.headers)
+  appendVaryAcceptEncoding(headers)
+  headers.set('content-encoding', enc)
+  headers.delete('content-length')
+  const etag = headers.get('etag')
+  if (etag !== null)
+    headers.set('etag', toWeakEtag(etag))
+  return markCompressionHandled(new Response(compressed, { status: res.status, statusText: res.statusText, headers }))
 }
 
 export async function maybeCompressResponse(
   res: Response,
   request: Request,
   cache: CompressionCache | undefined,
+  staticKey?: string,
 ): Promise<Response> {
-  if (cache === undefined)
+  if (cache === undefined || compressionHandled.has(res))
     return res
   if (res.status === 204 || res.status === 206 || res.status === 304 || (res.status >= 300 && res.status < 400))
     return res
@@ -369,24 +421,30 @@ export async function maybeCompressResponse(
 
   const cl = res.headers.get('content-length')
   const enc = request.method === 'HEAD' ? undefined : pickEncoding(request.headers.get('accept-encoding'))
-  if (enc === undefined) {
-    try {
-      appendVaryAcceptEncoding(res.headers)
-    }
-    catch {}
-    return res
-  }
+  if (enc === undefined)
+    return markCompressionHandled(tryAppendVaryAcceptEncoding(res))
 
-  if (cl !== null && Number(cl) < MIN_COMPRESS_BYTES) {
-    try {
-      appendVaryAcceptEncoding(res.headers)
-    }
-    catch {}
-    return res
-  }
+  if (cl !== null && Number(cl) < MIN_COMPRESS_BYTES)
+    return markCompressionHandled(tryAppendVaryAcceptEncoding(res))
 
   if (res.body === null)
     return res
+
+  if (staticKey !== undefined) {
+    let readRaw: Uint8Array<ArrayBuffer> | undefined
+    const compressed = await cache.file(staticKey, enc, async () => {
+      readRaw = new Uint8Array(await res.arrayBuffer())
+      return readRaw
+    })
+    if (compressed !== undefined)
+      return compressedResponseFrom(res, compressed, enc)
+    if (readRaw !== undefined) {
+      const headers = new Headers(res.headers)
+      appendVaryAcceptEncoding(headers)
+      return markCompressionHandled(new Response(readRaw, { status: res.status, statusText: res.statusText, headers }))
+    }
+    return markCompressionHandled(tryAppendVaryAcceptEncoding(res))
+  }
 
   let raw: Uint8Array<ArrayBuffer>
   if (cl !== null) {
@@ -395,19 +453,14 @@ export async function maybeCompressResponse(
   else {
     const probe = await readBufferedOrPassThrough(res)
     if ('passthrough' in probe)
-      return probe.passthrough
+      return markCompressionHandled(probe.passthrough)
     raw = probe.buffered
   }
   const compressed = cache.compress(raw, enc)
-  const headers = new Headers(res.headers)
-  appendVaryAcceptEncoding(headers)
-  if (compressed === undefined)
-    return new Response(raw, { status: res.status, statusText: res.statusText, headers })
-
-  headers.set('content-encoding', enc)
-  headers.delete('content-length')
-  const etag = headers.get('etag')
-  if (etag !== null)
-    headers.set('etag', toWeakEtag(etag))
-  return new Response(compressed, { status: res.status, statusText: res.statusText, headers })
+  if (compressed === undefined) {
+    const headers = new Headers(res.headers)
+    appendVaryAcceptEncoding(headers)
+    return markCompressionHandled(new Response(raw, { status: res.status, statusText: res.statusText, headers }))
+  }
+  return compressedResponseFrom(res, compressed, enc)
 }

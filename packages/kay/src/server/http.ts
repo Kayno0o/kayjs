@@ -124,6 +124,8 @@ export type Middleware = (ctx: RequestContext, next: () => Promise<Response>) =>
 export interface KayApp {
   handle: (request: Request, remoteIp?: string) => Promise<Response>
   serve: (port?: number, hostname?: string) => ReturnType<typeof Bun.serve>
+  /** Closes active long-lived streams (such as SSE) before `server.stop()` drains normal in-flight HTTP requests. */
+  closeStreams?: () => Promise<void>
   /** Runs plugin shutdown hooks and releases timers/resources (safe to call multiple times). */
   dispose?: () => Promise<void>
 }
@@ -348,9 +350,12 @@ export function applyHstsHeader(
   hstsValue: string | undefined,
   trustProxy: TrustProxy,
   isDev = false,
+  resolvedEnv?: string,
 ): Response {
-  const env = nodeEnv()
-  if (hstsValue === undefined || isDev || env === 'development' || env === 'test' || !isHttpsRequest(request, trustProxy))
+  if (hstsValue === undefined || isDev || !isHttpsRequest(request, trustProxy))
+    return res
+  const env = resolvedEnv ?? nodeEnv()
+  if (env === 'development' || env === 'test')
     return res
   if (res.headers.has('strict-transport-security'))
     return res

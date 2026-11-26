@@ -15,10 +15,11 @@ import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } fro
 import type { TrustProxy } from './security'
 import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
-import { compressedHtmlResponse } from './compress'
+import { compressedHtmlResponse, maybeCompressResponse } from './compress'
 import { headTagStyleHashes, mergeStyleHashes } from './document'
 import { isNotFound, makeRequestContext } from './http'
 import { pickPageIslandProps } from './page'
+import { withRegionVary } from './region'
 import { Router } from './router'
 import { styleHashesOf } from './security'
 
@@ -257,7 +258,8 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
   const respondHtml = (body: string, request: Request, rctx: RenderContext, cookieStore?: CookieStore): Response => {
     const html = docPrefix + body + docSuffix
     const styleHashes = mergeStyleHashes(headStyleHashes, styleHashesOf(rctx.inlineStyles))
-    const res = compressedHtmlResponse(html, 200, htmlHeaders(hasIslands, false, true, styleHashes), request, compressCache, !hasLoad)
+    const headers = withRegionVary(htmlHeaders(hasIslands, false, true, styleHashes), rctx.regionNames.size > 0)
+    const res = compressedHtmlResponse(html, 200, headers, request, compressCache, !hasLoad)
     return cookieStore?.hasChanges ? finish(res, request, cookieStore) : withHsts(res, request)
   }
   const layoutProps = (inner: string, url: URL, locals: KayLocals) => ({ children: raw(inner), url, params: {}, locals })
@@ -322,23 +324,39 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
 
   return (request, remoteIp, url = new URL(request.url)) => {
     const { ctx, cookieStore } = makeRequestContext(request, {}, { trustProxy, remoteIp, url })
+    if (request.method === 'HEAD' && typeof mod.HEAD === 'function') {
+      return actions.run(ctx, async () => {
+        try {
+          return finish(await mod.HEAD!(ctx), request, cookieStore)
+        }
+        catch (error) {
+          return fail(error, request, url, cookieStore, ctx)
+        }
+      })
+    }
     const rctx = createRenderContext()
     try {
       if (!hasLoad)
         return actions.run(ctx, () => runWithRenderContext(rctx, () => renderPage(undefined, request, url, ctx.locals, rctx, cookieStore, ctx)))
 
       return actions.run(ctx, async () => {
+        let loaded: unknown
         try {
-          const loaded = await mod.load!(ctx)
-          if (isNotFound(loaded))
-            return finish(await buildNotFoundResponse(url, request, ctx), request, cookieStore)
-          if (loaded instanceof Response)
-            return finish(loaded, request, cookieStore)
-          return await runWithRenderContext(rctx, () => renderPage(loaded, request, url, ctx.locals, rctx, cookieStore, ctx))
+          loaded = await mod.load!(ctx)
         }
         catch (error) {
           if (isNotFound(error))
-            return finish(await buildNotFoundResponse(url, request, ctx), request, cookieStore)
+            return finish(await maybeCompressResponse(await buildNotFoundResponse(url, request, ctx), request, compressCache), request, cookieStore)
+          return fail(error, request, url, cookieStore, ctx)
+        }
+        if (isNotFound(loaded))
+          return finish(await maybeCompressResponse(await buildNotFoundResponse(url, request, ctx), request, compressCache), request, cookieStore)
+        if (loaded instanceof Response)
+          return finish(await maybeCompressResponse(loaded, request, compressCache), request, cookieStore)
+        try {
+          return await runWithRenderContext(rctx, () => renderPage(loaded, request, url, ctx.locals, rctx, cookieStore, ctx))
+        }
+        catch (error) {
           return fail(error, request, url, cookieStore, ctx)
         }
       })

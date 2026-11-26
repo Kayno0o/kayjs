@@ -3,13 +3,79 @@
 import type { Stats } from 'node:fs'
 import type { KayApp } from './http'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
-import { existsSync, realpathSync, statSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
+import { realpath, stat } from 'node:fs/promises'
 import { extname, join, relative, resolve } from 'node:path'
 import { CompressionCache, isCompressibleType, maybeCompressResponse, pickPrecompressedEncoding, toWeakEtag } from './compress'
 import { applyHstsHeader, etagMatches, MIME } from './http'
 import { buildSecurityHeaderEntries, inlineStyleHashes, KAY_ISLAND_STYLE_HASH, resolveCspPolicy, resolveHstsValue, withCspHashes } from './security'
 
+interface ResolvedStaticFile {
+  path: string
+  st: Stats
+}
+
 const isRead = (request: Request): boolean => request.method === 'GET' || request.method === 'HEAD'
+
+function isContained(target: string, root: string): boolean {
+  return target === root || target.startsWith(`${root}/`) || target.startsWith(`${root}\\`)
+}
+
+function fileEtag(st: Stats): string {
+  return `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`
+}
+
+async function resolveContainedFile(absRoot: string, realRoot: string, abs: string): Promise<ResolvedStaticFile | undefined> {
+  if (!isContained(abs, absRoot))
+    return undefined
+  try {
+    const st = await stat(abs)
+    if (!st.isFile())
+      return undefined
+    const real = await realpath(abs)
+    return isContained(real, realRoot) ? { path: real, st } : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+async function resolveStaticFile(absRoot: string, realRoot: string, pathname: string): Promise<ResolvedStaticFile | undefined> {
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(pathname)
+  }
+  catch {
+    return undefined
+  }
+  if (decoded.includes('\0'))
+    return undefined
+  const rel = decoded.replace(/^\/+/, '').replace(/\/+$/, '')
+  const candidates = rel === ''
+    ? ['index.html']
+    : [rel, `${rel}.html`, `${rel}/index.html`]
+  for (const c of candidates) {
+    const resolved = await resolveContainedFile(absRoot, realRoot, resolve(absRoot, c))
+    if (resolved !== undefined)
+      return resolved
+  }
+  return undefined
+}
+
+async function resolveSidecars(
+  absRoot: string,
+  realRoot: string,
+  filePath: string,
+  compressEnabled: boolean,
+): Promise<{ br: ResolvedStaticFile | undefined, gz: ResolvedStaticFile | undefined }> {
+  if (!compressEnabled)
+    return { br: undefined, gz: undefined }
+  const [br, gz] = await Promise.all([
+    resolveContainedFile(absRoot, realRoot, `${filePath}.br`),
+    resolveContainedFile(absRoot, realRoot, `${filePath}.gz`),
+  ])
+  return { br, gz }
+}
 
 export function createStaticDirServer(
   outDir: string,
@@ -25,9 +91,9 @@ export function createStaticDirServer(
   try {
     realRoot = realpathSync(absRoot)
   }
-  catch {}
-  const isContained = (target: string, root: string): boolean =>
-    target === root || target.startsWith(`${root}/`) || target.startsWith(`${root}\\`)
+  catch {
+    realRoot = absRoot
+  }
   const compressCache = compressEnabled ? new CompressionCache() : undefined
   const securityEntries = buildSecurityHeaderEntries(security)
   const baseCsp = resolveCspPolicy(security)
@@ -36,57 +102,9 @@ export function createStaticDirServer(
     k === 'content-security-policy' && htmlCsp !== undefined ? [k, htmlCsp] : [k, v],
   )
   const hstsValue = resolveHstsValue(security)
-  const withHsts = (res: Response, req: Request) => applyHstsHeader(res, req, hstsValue, trustProxy, isDev)
-
-  function statFile(abs: string): Stats | undefined {
-    try {
-      const st = statSync(abs, { throwIfNoEntry: false })
-      return st?.isFile() ? st : undefined
-    }
-    catch {
-      return undefined
-    }
-  }
-
-  function resolveContainedFile(abs: string): { path: string, st: Stats } | undefined {
-    if (!isContained(abs, absRoot))
-      return undefined
-    const st = statFile(abs)
-    if (st === undefined)
-      return undefined
-    let real: string
-    try {
-      real = realpathSync(abs)
-    }
-    catch {
-      return undefined
-    }
-    if (!isContained(real, realRoot))
-      return undefined
-    return { path: real, st }
-  }
-
-  function resolveStaticFile(pathname: string): { path: string, st: Stats } | undefined {
-    let decoded: string
-    try {
-      decoded = decodeURIComponent(pathname)
-    }
-    catch {
-      return undefined
-    }
-    if (decoded.includes('\0'))
-      return undefined
-    const rel = decoded.replace(/^\/+/, '').replace(/\/+$/, '')
-    const candidates = rel === ''
-      ? ['index.html']
-      : [rel, `${rel}.html`, `${rel}/index.html`]
-    for (const c of candidates) {
-      const resolved = resolveContainedFile(resolve(absRoot, c))
-      if (resolved !== undefined)
-        return resolved
-    }
-    return undefined
-  }
+  const withHsts = hstsValue === undefined || isDev
+    ? (res: Response) => res
+    : (res: Response, req: Request) => applyHstsHeader(res, req, hstsValue, trustProxy, isDev)
 
   const initHeaders = (isHtml = false): Headers => new Headers((isHtml ? htmlSecurityEntries : securityEntries) as [string, string][])
 
@@ -103,7 +121,6 @@ export function createStaticDirServer(
     }
     headers.set('content-security-policy', cached.csp)
   }
-  const fileEtag = (st: Stats): string => `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`
 
   const handle = async (req: Request): Promise<Response> => {
     if (!isRead(req)) {
@@ -113,9 +130,9 @@ export function createStaticDirServer(
     }
 
     const url = new URL(req.url)
-    const found = resolveStaticFile(url.pathname)
+    const found = await resolveStaticFile(absRoot, realRoot, url.pathname)
     if (found === undefined) {
-      const notFound = resolveContainedFile(join(absRoot, '404.html'))
+      const notFound = await resolveContainedFile(absRoot, realRoot, join(absRoot, '404.html'))
       if (notFound !== undefined) {
         const headers = initHeaders(true)
         headers.set('content-type', 'text/html; charset=utf-8')
@@ -139,8 +156,7 @@ export function createStaticDirServer(
     if (isHtml)
       await setPageCsp(headers, filePath, etag)
 
-    const brFile = compressEnabled && existsSync(`${filePath}.br`) ? resolveContainedFile(`${filePath}.br`) : undefined
-    const gzFile = compressEnabled && existsSync(`${filePath}.gz`) ? resolveContainedFile(`${filePath}.gz`) : undefined
+    const { br: brFile, gz: gzFile } = await resolveSidecars(absRoot, realRoot, filePath, compressEnabled)
     const hasBr = brFile !== undefined
     const hasGz = gzFile !== undefined
     if (hasBr || hasGz || (compressEnabled && isCompressibleType(mime)))
@@ -163,7 +179,7 @@ export function createStaticDirServer(
     const res = new Response(req.method === 'HEAD' ? null : Bun.file(filePath), { status: 200, headers })
     if (!compressEnabled || req.method === 'HEAD')
       return withHsts(res, req)
-    return withHsts(await maybeCompressResponse(res, req, compressCache), req)
+    return withHsts(await maybeCompressResponse(res, req, compressCache, `sd:${filePath}:${etag}`), req)
   }
 
   return {

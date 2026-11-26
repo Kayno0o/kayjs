@@ -9,6 +9,7 @@ import { runWithAppContext } from '../plugins/context'
 import { Router } from './router'
 
 export interface PluginRouteDef {
+  plugin: string
   handler: (ctx: RequestContext) => Response | Promise<Response>
   csrf: boolean
   trustedOrigins: Set<string> | undefined
@@ -67,12 +68,13 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
   const router = new Router<Map<string, PluginRouteDef>>()
   const routeEntries = new Map<string, Map<string, PluginRouteDef>>()
 
-  const registerRoute = (
+  const registerRouteFor = (pluginName: string) => (
     method: string,
     path: string,
     handler: (ctx: RequestContext) => Response | Promise<Response>,
     routeOptions?: PluginRouteOptions,
   ): void => {
+    const upperMethod = method.toUpperCase()
     const normPath = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
     let byMethod = routeEntries.get(normPath)
     if (byMethod === undefined) {
@@ -80,11 +82,26 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
       routeEntries.set(normPath, byMethod)
       router.add(normPath, byMethod)
     }
+    else {
+      const directConflict = byMethod.get(upperMethod)
+      if (directConflict !== undefined) {
+        throw new Error(`kay: plugin "${pluginName}" registered ${upperMethod} ${normPath}, which collides with "${directConflict.plugin}". Mount one of the plugins on a different path.`)
+      }
+      if (upperMethod === 'ALL' && byMethod.size > 0) {
+        const [existingMethod, existingDef] = byMethod.entries().next().value!
+        throw new Error(`kay: plugin "${pluginName}" registered ALL ${normPath}, which collides with ${existingMethod} ${normPath} from "${existingDef.plugin}". Mount one of the plugins on a different path.`)
+      }
+      const allConflict = byMethod.get('ALL')
+      if (allConflict !== undefined) {
+        throw new Error(`kay: plugin "${pluginName}" registered ${upperMethod} ${normPath}, which collides with ALL ${normPath} from "${allConflict.plugin}". Mount one of the plugins on a different path.`)
+      }
+    }
     let routeTrustedOrigins = trustedOrigins
     if (routeOptions?.trustedOrigins !== undefined && routeOptions.trustedOrigins.length > 0) {
       routeTrustedOrigins = new Set([...(trustedOrigins ?? []), ...routeOptions.trustedOrigins])
     }
-    byMethod.set(method.toUpperCase(), {
+    byMethod.set(upperMethod, {
+      plugin: pluginName,
       handler,
       csrf: routeOptions?.csrf ?? true,
       trustedOrigins: routeTrustedOrigins,
@@ -118,7 +135,7 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
         use(mw: Middleware, middlewareOptions?: MiddlewareOptions) {
           scopedMiddlewares.push({ mw, scope: middlewareOptions?.scope ?? 'all' })
         },
-        route: registerRoute,
+        route: registerRouteFor(plugin.name),
         rewrite(fn) {
           rewrites.push(fn)
         },

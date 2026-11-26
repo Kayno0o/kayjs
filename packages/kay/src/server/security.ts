@@ -162,10 +162,29 @@ function forwardedValue(request: Request, header: string, trustProxy: TrustProxy
   const hops = proxyHops(trustProxy)
   if (hops === 0)
     return undefined
-  const entries = (request.headers.get(header) ?? '').split(',').map(e => e.trim()).filter(e => e !== '')
-  if (entries.length < hops)
+  const raw = request.headers.get(header)
+  if (raw === null || raw.length === 0)
     return undefined
-  return entries[entries.length - hops]
+  let end = raw.length
+  let seen = 0
+  while (end > 0) {
+    const comma = raw.lastIndexOf(',', end - 1)
+    let start = comma + 1
+    let stop = end
+    while (start < stop && raw.charCodeAt(start) <= 32)
+      start++
+    while (stop > start && raw.charCodeAt(stop - 1) <= 32)
+      stop--
+    if (start < stop) {
+      seen++
+      if (seen === hops)
+        return start === 0 && stop === raw.length ? raw : raw.slice(start, stop)
+    }
+    if (comma === -1)
+      break
+    end = comma
+  }
+  return undefined
 }
 
 function forwardedOrigin(request: Request, trustProxy: TrustProxy): string | undefined {
@@ -186,8 +205,12 @@ function forwardedOrigin(request: Request, trustProxy: TrustProxy): string | und
 
 /** Returns true when the request arrived over HTTPS (directly, or via X-Forwarded-Proto when `trustProxy` is true). */
 export function isHttpsRequest(request: Request, trustProxy: TrustProxy = false): boolean {
-  return request.url.startsWith('https:')
-    || forwardedValue(request, 'x-forwarded-proto', trustProxy)?.toLowerCase() === 'https'
+  if (request.url.startsWith('https:'))
+    return true
+  const proto = forwardedValue(request, 'x-forwarded-proto', trustProxy)
+  if (proto === undefined || proto.length !== 5)
+    return false
+  return proto === 'https' || proto.toLowerCase() === 'https'
 }
 
 /** Extracts the client IP from the trusted proxies' X-Forwarded-For header, or falls back to the direct socket IP. */

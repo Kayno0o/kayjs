@@ -11,6 +11,7 @@ import { build, createBuildCache } from '../build/index'
 import { createAppContext, loadConfig, resolvePlugins, resolveServerConfig, runWithAppContext } from '../plugins/index'
 import { DEFAULT_MAX_REQUEST_BODY_SIZE, wantsJson } from '../server/http'
 import { createServer, withCspHashes } from '../server/index'
+import { REGION_HEADER } from '../server/region'
 
 export interface DevServerOptions {
   root: string
@@ -45,6 +46,15 @@ function srcChangeKind(name: string): ChangeKind {
   if (name.endsWith('.css') && !name.endsWith('.module.css'))
     return 'css'
   return CODE_FILE_RE.test(name) ? 'code' : 'full'
+}
+
+function shouldInjectReload(request: Request, res: Response, ct: string): boolean {
+  return ct.includes('text/html')
+    && request.method !== 'HEAD'
+    && res.body !== null
+    && !res.headers.has('content-encoding')
+    && !request.headers.has(REGION_HEADER)
+    && !res.headers.has(REGION_HEADER)
 }
 
 // Injects the dev reload script into an HTML response while preserving streaming (<Suspense>).
@@ -523,13 +533,13 @@ export async function devServer(options: DevServerOptions): Promise<{
       const isStreamedHtml = ct.includes('text/html') && request.method !== 'HEAD' && res.body !== null && !res.headers.has('content-length')
       if (ct.includes('text/event-stream') || isStreamedHtml)
         srv.timeout(request, 0)
-      if (ct.includes('text/html') && request.method !== 'HEAD' && res.body !== null && !res.headers.has('content-encoding')) {
+      if (shouldInjectReload(request, res, ct)) {
         const headers = new Headers(res.headers)
         headers.delete('content-length')
         const existingCsp = headers.get('content-security-policy')
         if (existingCsp !== null)
           headers.set('content-security-policy', withCspHashes(existingCsp, { scriptHashes: [reloadAssets.hash] }))
-        return new Response(injectReloadStream(res.body, reloadAssets.script), { status: res.status, headers })
+        return new Response(injectReloadStream(res.body!, reloadAssets.script), { status: res.status, headers })
       }
       return res
     },
