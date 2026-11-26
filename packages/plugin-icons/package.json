@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/icons",
-  "version": "2.0.0-beta.5",
+  "version": "2.0.0-beta.6",
   "description": "Compile-time Iconify SVG icon plugin (~icons/<set>/<name>) for Kay v2",
   "license": "MIT",
   "type": "module",
@@ -23,6 +23,6 @@
     "directory": "packages/plugin-icons"
   },
   "peerDependencies": {
-    "@kayjs/kay": "^2.0.0-beta.5"
+    "@kayjs/kay": "^2.0.0-beta.6"
   }
 }

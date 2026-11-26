@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/images",
-  "version": "2.0.0-beta.5",
+  "version": "2.0.0-beta.6",
   "description": "Build-time responsive AVIF/WebP image optimization plugin for Kay v2",
   "license": "MIT",
   "type": "module",
@@ -21,6 +21,6 @@
     "directory": "packages/plugin-images"
   },
   "peerDependencies": {
-    "@kayjs/kay": "^2.0.0-beta.5"
+    "@kayjs/kay": "^2.0.0-beta.6"
   }
 }
