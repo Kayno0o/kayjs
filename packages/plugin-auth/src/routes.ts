@@ -7,8 +7,13 @@ import type { RateLimiter } from './ratelimit'
 import type { SessionManager } from './session'
 import type { AuthStore, AuthUser, PublicUser } from './store'
 import { safeRedirect, verifyPassword } from './crypto'
-import { fail, isValidEmail, parseBody, respondAuthError, wantsJson, withNoStore } from './http'
+import { fail, isValidEmail, linkConfirmPage, parseBody, respondAuthError, wantsJson, withNoStore } from './http'
 import { normalizeEmail, toPublicUser } from './store'
+
+const LINK_PAGES = {
+  'magic-link': { title: 'Sign in', button: 'Sign in' },
+  'verify-email': { title: 'Confirm your email address', button: 'Confirm' },
+}
 
 export interface AuthRoutesDeps<TUser extends AuthUser = AuthUser> {
   api: ServerPluginAPI
@@ -81,22 +86,36 @@ export function registerAuthRoutes<TUser extends AuthUser = AuthUser>(deps: Auth
     }, method === 'POST' ? authRouteOpts : undefined)
   }
 
-  async function handleVerifyEmail(ctx: RequestContext, rawToken: string, redirectTarget: string, redirectStatus: 302 | 303): Promise<Response> {
-    if (!rawToken)
-      return fail(ctx, 400, 'Missing token')
+  // GET on a mailed link: the token stays unused until the page's button posts it, and the POST checks the redirect.
+  function confirmLinkRoute(kind: 'magic-link' | 'verify-email', path: string, limit: string): void {
+    authRoute('GET', path, { limit }, (ctx) => {
+      const token = ctx.url.searchParams.get('token') ?? ''
+      if (!token)
+        return fail(ctx, 400, 'Missing token')
+      return linkConfirmPage(LINK_PAGES[kind], { token, redirect: ctx.url.searchParams.get('redirect') ?? '' })
+    })
+  }
 
-    const userRecord = (await consumeLink('verify-email', rawToken))?.user
-    if (!userRecord)
-      return fail(ctx, 400, 'Invalid or expired verification link')
+  // POST from the confirm page (form) or a client (JSON): consumes the token, then `signIn` picks the user to open a session for.
+  function consumeLinkRoute(kind: 'magic-link' | 'verify-email', path: string, limit: string, invalid: string, signIn: (consumed: { email: string, user: TUser | undefined }) => Promise<TUser | undefined>): void {
+    authRoute('POST', path, { limit, readBody: true }, async (ctx, body) => {
+      const rawToken = body.token ?? ctx.url.searchParams.get('token') ?? ''
+      const redirectTarget = safeRedirect(body.redirect ?? body.next ?? ctx.url.searchParams.get('redirect'), defaultRedirect)
+      if (!rawToken)
+        return fail(ctx, 400, 'Missing token')
 
-    const verified = (await sessions.observeAsync(store.updateUser(userRecord.id, { emailVerified: true } as Partial<Omit<TUser, 'id' | 'createdAt'>>))) ?? { ...userRecord, emailVerified: true }
-    await sessions.createSessionForUser(verified.id, ctx)
-    const pub = toPublicUser(verified)
-    sessions.setResolvedUser(ctx, pub)
+      const consumed = await consumeLink(kind, rawToken)
+      const userRecord = consumed && await signIn(consumed)
+      if (!userRecord)
+        return fail(ctx, 400, invalid)
 
-    if (wantsJson(ctx.request))
-      return ctx.json({ ok: true, user: pub }, { status: 200 })
-    return ctx.redirect(redirectTarget, redirectStatus)
+      await sessions.createSessionForUser(userRecord.id, ctx)
+      const pub = toPublicUser(userRecord)
+      sessions.setResolvedUser(ctx, pub)
+      if (wantsJson(ctx.request))
+        return ctx.json({ ok: true, user: pub }, { status: 200 })
+      return ctx.redirect(redirectTarget, 303)
+    })
   }
 
   function respondVerificationAccepted(ctx: RequestContext, redirectTarget: string): Response {
@@ -189,16 +208,11 @@ export function registerAuthRoutes<TUser extends AuthUser = AuthUser>(deps: Auth
     return ctx.redirect(redirectTarget, 303)
   })
 
-  authRoute('GET', '/verify-email', { limit: 'verify-email' }, (ctx) => {
-    const rawToken = ctx.url.searchParams.get('token') ?? ''
-    const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
-    return handleVerifyEmail(ctx, rawToken, redirectTarget, 302)
-  })
-
-  authRoute('POST', '/verify-email', { limit: 'verify-email', readBody: true }, (ctx, body) => {
-    const rawToken = body.token ?? ctx.url.searchParams.get('token') ?? ''
-    const redirectTarget = safeRedirect(body.redirect ?? body.next ?? ctx.url.searchParams.get('redirect'), defaultRedirect)
-    return handleVerifyEmail(ctx, rawToken, redirectTarget, 303)
+  confirmLinkRoute('verify-email', '/verify-email', 'verify-email')
+  consumeLinkRoute('verify-email', '/verify-email', 'verify-email', 'Invalid or expired verification link', async ({ user }) => {
+    if (!user)
+      return undefined
+    return (await sessions.observeAsync(store.updateUser(user.id, { emailVerified: true } as Partial<Omit<TUser, 'id' | 'createdAt'>>))) ?? { ...user, emailVerified: true }
   })
 
   authRoute('POST', '/signin', { limit: 'signin', emailLimit: 'signin', readBody: true }, async (ctx, body) => {
@@ -244,22 +258,10 @@ export function registerAuthRoutes<TUser extends AuthUser = AuthUser>(deps: Auth
     return ctx.json({ ok: true, message: 'If that address can sign in, a link has been sent.' })
   })
 
-  authRoute('GET', '/magic-link/verify', { limit: 'magic-verify' }, async (ctx) => {
-    const rawToken = ctx.url.searchParams.get('token') ?? ''
-    const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
-    if (!rawToken)
-      return fail(ctx, 400, 'Missing token')
-
-    const consumed = await consumeLink('magic-link', rawToken)
-    if (!consumed)
-      return fail(ctx, 400, 'Invalid or expired sign-in link')
-
-    const userRecord = !consumed.user
-      ? await insertUser({ email: consumed.email, emailVerified: true } as Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>)
-      : consumed.user.emailVerified ? consumed.user : await claimUnverified(consumed.user)
-
-    await sessions.createSessionForUser(userRecord.id, ctx)
-    sessions.setResolvedUser(ctx, toPublicUser(userRecord))
-    return ctx.redirect(redirectTarget, 302)
+  confirmLinkRoute('magic-link', '/magic-link/verify', 'magic-verify')
+  consumeLinkRoute('magic-link', '/magic-link/verify', 'magic-verify', 'Invalid or expired sign-in link', async ({ email, user }) => {
+    if (!user)
+      return insertUser({ email, emailVerified: true } as Pick<AuthUser, 'email' | 'emailVerified'> & Partial<TUser>)
+    return user.emailVerified ? user : claimUnverified(user)
   })
 }

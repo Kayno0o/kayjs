@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Database } from 'bun:sqlite'
+import { Window } from 'happy-dom'
 import { createAuth, createRateLimiter, discord, github, google, memoryAuthStore, oauthProvider } from '../../plugin-auth/src/index'
 import { sqliteAuthStore } from '../../plugin-auth/src/sqlite'
 import { scaffoldProject } from '../src/cli/new'
@@ -20,6 +21,40 @@ function makeMinimalApp(name: string): string {
   mkdirSync(join(dir, 'src', 'routes'), { recursive: true })
   writeFileSync(join(dir, 'src', 'routes', 'index.tsx'), 'export default function Home() { return <main>ok</main> }')
   return dir
+}
+
+interface ConfirmForm { method: string | null, action: string | null, fields: Record<string, string>, buttons: number, scripts: number, styles: number }
+
+// Reads the one form a mailed link's confirm page shows, as a browser parses it, and counts what a strict CSP would block.
+async function readConfirmForm(res: Response): Promise<ConfirmForm> {
+  const win = new Window()
+  try {
+    const doc = new win.DOMParser().parseFromString(await res.text(), 'text/html')
+    const formEl = doc.querySelector('form')!
+    const fields: Record<string, string> = {}
+    for (const input of doc.querySelectorAll('input[type="hidden"]'))
+      fields[input.getAttribute('name')!] = input.getAttribute('value')!
+    return {
+      method: formEl.getAttribute('method'),
+      action: formEl.getAttribute('action'),
+      fields,
+      buttons: doc.querySelectorAll('button').length,
+      scripts: doc.querySelectorAll('script').length,
+      styles: doc.querySelectorAll('style, [style]').length,
+    }
+  }
+  finally {
+    await win.happyDOM.close()
+  }
+}
+
+// Posts a confirm page's form back to the link it was opened from, as a browser without JS would.
+function submitConfirmForm(app: Awaited<ReturnType<typeof testApp>>, link: string, form: ConfirmForm): Promise<Response> {
+  const body = new FormData()
+  for (const [name, value] of Object.entries(form.fields))
+    body.append(name, value)
+  const url = new URL(link)
+  return app.post(url.pathname + url.search, body)
 }
 
 describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
@@ -78,10 +113,17 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         expect(unverifiedSignin.status).toBe(403)
         expect(app.cookies.has('kay_session')).toBe(false)
 
-        // Visiting the verification link verifies email and opens a session
+        // Opening the verification link (twice, as a mail scanner then the person would) only shows a confirm page
         const verifyUrl = new URL(mailed[0]!.url)
-        const verifyRes = await app.get(verifyUrl.pathname + verifyUrl.search)
-        expect(verifyRes.status).toBe(302)
+        await app.get(verifyUrl.pathname + verifyUrl.search)
+        const page = await app.get(verifyUrl.pathname + verifyUrl.search)
+        expect(page.status).toBe(200)
+        expect(app.cookies.has('kay_session')).toBe(false)
+        const form = await readConfirmForm(page)
+
+        // Its button verifies the email and opens a session
+        const verifyRes = await submitConfirmForm(app, mailed[0]!.url, form)
+        expect(verifyRes.status).toBe(303)
         expect(verifyRes.headers.get('location')).toBe('/welcome')
         expect(app.cookies.has('kay_session')).toBe(true)
 
@@ -91,7 +133,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
 
         // Replaying the verification token fails
         app.clearCookies()
-        const replay = await app.get(verifyUrl.pathname + verifyUrl.search)
+        const replay = await submitConfirmForm(app, mailed[0]!.url, form)
         expect(replay.status).toBe(400)
         expect(app.cookies.has('kay_session')).toBe(false)
 
@@ -126,6 +168,80 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         expect(body.user.email).toBe('bob@example.com')
         expect(body.user.emailVerified).toBe(true)
         expect(app.cookies.has('kay_session')).toBe(true)
+      }
+      finally {
+        auth.dispose()
+      }
+    })
+
+    test('opening a magic link twice leaves it valid; its page posts once without JS, inline script or style (#3656)', async () => {
+      const appDir = makeMinimalApp('magic-confirm')
+      const mailed: string[] = []
+      const auth = createAuth({
+        secret: 'audit-3656-magic-secret-32-bytes-min!',
+        site: 'https://app.example',
+        sendMail: (m) => { mailed.push(m.url) },
+      })
+      try {
+        const app = await testApp({ root: appDir, plugins: [auth] })
+        await app.post('/auth/magic-link', { email: 'carol@example.com', redirect: '/inbox' })
+        const link = new URL(mailed[0]!)
+
+        await app.get(link.pathname + link.search)
+        const page = await app.get(link.pathname + link.search)
+        expect(page.status).toBe(200)
+        expect(page.headers.get('content-type')).toBe('text/html; charset=utf-8')
+        expect(page.headers.get('cache-control')).toBe('no-store')
+        expect(app.cookies.has('kay_session')).toBe(false)
+        expect(await auth.store.getUserByEmail('carol@example.com')).toBeUndefined()
+
+        const form = await readConfirmForm(page)
+        expect(form).toEqual({
+          method: 'post',
+          action: null,
+          fields: { token: link.searchParams.get('token')!, redirect: '/inbox' },
+          buttons: 1,
+          scripts: 0,
+          styles: 0,
+        })
+
+        const signin = await submitConfirmForm(app, mailed[0]!, form)
+        expect(signin.status).toBe(303)
+        expect(signin.headers.get('location')).toBe('/inbox')
+        expect(app.cookies.has('kay_session')).toBe(true)
+        expect((await auth.store.getUserByEmail('carol@example.com'))?.emailVerified).toBe(true)
+
+        app.clearCookies()
+        const replay = await submitConfirmForm(app, mailed[0]!, form)
+        expect(replay.status).toBe(400)
+        expect(app.cookies.has('kay_session')).toBe(false)
+      }
+      finally {
+        auth.dispose()
+      }
+    })
+
+    test('a mailed link page escapes the redirect it carries, and its POST refuses an open redirect (#3656)', async () => {
+      const appDir = makeMinimalApp('magic-confirm-escape')
+      const mailed: string[] = []
+      const auth = createAuth({
+        secret: 'audit-3656-escape-secret-32-bytes-mn!',
+        site: 'https://app.example',
+        sendMail: (m) => { mailed.push(m.url) },
+      })
+      try {
+        const app = await testApp({ root: appDir, plugins: [auth] })
+        const page = await app.get(`/auth/magic-link/verify?token=t&redirect=${encodeURIComponent('/a?x="><script>alert(1)</script>')}`)
+        const form = await readConfirmForm(page)
+        expect(form.scripts).toBe(0)
+        expect(form.fields).toEqual({ token: 't', redirect: '/a?x="><script>alert(1)</script>' })
+
+        await app.post('/auth/magic-link', { email: 'dave@example.com' })
+        const tampered = new URL(mailed[0]!)
+        tampered.searchParams.set('redirect', '//evil.example')
+        const signin = await submitConfirmForm(app, tampered.href, await readConfirmForm(await app.get(tampered.pathname + tampered.search)))
+        expect(signin.status).toBe(303)
+        expect(signin.headers.get('location')).toBe('/')
       }
       finally {
         auth.dispose()
@@ -347,12 +463,12 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         const app = await testApp({ root: appDir, plugins: [auth] })
 
         // /magic-link/verify
-        expect((await app.get('/auth/magic-link/verify?token=bad1')).status).toBe(400)
-        expect((await app.get('/auth/magic-link/verify?token=bad2')).status).toBe(400)
+        expect((await app.get('/auth/magic-link/verify?token=bad1')).status).toBe(200)
+        expect((await app.post('/auth/magic-link/verify', { token: 'bad2' })).status).toBe(400)
         expect((await app.get('/auth/magic-link/verify?token=bad3')).status).toBe(429)
 
         // /verify-email (GET & POST share bucket)
-        expect((await app.get('/auth/verify-email?token=bad1')).status).toBe(400)
+        expect((await app.get('/auth/verify-email?token=bad1')).status).toBe(200)
         expect((await app.post('/auth/verify-email', { token: 'bad2' })).status).toBe(400)
         expect((await app.get('/auth/verify-email?token=bad3')).status).toBe(429)
 
@@ -762,8 +878,11 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         expect(mlReq.headers.get('cache-control')).toBe('no-store')
         const mlUrl = new URL(mailed[0]!)
         const mlVerify = await app.get(mlUrl.pathname + mlUrl.search)
-        expect(mlVerify.status).toBe(302)
+        expect(mlVerify.status).toBe(200)
         expect(mlVerify.headers.get('cache-control')).toBe('no-store')
+        const mlPost = await app.post('/auth/magic-link/verify', { token: mlUrl.searchParams.get('token') })
+        expect(mlPost.status).toBe(200)
+        expect(mlPost.headers.get('cache-control')).toBe('no-store')
 
         const signout = await app.post('/auth/signout', {})
         expect(signout.headers.get('cache-control')).toBe('no-store')
@@ -911,9 +1030,8 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         expect(mailed.length).toBe(2)
 
         // Verify email using the re-issued link
-        const verifyUrl = new URL(mailed[1]!.url)
-        const verifyRes = await app.get(verifyUrl.pathname + verifyUrl.search)
-        expect(verifyRes.status).toBe(302)
+        const verifyRes = await submitConfirmForm(app, mailed[1]!.url, await readConfirmForm(await app.get(new URL(mailed[1]!.url).pathname + new URL(mailed[1]!.url).search)))
+        expect(verifyRes.status).toBe(303)
         app.clearCookies()
 
         // Signing up again for an already-verified email returns the identical 202 response (no 409 enumeration) and sends no mail

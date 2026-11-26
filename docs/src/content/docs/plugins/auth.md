@@ -52,11 +52,11 @@ export default defineConfig({
 | Route | Behavior |
 | :--- | :--- |
 | `POST /auth/signup` | Argon2id password hash; by default sends a verification email and returns `202` without opening a session (`201` + session only when `requireEmailVerification: false`) |
-| `GET` / `POST /auth/verify-email` | Consumes one-time `verify-email` token, marks `emailVerified = true`, and opens a session cookie |
+| `GET` / `POST /auth/verify-email` | The `GET` the mail opens shows a page with one button and leaves the token unused, so a mail scanner opening the link first does not burn it. Its form `POST`s the token, which marks `emailVerified = true` and opens a session cookie |
 | `POST /auth/signin` | Timing-safe Argon2id verify, rejects unverified accounts (`403`) when verification is required, IP + email rate limiting (`429`) |
 | `POST /auth/signout` | Revokes hashed session + clears cookie |
 | `GET /auth/session` | Returns current public user JSON |
-| `POST /auth/magic-link` & `GET /auth/magic-link/verify` | One-time email login via `@kayjs/mail`. The first sign-in by link verifies the address and drops any password, sessions and provider links set before it |
+| `POST /auth/magic-link` & `GET` / `POST /auth/magic-link/verify` | One-time email login via `@kayjs/mail`. Like verification, the link opens a page whose button `POST`s the token and signs in. The first sign-in by link verifies the address and drops any password, sessions and provider links set before it |
 | `GET /auth/oauth/:provider` & callback | OAuth 2.0 + PKCE (`S256`) with HMAC-signed state (`github`, `discord`, `google`, or custom `oauthProvider`), rate limited |
 
 ## Protecting routes & actions

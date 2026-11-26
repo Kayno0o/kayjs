@@ -43,6 +43,18 @@ export function respondAuthError(ctx: RequestContext, status: number, error: str
   return ctx.redirect(`${redirectTo}${sep}error=${encodeURIComponent(error)}`, 303)
 }
 
+const ATTR_SPECIALS_RE = /[&"<>]/g
+const ATTR_ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' }
+
+/** The page a mailed link opens: one button posting the token back, so a mail scanner's GET leaves the link unused. No script or style, so any CSP lets it through. */
+export function linkConfirmPage(copy: { title: string, button: string }, fields: Record<string, string>): Response {
+  let inputs = ''
+  for (const [name, value] of Object.entries(fields))
+    inputs += `<input type="hidden" name="${name}" value="${value.replace(ATTR_SPECIALS_RE, c => ATTR_ENTITIES[c]!)}">`
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><title>${copy.title}</title></head><body><main><h1>${copy.title}</h1><form method="post">${inputs}<button type="submit">${copy.button}</button></form></main></body></html>`
+  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
+}
+
 export function withNoStore(res: Response): Response {
   if (res.headers.has('cache-control'))
     return res

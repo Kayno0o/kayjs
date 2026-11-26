@@ -178,8 +178,8 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       // Complete email verification to open Alice's session
       expect(mail.outbox.length).toBe(1)
       const aliceVerifyUrl = new URL(mail.outbox[0]!.text!.match(/http:\/\/localhost[^\s]+/)![0])
-      const aliceVerifyRes = await app.get(aliceVerifyUrl.pathname + aliceVerifyUrl.search)
-      expect(aliceVerifyRes.status).toBe(302)
+      const aliceVerifyRes = await app.post(aliceVerifyUrl.pathname + aliceVerifyUrl.search, new FormData())
+      expect(aliceVerifyRes.status).toBe(303)
       expect(app.cookies.has('kay_session')).toBe(true)
       mail.outbox.length = 0
 
@@ -243,8 +243,8 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       expect(urlMatch).not.toBeNull()
       const verifyPath = new URL(urlMatch![0]).pathname + new URL(urlMatch![0]).search
 
-      const verifyRes = await app.get(verifyPath)
-      expect(verifyRes.status).toBe(302)
+      const verifyRes = await app.post(verifyPath, new FormData())
+      expect(verifyRes.status).toBe(303)
       expect(verifyRes.headers.get('location')).toBe('/dashboard')
 
       const mlSession = await (await app.get('/auth/session')).json() as { user: { email: string, emailVerified: boolean } }
@@ -252,7 +252,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       expect(mlSession.user.emailVerified).toBe(true)
 
       // Replaying the same magic link token must fail
-      const replayRes = await app.get(verifyPath)
+      const replayRes = await app.post(verifyPath, new FormData())
       expect(replayRes.status).toBe(400)
 
       // 9b. A sign-in link is never built from a foreign Host
@@ -276,7 +276,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       app.clearCookies()
       await app.post('/auth/magic-link', { email: 'victim@example.com' })
       const victimLink = new URL(mail.outbox[0]!.text!.match(/http:\/\/localhost[^\s]+/)![0])
-      expect((await app.get(victimLink.pathname + victimLink.search)).status).toBe(302)
+      expect((await app.post(victimLink.pathname + victimLink.search, new FormData())).status).toBe(303)
       app.clearCookies()
       expect((await app.post('/auth/signin', { email: 'victim@example.com', password: 'attacker-password' })).status).toBe(401)
       app.cookies.set('kay_session', squatterCookie)
@@ -331,7 +331,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       app.clearCookies()
       await app.post('/auth/magic-link', { email: 'claimed@example.com' })
       const claimLink = new URL(mail.outbox[0]!.text!.match(/http:\/\/localhost[^\s]+/)![0])
-      expect((await app.get(claimLink.pathname + claimLink.search)).status).toBe(302)
+      expect((await app.post(claimLink.pathname + claimLink.search, new FormData())).status).toBe(303)
       app.clearCookies()
       app.cookies.set('kay_session', oauthSquatterCookie)
       expect(((await (await app.get('/auth/session')).json()) as { user: unknown }).user).toBeNull()
