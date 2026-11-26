@@ -1,9 +1,9 @@
 // JSON-RPC 2.0 & MCP Streamable HTTP (2025-03-26) dispatcher with bounded batch execution.
 
-import type { ActionContext, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
+import type { ActionContext, ActionResult, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
 import type { McpPruneMode, McpToolResult } from './format'
 import type { JsonSchemaObject } from './schema'
-import { formatSchemaIssues, validateSchema } from '@kayjs/kay/server'
+import { formatSchemaIssues, nodeEnv, validateSchema } from '@kayjs/kay/server'
 import { applyOutputBudget, finalizeToolValue, formatFieldErrors, formatResponseResult } from './format'
 
 export const MCP_PROTOCOL_VERSION = '2025-03-26'
@@ -68,19 +68,51 @@ export interface RpcDispatcherConfig {
   mapError?: ((error: unknown) => string | { message: string } | undefined) | undefined
 }
 
+function shouldExposeErrors(dev: boolean): boolean {
+  const env = nodeEnv()
+  if (env === 'production')
+    return false
+  return dev || env === 'development' || env === 'test'
+}
+
+function formatCaughtError(
+  err: unknown,
+  mapError: RpcDispatcherConfig['mapError'],
+  exposeInternal: boolean,
+): string {
+  const mapped = mapError?.(err)
+  if (typeof mapped === 'string')
+    return mapped
+  if (mapped && typeof mapped.message === 'string')
+    return mapped.message
+  if (!exposeInternal)
+    return 'Internal error'
+  return err instanceof Error ? err.message : String(err)
+}
+
+function formatActionFailure(invoked: Extract<ActionResult<unknown>, { ok: false }>): string {
+  if (invoked.issues !== undefined && invoked.issues.length > 0)
+    return `Invalid arguments: ${formatSchemaIssues(invoked.issues)}`
+  const fields = formatFieldErrors(invoked.fieldErrors)
+  return fields ? `${invoked.error} (${fields})` : invoked.error
+}
+
 export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
   const hasResources = cfg.resourceMap.size > 0
   const availableNamesHint = cfg.toolMap.size > 0 && cfg.toolMap.size <= 12
     ? ` (available: ${[...cfg.toolMap.keys()].join(', ')})`
     : ''
 
-  async function callTool(name: string, args: unknown, ctx: RequestContext): Promise<McpToolResult> {
+  async function callTool(name: string, args: unknown, ctx: RequestContext, dev: boolean): Promise<McpToolResult> {
     const tool = cfg.toolMap.get(name)
     if (tool === undefined)
       throw Object.assign(new Error(`Unknown tool: ${name}${availableNamesHint}`), { rpcCode: -32602 })
 
     let input: unknown = args ?? {}
-    if (tool.schema !== undefined) {
+    // When backed by an action that already declares a schema, `tool.action(input)` runs
+    // `validateSchema` once inside `invokeActionCore`; re-validating here would double-run transforms/codecs.
+    const actionValidates = tool.action !== undefined && tool.action.schema !== undefined
+    if (tool.schema !== undefined && !actionValidates) {
       const checked = await validateSchema(tool.schema, input)
       if (!checked.ok) {
         return {
@@ -96,10 +128,8 @@ export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
       if (tool.action !== undefined) {
         const invoked = await tool.action(input)
         if (!invoked.ok) {
-          const fields = formatFieldErrors(invoked.fieldErrors)
-          const msg = fields ? `${invoked.error} (${fields})` : invoked.error
           return applyOutputBudget({
-            content: [{ type: 'text', text: msg }],
+            content: [{ type: 'text', text: formatActionFailure(invoked) }],
             isError: true,
           }, tool.maxOutputChars)
         }
@@ -121,14 +151,7 @@ export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
       return applyOutputBudget(mcpResult, tool.maxOutputChars)
     }
     catch (err) {
-      const mapped = cfg.mapError?.(err)
-      const message = typeof mapped === 'string'
-        ? mapped
-        : mapped && typeof mapped.message === 'string'
-          ? mapped.message
-          : err instanceof Error
-            ? err.message
-            : String(err)
+      const message = formatCaughtError(err, cfg.mapError, shouldExposeErrors(dev))
       return applyOutputBudget({
         content: [{ type: 'text', text: message }],
         isError: true,
@@ -136,7 +159,7 @@ export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
     }
   }
 
-  async function handleMessage(msg: unknown, ctx: RequestContext): Promise<JsonRpcResponse | null> {
+  async function handleMessage(msg: unknown, ctx: RequestContext, dev = false): Promise<JsonRpcResponse | null> {
     if (typeof msg !== 'object' || msg === null)
       return { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } }
 
@@ -185,12 +208,13 @@ export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
         if (toolName === undefined)
           return { jsonrpc: '2.0', id, error: { code: -32602, message: 'Missing tool name' } }
         try {
-          const toolResult = await callTool(toolName, params?.arguments, ctx)
+          const toolResult = await callTool(toolName, params?.arguments, ctx, dev)
           return { jsonrpc: '2.0', id, result: toolResult }
         }
         catch (err) {
           const rpcCode = (err as { rpcCode?: number }).rpcCode ?? -32603
-          const message = err instanceof Error ? err.message : String(err)
+          const expose = rpcCode !== -32603 || shouldExposeErrors(dev)
+          const message = expose ? (err instanceof Error ? err.message : String(err)) : 'Internal error'
           return { jsonrpc: '2.0', id, error: { code: rpcCode, message } }
         }
       }
@@ -225,7 +249,7 @@ export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
           }
         }
         catch (err) {
-          const message = err instanceof Error ? err.message : String(err)
+          const message = formatCaughtError(err, cfg.mapError, shouldExposeErrors(dev))
           return { jsonrpc: '2.0', id, error: { code: -32603, message } }
         }
       }
@@ -239,7 +263,7 @@ export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
     }
   }
 
-  async function handlePost(ctx: RequestContext): Promise<Response> {
+  async function handlePost(ctx: RequestContext, dev = false): Promise<Response> {
     let payload: unknown
     try {
       payload = await ctx.request.json()
@@ -267,7 +291,7 @@ export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
       }
       const responses: JsonRpcResponse[] = []
       for (const item of payload) {
-        const res = await handleMessage(item, ctx)
+        const res = await handleMessage(item, ctx, dev)
         if (res !== null)
           responses.push(res)
       }
@@ -276,7 +300,7 @@ export function createRpcDispatcher(cfg: RpcDispatcherConfig) {
       return Response.json(responses, { status: 200 })
     }
 
-    const single = await handleMessage(payload, ctx)
+    const single = await handleMessage(payload, ctx, dev)
     if (single === null)
       return new Response(null, { status: 202 })
     const status = single.error?.code === -32600 ? 400 : 200

@@ -5,7 +5,11 @@ import type { BunPlugin } from 'bun'
 import type { KayPlugin } from '@kayjs/kay/config'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
-import { definePlugin } from '@kayjs/kay/config'
+import { definePlugin, serviceKey } from '@kayjs/kay/config'
+
+const UI_KUI_LAYER_SERVICE = serviceKey<boolean>('kay.ui.kuiLayer')
+// Declares @layer kui after Tailwind's base Preflight and before utilities so utilities override @kayjs/ui without Preflight wiping component styles.
+const KUI_LAYER_ORDER_TAG = '<style>@layer properties,theme,base,kui,components,utilities;</style>'
 
 export interface TailwindPluginOptions {
   /** Global stylesheet entry path relative to project root (default: 'src/app.css'). */
@@ -37,7 +41,12 @@ export function tailwind(options: TailwindPluginOptions = {}): KayPlugin {
 
   return definePlugin({
     name: '@kayjs/tailwind',
+    after: ['@kayjs/ui'],
     css: [options.css ?? 'src/app.css'],
+    build(ctx) {
+      if (ctx.inject(UI_KUI_LAYER_SERVICE) === true)
+        ctx.addHead(KUI_LAYER_ORDER_TAG)
+    },
     bunPlugins: options.bunPlugin !== undefined
       ? [options.bunPlugin]
       : ({ root }) => {

@@ -38,19 +38,56 @@ export class MailNotConfiguredError extends Error {
   }
 }
 
-function formatAddress(addr: MailAddress): string {
-  return typeof addr === 'string' ? addr : `${addr.name} <${addr.address}>`
+const CR_LF_OR_NUL_RE = /[\r\n\0]/
+const ANGLE_BRACKET_RE = /[<>]/
+const NEEDS_DISPLAY_NAME_QUOTES_RE = /[^A-Za-z0-9 !#$%&'*+\-/=?^_`{|}~]/
+const DEFAULT_RESEND_TIMEOUT_MS = 10_000
+
+function assertNoHeaderInjection(value: string, label: string): void {
+  if (CR_LF_OR_NUL_RE.test(value))
+    throw new RangeError(`@kayjs/mail: ${label} must not contain CR, LF, or NUL characters`)
 }
 
-function normalizeList(to: MailAddress | MailAddress[] | undefined): string[] {
+function escapeDisplayName(name: string): string {
+  const trimmed = name.trim()
+  if (trimmed.length === 0)
+    return ''
+  if (!NEEDS_DISPLAY_NAME_QUOTES_RE.test(trimmed))
+    return trimmed
+  return `"${trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
+function formatAddress(addr: MailAddress, label: string): string {
+  if (typeof addr === 'string') {
+    assertNoHeaderInjection(addr, label)
+    return addr
+  }
+  assertNoHeaderInjection(addr.name, `${label} name`)
+  assertNoHeaderInjection(addr.address, `${label} address`)
+  const address = addr.address.trim()
+  if (ANGLE_BRACKET_RE.test(address))
+    throw new RangeError(`@kayjs/mail: ${label} address must not contain angle brackets`)
+  const displayName = escapeDisplayName(addr.name)
+  return displayName.length > 0 ? `${displayName} <${address}>` : address
+}
+
+function normalizeList(to: MailAddress | MailAddress[] | undefined, label: string): string[] {
   if (to === undefined)
     return []
-  return Array.isArray(to) ? to.map(formatAddress) : [formatAddress(to)]
+  return Array.isArray(to) ? to.map(item => formatAddress(item, label)) : [formatAddress(to, label)]
+}
+
+function isDevOrTest(devFlag: boolean): boolean {
+  const env = nodeEnv()
+  if (env === 'production')
+    return false
+  return devFlag || env === 'development' || env === 'test'
 }
 
 /** Zero-dependency Resend HTTP transport using native fetch(). */
-export function resend(options: { apiKey?: string | undefined, endpoint?: string | undefined } = {}): MailTransport {
+export function resend(options: { apiKey?: string | undefined, endpoint?: string | undefined, timeoutMs?: number | undefined } = {}): MailTransport {
   const endpoint = options.endpoint ?? 'https://api.resend.com/emails'
+  const timeoutMs = options.timeoutMs ?? DEFAULT_RESEND_TIMEOUT_MS
   return {
     async send(mail) {
       const apiKey = options.apiKey ?? process.env.RESEND_API_KEY
@@ -70,6 +107,7 @@ export function resend(options: { apiKey?: string | undefined, endpoint?: string
           text: mail.text,
           html: mail.html,
         }),
+        ...(timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
       })
       if (!res.ok)
         throw new Error(`@kayjs/mail (resend): HTTP ${res.status}: ${await res.text()}`)
@@ -95,6 +133,7 @@ export interface Mailer extends KayPlugin {
 
 export function createMailer(options: MailerOptions = {}): Mailer {
   const outbox: SentMail[] = []
+  let serverDev: boolean | undefined
 
   const getTransport = (): MailTransport | undefined => {
     if (options.transport !== undefined)
@@ -105,7 +144,9 @@ export function createMailer(options: MailerOptions = {}): Mailer {
   }
 
   const instance: Mailer = {
-    ...previewPlugin(outbox, options),
+    ...previewPlugin(outbox, options, (dev) => {
+      serverDev = dev
+    }),
     outbox,
     isConfigured() {
       return getTransport() !== undefined
@@ -114,29 +155,31 @@ export function createMailer(options: MailerOptions = {}): Mailer {
       outbox.length = 0
     },
     async send(message) {
+      assertNoHeaderInjection(message.subject, 'subject')
       const from = message.from ?? options.from ?? process.env.MAIL_FROM ?? 'noreply@localhost'
-      const toList = normalizeList(message.to ?? options.to ?? process.env.MAIL_TO)
+      const toList = normalizeList(message.to ?? options.to ?? process.env.MAIL_TO, 'to')
       const record: SentMail = {
         id: crypto.randomUUID(),
-        from: formatAddress(from),
+        from: formatAddress(from, 'from'),
         to: toList.length > 0 ? toList : ['dev@localhost'],
-        ...(message.replyTo !== undefined ? { replyTo: formatAddress(message.replyTo) } : {}),
+        ...(message.replyTo !== undefined ? { replyTo: formatAddress(message.replyTo, 'replyTo') } : {}),
         subject: message.subject,
         ...(message.text !== undefined ? { text: message.text } : {}),
         ...(message.html !== undefined ? { html: message.html } : {}),
         sentAt: new Date().toISOString(),
       }
 
+      const devOrTest = isDevOrTest(serverDev ?? (process.env.KAY_DEV === '1'))
       const transport = getTransport()
       if (transport !== undefined) {
         await transport.send(record)
       }
-      else if (nodeEnv() === 'production' && !options.optional) {
+      else if (!devOrTest && !options.optional) {
         throw new MailNotConfiguredError()
       }
 
-      // Production keeps no copy: the outbox holds sign-in links in plain text, and no preview reads it there.
-      if (nodeEnv() !== 'production') {
+      // Non-dev/test runs keep no copy: the outbox holds sign-in links in plain text, and no preview reads it there.
+      if (devOrTest) {
         outbox.unshift(record)
         if (outbox.length > 100)
           outbox.length = 100
@@ -156,15 +199,18 @@ export interface MailPreviewOptions {
 
 const MAIL_OUTBOX_CSS = 'body{font-family:system-ui,sans-serif;max-width:48rem;margin:2rem auto;padding:0 1rem;background:#f9fafb}article{border:1px solid #e5e7eb;border-radius:8px;padding:1rem;margin-bottom:1rem;background:#fff}h2{margin:0 0 .25rem;font-size:1rem}.meta,.empty{margin:0 0 .5rem;font-size:.85rem;color:#6b7280}iframe{width:100%;min-height:16rem;border:0}pre{margin:0;white-space:pre-wrap;font-size:.85rem}'
 
-
-function previewPlugin(outbox: readonly SentMail[], options: MailPreviewOptions): KayPlugin {
+function previewPlugin(
+  outbox: readonly SentMail[],
+  options: MailPreviewOptions,
+  onServerInit?: (dev: boolean) => void,
+): KayPlugin {
   const route = options.previewRoute ?? '/_kay/mail'
 
   return definePlugin({
     name: '@kayjs/mail',
     server(api) {
-      const env = nodeEnv()
-      const enablePreview = options.preview !== false && env !== 'production' && (api.dev || env === 'development' || env === 'test')
+      onServerInit?.(api.dev)
+      const enablePreview = options.preview !== false && isDevOrTest(api.dev)
       if (!enablePreview)
         return
 

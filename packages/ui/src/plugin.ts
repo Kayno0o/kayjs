@@ -4,7 +4,9 @@
 import type { KayPlugin } from '@kayjs/kay/config'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { definePlugin } from '@kayjs/kay/config'
+import { definePlugin, serviceKey } from '@kayjs/kay/config'
+
+const UI_KUI_LAYER_SERVICE = serviceKey<boolean>('kay.ui.kuiLayer')
 
 export type GrammarName = 'bare' | 'editorial' | 'workshop' | 'console' | 'soft' | 'orbit'
 
@@ -69,14 +71,18 @@ export function ui(options: UiPluginOptions = {}): KayPlugin {
   return definePlugin({
     name: '@kayjs/ui',
     css: grammar === false ? undefined : [grammarCssPath(grammar)],
-    ...(emit === undefined
+    ...(emit === undefined && grammar === false
       ? {}
       : {
           build(ctx) {
-            const bare = readFileSync(join(STYLES_DIR, 'bare.css'), 'utf8')
-            const prefix = emit.dir ? `${emit.dir}/` : ''
-            for (const g of emit.grammars)
-              ctx.emitPublic(`${prefix}${g}.css`, renderGrammarCss(g, bare))
+            if (grammar !== false)
+              ctx.provide?.(UI_KUI_LAYER_SERVICE, true)
+            if (emit !== undefined) {
+              const bare = readFileSync(join(STYLES_DIR, 'bare.css'), 'utf8')
+              const prefix = emit.dir ? `${emit.dir}/` : ''
+              for (const g of emit.grammars)
+                ctx.emitPublic(`${prefix}${g}.css`, renderGrammarCss(g, bare))
+            }
           },
         }),
     commands: {

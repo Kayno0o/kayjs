@@ -39,6 +39,13 @@ export interface ContentFeed {
   }) | undefined
 }
 
+function formatPubDate(value: string | Date | undefined): string {
+  if (value === undefined || value === '')
+    return ''
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? '' : `<pubDate>${date.toUTCString()}</pubDate>`
+}
+
 export function renderRss<TData>(feed: RssFeedConfig<TData>): string {
   const site = (feed.site ?? currentApp.site() ?? '').replace(/\/$/, '')
   const prefix = (feed.linkPrefix ?? '').replace(/\/$/, '')
@@ -53,7 +60,7 @@ export function renderRss<TData>(feed: RssFeedConfig<TData>): string {
           link: `${site}${prefix}/${entry.slug}`,
         }
     const link = mapped.link ?? `${site}${prefix}/${entry.slug}`
-    const pubDate = mapped.date ? `<pubDate>${new Date(mapped.date).toUTCString()}</pubDate>` : ''
+    const pubDate = formatPubDate(mapped.date)
     const desc = mapped.description ? `<description>${escAttr(mapped.description)}</description>` : ''
     return `<item><title>${escAttr(mapped.title)}</title><link>${escAttr(link)}</link><guid>${escAttr(link)}</guid>${pubDate}${desc}</item>`
   }).join('')

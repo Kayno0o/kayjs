@@ -24,9 +24,9 @@ export interface ConnectionLimits {
   maxConnectionsPerClient?: number | undefined
   /** Maximum concurrent subscribers across all rooms (default: 10000). */
   maxTotalConnections?: number | undefined
-  /** Derive a client key for per-client caps (defaults to ctx.ip, else 'anonymous'). */
-  clientKey?: ((ctx: RequestContext) => string) | undefined
-  /** ReadableStream queue high-water mark before dropping stalled subscribers (default: 64). */
+  /** Derive a client key for per-client caps (defaults to ctx.ip; skipped when unavailable). */
+  clientKey?: ((ctx: RequestContext) => string | undefined) | undefined
+  /** ReadableStream queue high-water mark in bytes before dropping stalled subscribers (default: 65536). */
   highWaterMark?: number | undefined
 }
 
@@ -72,7 +72,7 @@ export interface Rooms<TMessage, TMember = undefined> extends KayPlugin {
 const DEFAULT_MAX_PER_ROOM = 1_000
 const DEFAULT_MAX_PER_CLIENT = 10
 const DEFAULT_MAX_TOTAL = 10_000
-const DEFAULT_HIGH_WATER_MARK = 64
+const DEFAULT_HIGH_WATER_MARK = 64 * 1024
 
 const encoder = new TextEncoder()
 const CR_LF_RE = /[\r\n]/
@@ -90,17 +90,169 @@ function encodeEvent(message: unknown, event?: string, id?: string): Uint8Array 
     frame += `id: ${id}\n`
   if (event)
     frame += `event: ${event}\n`
-  frame += `data: ${JSON.stringify(message)}\n\n`
+  const serialized = JSON.stringify(message) ?? 'null'
+  frame += `data: ${serialized}\n\n`
   return encoder.encode(frame)
 }
 
 // ctx.ip already honours `trustProxy`; a forwarded header read here would let any client pick its own key.
-function defaultClientKey(ctx: RequestContext): string {
-  return ctx.ip || 'anonymous'
+// Missing IPs return undefined rather than pooling unrelated users into one shared 'anonymous' bucket.
+function defaultClientKey(ctx: RequestContext): string | undefined {
+  return ctx.ip || undefined
 }
 
 const PING_CHUNK = encoder.encode(': ping\n\n')
 const RETRY_CHUNK = encoder.encode('retry: 2000\n\n')
+
+interface RoomState<TMember> {
+  readonly defaultOpts: RoomsOptions<TMember>
+  readonly clientCounts: Map<string, number>
+  join(room: string, sub: Subscriber<TMember>): void
+  leave(room: string, sub: Subscriber<TMember>): void
+  size(room: string): number
+  getActiveConnections(): number
+}
+
+function openRoomStream<TMember>(
+  state: RoomState<TMember>,
+  ctx: RequestContext,
+  opts: StreamOptions<TMember>,
+): Response {
+  const { room, member, pingMs = 20_000, onJoin, onLeave } = opts
+  const { defaultOpts, clientCounts } = state
+  const maxPerRoom = opts.maxConnectionsPerRoom ?? defaultOpts.maxConnectionsPerRoom ?? DEFAULT_MAX_PER_ROOM
+  const maxPerClient = opts.maxConnectionsPerClient ?? defaultOpts.maxConnectionsPerClient ?? DEFAULT_MAX_PER_CLIENT
+  const maxTotal = opts.maxTotalConnections ?? defaultOpts.maxTotalConnections ?? DEFAULT_MAX_TOTAL
+  const highWaterMark = opts.highWaterMark ?? defaultOpts.highWaterMark ?? DEFAULT_HIGH_WATER_MARK
+  const resolveClientKey = opts.clientKey ?? defaultOpts.clientKey ?? defaultClientKey
+  const rawClientId = resolveClientKey(ctx)
+  const clientId = rawClientId !== undefined && rawClientId.length > 0 ? rawClientId : undefined
+
+  if (clientId !== undefined && maxPerClient > 0 && (clientCounts.get(clientId) ?? 0) >= maxPerClient) {
+    return new Response('Too Many Requests', {
+      status: 429,
+      headers: { 'retry-after': '5' },
+    })
+  }
+
+  if ((maxPerRoom > 0 && state.size(room) >= maxPerRoom) || (maxTotal > 0 && state.getActiveConnections() >= maxTotal)) {
+    return new Response('Service Unavailable', {
+      status: 503,
+      headers: { 'retry-after': '5' },
+    })
+  }
+
+  let cleaned = false
+  let joined = false
+  let timer: ReturnType<typeof setInterval> | undefined
+  let sub: Subscriber<TMember> | undefined
+  let countedClient = false
+  let abortHandler: (() => void) | undefined
+
+  const cleanup = () => {
+    if (cleaned)
+      return
+    cleaned = true
+    if (abortHandler !== undefined) {
+      ctx.request.signal.removeEventListener('abort', abortHandler)
+      abortHandler = undefined
+    }
+    if (timer !== undefined) {
+      clearInterval(timer)
+      timer = undefined
+    }
+    if (countedClient && clientId !== undefined) {
+      countedClient = false
+      const remaining = (clientCounts.get(clientId) ?? 1) - 1
+      if (remaining <= 0)
+        clientCounts.delete(clientId)
+      else
+        clientCounts.set(clientId, remaining)
+    }
+    if (sub !== undefined) {
+      state.leave(room, sub)
+      if (joined)
+        onLeave?.(room, member)
+    }
+  }
+
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const drop = () => {
+        cleanup()
+        try {
+          controller.close()
+        }
+        catch {
+          // Stream may already be closed or errored by the consumer.
+        }
+      }
+
+      sub = {
+        id: crypto.randomUUID(),
+        member,
+        send(chunk) {
+          if (cleaned)
+            return
+          if (controller.desiredSize !== null && controller.desiredSize <= 0) {
+            drop()
+            return
+          }
+          try {
+            controller.enqueue(chunk)
+          }
+          catch {
+            drop()
+          }
+        },
+        close: drop,
+      }
+
+      if (clientId !== undefined) {
+        clientCounts.set(clientId, (clientCounts.get(clientId) ?? 0) + 1)
+        countedClient = true
+      }
+
+      try {
+        controller.enqueue(RETRY_CHUNK)
+        state.join(room, sub)
+        onJoin?.(room, member)
+        joined = true
+      }
+      catch (err) {
+        cleanup()
+        throw err
+      }
+
+      if (pingMs > 0) {
+        timer = setInterval(() => {
+          sub?.send(PING_CHUNK)
+        }, pingMs)
+        ;(timer as unknown as { unref?: () => void }).unref?.()
+      }
+
+      if (ctx.request.signal.aborted) {
+        drop()
+      }
+      else {
+        abortHandler = drop
+        ctx.request.signal.addEventListener('abort', drop, { once: true })
+      }
+    },
+    cancel() {
+      cleanup()
+    },
+  }, { highWaterMark, size: chunk => chunk?.byteLength ?? 0 })
+
+  return new Response(body, {
+    status: 200,
+    headers: {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-cache, no-transform',
+      'x-accel-buffering': 'no',
+    },
+  })
+}
 
 export function createRooms<TMessage, TMember = undefined>(
   options: RoomsOptions<TMember> = {},
@@ -180,133 +332,17 @@ export function createRooms<TMessage, TMember = undefined>(
     }
   }
 
+  const roomState: RoomState<TMember> = {
+    defaultOpts,
+    clientCounts,
+    join,
+    leave,
+    size,
+    getActiveConnections: () => activeConnections,
+  }
+
   function stream(ctx: RequestContext, opts: StreamOptions<TMember>): Response {
-    const { room, member, pingMs = 20_000, onJoin, onLeave } = opts
-    const maxPerRoom = opts.maxConnectionsPerRoom ?? defaultOpts.maxConnectionsPerRoom ?? DEFAULT_MAX_PER_ROOM
-    const maxPerClient = opts.maxConnectionsPerClient ?? defaultOpts.maxConnectionsPerClient ?? DEFAULT_MAX_PER_CLIENT
-    const maxTotal = opts.maxTotalConnections ?? defaultOpts.maxTotalConnections ?? DEFAULT_MAX_TOTAL
-    const highWaterMark = opts.highWaterMark ?? defaultOpts.highWaterMark ?? DEFAULT_HIGH_WATER_MARK
-    const resolveClientKey = opts.clientKey ?? defaultOpts.clientKey ?? defaultClientKey
-    const clientId = resolveClientKey(ctx)
-
-    const currentClientCount = clientCounts.get(clientId) ?? 0
-    if (maxPerClient > 0 && currentClientCount >= maxPerClient) {
-      return new Response('Too Many Requests', {
-        status: 429,
-        headers: { 'retry-after': '5' },
-      })
-    }
-
-    if ((maxPerRoom > 0 && size(room) >= maxPerRoom) || (maxTotal > 0 && activeConnections >= maxTotal)) {
-      return new Response('Service Unavailable', {
-        status: 503,
-        headers: { 'retry-after': '5' },
-      })
-    }
-
-    let cleaned = false
-    let timer: ReturnType<typeof setInterval> | undefined
-    let sub: Subscriber<TMember> | undefined
-    let countedClient = false
-    let abortHandler: (() => void) | undefined
-
-    const cleanup = () => {
-      if (cleaned)
-        return
-      cleaned = true
-      if (abortHandler !== undefined) {
-        ctx.request.signal.removeEventListener('abort', abortHandler)
-        abortHandler = undefined
-      }
-      if (timer !== undefined) {
-        clearInterval(timer)
-        timer = undefined
-      }
-      if (countedClient) {
-        countedClient = false
-        const remaining = (clientCounts.get(clientId) ?? 1) - 1
-        if (remaining <= 0)
-          clientCounts.delete(clientId)
-        else
-          clientCounts.set(clientId, remaining)
-      }
-      if (sub !== undefined) {
-        leave(room, sub)
-        onLeave?.(room, member)
-      }
-    }
-
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        const drop = () => {
-          cleanup()
-          try {
-            controller.close()
-          }
-          catch {}
-        }
-
-        sub = {
-          id: crypto.randomUUID(),
-          member,
-          send(chunk) {
-            if (cleaned)
-              return
-            if (controller.desiredSize !== null && controller.desiredSize <= 0) {
-              drop()
-              return
-            }
-            try {
-              controller.enqueue(chunk)
-            }
-            catch {
-              drop()
-            }
-          },
-          close: drop,
-        }
-
-        clientCounts.set(clientId, (clientCounts.get(clientId) ?? 0) + 1)
-        countedClient = true
-
-        try {
-          controller.enqueue(RETRY_CHUNK)
-          join(room, sub)
-          onJoin?.(room, member)
-        }
-        catch (err) {
-          cleanup()
-          throw err
-        }
-
-        if (pingMs > 0) {
-          timer = setInterval(() => {
-            sub?.send(PING_CHUNK)
-          }, pingMs)
-          ;(timer as unknown as { unref?: () => void }).unref?.()
-        }
-
-        if (ctx.request.signal.aborted) {
-          drop()
-        }
-        else {
-          abortHandler = drop
-          ctx.request.signal.addEventListener('abort', drop, { once: true })
-        }
-      },
-      cancel() {
-        cleanup()
-      },
-    }, { highWaterMark })
-
-    return new Response(body, {
-      status: 200,
-      headers: {
-        'content-type': 'text/event-stream; charset=utf-8',
-        'cache-control': 'no-cache, no-transform',
-        'x-accel-buffering': 'no',
-      },
-    })
+    return openRoomStream(roomState, ctx, opts)
   }
 
   // An open stream would hold a graceful stop until its timeout.

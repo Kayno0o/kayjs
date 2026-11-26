@@ -368,6 +368,75 @@ function findTagEnd(src: string, start: number): { end: number, selfClosing: boo
   return undefined
 }
 
+// Returns true when the character at `idx` is escaped by an odd number of preceding backslashes.
+function isBackslashEscaped(src: string, idx: number): boolean {
+  let slashes = 0
+  for (let k = idx - 1; k >= 0 && src[k] === '\\'; k--)
+    slashes++
+  return (slashes & 1) === 1
+}
+
+// Advances past a CommonMark inline code span starting at backtick offset `start`.
+// Returns the offset right after the matching closing backtick run, or -1 if unclosed.
+function matchInlineCodeSpan(src: string, start: number): number {
+  let ticks = 0
+  while (start + ticks < src.length && src[start + ticks] === '`')
+    ticks++
+  let pos = start + ticks
+  while (pos < src.length) {
+    if (src[pos] === '`') {
+      let run = 0
+      while (pos + run < src.length && src[pos + run] === '`')
+        run++
+      if (run === ticks)
+        return pos + run
+      pos += run
+      continue
+    }
+    pos++
+  }
+  return -1
+}
+
+function findMatchingCloseTag(md: string, tagName: string, start: number): number {
+  const closeTag = `</${tagName}>`
+  const len = md.length
+  let depth = 1
+  let pos = start
+  while (pos < len) {
+    const ch = md[pos]!
+    if (ch === '`' && !isBackslashEscaped(md, pos)) {
+      const spanEnd = matchInlineCodeSpan(md, pos)
+      if (spanEnd !== -1) {
+        pos = spanEnd
+        continue
+      }
+      while (pos < len && md[pos] === '`') pos++
+      continue
+    }
+    if (ch === '<') {
+      if (md.startsWith(closeTag, pos)) {
+        depth--
+        if (depth === 0)
+          return pos
+        pos += closeTag.length
+        continue
+      }
+      if (md.startsWith(`<${tagName}`, pos) && /[\s/>]/.test(md[pos + 1 + tagName.length] ?? '')) {
+        const innerEnd = findTagEnd(md, pos + 1 + tagName.length)
+        if (innerEnd !== undefined) {
+          if (!innerEnd.selfClosing)
+            depth++
+          pos = innerEnd.end
+          continue
+        }
+      }
+    }
+    pos++
+  }
+  return -1
+}
+
 export function expandComponents(
   md: string,
   components: Record<string, MarkdownComponent>,
@@ -386,6 +455,25 @@ export function expandComponents(
 
   while (i < len) {
     const lt = md.indexOf('<', i)
+    const tick = md.indexOf('`', i)
+
+    // Skip CommonMark inline code spans so `<Component />` inside backticks is never expanded.
+    if (tick !== -1 && (lt === -1 || tick < lt)) {
+      if (!isBackslashEscaped(md, tick)) {
+        const spanEnd = matchInlineCodeSpan(md, tick)
+        if (spanEnd !== -1) {
+          out += md.slice(i, spanEnd)
+          i = spanEnd
+          continue
+        }
+      }
+      let endTick = tick + 1
+      while (endTick < len && md[endTick] === '`') endTick++
+      out += md.slice(i, endTick)
+      i = endTick
+      continue
+    }
+
     if (lt === -1) {
       out += md.slice(i)
       break
@@ -412,27 +500,8 @@ export function expandComponents(
     let afterIndex = tagEnd.end
 
     if (!tagEnd.selfClosing) {
-      // Find matching closing </TagName> with nesting depth
       const closeTag = `</${tagName}>`
-      const openRe = new RegExp(`<${tagName}(?=[\\s/>])|</${tagName}>`, 'g')
-      openRe.lastIndex = tagEnd.end
-      let depth = 1
-      let closeIdx = -1
-      let m: RegExpExecArray | null
-      while ((m = openRe.exec(md)) !== null) {
-        if (m[0] === closeTag) {
-          depth--
-          if (depth === 0) {
-            closeIdx = m.index
-            break
-          }
-        }
-        else {
-          const innerEnd = findTagEnd(md, m.index + m[0].length)
-          if (innerEnd && !innerEnd.selfClosing)
-            depth++
-        }
-      }
+      const closeIdx = findMatchingCloseTag(md, tagName, tagEnd.end)
       if (closeIdx !== -1) {
         const innerMd = md.slice(tagEnd.end, closeIdx).trim()
         const innerRendered = renderMarkdown(innerMd, options)

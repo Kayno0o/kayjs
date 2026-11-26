@@ -11,7 +11,7 @@ export interface McpBudgetOptions {
   maxTotalBytes?: number | undefined
   /** When true, `kay check` fails with `ctx.error()` on budget overruns instead of warning (default: false). */
   strict?: boolean | undefined
-  /** Custom warning sink for dev startup / non-strict `kay check` (default: `console.warn`). */
+  /** Custom warning sink for dev startup (and alongside `ctx.warn()` in non-strict `kay check`). */
   onWarn?: ((message: string) => void) | undefined
 }
 

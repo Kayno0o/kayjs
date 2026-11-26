@@ -12,14 +12,29 @@ import { renderMarkdown } from './markdown'
 export const COLLECTION_VERSION_KEY = Symbol.for('kay.content.collectionVersion')
 export const COLLECTION_VALIDATE_KEY = Symbol.for('kay.content.validateAll')
 export const COLLECTION_DIR_FOR_ROOT_KEY = Symbol.for('kay.content.dirForRoot')
+export const COLLECTION_OWNER_ROOT_KEY = Symbol.for('kay.content.ownerRoot')
 
 export interface InternalCollection extends Collection<unknown> {
   [COLLECTION_VERSION_KEY]?: () => number
   [COLLECTION_VALIDATE_KEY]?: (root: string) => string[]
   [COLLECTION_DIR_FOR_ROOT_KEY]?: (root?: string) => string
+  [COLLECTION_OWNER_ROOT_KEY]?: string | undefined
 }
 
-export const registeredCollections = new Set<InternalCollection>()
+// Keyed by (ownerRoot, resolved dir, localized) so dev reloads replace the prior instance instead of leaking.
+export const registeredCollections = new Map<string, InternalCollection>()
+let discoverRoot: string | undefined
+
+function registerCollection(col: InternalCollection, rawDir: string, localized: boolean): void {
+  const owner = discoverRoot ?? currentApp.root()
+  const explicitOwner = owner !== undefined && owner !== '' ? resolve(owner) : undefined
+  const absOwner = explicitOwner ?? (isAbsolute(rawDir) ? undefined : resolve(process.cwd()))
+  col[COLLECTION_OWNER_ROOT_KEY] = absOwner
+  const resolvedKey = isAbsolute(rawDir)
+    ? resolve(rawDir)
+    : (absOwner !== undefined ? resolve(absOwner, rawDir) : rawDir)
+  registeredCollections.set(`${absOwner ?? ''}\0${resolvedKey}\0${localized ? '1' : '0'}`, col)
+}
 
 export interface ContentHeading {
   level: number
@@ -205,32 +220,49 @@ function validateCollectionFiles(
   return errors
 }
 
-function walkCollectionDefFiles(dir: string, out: string[] = []): string[] {
+export function walkCollectionDefFiles(dir: string, out: string[] = []): string[] {
   if (!existsSync(dir))
     return out
   for (const ent of readdirSync(dir, { withFileTypes: true })) {
-    if (ent.name === 'node_modules' || ent.name === 'dist' || ent.name.startsWith('.') || ent.name === 'routes')
+    if (ent.name === 'node_modules' || ent.name === 'dist' || ent.name.startsWith('.'))
       continue
     const full = join(dir, ent.name)
     if (ent.isDirectory())
       walkCollectionDefFiles(full, out)
-    else if (ent.isFile() && ent.name.endsWith('.ts') && !ent.name.endsWith('.d.ts') && !/\.(?:test|spec)\.ts$/.test(ent.name))
+    else if (ent.isFile() && (ent.name.endsWith('.ts') || ent.name.endsWith('.tsx')) && !ent.name.endsWith('.d.ts') && !/\.(?:test|spec)\.tsx?$/.test(ent.name))
       out.push(full)
   }
   return out
 }
 
-const DEFINE_COLLECTION_RE = /\bdefineCollection\s*(?:<[^>]*>)?\s*\(/
+export const DEFINE_COLLECTION_RE = /\bdefineCollection\s*(?:<[^>]*>)?\s*\(/
 
 export async function discoverAppCollections(root: string): Promise<void> {
-  const srcDir = resolve(root, 'src')
-  for (const file of walkCollectionDefFiles(srcDir)) {
-    try {
-      const text = readFileSync(file, 'utf8')
-      if (DEFINE_COLLECTION_RE.test(text))
+  const absRoot = resolve(root)
+  const prevDiscoverRoot = discoverRoot
+  discoverRoot = absRoot
+  try {
+    const srcDir = resolve(absRoot, 'src')
+    for (const file of walkCollectionDefFiles(srcDir)) {
+      let text: string
+      try {
+        text = readFileSync(file, 'utf8')
+      }
+      catch {
+        continue
+      }
+      if (!DEFINE_COLLECTION_RE.test(text))
+        continue
+      try {
         await import(file)
+      }
+      catch {
+        // Route/TSX files may import virtual modules (~icons) or CSS outside Bun.build; skip unimportable files.
+      }
     }
-    catch {}
+  }
+  finally {
+    discoverRoot = prevDiscoverRoot
   }
 }
 
@@ -481,6 +513,6 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     [COLLECTION_VALIDATE_KEY]: (root: string) => validateCollectionFiles(resolveCollectionDir(options.dir, root), root, options.schema),
     [COLLECTION_DIR_FOR_ROOT_KEY]: (root?: string) => resolveCollectionDir(options.dir, root),
   }
-  registeredCollections.add(col as InternalCollection)
+  registerCollection(col as InternalCollection, options.dir, localized)
   return col
 }

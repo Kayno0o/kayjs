@@ -6,12 +6,57 @@
 // - Opt-in prefetch via [data-kay-prefetch] (bounded 8-entry / 15s TTL cache, respects Save-Data)
 
 import { ANNOUNCER_ID, announce } from './announcer'
-import { fetchKeyOf, getCachedHtml, inflightPrefetch, prefetch, prefetchCache } from './prefetch'
+import { fetchKeyOf, getCachedHtml, getDocId, inflightPrefetch, isSameDocRegionState, nextDocId, prefetch, prefetchCache, setDocId } from './prefetch'
 
 export { prefetch }
 
 let activeController: AbortController | undefined
 let currentDocKey = typeof location !== 'undefined' ? `${location.pathname}${location.search}` : ''
+
+// Framework inline styles shipped in kay-island.css so SPA navigation never injects unhashed <style> tags.
+const KAY_BUILTIN_STYLES = new Set([
+  'kay-island,kay-slot{display:contents}',
+  'kay-s{display:contents}',
+])
+
+// One-time token and OAuth redirect endpoints must hit the server once via normal navigation, never via SPA fetch.
+const SKIP_SPA_PATH_RE = /(?:^|\/)auth\/(?:oauth(?:\/|$)|verify-email(?:\/|$)|magic-link\/verify(?:\/|$))/
+
+// Inline <style> blocks present on initial document load already have their SHA-256 hashes in this document's CSP.
+const initialInlineStyles = new Set<string>(
+  typeof document !== 'undefined'
+    ? [...document.querySelectorAll('style')].map(s => s.textContent ?? '').filter(Boolean)
+    : [],
+)
+
+function hasStrictStyleCsp(csp: string | null | undefined): boolean {
+  if (!csp)
+    return false
+  const directives = new Map<string, string>()
+  for (const part of csp.split(';')) {
+    const trimmed = part.trim()
+    if (!trimmed)
+      continue
+    const space = trimmed.search(/\s/)
+    const name = (space === -1 ? trimmed : trimmed.slice(0, space)).toLowerCase()
+    const value = space === -1 ? '' : trimmed.slice(space + 1)
+    if (!directives.has(name))
+      directives.set(name, value)
+  }
+  const effective = directives.get('style-src-elem') ?? directives.get('style-src') ?? directives.get('default-src')
+  return effective !== undefined && !effective.includes("'unsafe-inline'")
+}
+
+function hasBlockedInlineStyle(nextDoc: Document, csp: string | null | undefined): boolean {
+  if (!hasStrictStyleCsp(csp))
+    return false
+  for (const style of nextDoc.querySelectorAll('style')) {
+    const txt = style.textContent ?? ''
+    if (txt && !KAY_BUILTIN_STYLES.has(txt) && !initialInlineStyles.has(txt))
+      return true
+  }
+  return false
+}
 
 function isEligibleLink(link: HTMLAnchorElement): URL | undefined {
   if (link.target || link.hasAttribute('download') || link.hasAttribute('data-no-spa'))
@@ -21,15 +66,19 @@ function isEligibleLink(link: HTMLAnchorElement): URL | undefined {
     return undefined
   if (url.protocol !== 'http:' && url.protocol !== 'https:')
     return undefined
+  if (SKIP_SPA_PATH_RE.test(url.pathname))
+    return undefined
   return url
 }
 
 function saveScrollState(): void {
   try {
     const prev = (history.state && typeof history.state === 'object') ? history.state as Record<string, unknown> : {}
-    history.replaceState({ ...prev, __kayScrollY: window.scrollY }, '')
+    history.replaceState({ ...prev, __kayDoc: getDocId(), __kayScrollY: window.scrollY }, '')
   }
-  catch {}
+  catch {
+    // Restricted history API environments (e.g. sandboxed iframes) ignore state updates.
+  }
 }
 
 const SYNC_HEAD_SELECTOR = 'meta[name="description"],meta[name="robots"],meta[property^="og:"],meta[name^="twitter:"],link[rel="canonical"],link[rel="alternate"][hreflang],script[type="application/ld+json"]'
@@ -102,17 +151,37 @@ async function prepareHeadStyles(nextDoc: Document): Promise<{ commit: () => voi
         if (!nextHrefs.has(href))
           el.remove()
       }
-      // Ensure required inline core <style> tags (e.g. kay-island display:contents) exist if navigating from an island-less page.
-      const existingStyles = new Set([...document.head.querySelectorAll('style')].map(s => s.textContent ?? ''))
+      // Sync non-builtin <head> <style> tags (skipping kay-island/kay-s styles already covered by kay-island.css).
+      const nextHeadStyles = new Set<string>()
       for (const nextStyle of nextDoc.head.querySelectorAll('style')) {
         const txt = nextStyle.textContent ?? ''
-        if (txt && !existingStyles.has(txt))
-          document.head.appendChild(document.importNode(nextStyle, true))
+        if (txt && !KAY_BUILTIN_STYLES.has(txt))
+          nextHeadStyles.add(txt)
       }
-      // Sync <html lang>, <title>, and head metadata tags
+      const existingStyles = new Set<string>()
+      for (const curStyle of document.head.querySelectorAll('style')) {
+        const txt = curStyle.textContent ?? ''
+        if (!KAY_BUILTIN_STYLES.has(txt) && !nextHeadStyles.has(txt))
+          curStyle.remove()
+        else if (txt)
+          existingStyles.add(txt)
+      }
+      for (const nextStyle of nextDoc.head.querySelectorAll('style')) {
+        const txt = nextStyle.textContent ?? ''
+        if (txt && !KAY_BUILTIN_STYLES.has(txt) && !existingStyles.has(txt)) {
+          document.head.appendChild(document.importNode(nextStyle, true))
+          existingStyles.add(txt)
+        }
+      }
+      // Sync <html lang>, <html dir>, <title>, and head metadata tags
       const nextLang = nextDoc.documentElement.getAttribute('lang')
       if (nextLang)
         document.documentElement.setAttribute('lang', nextLang)
+      const nextDir = nextDoc.documentElement.getAttribute('dir')
+      if (nextDir)
+        document.documentElement.setAttribute('dir', nextDir)
+      else
+        document.documentElement.removeAttribute('dir')
       document.title = nextDoc.title
 
       for (const oldMeta of document.head.querySelectorAll(SYNC_HEAD_SELECTOR))
@@ -123,7 +192,32 @@ async function prepareHeadStyles(nextDoc: Document): Promise<{ commit: () => voi
   }
 }
 
-export async function navigate(url: string, push = true, restoreScrollY?: number): Promise<void> {
+async function fetchPageHtml(fetchKey: string, signal: AbortSignal): Promise<{ html: string, url: string, csp: string | null | undefined } | undefined> {
+  const cached = getCachedHtml(fetchKey)
+  if (cached !== undefined) {
+    prefetchCache.delete(fetchKey)
+    return { html: cached.html, url: cached.url, csp: cached.csp }
+  }
+  const pending = inflightPrefetch.get(fetchKey)
+  const prefetched = pending !== undefined ? await pending : undefined
+  if (signal.aborted)
+    return undefined
+  if (prefetched !== undefined) {
+    prefetchCache.delete(fetchKey)
+    return { html: prefetched.html, url: prefetched.url, csp: prefetched.csp }
+  }
+  const res = await fetch(fetchKey, {
+    headers: { 'x-kay-spa': '1' },
+    signal,
+  })
+  if (signal.aborted)
+    return undefined
+  if (!res.ok || !(res.headers.get('content-type') ?? '').includes('text/html'))
+    return undefined
+  return { html: await res.text(), url: res.url || fetchKey, csp: res.headers.get('content-security-policy') }
+}
+
+export async function navigate(url: string, push = true, restoreScrollY?: number, targetDocId?: number): Promise<void> {
   // Abort any in-flight navigation so rapid clicks always win immediately
   activeController?.abort()
   const controller = new AbortController()
@@ -134,53 +228,33 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
   const fetchKey = fetchKeyOf(targetUrl)
 
   try {
-    let html: string
-    let finalUrl: string
-
-    const cached = getCachedHtml(fetchKey)
-    if (cached !== undefined) {
-      html = cached.html
-      finalUrl = cached.url
-      prefetchCache.delete(fetchKey)
-    }
-    else {
-      const pending = inflightPrefetch.get(fetchKey)
-      const prefetched = pending !== undefined ? await pending : undefined
-      if (controller.signal.aborted)
-        return
-      if (prefetched !== undefined) {
-        html = prefetched.html
-        finalUrl = prefetched.url
-        prefetchCache.delete(fetchKey)
-      }
-      else {
-        const res = await fetch(fetchKey, {
-          headers: { 'x-kay-spa': '1' },
-          signal: controller.signal,
-        })
-        if (controller.signal.aborted)
-          return
-        if (!res.ok || !(res.headers.get('content-type') ?? '').includes('text/html')) {
-          location.assign(url)
-          return
-        }
-        html = await res.text()
-        finalUrl = res.url || fetchKey
-      }
-    }
-
+    const fetched = await fetchPageHtml(fetchKey, controller.signal)
     if (controller.signal.aborted)
       return
+    if (fetched === undefined) {
+      location.assign(url)
+      return
+    }
+    const { html, url: finalUrl, csp } = fetched
 
     const nextDoc = new DOMParser().parseFromString(html, 'text/html')
     resolveSuspenseTemplates(nextDoc)
+
+    const nextFullUrl = hash && !finalUrl.includes('#') ? `${finalUrl}${hash}` : finalUrl
+    if (hasBlockedInlineStyle(nextDoc, csp)) {
+      if (push)
+        location.assign(nextFullUrl)
+      else
+        location.reload()
+      return
+    }
+
     const headPrep = await prepareHeadStyles(nextDoc)
     if (controller.signal.aborted) {
       headPrep.abort()
       return
     }
 
-    const nextFullUrl = hash && !finalUrl.includes('#') ? `${finalUrl}${hash}` : finalUrl
     const nextParsed = new URL(nextFullUrl, location.href)
 
     const applySwap = () => {
@@ -210,8 +284,14 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
         nextDoc.body.appendChild(existingAnnouncer)
 
       document.body.replaceWith(nextDoc.body)
-      if (push)
-        history.pushState({ __kayScrollY: 0 }, '', nextFullUrl)
+      if (push) {
+        const newDocId = nextDocId()
+        setDocId(newDocId)
+        history.pushState({ __kayDoc: newDocId, __kayScrollY: 0 }, '', nextFullUrl)
+      }
+      else {
+        setDocId(targetDocId ?? nextDocId())
+      }
       currentDocKey = `${nextParsed.pathname}${nextParsed.search}`
 
       if (typeof restoreScrollY === 'number') {
@@ -222,7 +302,9 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
         try {
           anchorId = decodeURIComponent(anchorId)
         }
-        catch {}
+        catch {
+          // Malformed percent-encoding in hash: use the raw fragment id.
+        }
         const anchor = document.getElementById(anchorId)
         if (anchor !== null)
           anchor.scrollIntoView()
@@ -300,10 +382,11 @@ if (typeof document !== 'undefined') {
     const nextDocKey = `${location.pathname}${location.search}`
     if (nextDocKey === currentDocKey)
       return
-    const st = event.state as { __kayScrollY?: number, __kayIdx?: number } | null
-    // An entry a region swap made belongs to regions().
-    if (typeof st?.__kayIdx === 'number')
+    const st = event.state as { __kayScrollY?: number, __kayIdx?: number, __kayDoc?: number } | null
+    // Only same-document region swaps belong to regions(); cross-document entries (even with __kayIdx) belong to spa().
+    if (isSameDocRegionState(st))
       return
-    void navigate(location.href, false, typeof st?.__kayScrollY === 'number' ? st.__kayScrollY : 0)
+    const targetDocId = typeof st?.__kayDoc === 'number' ? st.__kayDoc : undefined
+    void navigate(location.href, false, typeof st?.__kayScrollY === 'number' ? st.__kayScrollY : 0, targetDocId)
   })
 }

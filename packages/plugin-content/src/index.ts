@@ -4,17 +4,20 @@
 import type { KayPlugin } from '@kayjs/kay/config'
 import type { Collection, InternalCollection } from './collection'
 import type { ContentFeed, RssFeedConfig } from './rss'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { definePlugin } from '@kayjs/kay/config'
 import { currentApp } from './app'
 import {
   COLLECTION_DIR_FOR_ROOT_KEY,
+  COLLECTION_OWNER_ROOT_KEY,
   COLLECTION_VALIDATE_KEY,
   COLLECTION_VERSION_KEY,
+  DEFINE_COLLECTION_RE,
   discoverAppCollections,
   isInsideOrSame,
   registeredCollections,
+  walkCollectionDefFiles,
 } from './collection'
 import { etagMatches, renderRss } from './rss'
 
@@ -39,6 +42,33 @@ export { renderMarkdown } from './markdown'
 export { renderRss } from './rss'
 export type { ContentFeed, RssFeedConfig } from './rss'
 
+const STATIC_COLLECTION_DIR_RE = /\bdefineCollection\s*(?:<[^>]*>)?\s*\(\s*\{[\s\S]*?\bdir\s*:\s*(['"`])([^'"`]+)\1/g
+
+function discoverStaticCollectionDirs(root: string): string[] {
+  const absRoot = resolve(root)
+  const srcDir = resolve(absRoot, 'src')
+  const found: string[] = []
+  for (const file of walkCollectionDefFiles(srcDir)) {
+    let text: string
+    try {
+      text = readFileSync(file, 'utf8')
+    }
+    catch {
+      continue
+    }
+    if (!DEFINE_COLLECTION_RE.test(text))
+      continue
+    STATIC_COLLECTION_DIR_RE.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = STATIC_COLLECTION_DIR_RE.exec(text)) !== null) {
+      const dir = resolve(absRoot, m[2]!)
+      if (existsSync(dir) && isInsideOrSame(absRoot, dir))
+        found.push(dir)
+    }
+  }
+  return found
+}
+
 export function content<const TDataList extends readonly unknown[] = readonly unknown[]>(options?: {
   feeds?: { [K in keyof TDataList]: RssFeedConfig<TDataList[K]> } | undefined
   collections?: readonly Collection<unknown>[] | undefined
@@ -58,7 +88,10 @@ export function content(options: { feeds?: readonly ContentFeed[] | undefined, c
     for (const c of extraCollections)
       out.add(c as InternalCollection)
     const absRoot = root !== undefined ? resolve(root) : currentApp.root()
-    for (const c of registeredCollections) {
+    for (const c of registeredCollections.values()) {
+      const owner = c[COLLECTION_OWNER_ROOT_KEY]
+      if (owner !== undefined && absRoot !== undefined && owner !== absRoot)
+        continue
       const dir = dirOf(c, absRoot)
       if (!existsSync(dir))
         continue
@@ -70,11 +103,13 @@ export function content(options: { feeds?: readonly ContentFeed[] | undefined, c
 
   return definePlugin({
     name: '@kayjs/content',
-    after: ['@kayjs/i18n'],
+    after: ['@kayjs/i18n', '@kayjs/images'],
     watchPaths: (root) => {
       const dirs = new Set<string>()
       for (const c of activeCollections(root))
         dirs.add(dirOf(c, root))
+      for (const dir of discoverStaticCollectionDirs(root))
+        dirs.add(dir)
       return [...dirs]
     },
     async check(ctx) {

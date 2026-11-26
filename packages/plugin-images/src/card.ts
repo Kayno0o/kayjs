@@ -1,12 +1,23 @@
-// Build-time OG shareCard() generator for @kayjs/images:
-// Renders a crisp 1200x630 SVG social card and rasterizes to PNG via `rsvg-convert` (preferred) or `magick`
-// when available (cached by content hash in `.kay-cache/images/`), with zero npm binary dependencies.
+// OG shareCard() generator for @kayjs/images:
+// Renders a crisp 1200x630 SVG social card and rasterizes asynchronously to PNG via `rsvg-convert` or `magick`
+// (cached by content hash in `.kay-cache/images/` at build time, or served from memory at runtime for --compile).
 
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import { serviceKey } from '@kayjs/kay/config'
 import { getAppContext } from '@kayjs/kay/internal/server'
 import { escAttr } from '@kayjs/kay/server'
+import {
+  computeEtag,
+  hasMagick,
+  hasRsvgConvert,
+  isBuildPhase,
+  queueBuildTask,
+  rasterizeSvgToPngBytesAsync,
+  RUNTIME_IMAGE_STORE_SERVICE,
+} from './runtime'
+
+export { hasMagick, hasRsvgConvert }
 
 export interface ShareCardDefaults {
   /** Base URL prepended to returned card URL (optional, e.g. 'https://log.kaynooo.fr'). */
@@ -37,39 +48,6 @@ export interface ShareCardInput {
 
 export const SHARE_CARD_CONFIG_SERVICE = serviceKey<ShareCardDefaults>('kay.images.shareCardConfig')
 
-let magickCache: { path: string | undefined, available: boolean } | undefined
-let rsvgCache: { path: string | undefined, available: boolean } | undefined
-
-export function hasMagick(): boolean {
-  const envPath = process.env.PATH
-  if (magickCache === undefined || magickCache.path !== envPath)
-    magickCache = { path: envPath, available: (envPath ?? '') !== '' && Bun.which('magick', { PATH: envPath! }) !== null }
-  return magickCache.available
-}
-
-export function hasRsvgConvert(): boolean {
-  const envPath = process.env.PATH
-  if (rsvgCache === undefined || rsvgCache.path !== envPath)
-    rsvgCache = { path: envPath, available: (envPath ?? '') !== '' && Bun.which('rsvg-convert', { PATH: envPath! }) !== null }
-  return rsvgCache.available
-}
-
-function rasterizeSvgToPng(tmpSvg: string, tmpPng: string): boolean {
-  if (hasRsvgConvert()) {
-    const proc = Bun.spawnSync(['rsvg-convert', '-o', tmpPng, tmpSvg], { stdout: 'pipe', stderr: 'pipe' })
-    if (proc.exitCode === 0 && existsSync(tmpPng))
-      return true
-    rmSync(tmpPng, { force: true })
-  }
-  if (hasMagick()) {
-    const proc = Bun.spawnSync(['magick', tmpSvg, tmpPng], { stdout: 'pipe', stderr: 'pipe' })
-    if (proc.exitCode === 0 && existsSync(tmpPng))
-      return true
-    rmSync(tmpPng, { force: true })
-  }
-  return false
-}
-
 let standaloneCardConfig: ShareCardDefaults | undefined
 
 export function configureShareCard(defaults: ShareCardDefaults): void {
@@ -88,6 +66,11 @@ function getCardConfig(): ShareCardDefaults {
   if (appCtx !== undefined)
     return { publicDir: appCtx.publicDir }
   return standaloneCardConfig ?? {}
+}
+
+function isStrictlyInside(parent: string, target: string): boolean {
+  const rel = relative(parent, target)
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
 }
 
 function wrapLines(text: string, maxChars: number, maxLines: number): string[] {
@@ -109,6 +92,25 @@ function wrapLines(text: string, maxChars: number, maxLines: number): string[] {
   if (cur && lines.length < maxLines)
     lines.push(cur)
   return lines
+}
+
+function readConfinedSvgImage(imageSpec: string): string {
+  if (imageSpec.trim().startsWith('<svg'))
+    return imageSpec
+  const rootDir = resolve(getAppContext()?.root ?? process.cwd())
+  const absImg = resolve(rootDir, imageSpec)
+  if (!isStrictlyInside(rootDir, absImg) || !existsSync(absImg))
+    return ''
+  try {
+    const realRoot = realpathSync(rootDir)
+    const realImg = realpathSync(absImg)
+    if (!isStrictlyInside(realRoot, realImg))
+      return ''
+    return readFileSync(realImg, 'utf8')
+  }
+  catch {
+    return ''
+  }
 }
 
 function buildCardSvg(input: ShareCardInput, cfg: ShareCardDefaults): string {
@@ -140,16 +142,7 @@ function buildCardSvg(input: ShareCardInput, cfg: ShareCardDefaults): string {
 
   let graphicSvg = ''
   if (input.image) {
-    let rawImg = ''
-    if (input.image.trim().startsWith('<svg')) {
-      rawImg = input.image
-    }
-    else {
-      const rootDir = resolve(getAppContext()?.root ?? process.cwd())
-      const absImg = resolve(rootDir, input.image)
-      if ((absImg === rootDir || absImg.startsWith(`${rootDir}/`) || absImg.startsWith(`${rootDir}\\`)) && existsSync(absImg))
-        rawImg = readFileSync(absImg, 'utf8')
-    }
+    const rawImg = readConfinedSvgImage(input.image)
     if (rawImg.includes('<svg')) {
       const dataUri = `data:image/svg+xml;base64,${Buffer.from(rawImg, 'utf8').toString('base64')}`
       graphicSvg = `<image href="${dataUri}" x="${width - 340}" y="175" width="260" height="260" />`
@@ -167,21 +160,62 @@ function buildCardSvg(input: ShareCardInput, cfg: ShareCardDefaults): string {
     + `</svg>`
 }
 
-/** Generate a build-time OG social share card (PNG via ImageMagick when available, SVG fallback) and return its public URL. */
+function writePngAtomic(dstPath: string, bytes: Uint8Array): void {
+  const tmpPath = `${dstPath}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}`
+  writeFileSync(tmpPath, bytes)
+  try {
+    renameSync(tmpPath, dstPath)
+  }
+  catch {
+    rmSync(tmpPath, { force: true })
+  }
+}
+
+/** Generate an OG social share card (async PNG via rsvg-convert/magick when available, SVG fallback) and return its public URL. */
 export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults): string {
   const cfg = { ...getCardConfig(), ...overrides }
   const svg = buildCardSvg(input, cfg)
   const hash = Bun.hash(svg).toString(36)
   const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'card'
   const appCtx = getAppContext()
+  const rawSite = cfg.site ?? appCtx?.site
+  const site = rawSite ? rawSite.replace(/\/$/, '') : ''
+  const canRasterize = hasRsvgConvert() || hasMagick()
+  const inBuild = appCtx !== undefined && isBuildPhase(appCtx.outDir)
+
+  // Runtime server mode (including --compile): serve from bounded in-memory store with async Bun.spawn, zero dist/public writes.
+  const runtimeStore = overrides?.publicDir === undefined ? appCtx?.inject(RUNTIME_IMAGE_STORE_SERVICE) : undefined
+  if (runtimeStore !== undefined && !inBuild) {
+    if (canRasterize) {
+      const fileName = `${slug}-${hash}.png`
+      const urlPath = `/og/${fileName}`
+      const cacheDir = cfg.cacheDir !== undefined ? resolve(cfg.cacheDir) : undefined
+      const cachedPng = cacheDir !== undefined ? join(cacheDir, `og-${fileName}`) : undefined
+      runtimeStore.setLazy(urlPath, async () => {
+        if (cachedPng !== undefined && existsSync(cachedPng)) {
+          const cached = await Bun.file(cachedPng).arrayBuffer().then(buf => new Uint8Array(buf), () => undefined)
+          if (cached !== undefined)
+            return { body: cached, contentType: 'image/png', etag: computeEtag(cached) }
+        }
+        const png = await rasterizeSvgToPngBytesAsync(svg)
+        if (png !== undefined)
+          return { body: png, contentType: 'image/png', etag: computeEtag(png) }
+        return { body: svg, contentType: 'image/svg+xml', etag: computeEtag(svg) }
+      })
+      return `${site}${urlPath}`
+    }
+    const svgFile = `${slug}-${hash}.svg`
+    const urlPath = `/og/${svgFile}`
+    runtimeStore.setStatic(urlPath, svg, 'image/svg+xml')
+    return `${site}${urlPath}`
+  }
+
+  // Build / prerender or standalone explicit publicDir mode
   const publicDir = resolve(cfg.publicDir ?? appCtx?.publicDir ?? 'dist/public')
   const ogDir = join(publicDir, 'og')
   mkdirSync(ogDir, { recursive: true })
 
-  const rawSite = cfg.site ?? appCtx?.site
-  const site = rawSite ? rawSite.replace(/\/$/, '') : ''
-
-  if (hasRsvgConvert() || hasMagick()) {
+  if (canRasterize) {
     const fileName = `${slug}-${hash}.png`
     const outPath = join(ogDir, fileName)
     if (existsSync(outPath)) {
@@ -190,33 +224,25 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
     }
 
     const cacheDir = resolve(cfg.cacheDir ?? '.kay-cache/images')
-    mkdirSync(cacheDir, { recursive: true })
     const cachedPng = join(cacheDir, `og-${fileName}`)
-
     if (existsSync(cachedPng)) {
       writeFileSync(outPath, readFileSync(cachedPng))
       appCtx?.registerPublicFile(`og/${fileName}`)
       return `${site}/og/${fileName}`
     }
 
-    const nonce = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`
-    const tmpSvg = join(cacheDir, `og-${slug}-${hash}-${nonce}.svg`)
-    const tmpPng = join(cacheDir, `og-${slug}-${hash}-${nonce}.png`)
-    writeFileSync(tmpSvg, svg)
-    const ok = rasterizeSvgToPng(tmpSvg, tmpPng)
-    rmSync(tmpSvg, { force: true })
-    if (ok) {
-      try {
-        renameSync(tmpPng, cachedPng)
-      }
-      catch {
-        rmSync(tmpPng, { force: true })
-      }
-      if (existsSync(cachedPng)) {
-        writeFileSync(outPath, readFileSync(cachedPng))
-        appCtx?.registerPublicFile(`og/${fileName}`)
-        return `${site}/og/${fileName}`
-      }
+    if (inBuild) {
+      appCtx.registerPublicFile(`og/${fileName}`)
+      queueBuildTask(appCtx.outDir, (async () => {
+        const png = await rasterizeSvgToPngBytesAsync(svg)
+        if (png === undefined)
+          return
+        mkdirSync(cacheDir, { recursive: true })
+        writePngAtomic(cachedPng, png)
+        mkdirSync(ogDir, { recursive: true })
+        writeFileSync(outPath, png)
+      })())
+      return `${site}/og/${fileName}`
     }
   }
 

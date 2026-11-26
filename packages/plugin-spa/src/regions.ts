@@ -7,13 +7,17 @@
 
 import type { PrefetchEntry } from './prefetch'
 import { announce } from './announcer'
-import { fetchKeyOf, getCachedHtml, inflightPrefetch, prefetch, prefetchCache } from './prefetch'
+import { fetchKeyOf, getCachedHtml, getDocId, inflightPrefetch, isSameDocRegionState, prefetch, prefetchCache } from './prefetch'
 
 const BUSY_DELAY = 150
 const LIVE_DEBOUNCE = 200
 const BURST_PAUSE = 1000
 
-interface RegionState { __kayIdx: number, __kayRegion?: string | undefined }
+interface RegionState { __kayIdx: number, __kayDoc?: number | undefined, __kayRegion?: string | undefined }
+
+function safeGetAttribute(el: Element, name: string): string | null {
+  return Element.prototype.getAttribute.call(el, name)
+}
 
 interface Swap {
   url: URL
@@ -63,7 +67,7 @@ async function load(url: URL, region: string, signal: AbortSignal, fresh: boolea
   const res = await fetch(fetchKeyOf(url), { headers: { 'x-kay-region': region }, signal })
   if (!res.ok || !(res.headers.get('content-type') ?? '').includes('text/html'))
     return undefined
-  return { html: await res.text(), url: res.url, ts: Date.now(), region: res.headers.get('x-kay-region'), title: res.headers.get('x-kay-title') }
+  return { html: await res.text(), url: res.url || fetchKeyOf(url), ts: Date.now(), region: res.headers.get('x-kay-region'), title: res.headers.get('x-kay-title') }
 }
 
 // The region's inner HTML and the page title: the answer itself when the server sent the region alone, else the region cut out of a full page (a prerendered page, a proxy that dropped the header).
@@ -101,14 +105,15 @@ function record(url: URL, name: string, mode: 'push' | 'replace' | 'burst'): voi
   if (next === `${location.pathname}${location.search}${location.hash}`)
     push = false
   const prev = (typeof history.state === 'object' && history.state !== null ? history.state : {}) as Record<string, unknown>
+  const docId = getDocId()
   if (push) {
     // The entry left behind is stamped first, so back and forward can tell it from a page of another document.
-    history.replaceState({ ...prev, __kayIdx: idx }, '')
+    history.replaceState({ ...prev, __kayDoc: docId, __kayIdx: idx }, '')
     idx++
-    history.pushState({ __kayIdx: idx, __kayRegion: around }, '', next)
+    history.pushState({ __kayDoc: docId, __kayIdx: idx, __kayRegion: around }, '', next)
   }
   else {
-    history.replaceState({ ...prev, __kayIdx: idx, __kayRegion: around }, '', next)
+    history.replaceState({ ...prev, __kayDoc: docId, __kayIdx: idx, __kayRegion: around }, '', next)
   }
   lastRegion = around
   shown = url.pathname + url.search
@@ -143,10 +148,10 @@ function syncParams(): void {
   }
 }
 
-function apply(region: HTMLElement, found: { content: DocumentFragment, title: string | undefined }, swap: Swap): void {
+function apply(region: HTMLElement, found: { content: DocumentFragment, title: string | undefined }, swap: Swap, finalUrl: URL): void {
   const { content, title } = found
   if (swap.history !== 'none')
-    record(swap.url, swap.region, swap.history)
+    record(finalUrl, swap.region, swap.history)
   const first = content.firstElementChild
   if (swap.append) {
     if (swap.trigger !== undefined && region.contains(swap.trigger))
@@ -186,9 +191,14 @@ async function swapRegion(swap: Swap): Promise<boolean> {
       return true
     const content = entry === undefined ? undefined : contentOf(entry, path)
     const region = findRegion(name)
-    if (content === undefined || region === null)
+    if (entry === undefined || content === undefined || region === null)
       return false
-    apply(region, content, swap)
+    const finalUrl = entry.url ? new URL(entry.url, location.href) : swap.url
+    if (finalUrl.origin !== location.origin)
+      return false
+    if (swap.url.hash && !finalUrl.hash)
+      finalUrl.hash = swap.url.hash
+    apply(region, content, swap, finalUrl)
     return true
   }
   catch (err) {
@@ -215,8 +225,19 @@ export async function refreshRegion(name: string): Promise<void> {
     throw new Error(`kay: region "${name}" could not be redrawn from ${location.href}: render a <Region name="${name}"> on this page, and check the server answers it.`)
 }
 
+function formMethod(form: HTMLFormElement, submitter?: HTMLElement | null): string {
+  const rawMethod = (submitter !== null && submitter !== undefined ? safeGetAttribute(submitter, 'formmethod') : null)
+    ?? safeGetAttribute(form, 'method')
+    ?? 'get'
+  return rawMethod.toLowerCase()
+}
+
 function formUrl(form: HTMLFormElement, submitter?: HTMLElement | null): URL {
-  const url = new URL(form.action, location.href)
+  // Read raw attributes via Element.prototype.getAttribute so <input name="action"> cannot DOM-clobber form.action.
+  const rawAction = (submitter !== null && submitter !== undefined ? safeGetAttribute(submitter, 'formaction') : null)
+    ?? safeGetAttribute(form, 'action')
+    ?? ''
+  const url = new URL(rawAction, location.href)
   const params = new URLSearchParams()
   for (const [key, value] of new FormData(form, submitter ?? undefined)) {
     if (typeof value === 'string')
@@ -255,21 +276,24 @@ if (typeof document !== 'undefined') {
 
   document.addEventListener('submit', (event) => {
     const form = event.target as HTMLFormElement
-    const name = form.getAttribute?.('data-kay-target')
-    if (event.defaultPrevented || name === null || name === undefined || form.method !== 'get' || missingRegion(name, '<form>'))
+    if (!(form instanceof HTMLFormElement))
+      return
+    const submitter = (event as SubmitEvent).submitter
+    const name = safeGetAttribute(form, 'data-kay-target')
+    if (event.defaultPrevented || name === null || formMethod(form, submitter) !== 'get' || missingRegion(name, '<form>'))
       return
     event.preventDefault()
     clearTimeout(liveTimer)
-    void navigate({ url: formUrl(form, (event as SubmitEvent).submitter), region: name, history: 'push' })
+    void navigate({ url: formUrl(form, submitter), region: name, history: 'push' })
   }, true)
 
   document.addEventListener('input', (event) => {
     const form = (event.target as Element | null)?.closest?.<HTMLFormElement>('form[data-kay-live][data-kay-target]')
-    if (form === null || form === undefined || form.method !== 'get')
+    if (form === null || form === undefined || formMethod(form) !== 'get')
       return
     clearTimeout(liveTimer)
     liveTimer = setTimeout(() => {
-      const name = form.getAttribute('data-kay-target')!
+      const name = safeGetAttribute(form, 'data-kay-target')!
       if (!missingRegion(name, '<form>'))
         void navigate({ url: formUrl(form), region: name, history: 'burst' })
     }, LIVE_DEBOUNCE)
@@ -290,9 +314,17 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointerover', onIntent, { passive: true })
   document.addEventListener('focusin', onIntent, { passive: true })
 
-  // spa() skips these entries: they carry __kayIdx.
-  window.addEventListener('kay:navigate', () => { shown = location.pathname + location.search })
+  // Keep region state aligned when spa() swaps to another document (including popstate back to a document with prior region entries).
+  window.addEventListener('kay:navigate', () => {
+    shown = location.pathname + location.search
+    const st = stateOf(history.state)
+    idx = st?.__kayIdx ?? 0
+    lastRegion = st?.__kayRegion
+    burstOpen = false
+  })
   window.addEventListener('popstate', (event) => {
+    if (!isSameDocRegionState(event.state))
+      return
     const state = stateOf(event.state)
     const sameDocument = location.pathname + location.search === shown
     shown = location.pathname + location.search

@@ -9,7 +9,7 @@ import type { McpPruneMode, McpToolResult } from './format'
 import type { ListedTool, McpToolAnnotations, ResolvedResource, ResolvedToolEntry } from './rpc'
 import type { CompactSchemaOptions, JsonSchemaObject } from './schema'
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFile, stat } from 'node:fs/promises'
 import { definePlugin } from '@kayjs/kay/config'
 import { nodeEnv } from '@kayjs/kay/server'
 import { collectBudgetViolations, computeFootprint, formatMcpFootprint } from './footprint'
@@ -350,19 +350,52 @@ export function inspectMcpFootprint(
   return computeFootprint(options.instructions, listedTools)
 }
 
-function readTokenFile(filePath: string): string | undefined {
-  if (!existsSync(filePath))
-    return undefined
-  try {
-    const raw = readFileSync(filePath, 'utf8').trim()
-    return raw.length > 0 ? raw : undefined
-  }
-  catch {
-    return undefined
+interface CachedTokenFile {
+  mtimeNs: bigint
+  ctimeNs: bigint
+  size: bigint
+  ino: bigint
+  token: string | undefined
+}
+
+function createTokenFileReader(): (filePath: string) => Promise<string | undefined> {
+  const cache = new Map<string, CachedTokenFile>()
+
+  return async (filePath: string): Promise<string | undefined> => {
+    try {
+      const info = await stat(filePath, { bigint: true })
+      const prev = cache.get(filePath)
+      if (
+        prev !== undefined
+        && prev.mtimeNs === info.mtimeNs
+        && prev.ctimeNs === info.ctimeNs
+        && prev.size === info.size
+        && prev.ino === info.ino
+      ) {
+        return prev.token
+      }
+      const raw = (await readFile(filePath, 'utf8')).trim()
+      const token = raw.length > 0 ? raw : undefined
+      cache.set(filePath, {
+        mtimeNs: info.mtimeNs,
+        ctimeNs: info.ctimeNs,
+        size: info.size,
+        ino: info.ino,
+        token,
+      })
+      return token
+    }
+    catch {
+      cache.delete(filePath)
+      return undefined
+    }
   }
 }
 
-async function resolveToken(src: McpTokenSource | undefined): Promise<string | undefined> {
+async function resolveToken(
+  src: McpTokenSource | undefined,
+  readTokenFile: (filePath: string) => Promise<string | undefined>,
+): Promise<string | undefined> {
   if (src === undefined)
     return undefined
   if (typeof src === 'function') {
@@ -418,9 +451,9 @@ export function mcp(options: McpOptions): KayPlugin {
   }))
 
   const footprint = computeFootprint(options.instructions, listedTools)
-  const warnSink = (options.budget !== false && options.budget?.onWarn)
-    ? options.budget.onWarn
-    : (msg: string) => console.warn(msg)
+  const customWarn = options.budget !== false ? options.budget?.onWarn : undefined
+  const warnSink = customWarn ?? ((msg: string) => console.warn(msg))
+  const readTokenFile = createTokenFileReader()
 
   const rpc = createRpcDispatcher({
     serverName,
@@ -435,7 +468,7 @@ export function mcp(options: McpOptions): KayPlugin {
   })
 
   async function authorize(request: Request): Promise<Response | undefined> {
-    const configured = await resolveToken(options.token)
+    const configured = await resolveToken(options.token, readTokenFile)
     if (configured === undefined)
       return new Response('Not Found', { status: 404 })
 
@@ -462,7 +495,7 @@ export function mcp(options: McpOptions): KayPlugin {
         const denied = await authorize(ctx.request)
         if (denied !== undefined)
           return denied
-        return rpc.handlePost(ctx)
+        return rpc.handlePost(ctx, api.dev)
       }, { csrf: false })
 
       api.route('GET', endpoint, async (ctx) => {
@@ -484,10 +517,13 @@ export function mcp(options: McpOptions): KayPlugin {
       const violations = collectBudgetViolations(footprint, options.budget)
       const strict = options.budget !== false && options.budget?.strict === true
       for (const msg of violations) {
-        if (strict)
+        if (strict) {
           ctx.error(msg)
-        else
-          warnSink(msg)
+        }
+        else {
+          ctx.warn(msg)
+          customWarn?.(msg)
+        }
       }
     },
 

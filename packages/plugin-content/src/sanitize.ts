@@ -1,4 +1,4 @@
-// HTML allow-list sanitizer applied to rendered Markdown: drops dangerous tags, attributes and URL schemes.
+// HTML allow-list sanitizer applied to rendered Markdown: drops dangerous tags, non-allowlisted attributes and unsafe URL schemes.
 
 const DROP_CONTENT_TAGS = new Set([
   'script',
@@ -22,8 +22,41 @@ const ALLOWED_MD_TAGS = new Set([
   'input',
 ])
 
-const URL_ATTRS = new Set(['href', 'src', 'cite', 'poster', 'action', 'formaction'])
-const FORBIDDEN_ATTRS = new Set(['srcdoc', 'action', 'formaction', 'xmlns', 'xlink:href', 'style', 'is', 'data-persist'])
+// Strict attribute allowlist: blocks event handlers (on*), data-kay-*, data-persist, DOM clobbering (id/name), style, etc.
+const GLOBAL_ALLOWED_ATTRS = new Set([
+  'class',
+  'title',
+  'lang',
+  'dir',
+  'role',
+  'aria-label',
+  'aria-hidden',
+  'aria-current',
+  'aria-expanded',
+  'aria-level',
+  'aria-description',
+  'aria-roledescription',
+])
+
+const TAG_ALLOWED_ATTRS: Record<string, ReadonlySet<string>> = {
+  a: new Set(['href', 'rel', 'target', 'hreflang']),
+  img: new Set(['src', 'srcset', 'sizes', 'alt', 'width', 'height', 'loading', 'decoding', 'fetchpriority']),
+  source: new Set(['src', 'srcset', 'sizes', 'type', 'media', 'width', 'height']),
+  blockquote: new Set(['cite']),
+  q: new Set(['cite']),
+  del: new Set(['cite', 'datetime']),
+  ins: new Set(['cite', 'datetime']),
+  time: new Set(['datetime']),
+  ol: new Set(['start', 'reversed', 'type']),
+  li: new Set(['value']),
+  th: new Set(['colspan', 'rowspan', 'scope', 'align', 'valign', 'abbr']),
+  td: new Set(['colspan', 'rowspan', 'align', 'valign', 'abbr']),
+  col: new Set(['span', 'align']),
+  colgroup: new Set(['span', 'align']),
+  details: new Set(['open']),
+}
+
+const URL_ATTRS = new Set(['href', 'src', 'cite'])
 const SAFE_DATA_IMAGE_RE = /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=\s]+$/i
 const SAFE_SCHEME_RE = /^(?:https?|mailto|tel):/i
 const HAS_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i
@@ -100,7 +133,90 @@ function parseTagAttributes(attrSrc: string): Array<{ name: string, value: strin
   return attrs
 }
 
-function sanitizePass(html: string): string {
+function sanitizeInputTag(rawAttrs: Array<{ name: string, value: string | null }>): string {
+  const typeAttr = rawAttrs.find(a => a.name === 'type')
+  if (typeAttr?.value?.toLowerCase() !== 'checkbox')
+    return ''
+  const safeParts = ['type="checkbox"']
+  for (const a of rawAttrs) {
+    if (a.name === 'class' && a.value !== null)
+      safeParts.push(`class="${a.value.replaceAll('"', '&quot;')}"`)
+    else if (a.name === 'disabled')
+      safeParts.push('disabled')
+    else if (a.name === 'checked')
+      safeParts.push('checked')
+  }
+  return `<input ${safeParts.join(' ')}>`
+}
+
+type AllowedSlotPrefixes = string | ReadonlySet<string> | undefined
+
+function matchesSlotPrefix(value: string | null, allowed: AllowedSlotPrefixes): boolean {
+  if (value === null || allowed === undefined)
+    return false
+  if (typeof allowed === 'string')
+    return value.startsWith(allowed)
+  for (const prefix of allowed) {
+    if (value.startsWith(prefix))
+      return true
+  }
+  return false
+}
+
+function isAllowedAttr(tagName: string, name: string, value: string | null, slotPrefixes: AllowedSlotPrefixes): boolean {
+  if (tagName === 'div' && name === 'data-kay-md-slot')
+    return matchesSlotPrefix(value, slotPrefixes)
+  return GLOBAL_ALLOWED_ATTRS.has(name) || TAG_ALLOWED_ATTRS[tagName]?.has(name) === true
+}
+
+function sanitizeAttributes(
+  tagName: string,
+  rawAttrs: Array<{ name: string, value: string | null }>,
+  slotPrefixes: AllowedSlotPrefixes,
+): string[] {
+  const safeParts: string[] = []
+  for (const a of rawAttrs) {
+    if (!isAllowedAttr(tagName, a.name, a.value, slotPrefixes))
+      continue
+    if (URL_ATTRS.has(a.name)) {
+      if (a.value === null || !isSafeUrl(a.value))
+        continue
+    }
+    else if (a.name === 'srcset' && a.value !== null) {
+      const candidates = a.value.split(',').map(s => s.trim().split(/\s+/)[0] ?? '')
+      if (!candidates.every(isSafeUrl))
+        continue
+    }
+    if (a.value === null)
+      safeParts.push(a.name)
+    else
+      safeParts.push(`${a.name}="${a.value.replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}"`)
+  }
+  return safeParts
+}
+
+function findTagEndOffset(html: string, start: number): number {
+  let tagEnd = start
+  const len = html.length
+  let inQuote: string | null = null
+  while (tagEnd < len) {
+    const c = html[tagEnd]!
+    if (inQuote !== null) {
+      if (c === inQuote)
+        inQuote = null
+    }
+    else if (c === '"' || c === '\'') {
+      inQuote = c
+    }
+    else if (c === '>') {
+      return tagEnd
+    }
+    tagEnd++
+  }
+  return -1
+}
+
+function sanitizePass(html: string, slotPrefixes: AllowedSlotPrefixes): string {
   let out = ''
   let i = 0
   const len = html.length
@@ -126,7 +242,6 @@ function sanitizePass(html: string): string {
       continue
     }
 
-    // Parse tag start
     let pos = lt + 1
     const isClosing = html[pos] === '/'
     if (isClosing)
@@ -141,33 +256,14 @@ function sanitizePass(html: string): string {
       continue
     }
 
-    // Find tag end respecting quoted attribute values
-    let tagEnd = pos
-    let inQuote: string | null = null
-    while (tagEnd < len) {
-      const c = html[tagEnd]!
-      if (inQuote !== null) {
-        if (c === inQuote)
-          inQuote = null
-      }
-      else {
-        if (c === '"' || c === '\'')
-          inQuote = c
-        else if (c === '>')
-          break
-      }
-      tagEnd++
-    }
-    if (tagEnd >= len) {
-      // Unclosed tag at EOF: drop it
+    const tagEnd = findTagEndOffset(html, pos)
+    if (tagEnd === -1)
       break
-    }
 
     const attrSrc = html.slice(pos, tagEnd)
     const selfClosing = !isClosing && /\/\s*$/.test(attrSrc)
     i = tagEnd + 1
 
-    // Drop dangerous container tags together with their inner content
     if (!isClosing && DROP_CONTENT_TAGS.has(tagName)) {
       if (!selfClosing) {
         const closeRe = new RegExp(`</${tagName}\\b[^>]*>`, 'gi')
@@ -178,7 +274,6 @@ function sanitizePass(html: string): string {
       continue
     }
 
-    // Strip any non-allowlisted tag (e.g. <embed>, <form>, <base>, <meta>, <link>, <svg>, etc.)
     if (!ALLOWED_MD_TAGS.has(tagName))
       continue
 
@@ -189,44 +284,12 @@ function sanitizePass(html: string): string {
     }
 
     const rawAttrs = parseTagAttributes(attrSrc)
-
-    // Allow <input> strictly for GFM tasklist checkboxes
     if (tagName === 'input') {
-      const typeAttr = rawAttrs.find(a => a.name === 'type')
-      if (typeAttr?.value?.toLowerCase() !== 'checkbox')
-        continue
-      const safeParts = ['type="checkbox"']
-      for (const a of rawAttrs) {
-        if (a.name === 'class' && a.value !== null)
-          safeParts.push(`class="${a.value.replaceAll('"', '&quot;')}"`)
-        else if (a.name === 'disabled')
-          safeParts.push('disabled')
-        else if (a.name === 'checked')
-          safeParts.push('checked')
-      }
-      out += `<input ${safeParts.join(' ')}>`
+      out += sanitizeInputTag(rawAttrs)
       continue
     }
 
-    const safeParts: string[] = []
-    for (const a of rawAttrs) {
-      if (a.name.startsWith('on') || FORBIDDEN_ATTRS.has(a.name))
-        continue
-      if (URL_ATTRS.has(a.name)) {
-        if (a.value === null || !isSafeUrl(a.value))
-          continue
-      }
-      else if (a.name === 'srcset' && a.value !== null) {
-        const candidates = a.value.split(',').map(s => s.trim().split(/\s+/)[0] ?? '')
-        if (!candidates.every(isSafeUrl))
-          continue
-      }
-      if (a.value === null)
-        safeParts.push(a.name)
-      else
-        safeParts.push(`${a.name}="${a.value.replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}"`)
-    }
-
+    const safeParts = sanitizeAttributes(tagName, rawAttrs, slotPrefixes)
     const attrOut = safeParts.length > 0 ? ` ${safeParts.join(' ')}` : ''
     out += selfClosing ? `<${tagName}${attrOut} />` : `<${tagName}${attrOut}>`
   }
@@ -234,10 +297,10 @@ function sanitizePass(html: string): string {
   return out
 }
 
-export function sanitizeMarkdownHtml(html: string): string {
+export function sanitizeMarkdownHtml(html: string, slotPrefixes?: AllowedSlotPrefixes): string {
   let current = html
   for (let pass = 0; pass < 3; pass++) {
-    const next = sanitizePass(current)
+    const next = sanitizePass(current, slotPrefixes)
     if (next === current)
       return next
     current = next

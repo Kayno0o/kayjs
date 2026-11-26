@@ -5,32 +5,42 @@ import type { BunPlugin } from 'bun'
 import type { KayPlugin } from '@kayjs/kay/config'
 import type { ShareCardDefaults } from './card'
 import type { ImageAsset } from './helpers'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
+import type { CachedImageMeta, VariantPipelineConfig } from './pipeline'
+import type { RuntimeImageStore } from './runtime'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, extname, join, resolve } from 'node:path'
 import { CONTENT_IMAGE_RESOLVER_SERVICE, definePlugin } from '@kayjs/kay/config'
 import { getAppContext } from '@kayjs/kay/internal/server'
-import { hasMagick, SHARE_CARD_CONFIG_SERVICE } from './card'
+import { SHARE_CARD_CONFIG_SERVICE } from './card'
+import {
+  ALLOWED_IMAGE_EXTS,
+  assembleImageAsset,
+  computeImageKey,
+  encodeVariantAsync,
+  identifyImageAsync,
+  isStrictlyInside,
+  mapConcurrent,
+  MAX_ENCODE_CONCURRENCY,
+  planVariantJobs,
+  readCachedMeta,
+  writeFileAtomic,
+} from './pipeline'
+import {
+  computeEtag,
+  createRuntimeImageStore,
+  encodeVariantToBytesAsync,
+  enterBuildPhase,
+  flushBuildPhase,
+  hasMagick,
+  isBuildPhase,
+  leaveBuildPhase,
+  mimeForImageExt,
+  queueBuildTask,
+  registerRuntimeImageMiddleware,
+  RUNTIME_IMAGE_STORE_SERVICE,
+} from './runtime'
 
 export { CONTENT_IMAGE_RESOLVER_SERVICE }
-
-const ALLOWED_IMAGE_EXTS = new Set([
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.webp',
-  '.avif',
-  '.gif',
-  '.svg',
-  '.ico',
-  '.bmp',
-  '.tiff',
-  '.tif',
-])
-
-function isStrictlyInside(dir: string, target: string): boolean {
-  const rel = relative(dir, target)
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
-}
 
 export interface ImagesPluginOptions {
   widths?: number[] | undefined
@@ -48,31 +58,7 @@ export interface ImagesPluginOptions {
 
 const DEFAULT_WIDTHS = [320, 640, 960, 1280, 1920]
 const DEFAULT_FORMATS: ('avif' | 'webp')[] = ['avif', 'webp']
-
-interface CachedImageMeta {
-  width: number
-  height: number
-  files: { rel: string, width: number, format: string }[]
-}
-
-interface VariantEncodeJob {
-  fileName: string
-  cachedFile: string
-  width: number
-  format: 'avif' | 'webp'
-  quality: number
-}
-
-interface VariantPipelineConfig {
-  widths: number[]
-  formats: ('avif' | 'webp')[]
-  quality: number
-  avifQuality: number
-  cachePrefix: string
-}
-
 const MISSING_MAGICK_MESSAGE = '@kayjs/images: ImageMagick ("magick") was not found on PATH; AVIF/WebP optimization is disabled. Install ImageMagick to enable responsive image optimization.'
-const MAX_ENCODE_CONCURRENCY = 4
 
 /** Pure-JS binary header parser for PNG, GIF, WebP, JPEG, and AVIF/HEIF dimensions (zero external dependencies). */
 export function readImageDimensions(bytes: Uint8Array): { width: number, height: number } | undefined {
@@ -161,178 +147,6 @@ export function readImageDimensions(bytes: Uint8Array): { width: number, height:
   }
 
   return undefined
-}
-
-function parseMagickDimensions(stdout: string): { width: number, height: number } | undefined {
-  const parts = stdout.trim().split(/\s+/)
-  const w = Number(parts[0])
-  const h = Number(parts[1])
-  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
-    return undefined
-  return { width: w, height: h }
-}
-
-function identifyImage(filePath: string): { width: number, height: number } | undefined {
-  const proc = Bun.spawnSync(['magick', 'identify', '-ping', '-format', '%w %h', `${filePath}[0]`], {
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
-  if (proc.exitCode !== 0)
-    return undefined
-  return parseMagickDimensions(proc.stdout.toString())
-}
-
-async function identifyImageAsync(filePath: string): Promise<{ width: number, height: number } | undefined> {
-  const proc = Bun.spawn(['magick', 'identify', '-ping', '-format', '%w %h', `${filePath}[0]`], {
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
-  const [exitCode, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()])
-  if (exitCode !== 0)
-    return undefined
-  return parseMagickDimensions(stdout)
-}
-
-async function mapConcurrent<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length)
-  let next = 0
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const idx = next++
-      results[idx] = await fn(items[idx]!)
-    }
-  })
-  await Promise.all(workers)
-  return results
-}
-
-function writeFileAtomic(dstPath: string, data: string | Uint8Array): void {
-  const tmpPath = `${dstPath}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}`
-  writeFileSync(tmpPath, data)
-  try {
-    renameSync(tmpPath, dstPath)
-  }
-  catch {
-    rmSync(tmpPath, { force: true })
-  }
-}
-
-function variantTmpPath(dstPath: string): string {
-  const ext = extname(dstPath)
-  const stem = ext !== '' ? dstPath.slice(0, -ext.length) : dstPath
-  return `${stem}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}${ext}`
-}
-
-function magickResizeArgs(srcPath: string, width: number, quality: number, tmpPath: string): string[] {
-  return ['magick', `${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), tmpPath]
-}
-
-function finalizeEncodedVariant(exitCode: number, tmpPath: string, dstPath: string): boolean {
-  if (exitCode === 0 && existsSync(tmpPath)) {
-    try {
-      renameSync(tmpPath, dstPath)
-    }
-    catch {
-      rmSync(tmpPath, { force: true })
-    }
-    return existsSync(dstPath)
-  }
-  rmSync(tmpPath, { force: true })
-  return false
-}
-
-function encodeVariant(srcPath: string, dstPath: string, width: number, quality: number): boolean {
-  const tmpPath = variantTmpPath(dstPath)
-  const proc = Bun.spawnSync(magickResizeArgs(srcPath, width, quality, tmpPath), { stdout: 'pipe', stderr: 'pipe' })
-  return finalizeEncodedVariant(proc.exitCode, tmpPath, dstPath)
-}
-
-async function encodeVariantAsync(srcPath: string, dstPath: string, width: number, quality: number): Promise<boolean> {
-  const tmpPath = variantTmpPath(dstPath)
-  const proc = Bun.spawn(magickResizeArgs(srcPath, width, quality, tmpPath), { stdout: 'pipe', stderr: 'pipe' })
-  return finalizeEncodedVariant(await proc.exited, tmpPath, dstPath)
-}
-
-function computeImageKey(srcPath: string, rawBytes: Uint8Array, cfg: VariantPipelineConfig): { hash: string, stem: string, rawFileName: string } {
-  const ext = extname(srcPath).toLowerCase()
-  const hash = Bun.hash(`${Bun.hash(rawBytes)}:${cfg.widths.join(',')}:${cfg.formats.join(',')}:${cfg.quality}:${cfg.avifQuality}`).toString(36)
-  const stem = basename(srcPath, extname(srcPath)).toLowerCase().replace(/[^a-z0-9-_]/g, '-')
-  return { hash, stem, rawFileName: `${stem}-${hash}${ext}` }
-}
-
-function readCachedMeta(metaPath: string, cacheRoot: string, cachePrefix: string): CachedImageMeta | undefined {
-  if (!existsSync(metaPath))
-    return undefined
-  try {
-    const parsed = JSON.parse(readFileSync(metaPath, 'utf8')) as CachedImageMeta
-    if (parsed.files.every(f => existsSync(join(cacheRoot, `${cachePrefix}${basename(f.rel)}`))))
-      return parsed
-  }
-  catch {
-    return undefined
-  }
-  return undefined
-}
-
-function planVariantJobs(
-  dims: { width: number, height: number },
-  stem: string,
-  hash: string,
-  cacheRoot: string,
-  cfg: VariantPipelineConfig,
-): VariantEncodeJob[] {
-  const targetWidths = cfg.widths.filter(w => w < dims.width)
-  targetWidths.push(dims.width)
-  const jobs: VariantEncodeJob[] = []
-  for (const w of targetWidths) {
-    for (const fmt of cfg.formats) {
-      const fileName = `${stem}-${hash}-${w}w.${fmt}`
-      jobs.push({
-        fileName,
-        cachedFile: join(cacheRoot, `${cfg.cachePrefix}${fileName}`),
-        width: w,
-        format: fmt,
-        quality: fmt === 'avif' ? cfg.avifQuality : cfg.quality,
-      })
-    }
-  }
-  return jobs
-}
-
-function assembleImageAsset(
-  meta: CachedImageMeta,
-  cacheRoot: string,
-  cachePrefix: string,
-  urlPrefix: string,
-  emitVariant: (rel: string, fileName: string, cachedFile: string) => void,
-): ImageAsset {
-  const webpEntries: string[] = []
-  const avifEntries: string[] = []
-  let fallbackSrc = ''
-
-  for (const f of meta.files) {
-    const fileName = basename(f.rel)
-    const cachedFile = join(cacheRoot, `${cachePrefix}${fileName}`)
-    emitVariant(f.rel, fileName, cachedFile)
-    const url = `${urlPrefix}/${f.rel}`
-    if (f.format === 'webp') {
-      webpEntries.push(`${url} ${f.width}w`)
-      fallbackSrc = url
-    }
-    else if (f.format === 'avif') {
-      avifEntries.push(`${url} ${f.width}w`)
-      if (fallbackSrc === '')
-        fallbackSrc = url
-    }
-  }
-
-  return {
-    src: fallbackSrc,
-    width: meta.width,
-    height: meta.height,
-    ...(webpEntries.length > 0 ? { webpSrcset: webpEntries.join(', ') } : {}),
-    ...(avifEntries.length > 0 ? { avifSrcset: avifEntries.join(', ') } : {}),
-  }
 }
 
 interface PersistedImagesConfig {
@@ -438,6 +252,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       }]
     },
     build(ctx) {
+      enterBuildPhase(ctx.outDir)
       const publicDir = join(ctx.outDir, 'public')
       const cacheDir = resolve(ctx.root, cacheDirRel)
       const cardWithSite: ShareCardDefaults | undefined = options.card !== undefined || ctx.site !== undefined
@@ -453,11 +268,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
         card: cardWithSite,
       }
       ctx.setData(persisted as unknown as Record<string, unknown>)
-      ctx.provide(SHARE_CARD_CONFIG_SERVICE, {
-        ...cardWithSite,
-        publicDir,
-        cacheDir,
-      } satisfies ShareCardDefaults)
+      ctx.provide(SHARE_CARD_CONFIG_SERVICE, { ...cardWithSite, publicDir, cacheDir } satisfies ShareCardDefaults)
       ctx.provide(CONTENT_IMAGE_RESOLVER_SERVICE, createMarkdownImageResolver({
         root: resolve(ctx.root),
         outPublicDir: publicDir,
@@ -472,42 +283,41 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
         ctx.emitAsset(rel, bytes)
       if (pruneCache && !ctx.dev && lastCacheRoot !== undefined && activeCacheFiles.size > 0 && existsSync(lastCacheRoot)) {
         for (const entry of readdirSync(lastCacheRoot)) {
-          if (entry.startsWith('og-') || entry.startsWith('md-'))
-            continue
-          if (!activeCacheFiles.has(entry))
+          if (!entry.startsWith('og-') && !entry.startsWith('md-') && !activeCacheFiles.has(entry))
             rmSync(join(lastCacheRoot, entry), { force: true })
         }
       }
       emittedAssets.clear()
       activeCacheFiles.clear()
     },
+    async afterPrerender(ctx) {
+      await flushBuildPhase(ctx.outDir)
+    },
     server(api) {
       const persisted = api.getBuildData<PersistedImagesConfig>()
-      const effCacheRel = persisted?.cacheDirRel ?? cacheDirRel
-      const effWidths = persisted?.widths ?? widths
-      const effFormats = persisted?.formats ?? formats
-      const effQuality = persisted?.quality ?? quality
-      const effAvifQuality = persisted?.avifQuality ?? avifQuality
-      const effMarkdownSizes = persisted?.markdownSizes ?? options.markdownSizes
-      const effCard = persisted?.card ?? options.card
       const publicDir = join(api.outDir, 'public')
-      const cacheDir = resolve(api.root, effCacheRel)
-
+      const cacheDir = resolve(api.root, persisted?.cacheDirRel ?? cacheDirRel)
+      const runtimeStore = createRuntimeImageStore()
+      api.provide(RUNTIME_IMAGE_STORE_SERVICE, runtimeStore)
+      registerRuntimeImageMiddleware(api, runtimeStore)
+      api.onShutdown(() => {
+        if (isBuildPhase(api.outDir))
+          leaveBuildPhase(api.outDir)
+      })
       api.provide(SHARE_CARD_CONFIG_SERVICE, {
         ...(api.site !== undefined ? { site: api.site } : {}),
-        ...effCard,
+        ...(persisted?.card ?? options.card),
         publicDir,
         cacheDir,
       } satisfies ShareCardDefaults)
       api.provide(CONTENT_IMAGE_RESOLVER_SERVICE, createMarkdownImageResolver({
         root: resolve(api.root),
-        outPublicDir: publicDir,
         cacheDir,
-        widths: effWidths,
-        formats: effFormats,
-        quality: effQuality,
-        avifQuality: effAvifQuality,
-        sizes: effMarkdownSizes,
+        widths: persisted?.widths ?? widths,
+        formats: persisted?.formats ?? formats,
+        quality: persisted?.quality ?? quality,
+        avifQuality: persisted?.avifQuality ?? avifQuality,
+        sizes: persisted?.markdownSizes ?? options.markdownSizes,
       }))
     },
   })
@@ -522,7 +332,59 @@ export interface OptimizeImageFileOptions {
   avifQuality?: number | undefined
 }
 
-/** Synchronously optimize a local image file (e.g. from Markdown) into `dist/public/img/` with disk caching. */
+function optimizeForRuntime(
+  absPath: string,
+  ext: string,
+  rawBytes: Uint8Array<ArrayBuffer>,
+  dims: { width: number, height: number },
+  stem: string,
+  hash: string,
+  rawFileName: string,
+  cacheRoot: string,
+  pipelineCfg: VariantPipelineConfig,
+  runtimeStore: RuntimeImageStore,
+): ImageAsset {
+  const rawMime = mimeForImageExt(ext)
+  if (!hasMagick()) {
+    runtimeStore.setStatic(`/img/${rawFileName}`, rawBytes, rawMime)
+    return { src: `/img/${rawFileName}`, width: dims.width, height: dims.height }
+  }
+  const metaPath = join(cacheRoot, `md-${stem}-${hash}.json`)
+  const cachedMeta = readCachedMeta(metaPath, cacheRoot, 'md-')
+  if (cachedMeta !== undefined) {
+    return assembleImageAsset(cachedMeta, cacheRoot, 'md-', '', (_rel, fileName, cachedFile) => {
+      const mime = mimeForImageExt(extname(fileName))
+      runtimeStore.setLazy(`/img/${fileName}`, async () => {
+        try {
+          const bytes = new Uint8Array(await Bun.file(cachedFile).arrayBuffer())
+          return { body: bytes, contentType: mime, etag: computeEtag(bytes) }
+        }
+        catch {
+          return { body: rawBytes, contentType: rawMime, etag: computeEtag(rawBytes) }
+        }
+      })
+    })
+  }
+  const jobs = planVariantJobs(dims, stem, hash, cacheRoot, pipelineCfg)
+  const plannedMeta: CachedImageMeta = {
+    width: dims.width,
+    height: dims.height,
+    files: jobs.map(j => ({ rel: `img/${j.fileName}`, width: j.width, format: j.format })),
+  }
+  const jobByFile = new Map(jobs.map(j => [j.fileName, j]))
+  return assembleImageAsset(plannedMeta, cacheRoot, 'md-', '', (_rel, fileName) => {
+    const job = jobByFile.get(fileName)!
+    const targetMime = mimeForImageExt(`.${job.format}`)
+    runtimeStore.setLazy(`/img/${fileName}`, async () => {
+      const encoded = await encodeVariantToBytesAsync(absPath, job.width, job.format, job.quality)
+      if (encoded !== undefined)
+        return { body: encoded, contentType: targetMime, etag: computeEtag(encoded) }
+      return { body: rawBytes, contentType: rawMime, etag: computeEtag(rawBytes) }
+    })
+  })
+}
+
+/** Optimize a local image file (e.g. from Markdown) with non-blocking encoding and runtime in-memory serving for --compile. */
 export function optimizeImageFile(absPath: string, options: OptimizeImageFileOptions = {}): ImageAsset {
   const ext = extname(absPath).toLowerCase()
   if (!ALLOWED_IMAGE_EXTS.has(ext))
@@ -536,51 +398,67 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
     cachePrefix: 'md-',
   }
   const appCtx = getAppContext()
+  const rawBytes = new Uint8Array(readFileSync(absPath))
+  const dims = readImageDimensions(rawBytes)
+  if (dims === undefined)
+    throw new Error(`@kayjs/images: could not determine dimensions for "${absPath}"`)
+
+  const { hash, stem, rawFileName } = computeImageKey(absPath, rawBytes, pipelineCfg)
+  const cacheRoot = resolve(options.cacheDir ?? '.kay-cache/images')
+  const inBuild = appCtx !== undefined && isBuildPhase(appCtx.outDir)
+
+  // Runtime server mode (including --compile): never write to dist/public or block on Bun.spawnSync.
+  const runtimeStore = options.outPublicDir === undefined ? appCtx?.inject(RUNTIME_IMAGE_STORE_SERVICE) : undefined
+  if (runtimeStore !== undefined && !inBuild)
+    return optimizeForRuntime(absPath, ext, rawBytes, dims, stem, hash, rawFileName, cacheRoot, pipelineCfg, runtimeStore)
+
   const outPublicDir = resolve(options.outPublicDir ?? appCtx?.publicDir ?? 'dist/public')
   const imgOutDir = join(outPublicDir, 'img')
   mkdirSync(imgOutDir, { recursive: true })
-
-  const rawBytes = new Uint8Array(readFileSync(absPath))
-  const { hash, stem, rawFileName } = computeImageKey(absPath, rawBytes, pipelineCfg)
-  const emitRaw = (width: number, height: number): ImageAsset => {
+  const emitRaw = (): ImageAsset => {
     writeFileSync(join(imgOutDir, rawFileName), rawBytes)
     appCtx?.registerPublicFile(`img/${rawFileName}`)
-    return { src: `/img/${rawFileName}`, width, height }
+    return { src: `/img/${rawFileName}`, width: dims.width, height: dims.height }
   }
 
-  if (!hasMagick()) {
-    const dims = readImageDimensions(rawBytes)
-    if (dims === undefined)
-      throw new Error(`@kayjs/images: could not determine dimensions for "${absPath}" (ImageMagick is unavailable and binary header could not be parsed)`)
-    return emitRaw(dims.width, dims.height)
-  }
+  if (!hasMagick())
+    return emitRaw()
 
-  const cacheRoot = resolve(options.cacheDir ?? '.kay-cache/images')
-  mkdirSync(cacheRoot, { recursive: true })
   const metaPath = join(cacheRoot, `md-${stem}-${hash}.json`)
-  let meta = readCachedMeta(metaPath, cacheRoot, 'md-')
-
-  if (meta === undefined) {
-    const dims = identifyImage(absPath) ?? readImageDimensions(rawBytes)
-    if (dims === undefined)
-      throw new Error(`@kayjs/images: could not determine dimensions for "${absPath}"`)
-
-    const jobs = planVariantJobs(dims, stem, hash, cacheRoot, pipelineCfg)
-    const files: CachedImageMeta['files'] = []
-    for (const job of jobs) {
-      if (existsSync(job.cachedFile) || encodeVariant(absPath, job.cachedFile, job.width, job.quality))
-        files.push({ rel: `img/${job.fileName}`, width: job.width, format: job.format })
-    }
-    if (files.length === 0)
-      return emitRaw(dims.width, dims.height)
-
-    meta = { width: dims.width, height: dims.height, files }
-    writeFileAtomic(metaPath, JSON.stringify(meta))
+  const cachedMeta = readCachedMeta(metaPath, cacheRoot, 'md-')
+  if (cachedMeta !== undefined) {
+    return assembleImageAsset(cachedMeta, cacheRoot, 'md-', '', (_rel, fileName, cachedFile) => {
+      writeFileSync(join(imgOutDir, fileName), readFileSync(cachedFile))
+      appCtx?.registerPublicFile(`img/${fileName}`)
+    })
   }
 
-  return assembleImageAsset(meta, cacheRoot, 'md-', '', (_rel, fileName, cachedFile) => {
-    writeFileSync(join(imgOutDir, fileName), readFileSync(cachedFile))
-    appCtx?.registerPublicFile(`img/${fileName}`)
+  if (!inBuild)
+    return emitRaw()
+
+  // Build / prerender mode: queue non-blocking async Bun.spawn encoding and flush in afterPrerender().
+  const jobs = planVariantJobs(dims, stem, hash, cacheRoot, pipelineCfg)
+  const plannedMeta: CachedImageMeta = {
+    width: dims.width,
+    height: dims.height,
+    files: jobs.map(j => ({ rel: `img/${j.fileName}`, width: j.width, format: j.format })),
+  }
+  queueBuildTask(appCtx.outDir, (async () => {
+    mkdirSync(cacheRoot, { recursive: true })
+    mkdirSync(imgOutDir, { recursive: true })
+    const encoded = await mapConcurrent(jobs, MAX_ENCODE_CONCURRENCY, async (job) => {
+      const ok = existsSync(job.cachedFile) || await encodeVariantAsync(absPath, job.cachedFile, job.width, job.quality)
+      if (!ok)
+        return undefined
+      writeFileSync(join(imgOutDir, job.fileName), readFileSync(job.cachedFile))
+      return { rel: `img/${job.fileName}`, width: job.width, format: job.format }
+    })
+    const files = encoded.filter((entry): entry is NonNullable<typeof entry> => entry !== undefined)
+    if (files.length === jobs.length)
+      writeFileAtomic(metaPath, JSON.stringify({ width: dims.width, height: dims.height, files }))
+  })())
+  return assembleImageAsset(plannedMeta, cacheRoot, 'md-', '', (_rel, fileName) => {
+    appCtx.registerPublicFile(`img/${fileName}`)
   })
 }
 

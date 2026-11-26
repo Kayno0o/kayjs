@@ -18,6 +18,8 @@ export interface UseLiveOptions {
   maxDelayMs?: number | undefined
   /** Maximum random jitter added in milliseconds (default: 30% of current delay). */
   jitterMs?: number | undefined
+  /** Maximum consecutive failed reconnect attempts before staying closed (default: 5; resets on open). */
+  maxRetries?: number | undefined
   /** Named SSE `event:` types to listen for in addition to default unnamed `message` events. */
   events?: readonly string[] | undefined
   /** Send cookies / credentials on cross-origin EventSource connections. */
@@ -26,6 +28,7 @@ export interface UseLiveOptions {
 
 const DEFAULT_BASE_DELAY_MS = 1_000
 const DEFAULT_MAX_DELAY_MS = 30_000
+const DEFAULT_MAX_RETRIES = 5
 
 export function useLive<TMessage>(
   url: string,
@@ -71,16 +74,24 @@ export function useLive<TMessage>(
       status.value = 'open'
     }
 
-    es.onerror = () => {
+    es.onerror = (ev?: Event) => {
       if (source !== es || manuallyClosed)
         return
+      const errStatus = (ev as { status?: unknown } | undefined)?.status
+      if (errStatus === 401 || errStatus === 403 || errStatus === 404) {
+        es.close()
+        source = undefined
+        status.value = 'closed'
+        return
+      }
       if (es.readyState === EventSource.CLOSED) {
         status.value = 'closed'
         source = undefined
+        if (attempt >= (options?.maxRetries ?? DEFAULT_MAX_RETRIES))
+          return
         const base = options?.baseDelayMs ?? DEFAULT_BASE_DELAY_MS
         const max = options?.maxDelayMs ?? DEFAULT_MAX_DELAY_MS
-        const exp = Math.min(max, base * 2 ** attempt)
-        attempt++
+        const exp = Math.min(max, base * 2 ** attempt++)
         const maxJitter = options?.jitterMs ?? Math.max(1, Math.floor(exp * 0.3))
         const jitter = maxJitter > 0 ? Math.floor(Math.random() * maxJitter) : 0
         reconnectTimer = setTimeout(() => {
@@ -96,17 +107,24 @@ export function useLive<TMessage>(
     const handleEvent = (ev: Event) => {
       if (source !== es || manuallyClosed)
         return
+      const data = (ev as MessageEvent<unknown>).data
+      if (typeof data !== 'string')
+        return
       try {
-        const parsed = JSON.parse((ev as MessageEvent<string>).data) as TMessage
+        const parsed = JSON.parse(data) as TMessage
         last.value = parsed
         onMessage?.(parsed)
       }
-      catch {}
+      catch {
+        // Ignore malformed non-JSON SSE frames.
+      }
     }
 
     es.onmessage = handleEvent
     if (options?.events !== undefined) {
-      for (const name of options.events)
+      const seen = new Set(options.events)
+      seen.delete('message')
+      for (const name of seen)
         es.addEventListener(name, handleEvent)
     }
   }

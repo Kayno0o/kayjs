@@ -32,6 +32,7 @@ export interface CompactListOptions {
 export function pruneEmpty(value: unknown, options?: PruneEmptyOptions): unknown {
   const dropCollections = options?.emptyCollections ?? true
   const dropStrings = options?.emptyStrings ?? false
+  const ancestors = new Set<object>()
 
   function walk(node: unknown, isRoot: boolean): unknown {
     if (node === null || node === undefined)
@@ -39,32 +40,48 @@ export function pruneEmpty(value: unknown, options?: PruneEmptyOptions): unknown
     if (typeof node === 'string')
       return !isRoot && dropStrings && node.length === 0 ? undefined : node
     if (Array.isArray(node)) {
-      const out: unknown[] = []
-      for (const item of node) {
-        const cleaned = walk(item, false)
-        if (cleaned !== undefined)
-          out.push(cleaned)
-      }
-      if (!isRoot && dropCollections && out.length === 0)
+      if (ancestors.has(node))
         return undefined
-      return out
+      ancestors.add(node)
+      try {
+        const out: unknown[] = []
+        for (const item of node) {
+          const cleaned = walk(item, false)
+          if (cleaned !== undefined)
+            out.push(cleaned)
+        }
+        if (!isRoot && dropCollections && out.length === 0)
+          return undefined
+        return out
+      }
+      finally {
+        ancestors.delete(node)
+      }
     }
     if (typeof node === 'object') {
       const proto = Object.getPrototypeOf(node)
       if (proto !== Object.prototype && proto !== null)
         return node
-      const out: Record<string, unknown> = {}
-      let count = 0
-      for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-        const cleaned = walk(v, false)
-        if (cleaned !== undefined) {
-          out[k] = cleaned
-          count++
-        }
-      }
-      if (!isRoot && dropCollections && count === 0)
+      if (ancestors.has(node))
         return undefined
-      return out
+      ancestors.add(node)
+      try {
+        const out: Record<string, unknown> = {}
+        let count = 0
+        for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+          const cleaned = walk(v, false)
+          if (cleaned !== undefined) {
+            out[k] = cleaned
+            count++
+          }
+        }
+        if (!isRoot && dropCollections && count === 0)
+          return undefined
+        return out
+      }
+      finally {
+        ancestors.delete(node)
+      }
     }
     return node
   }

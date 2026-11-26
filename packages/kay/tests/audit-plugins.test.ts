@@ -488,12 +488,15 @@ Safe **bold** and [good link](https://example.com) and ![ok](/img/a.png).
       expect(r4.status).toBe(200)
       ac2.abort()
 
-      // Without ctx.ip, a client-sent X-Forwarded-For does not buy a fresh per-client quota
-      const lone = createRooms<{ n: number }, string>({ maxConnectionsPerClient: 1 })
+      // Without ctx.ip, clients are not pooled into one shared per-IP bucket; room/total caps still protect the server
+      const lone = createRooms<{ n: number }, string>({ maxConnectionsPerClient: 1, maxConnectionsPerRoom: 2 })
       const acA = new AbortController()
+      const acB = new AbortController()
       expect(lone.stream(fromIp(undefined, { headers: { 'x-forwarded-for': '4.4.4.4' }, signal: acA.signal }), { room: 'b', member: 'x', pingMs: 0 }).status).toBe(200)
-      expect(lone.stream(fromIp(undefined, { headers: { 'x-forwarded-for': '5.5.5.5' } }), { room: 'b', member: 'y', pingMs: 0 }).status).toBe(429)
+      expect(lone.stream(fromIp(undefined, { headers: { 'x-forwarded-for': '5.5.5.5' }, signal: acB.signal }), { room: 'b', member: 'y', pingMs: 0 }).status).toBe(200)
+      expect(lone.stream(fromIp(undefined, { headers: { 'x-forwarded-for': '6.6.6.6' } }), { room: 'b', member: 'z', pingMs: 0 }).status).toBe(503)
       acA.abort()
+      acB.abort()
     })
 
     it('drops stalled subscribers when controller.desiredSize <= 0', () => {

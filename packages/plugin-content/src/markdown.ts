@@ -36,8 +36,11 @@ function findDefaultImageResolver(file: string | undefined): MarkdownImageResolv
 const FENCE_RE = /^([`~]{3,})([^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm
 let slotBatchId = 0
 
-/** Renders Markdown via Bun's native Zig `Bun.markdown.html()`, with optional Shiki `highlight`, embedded TSX `components`, heading IDs, TOC, and reading time. */
-export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}): {
+function renderMarkdownInternal(
+  body: string,
+  options: RenderMarkdownOptions,
+  inheritedSlotPrefixes?: ReadonlySet<string>,
+): {
   html: string
   headings: ContentHeading[]
   wordCount: number
@@ -46,6 +49,8 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
   const slots: string[] = []
   // Cryptographically unguessable per-render slot prefix so untrusted markdown cannot forge or duplicate component slots.
   const slotPrefix = `b${++slotBatchId}-${crypto.randomUUID().slice(0, 12)}-`
+  const allowedSlotPrefixes = new Set<string>(inheritedSlotPrefixes)
+  allowedSlotPrefixes.add(slotPrefix)
   let processed = body
 
   // 1. Extract fenced code blocks before component expansion so `<Tag>` inside ```code``` is never treated as a component
@@ -65,8 +70,16 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
   }
 
   // 2. Expand embedded TSX components
-  if (options.components !== undefined)
-    processed = expandComponents(processed, options.components, options, slots, slotPrefix, renderMarkdown)
+  if (options.components !== undefined) {
+    processed = expandComponents(
+      processed,
+      options.components,
+      options,
+      slots,
+      slotPrefix,
+      (innerMd, innerOpts) => renderMarkdownInternal(innerMd, innerOpts, allowedSlotPrefixes),
+    )
+  }
 
   // 3. Render remaining Markdown via native Zig Bun.markdown.html
   let html = Bun.markdown.html(processed, {
@@ -79,7 +92,7 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
   // 3b. Sanitize rendered Markdown HTML by default unless `trusted: true` is opted into.
   // Runs before splicing developer-supplied highlight/component slots so custom components remain intact.
   if (options.trusted !== true)
-    html = sanitizeMarkdownHtml(html)
+    html = sanitizeMarkdownHtml(html, allowedSlotPrefixes)
 
   // 4. Add unique heading IDs & collect TOC
   const headings: ContentHeading[] = []
@@ -93,7 +106,7 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
     usedIds.set(base, count + 1)
     const id = count === 0 ? base : `${base}-${count}`
     headings.push({ level, id, text })
-    if (options.headingLinks && level >= 2)
+    if (options.headingLinks && level >= 2 && !/<a\b/i.test(inner))
       return `<h${level} id="${id}"><a href="#${id}">${inner}</a></h${level}>`
     return `<h${level} id="${id}">${inner}</h${level}>`
   })
@@ -145,4 +158,14 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
   const words = body.trim().split(/\s+/).filter(Boolean).length
   const readingMinutes = Math.max(1, Math.ceil(words / 220))
   return { html, headings, wordCount: words, readingMinutes }
+}
+
+/** Renders Markdown via Bun's native Zig `Bun.markdown.html()`, with optional Shiki `highlight`, embedded TSX `components`, heading IDs, TOC, and reading time. */
+export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}): {
+  html: string
+  headings: ContentHeading[]
+  wordCount: number
+  readingMinutes: number
+} {
+  return renderMarkdownInternal(body, options)
 }

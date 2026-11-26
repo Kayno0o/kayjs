@@ -4,7 +4,7 @@
 
 import type { ActiveI18nConfig, KayPlugin } from '@kayjs/kay/config'
 import { definePlugin, I18N_CONFIG_SERVICE } from '@kayjs/kay/config'
-import { escAttr } from '@kayjs/kay/server'
+import { escAttr, isTrustedOrigin } from '@kayjs/kay/server'
 
 declare module '@kayjs/kay/server' {
   interface KayLocals {
@@ -90,6 +90,7 @@ export function formatNumber(
 export function i18n(options: I18nOptions): KayPlugin {
   const { locales, defaultLocale, messages = {}, prefixDefault = false } = options
   let activeSite = options.site?.replace(/\/$/, '')
+  let activeAssetPrefix = '/_kay'
   const localeSet = new Set(locales)
   const sharedConfig: ActiveI18nConfig = { locales, defaultLocale, prefixDefault }
 
@@ -118,24 +119,68 @@ export function i18n(options: I18nOptions): KayPlugin {
     build(ctx) {
       if (options.site === undefined && ctx.site !== undefined)
         activeSite = ctx.site.replace(/\/$/, '')
+      if (ctx.assetPrefix)
+        activeAssetPrefix = ctx.assetPrefix.replace(/\/+$/, '') || '/_kay'
       ctx.provide(I18N_CONFIG_SERVICE, sharedConfig)
     },
 
     server(api) {
       if (options.site === undefined && api.site !== undefined)
         activeSite = api.site.replace(/\/$/, '')
+      if (api.assetPrefix)
+        activeAssetPrefix = api.assetPrefix.replace(/\/+$/, '') || '/_kay'
+      const assetPrefixSlash = `${activeAssetPrefix}/`
+      const actionPrefix = `${assetPrefixSlash}action/`
+      const trustedOrigins = api.trustedOrigins.length > 0 ? new Set(api.trustedOrigins) : undefined
       api.provide(I18N_CONFIG_SERVICE, sharedConfig)
 
       // Rewrite /fr/about -> /about and attach locale + helpers onto ctx.locals
       api.rewrite((pathname, ctx) => {
-        const { locale: matched, path } = stripLocalePrefix(pathname, locales)
+        const stripped = stripLocalePrefix(pathname, locales)
+        let matched = stripped.locale
+        let path = stripped.path
+        // Server action URLs live under <assetPrefix>/action/<id> without a locale prefix; recover locale from trusted Referer.
+        if (matched === undefined && pathname.startsWith(actionPrefix)) {
+          const referer = ctx.request.headers.get('referer')
+          if (referer !== null && URL.canParse(referer)) {
+            const refUrl = new URL(referer)
+            if (isTrustedOrigin(refUrl.origin, ctx.request, trustedOrigins, api.trustProxy, ctx.url)) {
+              const fromRef = stripLocalePrefix(refUrl.pathname, locales)
+              matched = fromRef.locale
+              path = fromRef.path
+            }
+          }
+        }
         const active = matched ?? defaultLocale
         ctx.locals.locale = active
         ctx.locals.t = (key: string) => translate(active, key)
         ctx.locals.localize = (p: string, target = active) => localizePath(p, target, defaultLocale, locales, prefixDefault)
         ctx.locals.alternates = () => alternateLinks(path, { site: activeSite, locales, defaultLocale, prefixDefault })
-        return matched !== undefined ? path : undefined
+        return stripped.locale !== undefined ? stripped.path : undefined
       })
+
+      if (prefixDefault) {
+        api.use((ctx, next) => {
+          const method = ctx.request.method
+          if (method !== 'GET' && method !== 'HEAD')
+            return next()
+          const rawPath = ctx.url.pathname
+          if (
+            rawPath === activeAssetPrefix
+            || rawPath.startsWith(assetPrefixSlash)
+            || rawPath === '/_i18n'
+            || rawPath.startsWith('/_i18n/')
+            || rawPath === '/api'
+            || rawPath.startsWith('/api/')
+          ) {
+            return next()
+          }
+          if (stripLocalePrefix(rawPath, locales).locale !== undefined)
+            return next()
+          const target = localizePath(rawPath, defaultLocale, defaultLocale, locales, true)
+          return ctx.redirect(`${target}${ctx.url.search}`, 302)
+        })
+      }
 
       api.route('GET', '/_i18n/locales', ctx =>
         ctx.json({ locales, defaultLocale, current: ctx.locals.locale ?? defaultLocale }))
@@ -171,16 +216,19 @@ export function i18n(options: I18nOptions): KayPlugin {
       // Prefix internal <a href="/..."> links for non-default locales only
       if (locale === defaultLocale && !prefixDefault)
         return html
+      const assetPrefixSlash = `${activeAssetPrefix}/`
+      const escapedLocale = escAttr(locale)
       return html.replace(INTERNAL_HREF_RE, (match, before: string, href: string, after: string) => {
         if (before.includes('data-no-localize') || after.includes('data-no-localize'))
           return match
-        if (href.startsWith('//') || href.startsWith('/_kay/') || href.startsWith('/_i18n/'))
+        if (href.startsWith('//') || href === activeAssetPrefix || href.startsWith(assetPrefixSlash) || href.startsWith('/_i18n/'))
           return match
-        const seg = href.split('/')[1]
+        const seg = href.slice(1).split(/[/?#]/, 1)[0]
         if (seg !== undefined && localeSet.has(seg))
           return match
-        const prefixed = href === '/' ? `/${locale}` : `/${locale}${href}`
-        return `<a${before}href="${escAttr(prefixed)}"${after}>`
+        // `href` is already extracted from a double-quoted HTML attribute; only escape the prepended locale segment to avoid double-escaping `&amp;`.
+        const prefixed = href === '/' ? `/${escapedLocale}` : `/${escapedLocale}${href}`
+        return `<a${before}href="${prefixed}"${after}>`
       })
     },
 
