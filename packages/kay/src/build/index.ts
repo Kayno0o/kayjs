@@ -178,7 +178,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     graph.load(f)
   for (const analysis of graph.analyses.values()) {
     for (const warning of analysis.warnings)
-      console.warn(warning)
+      console.warn(warning.message)
   }
 
   const routesRel = relPosix(root, routesDir)

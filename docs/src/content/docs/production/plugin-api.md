@@ -61,7 +61,7 @@ export function myPlugin() {
 
     // Validate plugin invariants during `kay check`
     check(ctx) {
-      // ctx.error('missing required file')
+      // ctx.error('missing required file'), or ctx.warn('...') for what may be intended
     },
 
     // Extra paths for `kay dev` to watch

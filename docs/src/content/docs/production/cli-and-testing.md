@@ -10,7 +10,7 @@ order: 4
 | Command | Description |
 | :--- | :--- |
 | `kay new <dir> [--template minimal\|fullstack\|blog\|app] [--force]` | Scaffold a new project |
-| `kay check [dir] [--no-typecheck]` | Run Kay compiler checks, route checks, plugin `check()` hooks, and `bun check`/`tsgo`/`tsc` |
+| `kay check [dir] [--no-typecheck] [--json] [--strict]` | Run Kay compiler checks, route checks, plugin `check()` hooks, and `bun check`/`tsgo`/`tsc`. Every mistake in a file is reported in one run, each at its `file:line:col`. `--json` prints the findings as data, and `--strict` fails on a warning too |
 | `kay dev [dir] [--port 3000] [--host [addr]]` | Dev server with live reload (binds `127.0.0.1` by default; pass `--host` for `0.0.0.0`). A `kay.config.ts` that fails to load stops it with the error and its `file:line:column` |
 | `kay build [dir] [--analyze] [--max-js <size>]` | Single-pass production build into `dist/`. `--analyze` prints per-route JS/CSS weights and each island with the reason it became one. `--max-js 40kb` (or a byte count) fails the build when a route's gzipped eager JS is over the size, naming the route and its islands |
 | `kay build --static` | Static HTML + asset export into `dist/` |
@@ -32,7 +32,7 @@ Print a shell completion script with `kay --completions fish` (also `bash` and `
 | Code | Meaning |
 | :--- | :--- |
 | `0` | The command did what was asked |
-| `1` | A finding or a failure: `kay check` found an error, `kay upgrade` has steps left to do by hand, a build failed or a route is over `--max-js` |
+| `1` | A finding or a failure: `kay check` found an error (or a warning, with `--strict`), `kay upgrade` has steps left to do by hand, a build failed or a route is over `--max-js` |
 | `2` | A usage error: an unknown command or option, a bad `--port` or `--max-js`, a missing argument |
 
 The CLI does not write a usage log: it runs on `@kaynooo/cli-kit` with that turned off.

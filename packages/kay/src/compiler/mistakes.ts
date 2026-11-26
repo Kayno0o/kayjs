@@ -48,8 +48,52 @@ function eventProp(event: string): string {
   return EVENT_PROPS.get(event) ?? `on${event.charAt(0).toUpperCase()}${event.slice(1)}`
 }
 
-export function mistake(what: string, filename: string, fix: string): Error {
-  return new Error(`kay compiler: ${what} in ${filename}: ${fix}.`)
+/** A compiler mistake, with the source offset of the code it names once known. */
+export class KayMistake extends Error {
+  start: number | undefined = undefined
+}
+
+/** Code that compiles but usually means something else, at its source offset. */
+export interface CompilerWarning {
+  message: string
+  start: number
+}
+
+export function mistake(what: string, filename: string, fix: string): KayMistake {
+  return new KayMistake(`kay compiler: ${what} in ${filename}: ${fix}.`)
+}
+
+let collected: KayMistake[] | undefined
+
+/** Runs one check. The build stops at the first mistake; while `collectMistakes` runs, the mistake is recorded at `start` and the caller goes on. */
+export function guarded(start: number, check: () => void): void {
+  if (collected === undefined)
+    return check()
+  try {
+    check()
+  }
+  catch (err) {
+    if (!(err instanceof KayMistake))
+      throw err
+    err.start ??= start
+    collected.push(err)
+  }
+}
+
+/** Runs `fn` with every guarded check recording its mistake; `error` is what `fn` threw past them, a syntax error or a mistake that stops the analysis. */
+export function collectMistakes<T>(fn: () => T): { value: T | undefined, mistakes: KayMistake[], error: unknown } {
+  const prev = collected
+  const mistakes: KayMistake[] = []
+  collected = mistakes
+  try {
+    return { value: fn(), mistakes, error: undefined }
+  }
+  catch (error) {
+    return { value: undefined, mistakes, error }
+  }
+  finally {
+    collected = prev
+  }
 }
 
 export function islandRemoved(filename: string): Error {
@@ -237,47 +281,52 @@ function staticAttr(attributes: readonly JSXAttributeItem[], name: string): JSXA
   return undefined
 }
 
-function checkFocusAndChange(tag: string, attributes: readonly JSXAttributeItem[], filename: string, warnings: string[]): void {
+function checkFocusAndChange(tag: string, attributes: readonly JSXAttributeItem[], filename: string, warnings: CompilerWarning[]): void {
   const canFocus = !UNFOCUSABLE_TAGS.has(tag) || attributes.some(a =>
     a.type === 'JSXSpreadAttribute'
     || (a.name.type === 'JSXIdentifier' && ['tabIndex', 'tabindex', 'contentEditable', 'contenteditable'].includes(a.name.name)),
   )
   for (const [prop, bubbling] of FOCUS_EVENTS) {
-    if (!canFocus && staticAttr(attributes, prop) !== undefined)
-      throw mistake(`${prop} on <${tag}>`, filename, `focus does not bubble, write ${bubbling}={...}, or give the <${tag}> a tabIndex`)
+    const attr = canFocus ? undefined : staticAttr(attributes, prop)
+    if (attr !== undefined)
+      guarded(attr.start, () => { throw mistake(`${prop} on <${tag}>`, filename, `focus does not bubble, write ${bubbling}={...}, or give the <${tag}> a tabIndex`) })
   }
-  if (staticAttr(attributes, 'onChange') === undefined)
+  const onChange = staticAttr(attributes, 'onChange')
+  if (onChange === undefined)
     return
   const type = staticAttr(attributes, 'type')?.value
   const isTextField = tag === 'textarea' || (tag === 'input' && (type === undefined || (type?.type === 'Literal' && typeof type.value === 'string' && TEXT_INPUT_TYPES.has(type.value))))
   if (isTextField)
-    warnings.push(`kay compiler: onChange on <${tag}> in ${filename} fires when the field loses focus, not per keystroke; write onInput={...} for every keystroke.`)
+    warnings.push({ message: `kay compiler: onChange on <${tag}> in ${filename} fires when the field loses focus, not per keystroke; write onInput={...} for every keystroke.`, start: onChange.start })
 }
 
 /** Throws when a JSX element would compile into something other than what its author meant, and adds to `warnings` what may be meant but usually is not. */
-export function checkMistakes(element: JSXElement, filename: string, code: string, warnings: string[]): void {
+export function checkMistakes(element: JSXElement, filename: string, code: string, warnings: CompilerWarning[]): void {
   const tag = jsxTagName(element.openingElement.name)
   const isElement = tag !== '' && !isComponentTag(tag)
   const isCustomElement = tag.includes('-')
   if (tag === 'Suspense') {
     const children = filterMeaningfulChildren(element.children).length
     if (children > 1)
-      throw mistake(`<Suspense> with ${children} children`, filename, 'give it one child, and one <Suspense> per async component')
+      guarded(element.start, () => { throw mistake(`<Suspense> with ${children} children`, filename, 'give it one child, and one <Suspense> per async component') })
   }
   const attributes = element.openingElement.attributes
-  if (isElement && staticAttr(attributes, 'class') !== undefined && staticAttr(attributes, 'className') !== undefined)
-    throw mistake('class and className', filename, 'keep one, they set the same attribute')
+  const className = isElement && staticAttr(attributes, 'class') !== undefined ? staticAttr(attributes, 'className') : undefined
+  if (className !== undefined)
+    guarded(className.start, () => { throw mistake('class and className', filename, 'keep one, they set the same attribute') })
   if (isElement)
     checkFocusAndChange(tag, attributes, filename, warnings)
   for (const attr of attributes) {
     if (attr.type !== 'JSXAttribute')
       continue
-    if (attr.name.type === 'JSXNamespacedName')
-      checkNamespacedAttribute(attr.name.namespace.name, attr.name.name.name, filename)
-    else if (isElement && attr.name.name === 'innerHTML')
-      checkInnerHtml(element, tag, attr, filename, code)
-    else if (isElement)
-      checkElementAttribute(attr, isCustomElement, filename, code)
+    guarded(attr.start, () => {
+      if (attr.name.type === 'JSXNamespacedName')
+        checkNamespacedAttribute(attr.name.namespace.name, attr.name.name.name, filename)
+      else if (isElement && attr.name.name === 'innerHTML')
+        checkInnerHtml(element, tag, attr, filename, code)
+      else if (isElement)
+        checkElementAttribute(attr, isCustomElement, filename, code)
+    })
   }
 }
 
@@ -422,7 +471,7 @@ export function checkBareSignals(program: Program, signalCallees: ReadonlySet<st
     const refuse = (expr: Node): void => {
       const name = bareSignal(expr, signals)
       if (name !== undefined)
-        throw mistake(`${name} without .value`, filename, `write ${name}.value`)
+        guarded(expr.start, () => { throw mistake(`${name} without .value`, filename, `write ${name}.value`) })
     }
     const tag = node.type === 'JSXElement' ? jsxTagName(node.openingElement.name) : ''
     if (isComponentTag(tag))

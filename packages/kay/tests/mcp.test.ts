@@ -672,6 +672,7 @@ describe('@kayjs/mcp — Streamable HTTP (2025-03-26) plugin', () => {
       root: fixtureDir,
       routesDir: join(fixtureDir, 'src/routes'),
       error: msg => checkErrors.push(msg),
+      warn: () => {},
     })
     expect(checkErrors.length).toBe(1)
     expect(checkErrors[0]).toContain('edit_note')

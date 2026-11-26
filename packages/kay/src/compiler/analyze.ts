@@ -12,9 +12,10 @@ import type {
 import { parseSync, visitorKeys } from 'oxc-parser'
 import { walk } from './ast'
 import type { BindingFacts, Interactivity } from './interactivity'
+import type { CompilerWarning } from './mistakes'
 import { analyzeDefaultDataKeys } from './data-keys'
 import { resolveInteractivity } from './interactivity'
-import { assertScopedKayImport, checkBareSignals, checkHydrateMode, checkMistakes, islandRemoved, mistake, serverOnlyTagError } from './mistakes'
+import { assertScopedKayImport, checkBareSignals, checkHydrateMode, checkMistakes, guarded, islandRemoved, mistake, serverOnlyTagError } from './mistakes'
 import { EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from './shared'
 
 
@@ -81,7 +82,7 @@ export interface ModuleAnalysis extends Interactivity {
   /** Each export by name, with the top-level binding it exports. */
   exportLocals: Map<string, string>
   /** Code that compiles but usually means something else, worded for build and `kay check` to print. */
-  warnings: string[]
+  warnings: CompilerWarning[]
 }
 
 export function computeJsxNodes(program: Program): WeakSet<Node> {
@@ -254,10 +255,10 @@ function scanImports(program: Program, filename: string): ImportScan {
   const scan: ImportScan = { imports: [], reactiveLocals: new Map(), stateCallees: new Set(), signalCallees: new Set(), serverOnlyLocals: new Map(), kayNamespaces: new Set(), serverNamespaces: new Set(), actionLocalName: undefined, usesRenderContext: false }
   for (const stmt of program.body) {
     if (stmt.type === 'ExportAllDeclaration' || (stmt.type === 'ExportNamedDeclaration' && stmt.source !== null))
-      assertScopedKayImport(stmt.source!.value, filename)
+      guarded(stmt.source!.start, () => assertScopedKayImport(stmt.source!.value, filename))
     if (stmt.type !== 'ImportDeclaration')
       continue
-    assertScopedKayImport(stmt.source.value, filename)
+    guarded(stmt.source.start, () => assertScopedKayImport(stmt.source.value, filename))
     // Entire `import type { ... } from '...'` declarations have zero runtime effect.
     if (stmt.importKind === 'type')
       continue
@@ -403,7 +404,8 @@ function scanExportedDeclaration(scan: DeclarationScan, decl: NonNullable<Export
       if (name === 'prerender' && d.init?.type === 'Literal' && d.init.value === true)
         scan.hasPrerender = true
       if (name === 'hydrate' && d.init?.type === 'Literal' && typeof d.init.value === 'string') {
-        checkHydrateMode(d.init.value, `hydrate = "${d.init.value}"`, filename)
+        const mode = d.init.value
+        guarded(d.init.start, () => checkHydrateMode(mode, `hydrate = "${mode}"`, filename))
         scan.defaultHydrate = d.init.value
       }
       if (d.init !== null && isActionCall(d.init, imports.actionLocalName, imports.serverNamespaces)) {
@@ -459,7 +461,7 @@ interface BodyScan {
 }
 
 // Walks each top-level binding for JSX, mistakes, action() placement and what makes it run in the browser.
-function scanBody(program: Program, filename: string, code: string, imports: ImportScan, decls: DeclarationScan, warnings: string[]): BodyScan {
+function scanBody(program: Program, filename: string, code: string, imports: ImportScan, decls: DeclarationScan, warnings: CompilerWarning[]): BodyScan {
   const body: BodyScan = { hasJsx: false, usesRenderContext: imports.usesRenderContext, deferredIslandTags: new Set(), hydrateModes: new Set(), jsxTags: new Set(), bindings: [] }
   const units = bindingUnits(program)
   const tracked = new Set(units.map(u => u.name))
@@ -482,7 +484,7 @@ function scanBody(program: Program, filename: string, code: string, imports: Imp
     if (node.type === 'JSXElement')
       checkMistakes(node, filename, code, warnings)
     if (checkActions && isActionCall(node, imports.actionLocalName, imports.serverNamespaces) && !decls.registeredActions.has(node))
-      throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${imports.actionLocalName ?? 'action'}(...) at the top level, only those get a URL`)
+      guarded(node.start, () => { throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${imports.actionLocalName ?? 'action'}(...) at the top level, only those get a URL`) })
     if (node.type === 'JSXOpeningElement') {
       scanOpeningElement(node, binding, body, imports, filename)
       const root = jsxTagName(node.name).split('.')[0]!
@@ -532,7 +534,7 @@ function scanOpeningElement(node: Extract<Node, { type: 'JSXOpeningElement' }>, 
     const attrName = attr.name.name
     if (isComponent && attrName === '$hydrate') {
       const mode = hydrateMode(attr.value)
-      checkHydrateMode(mode, `$hydrate="${mode}"`, filename)
+      guarded(attr.start, () => checkHydrateMode(mode, `$hydrate="${mode}"`, filename))
       body.hydrateModes.add(mode)
       if (mode !== 'load')
         body.deferredIslandTags.add(tag)
@@ -580,7 +582,7 @@ function stateExportsOf(decls: DeclarationScan, stateCallees: ReadonlySet<string
 export function analyzeModule(filename: string, code: string, program: Program = parseTsx(filename, code)): ModuleAnalysis {
   const imports = scanImports(program, filename)
   const decls = scanDeclarations(program, filename, imports)
-  const warnings: string[] = []
+  const warnings: CompilerWarning[] = []
   const body = scanBody(program, filename, code, imports, decls, warnings)
   checkBareSignals(program, imports.signalCallees, filename)
 

@@ -112,6 +112,36 @@ describe('Compile, check, and build error locations & code frames (#3546)', () =
     expect(res.errors.some(e => e.startsWith('src/routes/posts/[slug].tsx:1:1: error:'))).toBe(true)
   })
 
+  it('kay check reports every compiler mistake of a file at its place, and still checks the file (#3605)', async () => {
+    const dir = makeTemp('kay-diag-all-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), [
+      'import { readFileSync } from "node:fs"',
+      'import { signal } from "@kayjs/kay"',
+      'export function Counter() {',
+      '  const n = signal(0)',
+      '  void readFileSync',
+      '  return <button type="button" onClick={() => n.value++}>{n}</button>',
+      '}',
+      'export default function Home() {',
+      '  return <main>',
+      '    <button onclick={() => {}}>a</button>',
+      '    <input ref="field" />',
+      '    <input type="text" onChange={() => {}} />',
+      '    <Counter />',
+      '  </main>',
+      '}',
+    ].join('\n'))
+
+    const res = await checkProject(dir, { skipTypecheck: true })
+    const at = res.errors.map(e => e.split(': error: ')[0])
+    expect(at).toContain('src/routes/index.tsx:6:59')
+    expect(at).toContain('src/routes/index.tsx:10:13')
+    expect(at).toContain('src/routes/index.tsx:11:12')
+    expect(res.errors.some(e => e.startsWith('src/routes/index.tsx:1:') && e.includes('node:fs'))).toBe(true)
+    expect(res.warnings).toEqual([expect.stringMatching(/^src\/routes\/index\.tsx:12:24: warning: kay compiler: onChange on <input> in src\/routes\/index\.tsx fires/)])
+  })
+
   it('preserves file:line:col and source line from Bun.build logs on build failures', async () => {
     // Unit test of formatBunBuildLogs
     const formatted = formatBunBuildLogs([

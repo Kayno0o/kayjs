@@ -77,21 +77,32 @@ function checkCommand(cwd: string): Commands[string] {
     run: async (args) => {
       const { values, positionals: [dir] } = parse(args, 'kay check [options] [dir]: reports every mistake kay can find in the app: the compile, the config, the routes and the types', {
         'no-typecheck': { type: 'boolean', description: 'skip the TypeScript check' },
+        'json': { type: 'boolean', description: 'print { ok, checkedFiles, errors, warnings } as JSON, each diagnostic with file, line, col, severity and message' },
+        'strict': { type: 'boolean', description: 'fail on a warning too' },
         'root': ROOT,
-      }, { positionals: ['[dir]'], exits: [[0, 'no error found (warnings do not count)'], [1, 'at least one error found'], USAGE_EXIT] })
-      const { checkProject } = await import('./check')
+      }, { positionals: ['[dir]'], exits: [[0, 'no error found (warnings count only with --strict)'], [1, 'at least one error found, or a warning with --strict'], USAGE_EXIT] })
+      const { checkProject, diagnosticData } = await import('./check')
       const t0 = performance.now()
       const res = await checkProject(rootOf(cwd, values.root, dir), { skipTypecheck: values['no-typecheck'] === true })
       const ms = (performance.now() - t0).toFixed(1)
+      const failed = !res.ok || (values.strict === true && res.warnings.length > 0)
+      if (values.json === true) {
+        const errors = res.errors.map(e => diagnosticData(e, 'error'))
+        const warnings = res.warnings.map(w => diagnosticData(w, 'warning'))
+        console.log(JSON.stringify({ ok: res.ok, checkedFiles: res.checkedFiles, errors, warnings }, null, 2))
+        return failed ? 1 : 0
+      }
       for (const warning of res.warnings)
         console.warn(warning)
-      if (res.ok) {
-        console.log(`kay check passed (${res.checkedFiles} files) in ${ms} ms`)
-        return 0
-      }
       for (const e of res.errors)
         console.error(e)
-      return 1
+      if (failed) {
+        if (res.ok)
+          console.error(`kay check: ${res.warnings.length} warning${res.warnings.length === 1 ? '' : 's'}, which --strict counts as errors.`)
+        return 1
+      }
+      console.log(`kay check passed (${res.checkedFiles} files) in ${ms} ms`)
+      return 0
     },
   }
 }

@@ -33,6 +33,25 @@ describe('#3568 CLI argument parsing, plugin commands & dev config fidelity', ()
     expect((await kay(['upgrade', '--help'])).out).toContain('Exit codes:')
   })
 
+  test('kay check --json prints each diagnostic as data, --strict fails on a warning (#3605)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-check-json-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() {\n  return <input type="text" onChange={() => {}} />\n}\n')
+      expect((await kay(['check', '--no-typecheck'], dir)).code).toBe(0)
+      expect((await kay(['check', '--no-typecheck', '--strict'], dir)).code).toBe(1)
+
+      const res = await kay(['check', '--no-typecheck', '--json'], dir)
+      expect(res.code).toBe(0)
+      const report = JSON.parse(res.out) as { ok: boolean, checkedFiles: number, errors: unknown[], warnings: unknown[] }
+      expect(report).toMatchObject({ ok: true, checkedFiles: 1, errors: [] })
+      expect(report.warnings).toEqual([{ file: 'src/routes/index.tsx', line: 2, col: 29, severity: 'warning', message: expect.stringContaining('kay compiler: onChange on <input>') }])
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   test('an unknown option is a usage error that exits 2 and names the option', async () => {
     const res = await kay(['check', '--nope'])
     expect(res.code).toBe(2)

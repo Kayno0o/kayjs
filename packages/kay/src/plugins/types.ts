@@ -66,6 +66,8 @@ export interface CheckPluginContext {
   readonly routesDir: string
   /** Report a validation error from `kay check`. */
   error(message: string): void
+  /** Report what may be intended but usually is not; `kay check --strict` fails on it. */
+  warn(message: string): void
 }
 
 export interface PluginRouteOptions {

@@ -2,6 +2,7 @@
 
 import type { Program } from 'oxc-parser'
 import type { ModuleAnalysis } from '../compiler/analyze'
+import type { CheckPluginContext, KayPlugin } from '../plugins/index'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
 import { isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
@@ -10,7 +11,7 @@ import { fileToRoutePath, hasRouteHandlerExport, normalizeRoutePattern, routeExp
 import { analyzeModule } from '../compiler/analyze'
 import { walk } from '../compiler/ast'
 import { withStateReads } from '../compiler/interactivity'
-import { serverOnlyTagError } from '../compiler/mistakes'
+import { collectMistakes, KayMistake, serverOnlyTagError } from '../compiler/mistakes'
 import { findPrivateEnvOffset, SERVER_ONLY_MODULES } from '../compiler/server-only'
 import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc, jsxTagName } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
@@ -20,6 +21,24 @@ export interface CheckResult {
   checkedFiles: number
   errors: string[]
   warnings: string[]
+}
+
+/** One diagnostic of `kay check --json`; one without a place (a typecheck dump) has no file, line or col. */
+export interface CheckDiagnostic {
+  file?: string
+  line?: number
+  col?: number
+  severity: 'error' | 'warning'
+  message: string
+}
+
+const DIAGNOSTIC_RE = /^(.+?):(\d+):(\d+): (error|warning): ([\s\S]*)$/
+
+export function diagnosticData(text: string, severity: 'error' | 'warning'): CheckDiagnostic {
+  const m = DIAGNOSTIC_RE.exec(text)
+  if (m === null)
+    return { severity, message: text }
+  return { file: m[1]!, line: Number(m[2]), col: Number(m[3]), severity: m[4] as 'error' | 'warning', message: m[5]! }
 }
 
 const SERIALIZABLE_NEW_CTORS = new Set(['Date', 'Map', 'Set', 'URL', 'RegExp'])
@@ -75,12 +94,11 @@ function sourceOf(file: string, sources: Map<string, string>): string {
 
 function analysisOf(file: string, analyses: Map<string, ModuleAnalysis>, sources: Map<string, string>, unparsable: Set<string>): ModuleAnalysis | undefined {
   if (!analyses.has(file) && !unparsable.has(file) && isTsFile(file)) {
-    try {
-      analyses.set(file, analyzeModule(file, sourceOf(file, sources)))
-    }
-    catch {
+    const { value } = collectMistakes(() => analyzeModule(file, sourceOf(file, sources)))
+    if (value !== undefined)
+      analyses.set(file, value)
+    else
       unparsable.add(file)
-    }
   }
   return analyses.get(file)
 }
@@ -89,6 +107,49 @@ function locOf(root: string, file: string, sources: Map<string, string>, offset 
   const rel = relPosix(root, file)
   const code = sources.get(file)
   return code !== undefined ? formatLoc(rel, code, offset) : `${rel}:1:1`
+}
+
+// Analyzes each file, reporting every compiler mistake at its place. A file whose analysis stopped short (a syntax error, a mistake no later check can work past) is left out of the checks that need it.
+function analyzeFiles(root: string, files: readonly string[], analyses: Map<string, ModuleAnalysis>, sources: Map<string, string>, unparsable: Set<string>, errors: string[], warnings: string[]): void {
+  for (const file of files) {
+    const { value, mistakes, error } = collectMistakes(() => analyzeModule(file, sourceOf(file, sources)))
+    const rel = relPosix(root, file)
+    for (const m of mistakes)
+      errors.push(formatDiagnostic(locOf(root, file, sources, m.start), m.message.replaceAll(file, rel)))
+    if (value !== undefined) {
+      analyses.set(file, value)
+      for (const w of value.warnings)
+        warnings.push(formatDiagnostic(locOf(root, file, sources, w.start), w.message.replaceAll(file, rel), 'warning'))
+      continue
+    }
+    unparsable.add(file)
+    const msg = error instanceof Error ? error.message : String(error)
+    errors.push(error instanceof KayMistake && error.start !== undefined ? formatDiagnostic(locOf(root, file, sources, error.start), msg.replaceAll(file, rel)) : normalizeDiagnosticPath(root, file, msg))
+  }
+}
+
+// Each plugin's check(ctx) runs inside a real AppRuntimeContext; what it reports without a place lands on kay.config.ts.
+async function runPluginChecks(plugins: readonly KayPlugin[], paths: { root: string, routesDir: string, outDir: string, assetPrefix: string }, errors: string[], warnings: string[]): Promise<void> {
+  const { root, routesDir, outDir, assetPrefix } = paths
+  const appCtx = createAppContext({ root, outDir, publicDir: join(outDir, 'public'), assetPrefix, dev: false })
+  const placed = (message: string, severity: 'error' | 'warning'): string =>
+    DIAGNOSTIC_PREFIX_RE.test(message) ? message : formatDiagnostic('kay.config.ts:1:1', message, severity)
+  const pluginCtx: CheckPluginContext = {
+    root,
+    routesDir,
+    error: message => errors.push(placed(message, 'error')),
+    warn: message => warnings.push(placed(message, 'warning')),
+  }
+  for (const plugin of plugins) {
+    if (plugin.check === undefined)
+      continue
+    try {
+      await runWithAppContext(appCtx, () => plugin.check!(pluginCtx))
+    }
+    catch (err) {
+      errors.push(placed(`${plugin.name}: ${err instanceof Error ? err.message : String(err)}`, 'error'))
+    }
+  }
 }
 
 function findExportedConstOffset(analysis: ModuleAnalysis, name: string): number {
@@ -221,19 +282,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   const unparsable = new Set<string>()
 
   const warnings: string[] = []
-  for (const file of files) {
-    try {
-      const code = sourceOf(file, sources)
-      const analysis = analyzeModule(file, code)
-      analyses.set(file, analysis)
-      warnings.push(...analysis.warnings)
-    }
-    catch (err) {
-      unparsable.add(file)
-      const msg = err instanceof Error ? err.message : String(err)
-      errors.push(normalizeDiagnosticPath(root, file, msg))
-    }
-  }
+  analyzeFiles(root, files, analyses, sources, unparsable, errors, warnings)
 
   // 3a. Promote components reading imported reactive state (same rule as `planIslands` in `kay build`)
   for (const [file, analysis] of [...analyses]) {
@@ -393,34 +442,8 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     }
   }
 
-  // 3c. Run plugin check(ctx) hooks inside a real AppRuntimeContext
-  if (plugins && plugins.length > 0) {
-    const appCtx = createAppContext({
-      root,
-      outDir,
-      publicDir: join(outDir, 'public'),
-      assetPrefix,
-      dev: false,
-    })
-    const pluginCtx = {
-      root,
-      routesDir,
-      error(message: string) {
-        errors.push(DIAGNOSTIC_PREFIX_RE.test(message) ? message : formatDiagnostic('kay.config.ts:1:1', message))
-      },
-    }
-    for (const plugin of plugins) {
-      if (plugin.check !== undefined) {
-        try {
-          await runWithAppContext(appCtx, () => plugin.check!(pluginCtx))
-        }
-        catch (err) {
-          const msg = `${plugin.name}: ${err instanceof Error ? err.message : String(err)}`
-          errors.push(DIAGNOSTIC_PREFIX_RE.test(msg) ? msg : formatDiagnostic('kay.config.ts:1:1', msg))
-        }
-      }
-    }
-  }
+  // 3c. Plugin check(ctx) hooks
+  await runPluginChecks(plugins, { root, routesDir, outDir, assetPrefix }, errors, warnings)
 
   // 4. Run TypeScript check (`bun check` preferred, fallback to `tsgo` then `tsc`) when tsconfig.json exists
   const tsconfigPath = join(root, 'tsconfig.json')

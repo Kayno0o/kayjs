@@ -58,7 +58,7 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
   })
 
   test('onChange on a text field warns, since it fires on commit rather than per keystroke', () => {
-    const warningsOf = (jsx: string): string[] => analyzeModule('Page.tsx', `export default function Page() { const fn = () => {}; return ${jsx} }`).warnings
+    const warningsOf = (jsx: string): string[] => analyzeModule('Page.tsx', `export default function Page() { const fn = () => {}; return ${jsx} }`).warnings.map(w => w.message)
     expect(warningsOf('<input onChange={fn} />')).toEqual(['kay compiler: onChange on <input> in Page.tsx fires when the field loses focus, not per keystroke; write onInput={...} for every keystroke.'])
     expect(warningsOf('<textarea onChange={fn} />')).toHaveLength(1)
     expect(warningsOf('<input type="checkbox" onChange={fn} />')).toEqual([])
