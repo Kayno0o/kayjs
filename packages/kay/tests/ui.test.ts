@@ -152,7 +152,7 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
     `)
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
-      import { Head } from 'kay'
+      import { Head } from '@kayjs/kay'
       import { Card, CardBody, CardHeader, CommandPalette, DataTable, Dialog, Drawer, Grid, Menu, Popover, Select, Stack, Tabs, Toaster } from ${JSON.stringify(UI_ENTRY)}
       import { ToastDemo } from '../components/ToastDemo'
 

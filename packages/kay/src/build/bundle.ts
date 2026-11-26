@@ -64,11 +64,11 @@ function reuseDirFiles(srcDir: string, dstDir: string, relFiles?: readonly strin
   return count > 0
 }
 
-const KAY_SPECIFIER_FILTER = /^(?:@kayjs\/)?kay(?:\/.*)?$/
+const KAY_SPECIFIER_FILTER = /^@kayjs\/kay(?:\/.*)?$/
 const TS_FILTER = /\.(?:ts|tsx)$/
 const KAY_SCOPE_RE = /^@kayjs\//
 const LEADING_DOT_SLASH_RE = /^\.\//
-const EXTERNAL_KAY_SUBPATHS = new Set(['kay/build', 'kay/compiler', 'kay/dev', 'kay/test'])
+const EXTERNAL_KAY_SPECIFIERS = new Set(['@kayjs/kay/build', '@kayjs/kay/test'])
 
 export function pluginBunPlugins(env: Pick<BundleEnv, 'plugins' | 'root' | 'assetPrefix' | 'minify'>, target: BuildPluginTarget): BunPlugin[] {
   const { root, assetPrefix, minify } = env
@@ -226,8 +226,8 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   if (islands.targets.size > 0 || pluginClientEntries.length > 0) {
     const runtimeLines: string[] = []
     if (islands.targets.size > 0) {
-      runtimeLines.push(`import { defineIslandElement } from 'kay/island';`)
-      runtimeLines.push(`export { hydrate${hasClientOnlyHydrate ? ', mount' : ''} } from 'kay/dom';`)
+      runtimeLines.push(`import { defineIslandElement } from '@kayjs/kay/internal/island';`)
+      runtimeLines.push(`export { hydrate${hasClientOnlyHydrate ? ', mount' : ''} } from '@kayjs/kay/internal/dom';`)
       runtimeLines.push(`defineIslandElement();`)
     }
     for (const pe of pluginClientEntries)
@@ -267,7 +267,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
       b.onLoad({ filter: TS_FILTER }, (args) => {
         const actions = actionsByFile.get(args.path)
         if (actions !== undefined && !graph.analyses.get(args.path)?.isInteractive) {
-          const lines = [`import { actionStub } from 'kay/action';`]
+          const lines = [`import { actionStub } from '@kayjs/kay/internal/action';`]
           for (const a of actions)
             lines.push(`export const ${a.exportName} = actionStub(${JSON.stringify(a.url)});`)
           return { contents: `${lines.join('\n')}\n`, loader: 'ts' }
@@ -484,7 +484,7 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
         const resolved = resolveKaySpecifier(args.path)
         if (resolved === undefined)
           return undefined
-        return EXTERNAL_KAY_SUBPATHS.has(args.path.replace(KAY_SCOPE_RE, '')) ? { path: resolved, external: true } : { path: resolved }
+        return EXTERNAL_KAY_SPECIFIERS.has(args.path) ? { path: resolved, external: true } : { path: resolved }
       })
       b.onResolve({ filter: KAY_SCOPE_RE }, (args) => {
         try {

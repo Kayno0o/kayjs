@@ -16,7 +16,7 @@ export interface ServerEntryOptions {
   modules: readonly ServerEntryModule[]
   /** `kay.config.ts`, when the app has one. */
   config?: { file: string, source: string } | undefined
-  /** Absolute path of kay's `server/app-entry.ts`, bundled from source like the app's own `kay/server` imports. */
+  /** Absolute path of kay's `server/app-entry.ts`, bundled from source like the app's own `@kayjs/kay/server` imports. */
   assembler: string
 }
 

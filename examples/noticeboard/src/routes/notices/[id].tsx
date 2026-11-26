@@ -1,7 +1,7 @@
-import type { PageProps, RouteContext } from 'kay/server'
+import type { PageProps, RouteContext } from '@kayjs/kay/server'
 import { Button, Card, CardBody, CardFooter, CardHeader, Stack } from '@kayjs/ui'
-import { Head } from 'kay'
-import { notFound } from 'kay/server'
+import { Head } from '@kayjs/kay'
+import { notFound } from '@kayjs/kay/server'
 import { findNotice } from '../../db'
 
 export function load(ctx: RouteContext<'/notices/[id]'>) {

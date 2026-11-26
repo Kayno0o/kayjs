@@ -5,8 +5,8 @@ import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { measure } from 'mitata'
 import { chromium } from 'playwright-core'
-import { build } from 'kay/build'
-import { createServer } from 'kay/server'
+import { build } from '@kayjs/kay/build'
+import { createServer } from '@kayjs/kay/internal/server'
 
 const ROOT = import.meta.dir
 

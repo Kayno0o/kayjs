@@ -5,10 +5,10 @@ section: core
 order: 6
 ---
 
-Configure your app in `kay.config.ts` with `defineConfig()` from `kay/server`:
+Configure your app in `kay.config.ts` with `defineConfig()` from `@kayjs/kay/config`:
 
 ```ts
-import { defineConfig } from 'kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 
 export default defineConfig({
   lang: 'en',
@@ -84,7 +84,7 @@ ctx.cookies.delete('theme')
 Validate required server environment variables once at startup with any Standard Schema validator:
 
 ```ts
-import { defineEnv, nodeEnv } from 'kay/server'
+import { defineEnv, nodeEnv } from '@kayjs/kay/server'
 import { z } from 'zod'
 
 export const env = defineEnv(z.object({

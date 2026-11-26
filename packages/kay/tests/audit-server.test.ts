@@ -63,7 +63,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       mkdirSync(join(dir, 'src/routes/api'), { recursive: true })
 
       writeFileSync(join(dir, 'src/routes/api/items.ts'), `
-        import type { RequestContext } from 'kay/server'
+        import type { RequestContext } from '@kayjs/kay/server'
         export function GET(ctx: RequestContext) { return ctx.json({ ok: true, method: 'GET' }) }
         export function POST(ctx: RequestContext) { return ctx.json({ ok: true, method: 'POST' }) }
         export function PUT(ctx: RequestContext) { return ctx.json({ ok: true, method: 'PUT' }) }
@@ -72,7 +72,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       `)
 
       writeFileSync(join(dir, 'src/routes/api/webhook.ts'), `
-        import type { RequestContext } from 'kay/server'
+        import type { RequestContext } from '@kayjs/kay/server'
         export const csrf = false
         export function POST(ctx: RequestContext) { return ctx.json({ ok: true, webhook: true }) }
       `)
@@ -161,7 +161,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       mkdirSync(join(dir, 'src/actions'), { recursive: true })
 
       writeFileSync(join(dir, 'src/routes/api/upload.ts'), `
-        import type { RequestContext } from 'kay/server'
+        import type { RequestContext } from '@kayjs/kay/server'
         export async function POST(ctx: RequestContext) {
           const text = await ctx.request.text()
           return ctx.json({ len: text.length })
@@ -169,7 +169,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       `)
 
       writeFileSync(join(dir, 'src/actions/echo.ts'), `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         const passSchema = {
           '~standard': {
             version: 1 as const,
@@ -264,7 +264,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       mkdirSync(join(dir, 'src/actions'), { recursive: true })
 
       writeFileSync(join(dir, 'src/actions/fail.ts'), `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         export const failAction = action(async () => {
           throw new Error('SECRET_DB_STACK_LEAK_12345')
         })
@@ -356,7 +356,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       mkdirSync(join(dir, 'src/actions'), { recursive: true })
 
       writeFileSync(join(dir, 'src/actions/pay.ts'), `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         const schema = {
           '~standard': {
             version: 1 as const,
@@ -428,7 +428,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       mkdirSync(join(dir, 'src/actions'), { recursive: true })
 
       writeFileSync(join(dir, 'src/actions/signup.ts'), `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         const schema = {
           '~standard': {
             version: 1 as const,
@@ -486,7 +486,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
 
       writeFileSync(join(dir, 'public/icon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"></svg>')
       writeFileSync(join(dir, 'src/components/Counter.tsx'), `
-        import { signal } from 'kay'
+        import { signal } from '@kayjs/kay'
         export function Counter() {
           const n = signal(0)
           return <button type="button" onClick={() => n.value++}>{n.value}</button>
@@ -497,7 +497,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
         export default function Home() { return <main><Counter /></main> }
       `)
       writeFileSync(join(dir, 'src/routes/stream.tsx'), `
-        import { Suspense } from 'kay'
+        import { Suspense } from '@kayjs/kay'
         async function Slow() { await Bun.sleep(5); return <p>done</p> }
         export default function Stream() { return <Suspense fallback={<p>...</p>}><Slow /></Suspense> }
       `)
@@ -640,7 +640,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       const dir = makeTemp('kay-audit-box13-')
       mkdirSync(join(dir, 'src/routes/api'), { recursive: true })
       writeFileSync(join(dir, 'src/routes/api/who.ts'), `
-        import type { RequestContext } from 'kay/server'
+        import type { RequestContext } from '@kayjs/kay/server'
         export function GET(ctx: RequestContext) {
           return ctx.json({ ip: (ctx as { ip?: string }).ip ?? null })
         }
@@ -722,7 +722,7 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       mkdirSync(join(dir, 'src/components'), { recursive: true })
       writeFileSync(join(dir, 'src/components/Btn.tsx'), `
-        import { signal } from 'kay'
+        import { signal } from '@kayjs/kay'
         export function Btn() { const n = signal(0); return <button onClick={() => n.value++}>{n.value}</button> }
       `)
       writeFileSync(join(dir, 'src/routes/index.tsx'), `
@@ -803,7 +803,7 @@ describe('streamed Suspense boundaries', () => {
 
   it('renders a rejected boundary as its error template, completes the page and reports the error', async () => {
     const { errors, page } = await streamApp(`
-      import { Suspense } from 'kay'
+      import { Suspense } from '@kayjs/kay'
       async function Boom() { await Bun.sleep(1); throw new Error('stats down') }
       async function Bang() { await Bun.sleep(1); throw new Error('feed down') }
       export default function Home() {
@@ -824,7 +824,7 @@ describe('streamed Suspense boundaries', () => {
 
   it('flushes a boundary rendered by a boundary that resolved', async () => {
     const { page } = await streamApp(`
-      import { Suspense } from 'kay'
+      import { Suspense } from '@kayjs/kay'
       async function Inner() { await Bun.sleep(1); return <b>inner</b> }
       async function Outer() { await Bun.sleep(1); return <div><Suspense fallback={<i>wait</i>}><Inner /></Suspense></div> }
       export default function Home() { return <main><Suspense fallback={<p>...</p>}><Outer /></Suspense></main> }
@@ -837,7 +837,7 @@ describe('streamed Suspense boundaries', () => {
 
   it('ends the response with the error template once a boundary exceeds streamTimeout', async () => {
     const { errors, page } = await streamApp(`
-      import { Suspense } from 'kay'
+      import { Suspense } from '@kayjs/kay'
       async function Hang() { await new Promise(() => {}); return <p>never</p> }
       export default function Home() { return <main><Suspense fallback={<p>...</p>} error={<p>slow</p>}><Hang /></Suspense></main> }
     `, { streamTimeout: 30 })
@@ -850,7 +850,7 @@ describe('streamed Suspense boundaries', () => {
   it('runs plugin HTML transforms on the shell and initial body of a streamed page', async () => {
     const tag = definePlugin({ name: 'tag', transformHtml: html => html.replace('<main>', '<main data-tagged>').replace('</head>', '<meta name="t"></head>') })
     const { page } = await streamApp(`
-      import { Suspense } from 'kay'
+      import { Suspense } from '@kayjs/kay'
       async function Slow() { await Bun.sleep(1); return <p>done</p> }
       export default function Home() { return <main><Suspense fallback={<p>...</p>}><Slow /></Suspense></main> }
     `, { plugins: [tag] })
@@ -872,7 +872,7 @@ describe('fast static path', () => {
         export default function Page() { return <main>home</main> }
       `)
       writeFileSync(join(dir, 'src/routes/cookie.tsx'), `
-        import type { RequestContext } from 'kay/server'
+        import type { RequestContext } from '@kayjs/kay/server'
         export async function load(ctx: RequestContext) {
           ctx.cookies.set('seen', '1')
           return new Response(null, { status: 302, headers: { location: '/login' } })

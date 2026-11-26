@@ -5,7 +5,7 @@ section: core
 order: 4
 ---
 
-Define server mutations once with `action(schema, handler)` from `kay/server`. It accepts any [Standard Schema](https://standardschema.dev) validator (Zod, Valibot, ArkType, TypeBox, or custom).
+Define server mutations once with `action(schema, handler)` from `@kayjs/kay/server`. It accepts any [Standard Schema](https://standardschema.dev) validator (Zod, Valibot, ArkType, TypeBox, or custom).
 
 ## Defining an action
 
@@ -13,7 +13,7 @@ Declare every action as a **top-level named export** so Kay can assign it a stab
 
 ```ts
 // src/actions/preferences.ts
-import { action } from 'kay/server'
+import { action } from '@kayjs/kay/server'
 import { z } from 'zod'
 
 export const savePreferences = action(
@@ -39,7 +39,7 @@ Inside the handler, `ctx` provides `request`, `url`, `params`, `cookies`, `local
 Pass the action directly to `<form action={savePreferences} method="post">`:
 
 ```tsx
-import { getActionError } from 'kay/server'
+import { getActionError } from '@kayjs/kay/server'
 import { savePreferences } from '../actions/preferences'
 
 export default function SettingsPage({ locals }: { locals: Record<string, unknown> }) {
@@ -69,7 +69,7 @@ No client JavaScript is shipped. Form fields are parsed, validated, and executed
 Import and call the exact same export from an interactive island. Kay strips all server code and replaces it with a tiny RPC stub in the client bundle:
 
 ```tsx
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 import { savePreferences } from '../actions/preferences'
 
 export function QuickSave() {

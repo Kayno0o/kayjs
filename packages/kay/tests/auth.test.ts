@@ -105,7 +105,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     `)
 
     writeFileSync(join(routesDir, 'dashboard', 'index.tsx'), `
-      import { action } from 'kay/server'
+      import { action } from '@kayjs/kay/server'
       import type { Auth } from '${join(import.meta.dir, '../../plugin-auth/src/index.ts')}'
       const auth = (globalThis as Record<string, Auth>).__TEST_AUTH!
 
@@ -132,7 +132,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     `)
 
     writeFileSync(join(routesDir, 'admin', 'index.tsx'), `
-      import { action } from 'kay/server'
+      import { action } from '@kayjs/kay/server'
 
       export const purge = action(async () => ({ purged: true }))
 
@@ -440,7 +440,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       export default function PublicHome() { return <main>public-only</main> }
     `)
     writeFileSync(join(routesDir, 'me.tsx'), `
-      import type { PageProps } from 'kay'
+      import type { PageProps } from '@kayjs/kay'
       export default function Me({ locals }: PageProps) {
         const a = locals.user?.email ?? 'anon'
         const b = locals.user?.email ?? 'anon'

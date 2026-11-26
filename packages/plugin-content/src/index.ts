@@ -1,12 +1,13 @@
 // @kayjs/content — Zero-dependency Bun-native Markdown collections, nested YAML frontmatter (Bun.YAML),
 // Shiki/custom highlight hook, MDX-lite embedded TSX components, localized collections, TOC, and RSS (`0 KB` client JS).
 
-import type { KayPlugin } from '@kayjs/kay/server'
+import type { KayPlugin } from '@kayjs/kay/config'
 import type { Collection, InternalCollection } from './collection'
 import type { ContentFeed, RssFeedConfig } from './rss'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { definePlugin, getAppContext } from '@kayjs/kay/server'
+import { definePlugin } from '@kayjs/kay/config'
+import { getAppContext } from '@kayjs/kay/internal/server'
 import {
   COLLECTION_DIR_FOR_ROOT_KEY,
   COLLECTION_VALIDATE_KEY,

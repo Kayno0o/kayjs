@@ -171,7 +171,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   // kay.config.ts enters the graph too, so an action or component reached only from it is analyzed and gets its URL.
   const configSrc = join(root, 'kay.config.ts')
   const hasConfigFile = existsSync(configSrc)
-  const graph = new ModuleGraph(options.cache)
+  const graph = new ModuleGraph(root, options.cache)
   for (const f of [...specialFiles, ...candidatePageFiles, ...(hasConfigFile ? [configSrc] : [])])
     graph.load(f)
   for (const analysis of graph.analyses.values()) {

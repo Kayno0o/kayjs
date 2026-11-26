@@ -1,4 +1,4 @@
-import type { StandardSchemaV1 } from 'kay/server'
+import type { StandardSchemaV1 } from '@kayjs/kay/server'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { defineCollection } from '@kayjs/content'

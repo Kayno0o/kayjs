@@ -1,4 +1,4 @@
-import type { PageProps, RequestContext } from 'kay/server'
+import type { PageProps, RequestContext } from '@kayjs/kay/server'
 import type { Preferences } from '../actions/preferences'
 import {
   Accordion,

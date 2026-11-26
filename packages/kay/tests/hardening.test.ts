@@ -18,7 +18,7 @@ function makeTemp(prefix: string): string {
 }
 function linkKay(dir: string): void {
   mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
-  symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/kay'), 'dir')
+  symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/@kayjs/kay'), 'dir')
   const pkgRoot = join(KAY_PKG_DIR, '..')
   const links: Record<string, string> = {
     auth: 'plugin-auth',
@@ -40,7 +40,7 @@ afterAll(() => {
 describe('Milestone 4: Compiler hardening (spreads, SVG, destructured .map, kay-slot)', () => {
   it('compiles JSX spread attributes on intrinsic elements for SSR and DOM and folds static literal attrs', () => {
     const src = `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Btn({ label, ...rest }: { label: string, [k: string]: unknown }) {
         return <button type="button" tabIndex={-1} rows={4} disabled={false} hidden={true} {...rest}>{label}</button>
       }
@@ -61,7 +61,7 @@ describe('Milestone 4: Compiler hardening (spreads, SVG, destructured .map, kay-
 
   it('compiles SVG child root templates with isSvg=true and handles destructured .map()', () => {
     const src = `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Chart() {
         const pts = signal([{ id: 1, cx: 10 }, { id: 2, cx: 20 }])
         return (
@@ -84,8 +84,8 @@ describe('Milestone 4: Compiler hardening (spreads, SVG, destructured .map, kay-
     mkdirSync(join(dir, 'src/components'), { recursive: true })
 
     writeFileSync(join(dir, 'src/components/Drawer.tsx'), `
-      import { signal } from 'kay'
-      import type { KayChild } from 'kay'
+      import { signal } from '@kayjs/kay'
+      import type { KayChild } from '@kayjs/kay'
 
       export function Drawer({ title, children, ...rest }: { title: string, children?: KayChild, [k: string]: unknown }) {
         const open = signal(true)
@@ -250,7 +250,7 @@ describe('Milestone 4: CSS Modules, public/ static files, and plugins in --compi
     writeFileSync(join(dir, 'public/hello.txt'), 'compiled-public-ok')
     const i18nPath = join(import.meta.dir, '../../plugin-i18n/src/index.ts')
     writeFileSync(join(dir, 'kay.config.ts'), `
-      import { defineConfig } from 'kay/server'
+      import { defineConfig } from '@kayjs/kay/config'
       import { i18n } from ${JSON.stringify(i18nPath)}
       export default defineConfig({
         plugins: [
@@ -351,7 +351,7 @@ describe('Milestone 4: kay new scaffolder & kay check validator', () => {
 
     // Inject an illegal interactive async route and verify kay check catches it
     writeFileSync(join(fullDir, 'src/routes/bad.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export default async function Bad() {
         const n = signal(0)
         return <div>{n.value}</div>

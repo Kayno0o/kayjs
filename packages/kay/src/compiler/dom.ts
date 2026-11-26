@@ -1274,14 +1274,14 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     }
     if (used.size > 0) {
       const specifiers = [...used].sort().map(name => `${name} as __${name}`).join(', ')
-      header += `import { ${specifiers} } from 'kay/dom';\n`
+      header += `import { ${specifiers} } from '@kayjs/kay/internal/dom';\n`
     }
     if (usedExtras.length > 0) {
       const specifiers = usedExtras.map(name => `${name} as __${name}`).join(', ')
-      header += `import { ${specifiers} } from 'kay/dom-extras';\n`
+      header += `import { ${specifiers} } from '@kayjs/kay/internal/dom-extras';\n`
     }
     if (hasLoop)
-      header += `import { loop as __loop } from 'kay/dom-loop';\n`
+      header += `import { loop as __loop } from '@kayjs/kay/internal/dom-loop';\n`
   }
   for (const t of templates)
     header += `const ${t.name} = __template(${JSON.stringify(t.html)}${t.isSvg ? ', true' : ''});\n`

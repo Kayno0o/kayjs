@@ -1,4 +1,4 @@
-import type { KayChild } from 'kay'
+import type { KayChild } from '@kayjs/kay'
 
 export function Tab({ group, label, checked, children }: {
   group: string

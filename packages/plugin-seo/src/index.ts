@@ -2,11 +2,11 @@
 // Built strictly on the public KayPlugin API (server, build, transformHtml).
 
 import type { Html } from '@kayjs/kay'
-import type { ActiveI18nConfig, KayPlugin } from '@kayjs/kay/server'
+import type { ActiveI18nConfig, KayPlugin } from '@kayjs/kay/config'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, extname, resolve } from 'node:path'
-import { definePlugin, I18N_CONFIG_SERVICE } from '@kayjs/kay/server'
-import { escAttr, raw } from '@kayjs/kay/ssr'
+import { definePlugin, I18N_CONFIG_SERVICE } from '@kayjs/kay/config'
+import { escAttr, raw } from '@kayjs/kay/server'
 
 export interface FontEntry {
   family: string

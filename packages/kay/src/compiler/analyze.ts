@@ -11,7 +11,7 @@ import type {
   VariableDeclaration,
 } from 'oxc-parser'
 import { parseSync, visitorKeys } from 'oxc-parser'
-import { checkBareSignals, checkHydrateMode, checkMistakes, mistake } from './mistakes'
+import { assertScopedKayImport, checkBareSignals, checkHydrateMode, checkMistakes, mistake } from './mistakes'
 import { EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from './shared'
 
 export type AstNode = Node
@@ -30,9 +30,9 @@ const REACTIVE_IMPORTS = new Set([
 
 // Primitives whose result is reactive state another module can import and read.
 const STATE_PRIMITIVES = new Set(['signal', 'computed', 'selector', 'store'])
-const KAY_SOURCES = new Set(['kay', '@kayjs/kay'])
-const KAY_SSR_SOURCES = new Set(['kay', '@kayjs/kay', 'kay/ssr', '@kayjs/kay/ssr'])
-const KAY_SERVER_SOURCES = new Set(['kay/server', '@kayjs/kay/server'])
+const KAY_SOURCES = new Set(['@kayjs/kay'])
+const KAY_SSR_SOURCES = new Set(['@kayjs/kay', '@kayjs/kay/internal/ssr'])
+const KAY_SERVER_SOURCES = new Set(['@kayjs/kay/server'])
 const RENDER_CONTEXT_IMPORTS = new Set(['Head', 'Suspense', 'createContext', 'provideContext', 'useContext', 'useId'])
 
 export interface ImportInfo {
@@ -565,8 +565,11 @@ export function analyzeModule(filename: string, code: string, program: Program =
 
   // Pass 1: hoist all runtime imports first so import order relative to exports never matters.
   for (const stmt of program.body) {
+    if (stmt.type === 'ExportAllDeclaration' || (stmt.type === 'ExportNamedDeclaration' && stmt.source !== null))
+      assertScopedKayImport(stmt.source!.value, filename)
     if (stmt.type !== 'ImportDeclaration')
       continue
+    assertScopedKayImport(stmt.source.value, filename)
     // Entire `import type { ... } from '...'` declarations have zero runtime effect.
     if (stmt.importKind === 'type')
       continue

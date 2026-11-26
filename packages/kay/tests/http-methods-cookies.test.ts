@@ -76,7 +76,7 @@ export default function Home() {
 export function GET() { return Response.json({ ok: true }) }
 `)
       writeFileSync(join(dir, 'src/actions/ping.ts'), `
-import { action } from 'kay/server'
+import { action } from '@kayjs/kay/server'
 export const ping = action(async () => ({ pong: true }))
 `)
 

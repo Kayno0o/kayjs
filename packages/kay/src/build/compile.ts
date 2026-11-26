@@ -89,7 +89,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     const kayResolvePlugin: BunPlugin = {
       name: 'kay-v2-compile-resolve',
       setup(b) {
-        b.onResolve({ filter: /^(?:@kayjs\/)?kay(?:\/.*)?$/ }, (args) => {
+        b.onResolve({ filter: /^@kayjs\/kay(?:\/.*)?$/ }, (args) => {
           const resolved = resolveKaySpecifier(args.path)
           return resolved !== undefined ? { path: resolved } : undefined
         })

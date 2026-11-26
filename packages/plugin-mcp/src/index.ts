@@ -2,14 +2,16 @@
 // Exposes typed Kay v2 server `action()` handlers (and standalone tool handlers) as MCP tools
 // over a bearer-authenticated endpoint via `KayPlugin.server`, keeping core free of MCP code.
 
-import type { ActionContext, InferOutput, KayPlugin, RequestContext, ServerAction, ServerPluginAPI, StandardSchemaV1 } from '@kayjs/kay/server'
+import type { KayPlugin, ServerPluginAPI } from '@kayjs/kay/config'
+import type { ActionContext, InferOutput, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
 import type { McpBudgetOptions, McpFootprint } from './footprint'
 import type { McpPruneMode, McpToolResult } from './format'
 import type { ListedTool, McpToolAnnotations, ResolvedResource, ResolvedToolEntry } from './rpc'
 import type { CompactSchemaOptions, JsonSchemaObject } from './schema'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { definePlugin, nodeEnv } from '@kayjs/kay/server'
+import { definePlugin } from '@kayjs/kay/config'
+import { nodeEnv } from '@kayjs/kay/server'
 import { collectBudgetViolations, computeFootprint, formatMcpFootprint } from './footprint'
 import { createRpcDispatcher } from './rpc'
 import { isPlainRecord, isStandardSchema, normalizeObjectSchema, schemaToJsonSchema } from './schema'

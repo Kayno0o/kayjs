@@ -1,5 +1,5 @@
 import { Button, Notice, Stack } from '@kayjs/ui'
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 
 export default function NotFoundPage() {
   return (

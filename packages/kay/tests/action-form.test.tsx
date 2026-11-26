@@ -1,9 +1,9 @@
-import type { ActionResult } from 'kay/server'
+import type { ActionResult } from '@kayjs/kay/server'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { useAction } from 'kay'
+import { useAction } from '@kayjs/kay'
 import { actionStub } from '../src/dom/action'
 import { testApp } from '../src/test/index'
 
@@ -89,7 +89,7 @@ describe('useAction progressive form controller (#3555)', () => {
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
 
     writeFileSync(join(dir, 'src/actions/notes.ts'), `
-      import { action } from 'kay/server'
+      import { action } from '@kayjs/kay/server'
       const schema = {
         '~standard': {
           version: 1 as const,
@@ -107,7 +107,7 @@ describe('useAction progressive form controller (#3555)', () => {
     `)
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
-      import { useAction } from 'kay'
+      import { useAction } from '@kayjs/kay'
       import { createNote } from '../actions/notes'
 
       export default function NotesPage() {

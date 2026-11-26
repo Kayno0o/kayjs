@@ -668,7 +668,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
   if (used.size > 0) {
     const specifiers = [...used].sort().map(name => `${name} as __${name}`).join(', ')
-    editor.prepend(`import { ${specifiers} } from 'kay/ssr';\n`)
+    editor.prepend(`import { ${specifiers} } from '@kayjs/kay/internal/ssr';\n`)
   }
 
   return { code: editor.toString(), analysis }

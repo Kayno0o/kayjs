@@ -139,7 +139,7 @@ describe('Kay v2 architecture & regression suite', () => {
 
   it('import type does not mark a file interactive, and export * barrels resolve islands', async () => {
     const analysis = analyzeModule('Page.tsx', `
-      import type { signal, Signal } from 'kay'
+      import type { signal, Signal } from '@kayjs/kay'
       export default async function Page(props: { s?: Signal<number> }) {
         return <p>{props.s ? 'yes' : 'no'}</p>
       }
@@ -152,7 +152,7 @@ describe('Kay v2 architecture & regression suite', () => {
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
     mkdirSync(join(dir, 'src/components'), { recursive: true })
     writeFileSync(join(dir, 'src/components/Counter.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Counter() {
         const n = signal(0)
         return <button type="button" onClick={() => n.value++}>{n.value}</button>
@@ -201,7 +201,7 @@ describe('Kay v2 architecture & regression suite', () => {
 
     // Root JSXFragment with logical expression compiles to valid JS
     const frag = compileDom('Frag.tsx', `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Frag() {
         const n = signal(1)
         return <>{n.value > 0 && <b>pos</b>}</>
@@ -361,7 +361,7 @@ describe('Kay v2 architecture & regression suite', () => {
     mkdirSync(join(dir, 'src/routes/_components'), { recursive: true })
     writeFileSync(join(dir, 'src/routes/_components/Helper.tsx'), `export function Helper() { return <span>hi</span> }\n`)
     writeFileSync(join(dir, 'src/routes/index.tsx'), `import { Helper } from './_components/Helper'\nexport default function Home() { return <Helper /> }\n`)
-    writeFileSync(join(dir, 'src/routes/_layout.tsx'), `import { signal } from 'kay'\nexport default function Layout({ children }: any) { const n = signal(0); return <div>{n.value}{children}</div> }\n`)
+    writeFileSync(join(dir, 'src/routes/_layout.tsx'), `import { signal } from '@kayjs/kay'\nexport default function Layout({ children }: any) { const n = signal(0); return <div>{n.value}{children}</div> }\n`)
 
     const res = await checkProject(dir, { skipTypecheck: true })
     expect(res.ok).toBe(false)

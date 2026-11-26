@@ -29,7 +29,7 @@ describe('TSX compiler', () => {
     expect(analyzeModule('Card.tsx', staticCode).isInteractive).toBe(false)
 
     const signalCode = `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Counter() {
         const count = signal(0)
         return <button>{count.value}</button>
@@ -63,7 +63,7 @@ describe('TSX compiler', () => {
     ['local const exported by name', `const load = () => process.env.SECRET_MARKER\nexport { load }`],
   ])('client code and the private-env scan drop a load declared as %s', (_, loadCode) => {
     const page = `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       ${loadCode}
       export default function Home() {
         const n = signal(0)
@@ -88,8 +88,8 @@ describe('TSX compiler', () => {
 
   test('lists the exports bound to reactive state, in every export form', () => {
     const state = `
-      import { signal, store } from 'kay'
-      import * as kay from 'kay'
+      import { signal, store } from '@kayjs/kay'
+      import * as kay from '@kayjs/kay'
       export const count = signal(0)
       const items = store([])
       const total = kay.computed(() => count.value)
@@ -100,8 +100,8 @@ describe('TSX compiler', () => {
   })
 
   test('a reactive primitive called through a namespace import makes the module interactive', () => {
-    expect(analyzeModule('Counter.tsx', `import * as kay from 'kay'\nexport function Counter() { const n = kay.signal(0); return <p>{n.value}</p> }`).isInteractive).toBe(true)
-    expect(analyzeModule('Counter.tsx', `import * as kay from 'kay'\nexport function Card() { return <p>{kay.raw('x')}</p> }`).isInteractive).toBe(false)
+    expect(analyzeModule('Counter.tsx', `import * as kay from '@kayjs/kay'\nexport function Counter() { const n = kay.signal(0); return <p>{n.value}</p> }`).isInteractive).toBe(true)
+    expect(analyzeModule('Counter.tsx', `import * as kay from '@kayjs/kay'\nexport function Card() { return <p>{kay.raw('x')}</p> }`).isInteractive).toBe(false)
   })
 
   test.each([
@@ -109,12 +109,12 @@ describe('TSX compiler', () => {
     ['a const arrow exported by name', `const Home = async () => { const x = signal(0); return <p>{x.value}</p> }\nexport default Home`],
     ['an export list', `async function Home() { const x = signal(0); return <p>{x.value}</p> }\nexport { Home as default }`],
   ])('rejects interactivity in an async default page declared as %s', (_, page) => {
-    expect(() => analyzeModule('index.tsx', `import { signal } from 'kay'\n${page}`)).toThrow(/async route component/)
+    expect(() => analyzeModule('index.tsx', `import { signal } from '@kayjs/kay'\n${page}`)).toThrow(/async route component/)
   })
 
   test('rejects browser interactivity directly inside async route component', () => {
     const badPage = `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export default async function Home() {
         const x = signal(0)
         return <button onClick={() => x.value++}>{x.value}</button>
@@ -162,7 +162,7 @@ describe('TSX compiler', () => {
 
   test('compiles DOM with template cloning, destructured props, delegated events, and keyed .map()', () => {
     const counterCode = `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Counter({ start = 0 }: { start?: number }) {
         const count = signal(start)
         return <button class="counter" onClick={() => count.value++}>Clicked {count.value}</button>
@@ -223,7 +223,7 @@ describe('TSX compiler', () => {
 
   test('compiles BlockStatement .map() with keyed JSX, TypeScript non-null/as prop rewrites, and nested JSX expressions', () => {
     const src = `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       interface Item { id: string; kind: 'folder' | 'link'; label: string }
       const LIST = [{ id: 'a', name: 'Alpha' }]
       export function Explorer({ current, items }: { current: string; items: Item[] }) {

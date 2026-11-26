@@ -1,6 +1,6 @@
-import type { PageProps } from 'kay'
+import type { PageProps } from '@kayjs/kay'
 import { Button, Split, Stack } from '@kayjs/ui'
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 import { LiveBoard } from '../components/LiveBoard'
 import { NewNoticeModal } from '../components/NewNoticeModal'
 import { latestNotices } from '../db'

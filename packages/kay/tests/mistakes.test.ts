@@ -79,12 +79,12 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
   })
 
   test('<Suspense> with several children, which renders none of them', () => {
-    refuses('<Suspense fallback={<p>...</p>}><A /><B /></Suspense>', /<Suspense> with 2 children in Page\.tsx: give it one child/, 'import { Suspense } from \'kay\'\nconst A = () => <p>a</p>\nconst B = () => <p>b</p>')
-    accepts('<Suspense fallback={<p>...</p>}>\n  <A />\n</Suspense>', 'import { Suspense } from \'kay\'\nconst A = () => <p>a</p>')
+    refuses('<Suspense fallback={<p>...</p>}><A /><B /></Suspense>', /<Suspense> with 2 children in Page\.tsx: give it one child/, 'import { Suspense } from \'@kayjs/kay\'\nconst A = () => <p>a</p>\nconst B = () => <p>b</p>')
+    accepts('<Suspense fallback={<p>...</p>}>\n  <A />\n</Suspense>', 'import { Suspense } from \'@kayjs/kay\'\nconst A = () => <p>a</p>')
   })
 
   test('a signal used without .value, which renders [object Object] or is always truthy', () => {
-    const page = (jsx: string): string => `import { signal, computed } from 'kay'\nexport default function Page() { const count = signal(0); const label = computed(() => 'x'); return ${jsx} }`
+    const page = (jsx: string): string => `import { signal, computed } from '@kayjs/kay'\nexport default function Page() { const count = signal(0); const label = computed(() => 'x'); return ${jsx} }`
     const refusesPage = (jsx: string, message: RegExp): void => {
       expect(() => compileSsr('Page.tsx', page(jsx))).toThrow(message)
       expect(() => compileDom('Page.tsx', page(jsx))).toThrow(message)
@@ -96,7 +96,7 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     refusesPage('<p>{`n=${count}`}</p>', /count without \.value/)
     expect(() => compileSsr('Page.tsx', page('<p>{count.value} {label.value}</p>'))).not.toThrow()
     expect(() => compileSsr('Page.tsx', page('<Child n={count} />').replace('export default', 'const Child = (p: any) => <p>{p.n.value}</p>\nexport default'))).not.toThrow()
-    expect(() => compileSsr('Page.tsx', `import { signal } from 'kay'\nconst A = () => { const n = signal(0); return <p>{n.value}</p> }\nexport default function B({ n }: { n: number }) { return <p>{n}</p> }`)).not.toThrow()
+    expect(() => compileSsr('Page.tsx', `import { signal } from '@kayjs/kay'\nconst A = () => { const n = signal(0); return <p>{n.value}</p> }\nexport default function B({ n }: { n: number }) { return <p>{n}</p> }`)).not.toThrow()
   })
 
   test('a ref that is not a function, which fails at hydration far from the cause', () => {
@@ -123,7 +123,7 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<Counter $hydrate="media(max-width: 600px)" />', counter)
     accepts('<Counter $hydrate={mode} />', `${counter}\nconst mode = 'idle'`)
     expect(() => compileSsr('Counter.tsx', 'export const hydrate = \'idle \'\nexport default function C() { return <p>x</p> }')).toThrow(/hydrate = "idle " in Counter\.tsx: use load, visible/)
-    expect(() => compileSsr('Counter.tsx', 'import { island } from \'kay\'\nconst C = () => <p>x</p>\nexport const Counter = island(C, { hydrate: \'idle\' })')).toThrow(/island\(\) options on export Counter in Counter\.tsx: only the default export's island\(\) options apply/)
+    expect(() => compileSsr('Counter.tsx', 'import { island } from \'@kayjs/kay\'\nconst C = () => <p>x</p>\nexport const Counter = island(C, { hydrate: \'idle\' })')).toThrow(/island\(\) options on export Counter in Counter\.tsx: only the default export's island\(\) options apply/)
   })
 
   test('$hydrate on a component that is not an island, which kay ignores', () => {
@@ -192,7 +192,7 @@ describe('kay refuses island props the browser cannot receive', () => {
 })
 
 describe('kay refuses actions it cannot give a URL', () => {
-  const server = 'import { action } from \'kay/server\'\n'
+  const server = 'import { action } from \'@kayjs/kay/server\'\n'
   test('an action() that is not an exported const, which posts to the page and gets 405', () => {
     expect(() => compileSsr('actions.ts', `${server}const save = action(async () => {})\nexport { save }`)).toThrow(/action\(\) not declared as export const in actions\.ts: write export const save = action\(\.\.\.\) at the top level/)
     expect(() => compileSsr('actions.ts', `${server}export default action(async () => {})`)).toThrow(/write export const name = action/)

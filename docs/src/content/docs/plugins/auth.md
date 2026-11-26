@@ -39,7 +39,7 @@ export const auth = createAuth({
 Register `auth.plugin` in `kay.config.ts`:
 
 ```ts
-import { defineConfig } from 'kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 import { auth } from './src/auth'
 
 export default defineConfig({

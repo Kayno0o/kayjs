@@ -1,11 +1,11 @@
 import type { PublicUser } from '@kayjs/auth'
-import type { ExtractRouteParams, KayLocals, LayoutProps, LoaderData, PageProps, RouteContext } from 'kay'
-import type { ActionErrorFlash, RequestContext } from 'kay/server'
+import type { ExtractRouteParams, KayLocals, LayoutProps, LoaderData, PageProps, RouteContext } from '@kayjs/kay'
+import type { ActionErrorFlash, RequestContext } from '@kayjs/kay/server'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getActionError, notFound } from 'kay/server'
+import { getActionError, notFound } from '@kayjs/kay/server'
 import { testApp } from '../src/test/index'
 
 const tempDirs: string[] = []
@@ -117,7 +117,7 @@ describe('Route params, loader data, KayLocals, and notFound() (#3544)', () => {
     mkdirSync(join(root, 'src/routes/items'), { recursive: true })
 
     writeFileSync(join(root, 'src/routes/_layout.tsx'), `
-import type { LayoutProps } from 'kay'
+import type { LayoutProps } from '@kayjs/kay'
 export default function Layout({ children }: LayoutProps) {
   return <div class="shell">{children}</div>
 }
@@ -129,8 +129,8 @@ export default function Custom404() {
 `)
     // Dynamic route returning or throwing notFound()
     writeFileSync(join(root, 'src/routes/items/[id].tsx'), `
-import type { PageProps, RouteContext } from 'kay/server'
-import { notFound } from 'kay/server'
+import type { PageProps, RouteContext } from '@kayjs/kay/server'
+import { notFound } from '@kayjs/kay/server'
 
 export function load(ctx: RouteContext<'/items/[id]'>) {
   if (ctx.params.id === 'missing')
@@ -146,8 +146,8 @@ export default function ItemPage({ data, params }: PageProps<typeof load>) {
 `)
     // Static route (fastStaticPages path — no middleware, no <Head>, no dynamic segment) returning/throwing notFound()
     writeFileSync(join(root, 'src/routes/gone.tsx'), `
-import type { RequestContext } from 'kay/server'
-import { notFound } from 'kay/server'
+import type { RequestContext } from '@kayjs/kay/server'
+import { notFound } from '@kayjs/kay/server'
 
 export function load(ctx: RequestContext) {
   if (ctx.url.searchParams.get('throw') === '1')

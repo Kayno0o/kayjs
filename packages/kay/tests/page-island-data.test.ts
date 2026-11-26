@@ -13,7 +13,7 @@ import { ssrIsland } from '../src/ssr/index'
 describe('#3560 page island data pruning & JSON script transport', () => {
   test('analyzeModule statically extracts only read keys of data and bails out safely when data escapes', () => {
     const picked = analyzeModule('page.tsx', `
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 export async function load() { return { count: 1, secret: 'x' } }
 export default function Page({ data }: { data: { count: number, title: string, secret: string } }) {
   const n = signal(data.count)
@@ -23,7 +23,7 @@ export default function Page({ data }: { data: { count: number, title: string, s
     expect(picked.defaultDataKeys).toEqual(['count', 'title'])
 
     const nestedDestructured = analyzeModule('nested.tsx', `
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 export default function Page({ data: { start } }: { data: { start: number, secret: string } }) {
   const n = signal(start)
   return <button onClick={() => n.value++}>{n.value}</button>
@@ -32,7 +32,7 @@ export default function Page({ data: { start } }: { data: { start: number, secre
     expect(nestedDestructured.defaultDataKeys).toEqual(['start'])
 
     const unused = analyzeModule('unused.tsx', `
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 export default function Page() {
   const n = signal(0)
   return <button onClick={() => n.value++}>{n.value}</button>
@@ -41,7 +41,7 @@ export default function Page() {
     expect(unused.defaultDataKeys).toEqual([])
 
     const escaped = analyzeModule('escaped.tsx', `
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 function helper(x: unknown) { return String(x) }
 export default function Page({ data }: { data: Record<string, unknown> }) {
   const n = signal(0)
@@ -70,7 +70,7 @@ export default function Page({ data }: { data: Record<string, unknown> }) {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       // Route 1: automatic pruning via static analysis
       writeFileSync(join(dir, 'src/routes/index.tsx'), `
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 export async function load() {
   return {
     initial: 7,
@@ -86,7 +86,7 @@ export default function Page({ data }: { data: { initial: number, label: string 
 `)
       // Route 2: explicit clientData picker function (also stripped from client bundle)
       writeFileSync(join(dir, 'src/routes/explicit.tsx'), `
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 export async function load() {
   return { count: 2, note: 'keep', internalId: 'SECRET_ID_999' }
 }

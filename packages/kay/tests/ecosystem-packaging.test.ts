@@ -95,7 +95,7 @@ import { mcp } from '@kayjs/mcp'
 import { images } from '@kayjs/images'
 import { seo } from '@kayjs/seo'
 import { ui } from '@kayjs/ui/plugin'
-import { defineConfig } from '@kayjs/kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 
 const cfg = defineConfig({
   plugins: [

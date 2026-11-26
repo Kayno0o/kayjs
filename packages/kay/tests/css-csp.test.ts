@@ -55,7 +55,7 @@ describe('Per-route CSS scoping, strict CSP hashes, and bundle weight report (#3
     writeFileSync(join(dir, 'src/styles/widget.css'), '.widget-only { color: #333333; }\n')
 
     writeFileSync(join(dir, 'src/components/Widget.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       import '../styles/widget.css'
       export function Widget() {
         const n = signal(0)
@@ -64,7 +64,7 @@ describe('Per-route CSS scoping, strict CSP hashes, and bundle weight report (#3
     `)
 
     writeFileSync(join(dir, 'src/routes/_layout.tsx'), `
-      import type { KayChild } from 'kay'
+      import type { KayChild } from '@kayjs/kay'
       import '../styles/layout.css'
       export default function Layout({ children }: { children?: KayChild }) {
         return <div class="shell">{children}</div>
@@ -156,7 +156,7 @@ describe('Per-route CSS scoping, strict CSP hashes, and bundle weight report (#3
     mkdirSync(join(dir, 'src/components'), { recursive: true })
 
     writeFileSync(join(dir, 'src/components/Btn.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Btn() {
         const n = signal(0)
         return <button type="button" onClick={() => n.value++}>{n.value}</button>
@@ -174,7 +174,7 @@ describe('Per-route CSS scoping, strict CSP hashes, and bundle weight report (#3
       }
     `)
     writeFileSync(join(dir, 'src/routes/stream.tsx'), `
-      import { Suspense } from 'kay'
+      import { Suspense } from '@kayjs/kay'
       async function Delayed() {
         await Bun.sleep(5)
         return <p id="done">Loaded cleanly</p>
@@ -267,13 +267,13 @@ describe('the default CSP lets an app style its pages (#3582)', () => {
       }
     `)
     writeFileSync(join(dir, 'src/routes/head.tsx'), `
-      import { Head } from 'kay'
+      import { Head } from '@kayjs/kay'
       export default function WithHead() {
         return <><Head><style>{'p{margin:0}'}</style></Head><p>head</p></>
       }
     `)
     writeFileSync(join(dir, 'src/routes/stream.tsx'), `
-      import { Suspense } from 'kay'
+      import { Suspense } from '@kayjs/kay'
       async function Later() {
         await Bun.sleep(1)
         return <p>later</p>

@@ -1,10 +1,10 @@
 // @kayjs/ui KayPlugin — wires a pure CSS Grammar (`editorial | workshop | console | soft | orbit | bare`)
 // and adds `kay ui-eject <grammar> [dest]` so apps can copy & own the entire look in ONE ~200-line CSS file.
 
-import type { KayPlugin } from '@kayjs/kay/server'
+import type { KayPlugin } from '@kayjs/kay/config'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { definePlugin } from '@kayjs/kay/server'
+import { definePlugin } from '@kayjs/kay/config'
 
 export type GrammarName = 'bare' | 'editorial' | 'workshop' | 'console' | 'soft' | 'orbit'
 

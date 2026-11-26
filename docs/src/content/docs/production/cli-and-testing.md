@@ -1,6 +1,6 @@
 ---
 title: CLI & Testing
-description: Kay CLI commands, plugin subcommands, bundle analysis, and in-process integration testing with testApp() from kay/test.
+description: Kay CLI commands, plugin subcommands, bundle analysis, and in-process integration testing with testApp() from @kayjs/kay/test.
 section: production
 order: 4
 ---
@@ -22,13 +22,13 @@ order: 4
 
 Plugins can register additional commands via `KayPlugin.commands`.
 
-## In-process testing (`kay/test`)
+## In-process testing (`@kayjs/kay/test`)
 
 Test routes, middleware, cookies, auth flows, and server actions in-process with `testApp()` — no port binding needed:
 
 ```ts
 import { describe, expect, it } from 'bun:test'
-import { testApp } from 'kay/test'
+import { testApp } from '@kayjs/kay/test'
 
 describe('app routes', () => {
   it('renders home and submits a server action', async () => {

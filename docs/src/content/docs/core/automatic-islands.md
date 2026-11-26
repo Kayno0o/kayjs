@@ -22,7 +22,7 @@ When a route renders only static components and native HTML forms, Kay omits the
 
 ```tsx
 // src/components/Counter.tsx — auto-detected island
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 
 export function Counter({ initial = 0 }: { initial?: number }) {
   const count = signal(initial)
@@ -66,7 +66,7 @@ An `export default async function Page()` route runs strictly on the server. You
 
 ## What an island may import
 
-An island ships to the browser with every module it imports. If any reachable module imports a server-only module (`bun:sqlite`, `node:fs`, `kay/server`, and similar) or reads `process.env`, `kay build` fails and `kay check` names the module and the island that reaches it.
+An island ships to the browser with every module it imports. If any reachable module imports a server-only module (`bun:sqlite`, `node:fs`, `@kayjs/kay/server`, and similar) or reads `process.env`, `kay build` fails and `kay check` names the module and the island that reaches it.
 
 A file that declares server actions is the exception. The browser receives a tiny RPC stub instead of its server code. Importing any non-action export from that file inside an island fails the build.
 

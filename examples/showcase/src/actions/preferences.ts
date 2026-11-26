@@ -1,5 +1,5 @@
-import type { StandardSchemaV1 } from 'kay/server'
-import { action } from 'kay/server'
+import type { StandardSchemaV1 } from '@kayjs/kay/server'
+import { action } from '@kayjs/kay/server'
 
 export interface Preferences {
   project: string

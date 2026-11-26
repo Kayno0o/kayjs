@@ -1,4 +1,4 @@
-import type { KayChild } from 'kay'
+import type { KayChild } from '@kayjs/kay'
 
 export function Tabs({ label = 'Code examples', children }: { label?: string, children?: KayChild }) {
   return (

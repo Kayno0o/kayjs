@@ -2,7 +2,7 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "kay",
+    "jsxImportSource": "@kayjs/kay",
     "noEmit": true
   },
   "include": ["src", "kay.config.ts"]

@@ -26,7 +26,7 @@ Static UI compiles to `0 KB` HTML strings; interactive components automatically 
 No directives needed — using `signal` or an event handler automatically marks the component as an island:
 
 ```tsx
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 
 export function Counter({ start = 0 }: { start?: number }) {
   const count = signal(start)
@@ -42,7 +42,7 @@ export function Counter({ start = 0 }: { start?: number }) {
 `async` route components run strictly on the server:
 
 ```tsx
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 import { Counter } from '../components/Counter'
 import { db } from '../db'
 
@@ -67,7 +67,7 @@ export default async function Home() {
 Accepts any [Standard Schema](https://standardschema.dev) validator (Zod, Valibot, ArkType, TypeBox). Works both as a zero-JS progressive `<form action={createPost} method="post">` and as a typed island RPC (`await createPost(data)`), with server code automatically stripped from client bundles and CSRF verified:
 
 ```ts
-import { action } from 'kay/server'
+import { action } from '@kayjs/kay/server'
 import { z } from 'zod'
 
 export const createPost = action(
@@ -87,7 +87,7 @@ Core holds the compiler, runtime, router, SSR and build. Every optional capabili
 
 | Package | Purpose | Notes |
 | :--- | :--- | :--- |
-| **`@kayjs/kay`** | Compiler, linked-list signals, DOM runtime, router, SSR/Suspense, actions, build/compile, `kay/test` (installed as `"kay": "npm:@kayjs/kay@beta"`) | 1 runtime dep (`oxc-parser`) |
+| **`@kayjs/kay`** | Compiler, linked-list signals, DOM runtime, router, SSR/Suspense, actions, build/compile, `@kayjs/kay/test` | 1 runtime dep (`oxc-parser`) |
 | **`@kayjs/ui`** | Platform-first headless primitives + 5 structurally distinct pure CSS `@layer kui` Grammars (`editorial`, `workshop`, `console`, `soft`, `orbit`) + `kay ui-eject` | Zero JS recipe engine, zero Tailwind lock-in |
 | **`@kayjs/auth`** | Argon2id passwords, hashed DB sessions, email verification, magic links, OAuth 2.0 + PKCE (GitHub/Discord/Google), `auth.guard()`, RGPD helpers, `bun:sqlite` store | Zero external deps |
 | **`@kayjs/live`** | Typed real-time SSE rooms, microtask-coalesced presence, `useLive()` browser signal hook | Zero external deps |

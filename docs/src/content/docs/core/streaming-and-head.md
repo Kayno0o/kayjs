@@ -10,7 +10,7 @@ order: 5
 Place `<Head>` anywhere inside a layout or page. Kay collects all tags during SSR and hoists them into `<head>`. When multiple `<title>` tags render, the innermost page `<title>` wins:
 
 ```tsx
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 
 export default function AboutPage() {
   return (
@@ -30,7 +30,7 @@ export default function AboutPage() {
 Wrap a slow async server component in `<Suspense fallback={...}>` to send the HTML shell immediately and stream the resolved chunk inline with **0 KB** of external JavaScript:
 
 ```tsx
-import { Suspense } from 'kay'
+import { Suspense } from '@kayjs/kay'
 
 async function LiveStats() {
   const stats = await fetchSlowAnalytics()

@@ -1,5 +1,5 @@
 import { ui } from '@kayjs/ui/plugin'
-import { defineConfig } from 'kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 import { auth, BOARD_ROOM, board, mail, sendPresence } from './src/services'
 
 export default defineConfig({

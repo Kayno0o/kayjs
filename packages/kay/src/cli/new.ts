@@ -20,10 +20,7 @@ export function scaffoldProject(targetDir: string, options: ScaffoldOptions = {}
   if (existsSync(root) && readdirSync(root).length > 0 && !options.force)
     throw new Error(`kay new: directory "${root}" is not empty (pass --force to overwrite)`)
 
-  const kayDep = kayVersion.startsWith('npm:') || kayVersion.startsWith('file:') || kayVersion.startsWith('link:')
-    ? kayVersion
-    : `npm:@kayjs/kay@${kayVersion}`
-  const deps: Record<string, string> = { kay: kayDep }
+  const deps: Record<string, string> = { '@kayjs/kay': kayVersion }
   if (template === 'blog') {
     deps['@kayjs/content'] = kayVersion
     deps['@kayjs/seo'] = kayVersion
@@ -58,7 +55,7 @@ export function scaffoldProject(targetDir: string, options: ScaffoldOptions = {}
         module: 'ESNext',
         moduleResolution: 'bundler',
         jsx: 'react-jsx',
-        jsxImportSource: 'kay',
+        jsxImportSource: '@kayjs/kay',
         strict: true,
         noEmit: true,
         skipLibCheck: true,
@@ -67,7 +64,7 @@ export function scaffoldProject(targetDir: string, options: ScaffoldOptions = {}
       include: ['src', 'kay.config.ts'],
     }, null, 2)}\n`,
 
-    'kay.config.ts': `import { defineConfig } from 'kay/server'
+    'kay.config.ts': `import { defineConfig } from '@kayjs/kay/config'
 
 export default defineConfig({
   lang: 'en',
@@ -101,8 +98,8 @@ button {
 button:hover { background: #f3f4f6; }
 `,
 
-    'src/routes/_layout.tsx': `import type { KayChild } from 'kay'
-import { Head } from 'kay'
+    'src/routes/_layout.tsx': `import type { KayChild } from '@kayjs/kay'
+import { Head } from '@kayjs/kay'
 import '../styles/app.css'
 
 export default function Layout({ children }: { children: KayChild }) {
@@ -117,7 +114,7 @@ export default function Layout({ children }: { children: KayChild }) {
 }
 `,
 
-    'src/components/Counter.tsx': `import { signal } from 'kay'
+    'src/components/Counter.tsx': `import { signal } from '@kayjs/kay'
 
 export function Counter({ initial = 0 }: { initial?: number }) {
   const count = signal(initial)
@@ -144,14 +141,14 @@ export default async function Home() {
   }
 
   if (template === 'fullstack') {
-    files['src/routes/api/health.ts'] = `import type { RequestContext } from 'kay/server'
+    files['src/routes/api/health.ts'] = `import type { RequestContext } from '@kayjs/kay/server'
 
 export function GET(ctx: RequestContext) {
   return ctx.json({ ok: true, runtime: 'bun' })
 }
 `
-    files['src/actions/greet.ts'] = `import type { StandardSchemaV1 } from 'kay/server'
-import { action } from 'kay/server'
+    files['src/actions/greet.ts'] = `import type { StandardSchemaV1 } from '@kayjs/kay/server'
+import { action } from '@kayjs/kay/server'
 
 const nameSchema: StandardSchemaV1<{ name: string }> = {
   '~standard': {
@@ -178,7 +175,7 @@ export const greet = action(nameSchema, async ({ name }) => {
   align-items: center;
 }
 `
-    files['src/components/GreetForm.tsx'] = `import { signal } from 'kay'
+    files['src/components/GreetForm.tsx'] = `import { signal } from '@kayjs/kay'
 import { greet } from '../actions/greet'
 
 export function GreetForm() {
@@ -267,7 +264,7 @@ export const posts = defineCollection<PostMeta>({ dir: postsDir })
     files['kay.config.ts'] = `import { contentPlugin } from '@kayjs/content'
 import { seo } from '@kayjs/seo'
 import { ui } from '@kayjs/ui/plugin'
-import { defineConfig } from 'kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 import { posts } from './src/posts'
 
 export default defineConfig({
@@ -288,8 +285,8 @@ export default defineConfig({
   ],
 })
 `
-    files['src/routes/_layout.tsx'] = `import type { KayChild } from 'kay'
-import { Head } from 'kay'
+    files['src/routes/_layout.tsx'] = `import type { KayChild } from '@kayjs/kay'
+import { Head } from '@kayjs/kay'
 import '../styles/app.css'
 
 export default function Layout({ children }: { children: KayChild }) {
@@ -339,9 +336,9 @@ export default async function BlogIndex() {
   )
 }
 `
-    files['src/routes/blog/[slug].tsx'] = `import type { RequestContext } from 'kay/server'
+    files['src/routes/blog/[slug].tsx'] = `import type { RequestContext } from '@kayjs/kay/server'
 import { Button, Stack } from '@kayjs/ui'
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 import { posts } from '../../posts'
 
 export const prerender = true
@@ -405,7 +402,7 @@ AUTH_SECRET=
 AUTH_DB=./data/auth.sqlite
 `
     files['kay.config.ts'] = `import { ui } from '@kayjs/ui/plugin'
-import { defineConfig } from 'kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 import { auth } from './src/auth'
 
 export default defineConfig({
@@ -416,9 +413,9 @@ export default defineConfig({
   ],
 })
 `
-    files['src/routes/_layout.tsx'] = `import type { LayoutProps } from 'kay'
+    files['src/routes/_layout.tsx'] = `import type { LayoutProps } from '@kayjs/kay'
 import { Button, Cluster, Toaster } from '@kayjs/ui'
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 import '../styles/app.css'
 
 export default function Layout({ children, locals }: LayoutProps) {
@@ -504,7 +501,7 @@ export default function LoginPage() {
 
 export default auth.guard({ redirectTo: '/login' })
 `
-    files['src/routes/dashboard/index.tsx'] = `import type { PageProps } from 'kay'
+    files['src/routes/dashboard/index.tsx'] = `import type { PageProps } from '@kayjs/kay'
 import { Card, CardBody, CardHeader } from '@kayjs/ui'
 
 export default async function DashboardPage({ locals }: PageProps) {

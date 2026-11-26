@@ -14,7 +14,7 @@ When two principles conflict, the higher one wins.
 4. **French law holds by default.** An app on kay should meet the RGPD and the CNIL's cookie rules, the RGAA (accessibility), the RGESN (eco-design) and the LCEN (legal notices) without extra work: no third-party request or non-essential cookie before consent, personal data kept to the minimum and exportable and deletable, accessible markup from `@kayjs/ui` and the templates. Where kay cannot make it true by itself, it warns with the fix (principle 3).
 5. **Secure by default.** Strict CSP with hashes, CSRF checks before middleware, a request body limit, loopback binds. Weakening any of them is an explicit opt-out in the app's config.
 6. **Standard TS, nothing new to learn.** No directives, no auto-imports, no implicit globals: every name a file uses is imported. The platform comes first: forms work without JS, and handlers take a `Request` and return a `Response`.
-7. **A small kernel, plugins for the rest.** `packages/kay` holds the compiler, signals, DOM runtime, router, SSR, actions, build and `kay/test`. Anything optional is a `KayPlugin` package under `packages/`, with no npm dependency where one can be avoided.
+7. **A small kernel, plugins for the rest.** `packages/kay` holds the compiler, signals, DOM runtime, router, SSR, actions, build and `@kayjs/kay/test`. Anything optional is a `KayPlugin` package under `packages/`, with no npm dependency where one can be avoided.
 8. **Agents are first-class users.** `llms.txt` fits on one page, errors carry their fix, and `@kayjs/mcp` exposes actions as tools.
 
 Non-goals: React compatibility, Node or Deno as runtimes, a virtual DOM, SPA navigation by default (`@kayjs/spa` opts in), auto-imports, configuration spread over several files.

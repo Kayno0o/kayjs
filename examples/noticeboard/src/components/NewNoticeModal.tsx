@@ -1,5 +1,5 @@
 import { Button, Cluster, Dialog, Field, Notice, Stack, toast } from '@kayjs/ui'
-import { signal, useAction } from 'kay'
+import { signal, useAction } from '@kayjs/kay'
 import { pinNotice } from '../actions/notices'
 
 export function NewNoticeModal() {

@@ -84,7 +84,7 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
     writeFileSync(join(dir, 'content/posts/hello.md'), '---\ntitle: Cold Start Post\n---\n![Hero](./hero.png)\n')
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
-      import { raw } from 'kay/ssr'
+      import { raw } from '@kayjs/kay/internal/ssr'
       import { defineCollection } from ${JSON.stringify(CONTENT_PKG)}
       import { shareCard } from ${JSON.stringify(IMAGES_PKG)}
       const posts = defineCollection({ dir: 'content/posts' })
@@ -164,13 +164,13 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
 
     writeFileSync(join(dir, 'src/routes/_404.tsx'), `
-      import { Head } from 'kay'
+      import { Head } from '@kayjs/kay'
       export default function NotFound() {
         return <><Head><title>Missing</title></Head><a href="/home">Back</a></>
       }
     `)
     writeFileSync(join(dir, 'src/routes/_error.tsx'), `
-      import { Head } from 'kay'
+      import { Head } from '@kayjs/kay'
       export default function Err() {
         return <><Head><title>Boom</title></Head><a href="/home">Recover</a></>
       }
@@ -237,7 +237,7 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
 
     writeFileSync(join(dir, 'src/lib/msg.ts'), `export const MSG = 'RAW_TS_TOKEN'\n`)
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       import { MSG } from '../lib/msg'
       export default function Home() {
         const clicks = signal(0)
@@ -373,5 +373,26 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
     expect(mailHtml).not.toContain(' style="')
     const csp = mailRes.headers.get('content-security-policy') ?? ''
     expect(csp).toContain("style-src 'self' 'sha256-")
+  })
+
+  it('hashes the <style> blocks of a plugin HTML page into the app CSP, and keeps a CSP the plugin set (#3578)', async () => {
+    const dir = makeTemp('kay-plugin-html-csp-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `export default function Home() { return <p>ok</p> }`)
+    const html = { 'content-type': 'text/html; charset=utf-8' }
+    const plugin = definePlugin({
+      name: 'pages',
+      server(api) {
+        api.route('GET', '/_pages/styled', () => new Response('<!DOCTYPE html><html><head><style>p{color:red}</style></head><body><p>styled</p></body></html>', { headers: html }))
+        api.route('GET', '/_pages/own', () => new Response('<p>own</p>', { headers: { ...html, 'content-security-policy': 'default-src \'none\'' } }))
+      },
+    })
+    const app = await testApp({ root: dir, plugins: [plugin] })
+
+    const styled = await app.get('/_pages/styled')
+    expect(styled.headers.get('content-security-policy')).toContain('\'sha256-p0bF+un5yUb9MBO6xRb8kPHlY2BdpHVtLiFkDrZPF64=\'')
+    expect(styled.headers.get('x-frame-options')).toBe('SAMEORIGIN')
+    expect(await styled.text()).toContain('<p>styled</p>')
+    expect((await app.get('/_pages/own')).headers.get('content-security-policy')).toBe('default-src \'none\'')
   })
 })

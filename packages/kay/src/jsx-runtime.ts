@@ -509,7 +509,7 @@ export namespace JSX {
   export interface ElementChildrenAttribute {
     children: object
   }
-  /** Augment this interface via `declare module 'kay/jsx-runtime'` to register custom elements (`<my-widget>`). */
+  /** Augment this interface via `declare module '@kayjs/kay/jsx-runtime'` to register custom elements (`<my-widget>`). */
   export interface CustomElements {}
   export interface IntrinsicElements extends HtmlIntrinsicElements, SvgIntrinsicElements, CustomElements {}
 }

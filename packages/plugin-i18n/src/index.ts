@@ -2,9 +2,9 @@
 // hreflang alternates, Intl formatters, and CLI missing-key check.
 // Implemented 100% through KayPlugin public hooks — zero i18n logic in @kay/core.
 
-import type { ActiveI18nConfig, KayPlugin } from '@kayjs/kay/server'
-import { definePlugin, I18N_CONFIG_SERVICE } from '@kayjs/kay/server'
-import { escAttr } from '@kayjs/kay/ssr'
+import type { ActiveI18nConfig, KayPlugin } from '@kayjs/kay/config'
+import { definePlugin, I18N_CONFIG_SERVICE } from '@kayjs/kay/config'
+import { escAttr } from '@kayjs/kay/server'
 
 declare module '@kayjs/kay/server' {
   interface KayLocals {

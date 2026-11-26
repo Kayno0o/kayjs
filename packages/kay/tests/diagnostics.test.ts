@@ -59,7 +59,7 @@ describe('Compile, check, and build error locations & code frames (#3546)', () =
 
     // 2. Interactive _layout.tsx
     writeFileSync(join(dir, 'src/routes/_layout.tsx'), [
-      'import { signal } from "kay"',
+      'import { signal } from "@kayjs/kay"',
       'export default function Layout({ children }: { children?: unknown }) {',
       '  const n = signal(0)',
       '  return <div>{n.value}{children}</div>',
@@ -68,7 +68,7 @@ describe('Compile, check, and build error locations & code frames (#3546)', () =
 
     // 3. Island importing server-only module
     writeFileSync(join(dir, 'src/components/BadIsland.tsx'), [
-      'import { signal } from "kay"',
+      'import { signal } from "@kayjs/kay"',
       'import { readFileSync } from "node:fs"',
       'export function BadIsland({ onDone }: { onDone?: () => void }) {',
       '  const n = signal(0)',
@@ -135,7 +135,7 @@ describe('Compile, check, and build error locations & code frames (#3546)', () =
     const dir = makeTemp('kay-diag-build-')
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
     writeFileSync(join(dir, 'src/routes/index.tsx'), [
-      'import { signal } from "kay"',
+      'import { signal } from "@kayjs/kay"',
       'import { nope } from "./definitely-does-not-exist"',
       'export default function Home() {',
       '  const n = signal(0)',

@@ -50,6 +50,14 @@ export function mistake(what: string, filename: string, fix: string): Error {
   return new Error(`kay compiler: ${what} in ${filename}: ${fix}.`)
 }
 
+const BARE_KAY_RE = /^kay(?:\/|$)/
+
+/** Refuses the bare `kay` spelling kay v1 used: v2 is imported as `@kayjs/kay`. */
+export function assertScopedKayImport(source: string, filename: string): void {
+  if (BARE_KAY_RE.test(source))
+    throw mistake(`import from '${source}'`, filename, `write '@kayjs/${source}'`)
+}
+
 const HYDRATE_MODES = new Set(['load', 'visible', 'idle', 'interaction', 'client'])
 const MEDIA_MODE = /^media\(.+\)$/
 

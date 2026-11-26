@@ -20,7 +20,6 @@ function makeTemp(prefix: string): string {
 const repoRoot = join(import.meta.dir, '../../..')
 function linkWorkspace(dir: string): void {
   mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
-  symlinkSync(join(repoRoot, 'packages/kay'), join(dir, 'node_modules/kay'))
   symlinkSync(join(repoRoot, 'packages/kay'), join(dir, 'node_modules/@kayjs/kay'))
   symlinkSync(join(repoRoot, 'packages/plugin-auth'), join(dir, 'node_modules/@kayjs/auth'))
   symlinkSync(join(repoRoot, 'packages/plugin-live'), join(dir, 'node_modules/@kayjs/live'))
@@ -83,7 +82,7 @@ describe('Shared server module instances & createAuth({ mailer }) (#3552)', () =
     `)
 
     writeFileSync(join(dir, 'kay.config.ts'), `
-      import { defineConfig } from 'kay/server'
+      import { defineConfig } from '@kayjs/kay/config'
       import { auth, mail, rooms } from './src/services'
 
       export default defineConfig({
@@ -107,7 +106,7 @@ describe('Shared server module instances & createAuth({ mailer }) (#3552)', () =
     `)
 
     writeFileSync(join(dir, 'src/routes/publish.ts'), `
-      import type { RequestContext } from 'kay/server'
+      import type { RequestContext } from '@kayjs/kay/server'
       import { mail, rooms } from '../services'
 
       export async function GET(ctx: RequestContext) {
@@ -179,13 +178,13 @@ describe('one bundled entry assembles the app (#3577)', () => {
     writeApp(dir, {
       'src/errors.ts': 'export const errors = { count: 0 }\n',
       'kay.config.ts': `
-        import { defineConfig } from 'kay/server'
+        import { defineConfig } from '@kayjs/kay/config'
         import { errors } from './src/errors'
         export default defineConfig({ onError() { errors.count++ } })
       `,
       'src/routes/boom.ts': 'export function GET(): Response { throw new Error(\'boom\') }\n',
       'src/routes/errors.ts': `
-        import type { RequestContext } from 'kay/server'
+        import type { RequestContext } from '@kayjs/kay/server'
         import { errors } from '../errors'
         export function GET(ctx: RequestContext) { return ctx.text(String(errors.count)) }
       `,
@@ -205,11 +204,11 @@ describe('one bundled entry assembles the app (#3577)', () => {
     const dir = makeTemp('kay-entry-config-action-')
     writeApp(dir, {
       'src/ping.ts': `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         export const ping = action(async () => 'pong')
       `,
       'kay.config.ts': `
-        import { defineConfig } from 'kay/server'
+        import { defineConfig } from '@kayjs/kay/config'
         import { ping } from './src/ping'
         export default defineConfig({
           plugins: [{ name: 'probe', server(api) { api.route('GET', '/ping-url', ctx => ctx.text(ping.url)) } }],
@@ -231,17 +230,17 @@ describe('one bundled entry assembles the app (#3577)', () => {
     const dir = makeTemp('kay-entry-mcp-middleware-')
     writeApp(dir, {
       'src/routes/admin/_middleware.ts': `
-        import type { Middleware } from 'kay/server'
+        import type { Middleware } from '@kayjs/kay/server'
         const adminsOnly: Middleware = ctx => ctx.deny(403, 'Admins only')
         export default adminsOnly
       `,
       'src/routes/admin/notes.ts': `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         export const addNote = action(async () => 'added')
       `,
       'kay.config.ts': `
         import { mcp } from '@kayjs/mcp'
-        import { defineConfig } from 'kay/server'
+        import { defineConfig } from '@kayjs/kay/config'
         import { addNote } from './src/routes/admin/notes'
         export default defineConfig({
           plugins: [mcp({ token: 'mcp-key-0123456789', tools: { add: { action: addNote, description: 'Adds a note.' } } })],
@@ -270,7 +269,7 @@ describe('one bundled entry assembles the app (#3577)', () => {
     const dir = makeTemp('kay-entry-import-')
     writeApp(dir, {
       'src/actions/preferences.ts': `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         const preferences = { '~standard': { version: 1 as const, vendor: 'test', validate: (value: unknown) => ({ value: value as { theme: string } }) } }
         let theme = 'light'
         export const currentTheme = (): string => theme

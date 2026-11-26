@@ -1,8 +1,8 @@
 // Unified Standard-Schema server action: pins a notice to SQLite, emails members via @kayjs/mail,
 // and broadcasts live to every connected browser tab via @kayjs/live.
 
-import type { StandardSchemaV1 } from 'kay/server'
-import { action } from 'kay/server'
+import type { StandardSchemaV1 } from '@kayjs/kay/server'
+import { action } from '@kayjs/kay/server'
 import { insertNotice, listMemberEmails } from '../db'
 import { auth, BOARD_ROOM, board, mail } from '../services'
 

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { raw } from '../src/ssr/index'
 
-declare module 'kay/jsx-runtime' {
+declare module '@kayjs/kay/jsx-runtime' {
   namespace JSX {
     interface CustomElements {
       'my-widget': {

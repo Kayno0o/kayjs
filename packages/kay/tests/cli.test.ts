@@ -80,8 +80,8 @@ export default { plugins: [ui({ grammar: 'editorial' })] }
       })
       expect(newCode).toBe(0)
       expect(existsSync(join(appDir, 'src/routes/index.tsx'))).toBe(true)
-      mkdirSync(join(appDir, 'node_modules'), { recursive: true })
-      symlinkSync(KAY_PKG_DIR, join(appDir, 'node_modules/kay'), 'dir')
+      mkdirSync(join(appDir, 'node_modules/@kayjs'), { recursive: true })
+      symlinkSync(KAY_PKG_DIR, join(appDir, 'node_modules/@kayjs/kay'), 'dir')
 
       const checkCode = await runCli(['check', 'demo-app', '--no-typecheck'], {
         cwd: dir,

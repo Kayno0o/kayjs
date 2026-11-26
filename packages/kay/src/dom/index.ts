@@ -1,4 +1,4 @@
-// Kay v2 minimal DOM & hydration core (loop -> kay/dom-loop, extras -> kay/dom-extras for fine-grained chunk splitting).
+// Kay v2 minimal DOM & hydration core (loop -> @kayjs/kay/internal/dom-loop, extras -> @kayjs/kay/internal/dom-extras for fine-grained chunk splitting).
 
 import { isBlockedAttr, isStringBoolAttr, isUnsafeUrlAttr } from '../attrs'
 import { batch, createOwner, disposeOwner, runWithOwner } from '../reactivity/index'

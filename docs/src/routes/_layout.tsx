@@ -1,4 +1,4 @@
-import type { KayChild } from 'kay'
+import type { KayChild } from '@kayjs/kay'
 import { SearchIsland } from '../components/SearchIsland'
 import { getFlatNav } from '../content'
 

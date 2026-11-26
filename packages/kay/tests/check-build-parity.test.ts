@@ -15,7 +15,6 @@ function makeTemp(prefix: string): string {
 const repoRoot = join(import.meta.dir, '../../..')
 function linkKay(dir: string): void {
   mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
-  symlinkSync(join(repoRoot, 'packages/kay'), join(dir, 'node_modules/kay'))
   symlinkSync(join(repoRoot, 'packages/kay'), join(dir, 'node_modules/@kayjs/kay'))
 }
 
@@ -45,7 +44,7 @@ describe('kay check and kay build graph/route parity (#3567)', () => {
 
     // Barrel re-exporting an interactive island
     writeFileSync(join(dir, 'src/ui/Counter.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Counter({ start }: { start: number }) {
         const n = signal(start)
         return <button onClick={() => n.value++}>{n.value}</button>
@@ -86,7 +85,7 @@ describe('kay check and kay build graph/route parity (#3567)', () => {
     writeFileSync(join(dir, 'src/lib/index.ts'), `export { loadSecret } from './secret'\n`)
 
     writeFileSync(join(dir, 'src/components/LeakyIsland.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       import { loadSecret } from '../lib'
       export default function LeakyIsland() {
         const s = signal('')
@@ -112,7 +111,7 @@ describe('kay check and kay build graph/route parity (#3567)', () => {
     mkdirSync(join(dir, 'src/ui'), { recursive: true })
 
     writeFileSync(join(dir, 'src/ui/Btn.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Btn({ onDone }: { onDone?: () => void }) {
         const n = signal(0)
         return <button onClick={() => { n.value++; onDone?.() }}>{n.value}</button>

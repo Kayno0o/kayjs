@@ -1,6 +1,7 @@
 // JSON-RPC 2.0 & MCP Streamable HTTP (2025-03-26) dispatcher with bounded batch execution.
 
-import type { ActionContext, RequestContext, ServerAction, ServerPluginAPI, StandardSchemaV1 } from '@kayjs/kay/server'
+import type { ServerPluginAPI } from '@kayjs/kay/config'
+import type { ActionContext, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
 import type { McpPruneMode, McpToolResult } from './format'
 import type { JsonSchemaObject } from './schema'
 import { formatSchemaIssues, validateSchema } from '@kayjs/kay/server'

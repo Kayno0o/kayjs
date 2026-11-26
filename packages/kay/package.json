@@ -14,19 +14,19 @@
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./dom": "./src/dom/index.ts",
-    "./dom-extras": "./src/dom/extras.ts",
-    "./dom-loop": "./src/dom/loop.ts",
-    "./action": "./src/dom/action.ts",
-    "./island": "./src/dom/island.ts",
-    "./ssr": "./src/ssr/index.ts",
-    "./server": "./src/server/index.ts",
-    "./compiler": "./src/compiler/index.ts",
-    "./build": "./src/build/index.ts",
-    "./dev": "./src/dev/index.ts",
+    "./server": "./src/server/public.ts",
+    "./config": "./src/plugins/public.ts",
     "./test": "./src/test/index.ts",
+    "./build": "./src/build/index.ts",
     "./jsx-runtime": "./src/jsx-runtime.ts",
-    "./jsx-dev-runtime": "./src/jsx-runtime.ts"
+    "./jsx-dev-runtime": "./src/jsx-runtime.ts",
+    "./internal/dom": "./src/dom/index.ts",
+    "./internal/dom-extras": "./src/dom/extras.ts",
+    "./internal/dom-loop": "./src/dom/loop.ts",
+    "./internal/action": "./src/dom/action.ts",
+    "./internal/island": "./src/dom/island.ts",
+    "./internal/ssr": "./src/ssr/index.ts",
+    "./internal/server": "./src/server/index.ts"
   },
   "engines": {
     "bun": ">=1.4.0"

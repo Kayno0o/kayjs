@@ -1,9 +1,9 @@
 // @kayjs/mail — Lightweight email delivery (Resend / custom transport / dev outbox) + `/_kay/mail` preview plugin.
 // Built strictly on the public KayPlugin API (server(api).route).
 
-import type { KayPlugin } from '@kayjs/kay/server'
-import { DEFAULT_CSP, definePlugin, nodeEnv, withCspHashes } from '@kayjs/kay/server'
-import { esc, escAttr } from '@kayjs/kay/ssr'
+import type { KayPlugin } from '@kayjs/kay/config'
+import { definePlugin } from '@kayjs/kay/config'
+import { esc, escAttr, nodeEnv } from '@kayjs/kay/server'
 
 export type MailAddress = string | { name: string, address: string }
 
@@ -158,8 +158,7 @@ export interface MailPluginOptions {
 }
 
 const MAIL_OUTBOX_CSS = 'body{font-family:system-ui,sans-serif;max-width:48rem;margin:2rem auto;padding:0 1rem;background:#f9fafb}article{border:1px solid #e5e7eb;border-radius:8px;padding:1rem;margin-bottom:1rem;background:#fff}h2{margin:0 0 .25rem;font-size:1rem}.meta,.empty{margin:0 0 .5rem;font-size:.85rem;color:#6b7280}iframe{width:100%;min-height:16rem;border:0}pre{margin:0;white-space:pre-wrap;font-size:.85rem}'
-const MAIL_OUTBOX_STYLE_HASH = `'sha256-${new Bun.CryptoHasher('sha256').update(MAIL_OUTBOX_CSS).digest('base64')}'`
-const MAIL_OUTBOX_CSP = withCspHashes(DEFAULT_CSP, { styleHashes: [MAIL_OUTBOX_STYLE_HASH] })
+
 
 export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): KayPlugin {
   const route = options.previewRoute ?? '/_kay/mail'
@@ -184,12 +183,8 @@ export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): K
         ).join('')
 
         const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Kay Mail Outbox (${instance.outbox.length})</title><style>${MAIL_OUTBOX_CSS}</style></head><body><h1>Mail Outbox (${instance.outbox.length})</h1>${rows || '<p class="empty">No messages sent yet.</p>'}</body></html>`
-        return new Response(html, {
-          headers: {
-            'content-type': 'text/html; charset=utf-8',
-            'content-security-policy': MAIL_OUTBOX_CSP,
-          },
-        })
+        // kay adds the app's CSP with this page's <style> hash.
+        return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
       })
     },
   })

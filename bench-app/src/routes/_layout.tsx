@@ -1,4 +1,4 @@
-import type { KayChild } from 'kay'
+import type { KayChild } from '@kayjs/kay'
 
 export default function Layout({ children }: { children?: KayChild }) {
   return (

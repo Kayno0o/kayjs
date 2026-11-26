@@ -1,6 +1,6 @@
-import type { LayoutProps } from 'kay'
+import type { LayoutProps } from '@kayjs/kay'
 import { Button, Cluster, Toaster } from '@kayjs/ui'
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 
 export default function Layout({ children, locals }: LayoutProps) {
   const user = locals.user

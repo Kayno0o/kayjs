@@ -3,10 +3,10 @@
 // Built strictly on the public KayPlugin API (bunPlugins).
 
 import type { BunPlugin } from 'bun'
-import type { KayPlugin } from '@kayjs/kay/server'
+import type { KayPlugin } from '@kayjs/kay/config'
 import type { IconData, IconifyIcon, IconSet } from './types'
 import { join } from 'node:path'
-import { definePlugin } from '@kayjs/kay/server'
+import { definePlugin } from '@kayjs/kay/config'
 
 export { Icon } from './Icon'
 export type { IconComponentProps } from './Icon'

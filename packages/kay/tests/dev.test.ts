@@ -15,8 +15,8 @@ function makeTemp(prefix: string): string {
 }
 
 function linkKay(dir: string): void {
-  mkdirSync(join(dir, 'node_modules'), { recursive: true })
-  symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/kay'), 'dir')
+  mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
+  symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/@kayjs/kay'), 'dir')
 }
 
 async function readNextSseData(reader: ReadableStreamDefaultReader<Uint8Array>, timeoutMs = 4000): Promise<string> {
@@ -53,7 +53,7 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
     const counterPath = join(dir, 'src/components/Counter.tsx')
     const pagePath = join(dir, 'src/routes/index.tsx')
     writeFileSync(counterPath, `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Counter() {
         const n = signal(0)
         return <button type="button" onClick={() => n.value++}>Count {n.value}</button>
@@ -100,7 +100,7 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
 
     writeFileSync(cssPath, 'body { color: rgb(1, 2, 3); }\n')
     writeFileSync(configPath, `
-      import { defineConfig } from 'kay/server'
+      import { defineConfig } from '@kayjs/kay/config'
       export default defineConfig({ lang: 'en' })
     `)
     writeFileSync(pagePath, `
@@ -157,7 +157,7 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
       // 4. Edit kay.config.ts (lang: 'en' -> 'fr') -> live config reload!
       await Bun.sleep(60)
       writeFileSync(configPath, `
-        import { defineConfig } from 'kay/server'
+        import { defineConfig } from '@kayjs/kay/config'
         export default defineConfig({ lang: 'fr' })
       `)
       const cfgMsg = await readNextSseData(reader)

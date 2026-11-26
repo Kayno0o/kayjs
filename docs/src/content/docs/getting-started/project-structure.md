@@ -39,7 +39,7 @@ Enable Kay's JSX import source in `tsconfig.json`:
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "kay",
+    "jsxImportSource": "@kayjs/kay",
     "noEmit": true
   }
 }
@@ -48,7 +48,7 @@ Enable Kay's JSX import source in `tsconfig.json`:
 ## Configuration (`kay.config.ts`)
 
 ```ts
-import { defineConfig } from 'kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 import { ui } from '@kayjs/ui/plugin'
 import { seo } from '@kayjs/seo'
 

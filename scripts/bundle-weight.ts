@@ -3,7 +3,7 @@
 
 import { existsSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { build } from 'kay/build'
+import { build } from '@kayjs/kay/build'
 
 const ROOT = resolve(import.meta.dir, '..')
 const APPS = [

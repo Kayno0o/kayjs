@@ -19,7 +19,7 @@ import {
   Switch,
   Tabs,
 } from '@kayjs/ui'
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 import { GrammarDemo } from '../components/GrammarDemo'
 
 export const prerender = true

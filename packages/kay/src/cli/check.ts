@@ -69,12 +69,10 @@ function findExportedConstOffset(analysis: ModuleAnalysis, name: string): number
 
 function normalizeDiagnosticPath(root: string, file: string, message: string): string {
   const rel = relPosix(root, file)
-  if (DIAGNOSTIC_PREFIX_RE.test(message)) {
-    if (message.startsWith(`${file}:`))
-      return `${rel}${message.slice(file.length)}`
-    return message
-  }
-  return formatDiagnostic(`${rel}:1:1`, message)
+  const relMessage = message.replaceAll(file, rel)
+  if (DIAGNOSTIC_PREFIX_RE.test(relMessage))
+    return relMessage
+  return formatDiagnostic(`${rel}:1:1`, relMessage)
 }
 
 // Walks the local imports of an island the way the client build follows them: a module that only declares actions is stubbed there, so its imports stop the walk.
@@ -181,7 +179,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       fileSet.add(f)
   }
   const files = [...fileSet].sort()
-  const graph = new ModuleGraph()
+  const graph = new ModuleGraph(root)
   const { analyses } = graph
   const sources = new Map<string, string>()
   const unparsable = new Set<string>()

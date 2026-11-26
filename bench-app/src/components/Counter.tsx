@@ -1,4 +1,4 @@
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 
 export function Counter({ start = 0 }: { start?: number }) {
   const count = signal(start)

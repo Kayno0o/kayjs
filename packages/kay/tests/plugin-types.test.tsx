@@ -1,6 +1,6 @@
 import type { AuthUser, PublicUser } from '@kayjs/auth'
-import type { KayChild } from 'kay'
-import type { KayLocals, RequestContext, StandardSchemaV1 } from 'kay/server'
+import type { KayChild } from '@kayjs/kay'
+import type { KayLocals, RequestContext, StandardSchemaV1 } from '@kayjs/kay/server'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -114,7 +114,7 @@ describe('Plugin generics: @kayjs/auth, @kayjs/mcp, @kayjs/content (#3545)', () 
     let seenOrg: string | undefined
     const probePlugin = {
       name: 'probe',
-      server(api: import('kay/server').ServerPluginAPI) {
+      server(api: import('@kayjs/kay/config').ServerPluginAPI) {
         api.route('GET', '/me', (ctx: RequestContext) => {
           const u = auth.getUser(ctx)
           seenPlan = u?.plan

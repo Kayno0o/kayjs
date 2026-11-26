@@ -1,7 +1,8 @@
 // MDX-lite: literal prop parsing and embedded component expansion for Markdown bodies.
 
 import type { MarkdownComponent, RenderMarkdownOptions } from './index'
-import { raw, ssrRaw } from '@kayjs/kay/ssr'
+import { ssrRaw } from '@kayjs/kay/internal/ssr'
+import { raw } from '@kayjs/kay/server'
 
 // Safe recursive-descent JSON5-literal parser for embedded Markdown component props.
 // Supports objects (unquoted/quoted keys, trailing commas), arrays (trailing commas),

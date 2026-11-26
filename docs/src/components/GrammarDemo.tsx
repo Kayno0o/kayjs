@@ -1,4 +1,4 @@
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 
 const GRAMMARS = [
   { id: 'orbit', label: 'Orbit', note: 'Starry sky, 1px hairlines, amber accent, cockpit states' },

@@ -2,7 +2,7 @@ import type { PinnedNotice } from '../db'
 import type { BoardMessage } from '../services'
 import { useLive } from '@kayjs/live/client'
 import { toast } from '@kayjs/ui'
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 
 export interface LiveBoardProps {
   initialNotices: PinnedNotice[]

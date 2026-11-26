@@ -9,7 +9,6 @@
     "check": "kay check"
   },
   "dependencies": {
-    "kay": "file:../packages/kay",
     "@kayjs/kay": "file:../packages/kay",
     "@kayjs/content": "file:../packages/plugin-content",
     "@kayjs/icons": "file:../packages/plugin-icons",

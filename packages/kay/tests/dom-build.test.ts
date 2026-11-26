@@ -132,7 +132,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     mkdirSync(join(dir, 'src/components'), { recursive: true })
 
     writeFileSync(join(dir, 'src/components/MixedBranches.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
 
       function Pair(props: { on: { value: boolean } }) {
         return props.on.value ? <><b>B</b><u>U</u></> : <i>I</i>
@@ -320,7 +320,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     mkdirSync(join(dir, 'src/components/blog'), { recursive: true })
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
     const counter = (label: string) => `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export default function Counter() {
         const n = signal(0)
         return <button type="button" onClick={() => n.value++}>{'${label}'}{n.value}</button>
@@ -329,7 +329,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     writeFileSync(join(dir, 'src/components/shop/Counter.tsx'), counter('shop-counter'))
     writeFileSync(join(dir, 'src/components/blog/Counter.tsx'), counter('blog-counter'))
     writeFileSync(join(dir, 'src/components/ui.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export default function Ui() {
         const n = signal(0)
         return <i onClick={() => n.value++}>{'ui-default'}{n.value}</i>
@@ -362,7 +362,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       mkdirSync(join(dir, 'src/components'), { recursive: true })
       writeFileSync(join(dir, 'src/components/Counter.tsx'), `
-        import { signal } from 'kay'
+        import { signal } from '@kayjs/kay'
         export const LABEL = 'count'
         export function Counter() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{n.value}</button> }
         export function Reset() { const n = signal(0); return <button type="button" onClick={() => n.value = 0}>reset</button> }
@@ -389,7 +389,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       mkdirSync(join(dir, 'src/components'), { recursive: true })
       writeFileSync(join(dir, 'src/state.ts'), `
-        import { signal } from 'kay'
+        import { signal } from '@kayjs/kay'
         export const count = signal(0)
         export const title = 'Cart'
       `)
@@ -427,7 +427,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       mkdirSync(join(dir, 'src/components'), { recursive: true })
       writeFileSync(join(dir, 'src/components/Counter.tsx'), `
-        import { signal } from 'kay'
+        import { signal } from '@kayjs/kay'
         export function Counter() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{n.value}</button> }
       `)
       writeFileSync(join(dir, 'src/routes/index.tsx'), `
@@ -452,9 +452,9 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-interactive-layout-'))
     try {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
-      writeFileSync(join(dir, file), `import { signal } from 'kay'\n${code}`)
+      writeFileSync(join(dir, file), `import { signal } from '@kayjs/kay'\n${code}`)
       writeFileSync(join(dir, 'src/routes/index.tsx'), `export default function Page() { return <p>home</p> }`)
-      await expect(build({ root: dir })).rejects.toThrow(`kay build: ${file} uses browser interactivity (imports signal from 'kay'), but it renders on the server only. Move the interactive part into a component and render that component from ${file}.`)
+      await expect(build({ root: dir })).rejects.toThrow(`kay build: ${file} uses browser interactivity (imports signal from '@kayjs/kay'), but it renders on the server only. Move the interactive part into a component and render that component from ${file}.`)
     }
     finally {
       rmSync(dir, { recursive: true, force: true })
@@ -467,12 +467,12 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       mkdirSync(join(dir, 'src/actions'), { recursive: true })
       writeFileSync(join(dir, 'src/actions/notes.ts'), `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         export const MAX_LENGTH = 140
         export const addNote = action(() => 'ok')
       `)
       writeFileSync(join(dir, 'src/routes/index.tsx'), `
-        import { signal } from 'kay'
+        import { signal } from '@kayjs/kay'
         import { addNote, MAX_LENGTH } from '../actions/notes'
         export default function Page() { const n = signal(''); return <button type="button" onClick={() => addNote(undefined)}>{MAX_LENGTH - n.value.length}</button> }
       `)
@@ -489,11 +489,11 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       mkdirSync(join(dir, 'src/actions'), { recursive: true })
       writeFileSync(join(dir, 'src/actions/notes.ts'), `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         export const addNote = action(() => 'ok')
       `)
       writeFileSync(join(dir, 'src/routes/index.tsx'), `
-        import { signal } from 'kay'
+        import { signal } from '@kayjs/kay'
         import * as notes from '../actions/notes'
         export default function Page() { const n = signal(0); return <button type="button" onClick={() => notes.addNote(undefined)}>{n.value}</button> }
       `)
@@ -516,7 +516,7 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       }
     `)
     writeFileSync(join(dir, 'src/components/Cart.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       import { Total } from './Total'
       export default function Cart() {
         const n = signal(1)
@@ -560,11 +560,11 @@ describe('route reach through a barrel file', () => {
       mkdirSync(join(dir, 'src/components'), { recursive: true })
       writeFileSync(join(dir, 'src/components/card.css'), '.card { color: rebeccapurple }\n')
       writeFileSync(join(dir, 'src/components/Counter.tsx'), `
-        import { signal } from 'kay'
+        import { signal } from '@kayjs/kay'
         export function Counter() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{n.value}</button> }
       `)
       writeFileSync(join(dir, 'src/components/Card.tsx'), `
-        import { Head } from 'kay'
+        import { Head } from '@kayjs/kay'
         import './card.css'
         import { Counter } from './Counter'
         export function Card() { return <div class="card"><Head><title>Barrel card</title></Head><Counter /></div> }
@@ -597,7 +597,7 @@ describe('chunk names', () => {
     try {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       writeFileSync(join(dir, 'src/routes/index.tsx'), `
-        import { signal } from 'kay'
+        import { signal } from '@kayjs/kay'
         function Counter() { const n = signal(0); return <button type="button" onClick={() => n.value++}>{n.value}</button> }
         export default function Page() { return <main><Counter /></main> }
       `)

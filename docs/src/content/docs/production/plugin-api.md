@@ -10,7 +10,7 @@ Every first-party package in Kay v2 is built exclusively on the public `KayPlugi
 ## `KayPlugin` contract
 
 ```ts
-import { definePlugin } from 'kay/server'
+import { definePlugin } from '@kayjs/kay/config'
 
 export function myPlugin() {
   return definePlugin({
@@ -84,4 +84,5 @@ export function myPlugin() {
 - **`ctx.setData(data)` / `api.getBuildData()`**: Persists JSON-serializable plugin data into `manifest.pluginData[plugin.name]` so it survives cold starts and `kay build --compile`.
 - **`provide(key, value)` / `inject(key)`**: Available on both `BuildPluginContext` and `ServerPluginAPI` to share services between plugins without module-level singletons.
 - **Per-route assets**: Use `ctx.addRouteStyle(routePath, href)` and `ctx.addRouteHead(routePath, html)` when an asset belongs on one route rather than every page.
+- **Route headers**: an `api.route()` response gets the app's security headers. An HTML response without its own `content-security-policy` gets the app's CSP, with a hash for each of its `<style>` blocks.
 - **Route CSRF**: `api.route()` enforces `Origin` / `Sec-Fetch-Site` on unsafe methods by default. Pass `{ csrf: false }` for webhooks or bearer-token endpoints (such as `@kayjs/mcp`).

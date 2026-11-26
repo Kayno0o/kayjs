@@ -1,4 +1,4 @@
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 import { CopyCommand } from '../components/CopyCommand'
 import { highlight } from '../highlight'
 
@@ -23,7 +23,7 @@ export default async function Home() {
 }`
 
 const ISLAND_CODE = `// Auto-detected island: no 'use client', no client:load
-import { computed, signal } from 'kay'
+import { computed, signal } from '@kayjs/kay'
 
 export function Counter({ initial = 0 }: { initial?: number }) {
   const count = signal(initial)
@@ -37,7 +37,7 @@ export function Counter({ initial = 0 }: { initial?: number }) {
 }`
 
 const ACTION_CODE = `// Progressive <form action={save}> AND typed island RPC
-import { action } from 'kay/server'
+import { action } from '@kayjs/kay/server'
 import { z } from 'zod'
 
 export const save = action(

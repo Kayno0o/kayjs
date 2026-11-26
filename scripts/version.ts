@@ -72,8 +72,6 @@ for (const p of manifests) {
   if (pkg.peerDependencies) {
     if ('@kayjs/kay' in pkg.peerDependencies)
       pkg.peerDependencies['@kayjs/kay'] = `^${next}`
-    if ('kay' in pkg.peerDependencies)
-      pkg.peerDependencies.kay = `^${next}`
   }
   writeFileSync(p, `${JSON.stringify(pkg, null, 2)}\n`)
 }

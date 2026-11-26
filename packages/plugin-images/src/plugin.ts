@@ -2,12 +2,13 @@
 // Built strictly on the public KayPlugin API (bunPlugins + build(ctx).emitAsset).
 
 import type { BunPlugin } from 'bun'
-import type { KayPlugin } from '@kayjs/kay/server'
+import type { KayPlugin } from '@kayjs/kay/config'
 import type { ShareCardDefaults } from './card'
 import type { ImageAsset } from './helpers'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
-import { CONTENT_IMAGE_RESOLVER_SERVICE, definePlugin, getAppContext } from '@kayjs/kay/server'
+import { CONTENT_IMAGE_RESOLVER_SERVICE, definePlugin } from '@kayjs/kay/config'
+import { getAppContext } from '@kayjs/kay/internal/server'
 import { hasMagick, SHARE_CARD_CONFIG_SERVICE } from './card'
 
 export { CONTENT_IMAGE_RESOLVER_SERVICE }

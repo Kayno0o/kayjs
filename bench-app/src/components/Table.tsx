@@ -1,4 +1,4 @@
-import { selector, signal } from 'kay'
+import { selector, signal } from '@kayjs/kay'
 import { type Row, rowBuilder } from '../data'
 
 const build = rowBuilder()

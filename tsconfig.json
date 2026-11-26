@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "jsxImportSource": "kay",
+    "jsxImportSource": "@kayjs/kay",
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
@@ -14,10 +14,20 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
-      "kay": ["./packages/kay/src/index.ts"],
-      "kay/*": ["./packages/kay/src/*"],
       "@kayjs/kay": ["./packages/kay/src/index.ts"],
-      "@kayjs/kay/*": ["./packages/kay/src/*"],
+      "@kayjs/kay/server": ["./packages/kay/src/server/public.ts"],
+      "@kayjs/kay/config": ["./packages/kay/src/plugins/public.ts"],
+      "@kayjs/kay/test": ["./packages/kay/src/test/index.ts"],
+      "@kayjs/kay/build": ["./packages/kay/src/build/index.ts"],
+      "@kayjs/kay/jsx-runtime": ["./packages/kay/src/jsx-runtime.ts"],
+      "@kayjs/kay/jsx-dev-runtime": ["./packages/kay/src/jsx-runtime.ts"],
+      "@kayjs/kay/internal/dom": ["./packages/kay/src/dom/index.ts"],
+      "@kayjs/kay/internal/dom-extras": ["./packages/kay/src/dom/extras.ts"],
+      "@kayjs/kay/internal/dom-loop": ["./packages/kay/src/dom/loop.ts"],
+      "@kayjs/kay/internal/action": ["./packages/kay/src/dom/action.ts"],
+      "@kayjs/kay/internal/island": ["./packages/kay/src/dom/island.ts"],
+      "@kayjs/kay/internal/ssr": ["./packages/kay/src/ssr/index.ts"],
+      "@kayjs/kay/internal/server": ["./packages/kay/src/server/index.ts"],
       "@kayjs/icons": ["./packages/plugin-icons/src/index.ts"],
       "@kayjs/icons/search": ["./packages/plugin-icons/src/search.ts"],
       "@kayjs/images": ["./packages/plugin-images/src/index.ts"],
@@ -35,5 +45,11 @@
       "@kayjs/tailwind": ["./packages/plugin-tailwind/src/index.ts"]
     }
   },
-  "include": ["packages/*/src", "packages/*/tests", "bench-app", "examples/*/src", "examples/*/kay.config.ts"]
+  "include": [
+    "packages/*/src",
+    "packages/*/tests",
+    "bench-app",
+    "examples/*/src",
+    "examples/*/kay.config.ts"
+  ]
 }

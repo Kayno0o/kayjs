@@ -1,4 +1,4 @@
-// kay/test: in-process testing for pages, middleware, cookies, and actions — zero port binding.
+// @kayjs/kay/test: in-process testing for pages, middleware, cookies, and actions — zero port binding.
 
 import type { BuildManifest, BuildOptions } from '../build/index'
 import type { KayApp, ServerAction, ServerRuntimeConfig } from '../server/index'

@@ -28,7 +28,7 @@ Every file in `src/routes/` maps directly to a URL path on `Bun.serve()`.
 Use either an `async` route component (strictly server-only) or a sync route with `export async function load(ctx)`. `load()` can return data props or a `Response` (such as a `404` or redirect):
 
 ```tsx
-import type { RequestContext } from 'kay/server'
+import type { RequestContext } from '@kayjs/kay/server'
 
 export async function load(ctx: RequestContext) {
   const post = await findPost(ctx.params.slug)
@@ -48,7 +48,7 @@ Export HTTP verb handlers from any `.ts` file under `src/routes/`:
 
 ```ts
 // src/routes/api/items.ts
-import type { RequestContext } from 'kay/server'
+import type { RequestContext } from '@kayjs/kay/server'
 
 export function GET(ctx: RequestContext) {
   return ctx.json({ items: [], ip: ctx.ip })
@@ -71,7 +71,7 @@ Unsafe HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`) verify `Origin` / `Sec-Fe
 Layouts receive `{ children, params, locals, url }`:
 
 ```tsx
-import type { KayChild } from 'kay'
+import type { KayChild } from '@kayjs/kay'
 
 export default function Layout({ children, locals }: { children: KayChild, locals: Record<string, unknown> }) {
   return (
@@ -86,7 +86,7 @@ export default function Layout({ children, locals }: { children: KayChild, local
 Middleware in `_middleware.ts` runs outer-to-inner before matching routes and actions in that directory:
 
 ```ts
-import type { Middleware } from 'kay/server'
+import type { Middleware } from '@kayjs/kay/server'
 
 const middleware: Middleware = async (ctx, next) => {
   ctx.locals.requestId = crypto.randomUUID()

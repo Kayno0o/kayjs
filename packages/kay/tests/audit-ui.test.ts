@@ -101,8 +101,8 @@ beforeAll(async () => {
 
   // A tiny island that exposes `mount`, `signal`, and `toast` from the exact same bundled client runtime used by the UI islands.
   writeFileSync(join(builtDir, 'src/components/SigHost.tsx'), `
-    import { signal } from 'kay'
-    import { mount } from 'kay/dom'
+    import { signal } from '@kayjs/kay'
+    import { mount } from '@kayjs/kay/internal/dom'
     import { toast } from ${JSON.stringify(UI_ENTRY)}
     ;(globalThis as Record<string, unknown>).__kayAuditTest = { mount, signal, toast }
     export function SigHost() {

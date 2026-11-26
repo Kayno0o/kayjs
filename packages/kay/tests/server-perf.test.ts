@@ -19,7 +19,7 @@ function makeTemp(prefix: string): string {
 
 function linkKay(dir: string): void {
   mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
-  symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/kay'), 'dir')
+  symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/@kayjs/kay'), 'dir')
   const pkgRoot = join(KAY_PKG_DIR, '..')
   symlinkSync(join(pkgRoot, 'plugin-seo'), join(dir, 'node_modules/@kayjs/seo'), 'dir')
   symlinkSync(join(pkgRoot, 'plugin-i18n'), join(dir, 'node_modules/@kayjs/i18n'), 'dir')
@@ -90,7 +90,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     writeFileSync(join(dir, 'public/pixel.png'), new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...new Array(400).fill(0)]))
 
     writeFileSync(join(dir, 'src/components/Counter.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function Counter() {
         const n = signal(0)
         return <button type="button" onClick={() => n.value++}>Count {n.value}</button>
@@ -112,7 +112,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     `)
 
     writeFileSync(join(dir, 'src/routes/cookie.tsx'), `
-      import type { RequestContext } from 'kay/server'
+      import type { RequestContext } from '@kayjs/kay/server'
       export function load(ctx: RequestContext) {
         ctx.cookies.set('sid', 'tok-123')
         return { msg: 'cookie-ok '.repeat(50) }
@@ -123,7 +123,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     `)
 
     writeFileSync(join(dir, 'src/routes/dyn/[id].tsx'), `
-      import type { RequestContext } from 'kay/server'
+      import type { RequestContext } from '@kayjs/kay/server'
       export function load(ctx: RequestContext) {
         ctx.cookies.set('dyn', ctx.params.id!)
         return { id: ctx.params.id }
@@ -134,7 +134,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     `)
 
     writeFileSync(join(dir, 'src/routes/stream.tsx'), `
-      import { Suspense } from 'kay'
+      import { Suspense } from '@kayjs/kay'
       async function Slow() {
         await Bun.sleep(5)
         return <p id="resolved">${'streamed-payload '.repeat(30)}</p>
@@ -145,7 +145,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     `)
 
     writeFileSync(join(dir, 'src/routes/api/data.ts'), `
-      import type { RequestContext } from 'kay/server'
+      import type { RequestContext } from '@kayjs/kay/server'
       export function GET(ctx: RequestContext) {
         return ctx.json({ rows: Array.from({ length: 40 }, (_, i) => ({ id: i, label: 'row-' + i })) })
       }
@@ -252,7 +252,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     const i18nPath = join(import.meta.dir, '../../plugin-i18n/src/index.ts')
 
     writeFileSync(join(dir, 'kay.config.ts'), `
-      import { defineConfig } from 'kay/server'
+      import { defineConfig } from '@kayjs/kay/config'
       import { seo } from ${JSON.stringify(seoPath)}
       import { i18n } from ${JSON.stringify(i18nPath)}
       export default defineConfig({
@@ -266,7 +266,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
       import { readFileSync, writeFileSync } from 'node:fs'
-      import { Head } from 'kay'
+      import { Head } from '@kayjs/kay'
       export const prerender = true
       export default function Home({ locals }: { locals: { t?: (k: string) => string } }) {
         const n = Number(readFileSync(${JSON.stringify(counterFile)}, 'utf8')) + 1
@@ -281,7 +281,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     `)
 
     writeFileSync(join(dir, 'src/routes/guarded/_middleware.ts'), `
-      import type { Middleware } from 'kay/server'
+      import type { Middleware } from '@kayjs/kay/server'
       const mw: Middleware = async (ctx, next) => {
         if (ctx.request.headers.get('x-allow') !== '1')
           return ctx.text('Forbidden', { status: 403 })

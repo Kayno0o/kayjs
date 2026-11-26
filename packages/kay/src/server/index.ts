@@ -20,7 +20,7 @@ import { ACTION_ERROR_COOKIE, executeAction, isServerAction } from './action'
 import { createActionRegistry } from './action-registry'
 import { createAssets } from './assets'
 import { CompressionCache, compressedHtmlResponse, maybeCompressResponse } from './compress'
-import { createDocumentHooks, createHtmlHeaders, resolveRenderedIslands } from './document'
+import { createDocumentHooks, createHtmlHeaders, resolveRenderedIslands, withPluginHtmlCsp } from './document'
 import { createErrorNotifier, createFallbackPages } from './errors'
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
 import { allowedMethodsHeader, isPlainObject, mergedHeadTags, pickPageIslandProps, stripHeadBody } from './page'
@@ -528,7 +528,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
             res = stripHeadBody(res)
           else if (isEventStream(res))
             disableTimeout?.()
-          return finish(await maybeCompressResponse(res, req, compressCache), req, cookieStore)
+          return finish(await maybeCompressResponse(await withPluginHtmlCsp(res, htmlHeaders), req, compressCache), req, cookieStore)
         }
         catch (error) {
           notifyError(error, req, 'plugin')

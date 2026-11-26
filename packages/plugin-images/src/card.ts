@@ -4,8 +4,8 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { getAppContext } from '@kayjs/kay/server'
-import { escAttr } from '@kayjs/kay/ssr'
+import { getAppContext } from '@kayjs/kay/internal/server'
+import { escAttr } from '@kayjs/kay/server'
 
 export interface ShareCardDefaults {
   /** Base URL prepended to returned card URL (optional, e.g. 'https://log.kaynooo.fr'). */

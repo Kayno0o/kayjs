@@ -17,7 +17,7 @@ function writeFixture(rel: string, content: string): void {
 
 // Create a full-stack fixture exercising every Milestone 2 feature
 writeFixture('src/schema.ts', `
-import type { StandardSchemaV1 } from 'kay/server'
+import type { StandardSchemaV1 } from '@kayjs/kay/server'
 
 // Minimal zero-dep Standard Schema v1 validator (same protocol as Zod/Valibot/ArkType)
 export function objectSchema<T extends Record<string, (v: unknown) => string | undefined>>(rules: T): StandardSchemaV1<Record<string, unknown>, { [K in keyof T]: string }> {
@@ -44,7 +44,7 @@ export function objectSchema<T extends Record<string, (v: unknown) => string | u
 `)
 
 writeFixture('src/routes/_layout.tsx', `
-import { Head, type KayChild } from 'kay'
+import { Head, type KayChild } from '@kayjs/kay'
 
 export default function RootLayout({ children }: { children?: KayChild }) {
   return (
@@ -73,7 +73,7 @@ export default function ErrorPage({ error }: { error: unknown }) {
 `)
 
 writeFixture('src/routes/_middleware.ts', `
-import type { Middleware } from 'kay/server'
+import type { Middleware } from '@kayjs/kay/server'
 
 const middleware: Middleware = async (ctx, next) => {
   ctx.locals.requestTag = 'from-root-mw'
@@ -85,7 +85,7 @@ export default middleware
 `)
 
 writeFixture('src/routes/index.tsx', `
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 
 export default function Home({ locals }: { locals: Record<string, unknown> }) {
   return (
@@ -98,7 +98,7 @@ export default function Home({ locals }: { locals: Record<string, unknown> }) {
 `)
 
 writeFixture('src/routes/posts/[slug].tsx', `
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 
 export const prerender = true
 
@@ -123,7 +123,7 @@ export default function Docs({ params }: { params: Record<string, string> }) {
 `)
 
 writeFixture('src/routes/admin/_layout.tsx', `
-import type { KayChild } from 'kay'
+import type { KayChild } from '@kayjs/kay'
 
 export default function AdminLayout({ children }: { children?: KayChild }) {
   return <section class="admin-layout">{children}</section>
@@ -131,7 +131,7 @@ export default function AdminLayout({ children }: { children?: KayChild }) {
 `)
 
 writeFixture('src/routes/admin/_middleware.ts', `
-import type { Middleware } from 'kay/server'
+import type { Middleware } from '@kayjs/kay/server'
 
 const adminGuard: Middleware = async (ctx, next) => {
   if (ctx.cookies.get('session') !== 'valid-token')
@@ -155,7 +155,7 @@ export default function Boom() {
 `)
 
 writeFixture('src/routes/stream.tsx', `
-import { Suspense } from 'kay'
+import { Suspense } from '@kayjs/kay'
 
 async function SlowWidget() {
   await Bun.sleep(25)
@@ -175,7 +175,7 @@ export default function StreamPage() {
 `)
 
 writeFixture('src/routes/api/ping.ts', `
-import type { RequestContext } from 'kay/server'
+import type { RequestContext } from '@kayjs/kay/server'
 
 export function GET(ctx: RequestContext) {
   return ctx.json({ pong: true, tag: ctx.locals.requestTag })
@@ -188,7 +188,7 @@ export function POST(ctx: RequestContext) {
 `)
 
 writeFixture('src/actions/notes.ts', `
-import { action } from 'kay/server'
+import { action } from '@kayjs/kay/server'
 import { objectSchema } from '../schema'
 
 const SECRET_SERVER_MARKER = 'TOP_SECRET_DB_PASSWORD_NEVER_IN_CLIENT'
@@ -207,7 +207,7 @@ export const addNote = action(noteSchema, async (input, ctx) => {
 `)
 
 writeFixture('src/components/NoteForm.tsx', `
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 import { addNote } from '../actions/notes'
 
 export function NoteForm() {
@@ -241,7 +241,7 @@ export default function NotesPage() {
 `)
 
 writeFixture('src/routes/admin/reports/_middleware.ts', `
-import type { Middleware } from 'kay/server'
+import type { Middleware } from '@kayjs/kay/server'
 
 const reportsMiddleware: Middleware = async (ctx, next) => {
   ctx.locals.chain = [ctx.locals.requestTag, ctx.locals.role].join('>')
@@ -251,7 +251,7 @@ export default reportsMiddleware
 `)
 
 writeFixture('src/routes/admin/reports/index.tsx', `
-import { action } from 'kay/server'
+import { action } from '@kayjs/kay/server'
 
 export const reportChain = action(async ctx => ctx.locals.chain)
 
@@ -508,7 +508,7 @@ describe('Kay v2 Milestone 2 full-stack features', () => {
       writeFileSync(
         join(appDir, 'src/routes/index.tsx'),
         `import { greet } from 'fake-ext-pkg'
-import { resolveKaySpecifier } from 'kay/build'
+import { resolveKaySpecifier } from '@kayjs/kay/build'
 
 export default function Home() {
   const hasBuild = typeof resolveKaySpecifier === 'function'
@@ -546,7 +546,7 @@ describe('calling an action from an island', () => {
     try {
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       writeFileSync(join(dir, 'src/routes/upload.ts'), `
-        import { action } from 'kay/server'
+        import { action } from '@kayjs/kay/server'
         const form = { '~standard': { version: 1, vendor: 'test', validate: (value: unknown) => ({ value: value as { avatar: File, name: string } }) } }
         export const upload = action(form, async input => ({ file: input.avatar.name, size: input.avatar.size, name: input.name }))
       `)
@@ -614,7 +614,7 @@ describe('form posts parsed for an action schema', () => {
   test('fields named like Object members parse as ordinary values', async () => {
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
     writeFileSync(join(dir, 'src/routes/form.ts'), `
-      import { action } from 'kay/server'
+      import { action } from '@kayjs/kay/server'
       // Each listed field must be a string, an array ('array') or a string of 3 or more characters ('long'); the parsed body comes back as is.
       const shape = (fields: Record<string, 'string' | 'array' | 'long'>) => ({ '~standard': { version: 1, vendor: 'test', validate(value: Record<string, unknown>) {
         const issues = Object.entries(fields).flatMap(([k, t]) => {

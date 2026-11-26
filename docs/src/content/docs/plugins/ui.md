@@ -15,7 +15,7 @@ Visit the interactive [UI Grammars sandbox](/grammars) to switch this site betwe
 
 ```ts
 // kay.config.ts
-import { defineConfig } from 'kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 import { ui } from '@kayjs/ui/plugin'
 
 export default defineConfig({

@@ -1,5 +1,5 @@
 import { Button, Card, CardBody, CardHeader, Field, Grid, Stack } from '@kayjs/ui'
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 
 export default function LoginPage() {
   return (

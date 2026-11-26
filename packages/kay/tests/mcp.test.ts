@@ -1,4 +1,4 @@
-import type { StandardSchemaV1 } from 'kay/server'
+import type { StandardSchemaV1 } from '@kayjs/kay/server'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

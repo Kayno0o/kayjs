@@ -19,7 +19,7 @@ function makeTemp(prefix: string): string {
 
 function linkKay(dir: string): void {
   mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
-  symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/kay'), 'dir')
+  symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/@kayjs/kay'), 'dir')
   symlinkSync(join(KAY_PKG_DIR, '../plugin-i18n'), join(dir, 'node_modules/@kayjs/i18n'), 'dir')
 }
 
@@ -38,7 +38,7 @@ describe('KayPlugin lifecycle hooks (check, watchPaths, addRouteStyle, addRouteH
       export default function Home() { return <h1>Hi</h1> }
     `)
     writeFileSync(join(dir, 'kay.config.ts'), `
-      import { defineConfig } from 'kay/server'
+      import { defineConfig } from '@kayjs/kay/config'
       import { i18n } from '@kayjs/i18n'
       export default defineConfig({
         plugins: [
@@ -107,7 +107,7 @@ describe('KayPlugin lifecycle hooks (check, watchPaths, addRouteStyle, addRouteH
     const notePath = join(dir, 'content/banner.txt')
     writeFileSync(notePath, 'Initial Banner')
     writeFileSync(join(dir, 'kay.config.ts'), `
-      import { defineConfig } from 'kay/server'
+      import { defineConfig } from '@kayjs/kay/config'
       export default defineConfig({
         plugins: [{ name: 'content-watch', watchPaths: ['content'] }],
       })

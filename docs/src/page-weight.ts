@@ -1,4 +1,4 @@
-import type { KayPlugin } from 'kay/server'
+import type { KayPlugin } from '@kayjs/kay/config'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'

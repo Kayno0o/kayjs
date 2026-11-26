@@ -16,7 +16,7 @@ bun add @kayjs/mcp
 ```ts
 // kay.config.ts
 import { mcp } from '@kayjs/mcp'
-import { defineConfig } from 'kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 import { listNotes, writeNote } from './src/actions/notes'
 
 export default defineConfig({

@@ -2,7 +2,7 @@
 
 import { createAuth, memoryAuthStore } from '@kayjs/auth'
 import { ui } from '@kayjs/ui/plugin'
-import { defineConfig } from 'kay/server'
+import { defineConfig } from '@kayjs/kay/config'
 
 export const auth = createAuth({
   store: memoryAuthStore(),

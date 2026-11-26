@@ -23,7 +23,7 @@ body { font-family: system-ui, sans-serif; }
 `)
 
 writeFixture('src/components/Counter.tsx', `
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 
 export function Counter() {
   const count = signal(0)
@@ -32,7 +32,7 @@ export function Counter() {
 `)
 
 writeFixture('src/routes/_layout.tsx', `
-import type { KayChild } from 'kay'
+import type { KayChild } from '@kayjs/kay'
 import { Counter } from '../components/Counter'
 
 export default function Layout({ children }: { children?: KayChild }) {
@@ -51,7 +51,7 @@ export default function Layout({ children }: { children?: KayChild }) {
 `)
 
 writeFixture('src/routes/index.tsx', `
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 
 export default function Home({ locals }: { locals: Record<string, unknown> }) {
   const t = locals.t as (k: string) => string
@@ -65,7 +65,7 @@ export default function Home({ locals }: { locals: Record<string, unknown> }) {
 `)
 
 writeFixture('src/routes/about.tsx', `
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 
 export default function About({ locals }: { locals: Record<string, unknown> }) {
   const t = locals.t as (k: string) => string
@@ -198,7 +198,7 @@ describe('KayPlugin API (tailwind + i18n + spa + custom transform)', () => {
       // Fake workspace/npm component library exporting a .tsx layout through a .ts barrel
       write('node_modules/fake-shell/package.json', JSON.stringify({ name: 'fake-shell', type: 'module', exports: './src/index.ts' }))
       write('node_modules/fake-shell/src/index.ts', `export { Shell } from './Shell.tsx'\n`)
-      write('node_modules/fake-shell/src/Shell.tsx', `/** @jsxImportSource kay */\nimport type { KayChild } from 'kay'\nexport function Shell({ children }: { children?: KayChild }) { return <div class="fake-shell"><main>{children}</main></div> }\n`)
+      write('node_modules/fake-shell/src/Shell.tsx', `/** @jsxImportSource kay */\nimport type { KayChild } from '@kayjs/kay'\nexport function Shell({ children }: { children?: KayChild }) { return <div class="fake-shell"><main>{children}</main></div> }\n`)
       write('src/routes/index.tsx', `import { Shell } from 'fake-shell'\nexport default function Home() { return <Shell><h1>Compiled Shell</h1></Shell> }\n`)
       write('src/routes/boom.tsx', `export default function Boom(): never { throw new Error('route exploded') }\n`)
 

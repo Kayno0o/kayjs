@@ -148,7 +148,7 @@ Hidden from production.
     `)
 
     writeFileSync(join(dir, 'src/routes/blog/[slug].tsx'), `
-      import { Head } from 'kay'
+      import { Head } from '@kayjs/kay'
       import { posts } from '../../posts'
 
       export const prerender = true
@@ -306,7 +306,7 @@ Contenu francais.
       })
     `)
     writeFileSync(join(dir, 'src/routes/posts/[slug].tsx'), `
-      import { Head } from 'kay'
+      import { Head } from '@kayjs/kay'
       import { shareCard } from ${JSON.stringify(imagesPkg)}
       import { posts } from '../../posts'
 

@@ -1,8 +1,8 @@
 import type { ContentEntry } from '@kayjs/content'
-import type { RequestContext } from 'kay/server'
+import type { RequestContext } from '@kayjs/kay/server'
 import { join } from 'node:path'
 import { shareCard } from '@kayjs/images'
-import { Head } from 'kay'
+import { Head } from '@kayjs/kay'
 import { type DocFrontmatter, docs, DOCS_ROOT, getFlatNav, getNavGroups, type NavItem, SECTIONS } from '../../content'
 
 export const prerender = true

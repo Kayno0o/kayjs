@@ -1,9 +1,12 @@
 // Typed file-backed Markdown collections with caching, schema validation, localization, and lazy renderers.
 
-import type { ActiveI18nConfig, ContentImageResolver, ContentImageResult, StandardSchemaV1 } from '@kayjs/kay/server'
+import type { ActiveI18nConfig, ContentImageResolver, ContentImageResult } from '@kayjs/kay/config'
+import type { StandardSchemaV1 } from '@kayjs/kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
-import { formatIssuePath, getAppContext, I18N_CONFIG_SERVICE, validateSchemaSync } from '@kayjs/kay/server'
+import { I18N_CONFIG_SERVICE } from '@kayjs/kay/config'
+import { getAppContext } from '@kayjs/kay/internal/server'
+import { formatIssuePath, validateSchemaSync } from '@kayjs/kay/server'
 import { findFrontmatterFieldLine, parseFrontmatter } from './frontmatter'
 import { renderMarkdown } from './markdown'
 

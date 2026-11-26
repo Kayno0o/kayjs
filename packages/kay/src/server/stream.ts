@@ -7,7 +7,8 @@ const textEncoder = new TextEncoder()
 // Where a streamed page's document splits: everything before it flushes first, resolved boundaries go in between.
 export const STREAM_TAIL_MARK = '<!--kay:stream-tail-->'
 
-async function settleWithin(chunk: PendingChunk, deadlineMs: number, signal: AbortSignal): Promise<SettledChunk | undefined> {
+/** `streamTimeout` is only named in the error: the page's boundaries share one `deadlineMs`. */
+async function settleWithin(chunk: PendingChunk, deadlineMs: number, streamTimeout: number, signal: AbortSignal): Promise<SettledChunk | undefined> {
   if (signal.aborted)
     return undefined
   const remaining = Math.max(0, deadlineMs - Date.now())
@@ -17,7 +18,7 @@ async function settleWithin(chunk: PendingChunk, deadlineMs: number, signal: Abo
     signal.addEventListener('abort', onAbort, { once: true })
     timer = setTimeout(() => {
       signal.removeEventListener('abort', onAbort)
-      const error = new Error(`<Suspense> boundary ${chunk.id} did not resolve within ${remaining} ms`)
+      const error = new Error(`<Suspense> boundary ${chunk.id} did not resolve within ${streamTimeout} ms`)
       resolve({ html: chunk.renderError(error), error })
     }, remaining)
   })
@@ -67,7 +68,7 @@ export function streamDocument(shell: string, rctx: RenderContext, streamTimeout
         const chunks = rctx.pending.slice(flushed)
         flushed = rctx.pending.length
         await Promise.all(chunks.map(async (chunk) => {
-          const settled = await settleWithin(chunk, deadline, abortCtrl.signal)
+          const settled = await settleWithin(chunk, deadline, streamTimeout, abortCtrl.signal)
           if (settled === undefined || closed || abortCtrl.signal.aborted)
             return
           if ('error' in settled)

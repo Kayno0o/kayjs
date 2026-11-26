@@ -3,7 +3,7 @@
 import type { ModuleAnalysis } from '../compiler/index'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { analyzeModule } from '../compiler/index'
-import { isTsFile } from './files'
+import { isTsFile, relPosix } from './files'
 import { resolveImportPath } from './resolve'
 
 export interface FileStamp {
@@ -105,7 +105,8 @@ export class ModuleGraph {
   private readonly resolved = new Map<string, string | undefined>()
   private readonly deps = new Map<string, string[]>()
 
-  constructor(private readonly cache?: BuildCache) {}
+  /** `root` is the app's folder, for the root-relative paths in errors. */
+  constructor(private readonly root: string, private readonly cache?: BuildCache) {}
 
   /** The file's mtime and size; only tracked when a cache is in use. */
   stamp(file: string): FileStamp | undefined {
@@ -174,7 +175,7 @@ export class ModuleGraph {
     }
     else {
       const code = this.source(file)
-      analysis = analyzeModule(file, code)
+      analysis = this.analyze(file, code)
       if (this.cache !== undefined && stamp !== undefined)
         this.cache.analyses.set(file, { mtimeMs: stamp.mtimeMs, size: stamp.size, code, analysis })
     }
@@ -182,6 +183,18 @@ export class ModuleGraph {
     for (const dep of this.localDeps(file))
       this.load(dep)
     return analysis
+  }
+
+  /** `analyzeModule`, its errors naming the file from the app's root. */
+  private analyze(file: string, code: string): ModuleAnalysis {
+    try {
+      return analyzeModule(file, code)
+    }
+    catch (err) {
+      if (err instanceof Error)
+        err.message = err.message.replaceAll(file, relPosix(this.root, file))
+      throw err
+    }
   }
 
   /** Follows `export { x } from './y'` and `export * from './y'` chains to the module that declares the export. */

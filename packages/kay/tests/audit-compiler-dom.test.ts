@@ -889,7 +889,7 @@ describe('destructured loop rows and component props in an island', () => {
   test('only a const bound to an array literal takes the render-once loop', () => {
     const out = (src: string) => compileDom('L.tsx', src).code
     expect(out(`const NAV = ['a', 'b'] as const\nexport function L() { return <ul>{NAV.map(n => <li>{n}</li>)}</ul> }`)).toContain('__eachStatic(')
-    expect(out(`import { store } from 'kay'\nconst todos = store(['a'])\nexport function L() { return <ul>{todos.map(n => <li>{n}</li>)}</ul> }`)).not.toContain('__eachStatic(')
+    expect(out(`import { store } from '@kayjs/kay'\nconst todos = store(['a'])\nexport function L() { return <ul>{todos.map(n => <li>{n}</li>)}</ul> }`)).not.toContain('__eachStatic(')
     expect(out(`import { todos } from './state'\nexport function L() { return <ul>{todos.map(n => <li>{n}</li>)}</ul> }`)).not.toContain('__eachStatic(')
     expect(out(`const items = ['a']\nexport function L(p) { const items = p.list; return <ul>{items.map(n => <li>{n}</li>)}</ul> }`)).not.toContain('__eachStatic(')
     expect(out(`let items = ['a']\nexport function L() { return <ul>{items.map(n => <li>{n}</li>)}</ul> }`)).not.toContain('__eachStatic(')
@@ -951,10 +951,11 @@ describe('destructured loop rows and component props in an island', () => {
   })
 
   test('#3562: resolveKaySpecifier derives from package.json exports and bunyan is not skipped as a bun builtin', () => {
-    expect(resolveKaySpecifier('kay')).toMatch(/src\/index\.ts$/)
-    expect(resolveKaySpecifier('@kayjs/kay/server')).toMatch(/src\/server\/index\.ts$/)
-    expect(resolveKaySpecifier('kay/jsx-dev-runtime')).toMatch(/src\/jsx-runtime\.ts$/)
-    expect(resolveKaySpecifier('kay/nonexistent')).toBeUndefined()
+    expect(resolveKaySpecifier('@kayjs/kay')).toMatch(/src\/index\.ts$/)
+    expect(resolveKaySpecifier('@kayjs/kay/server')).toMatch(/src\/server\/public\.ts$/)
+    expect(resolveKaySpecifier('@kayjs/kay/jsx-dev-runtime')).toMatch(/src\/jsx-runtime\.ts$/)
+    expect(resolveKaySpecifier('@kayjs/kay/nonexistent')).toBeUndefined()
+    expect(resolveKaySpecifier('kay')).toBeUndefined()
 
     const tmp = mkdtempSync(join(tmpdir(), 'kay-bunyan-'))
     try {

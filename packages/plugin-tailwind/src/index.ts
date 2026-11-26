@@ -2,10 +2,10 @@
 // Auto-loads `bun-plugin-tailwind` from the app root when `bunPlugin` is omitted.
 
 import type { BunPlugin } from 'bun'
-import type { KayPlugin } from '@kayjs/kay/server'
+import type { KayPlugin } from '@kayjs/kay/config'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
-import { definePlugin } from '@kayjs/kay/server'
+import { definePlugin } from '@kayjs/kay/config'
 
 export interface TailwindPluginOptions {
   /** Global stylesheet entry path relative to project root (default: 'src/app.css'). */

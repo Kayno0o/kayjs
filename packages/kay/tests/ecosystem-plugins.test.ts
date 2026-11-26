@@ -82,7 +82,7 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
     const mailP = mailPlugin(contactMailer)
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
-      import { Head } from 'kay'
+      import { Head } from '@kayjs/kay'
       import { Icon } from ${JSON.stringify(ICONS_PKG)}
       import { image, Picture } from ${JSON.stringify(IMAGES_PKG)}
       import { jsonLd } from ${JSON.stringify(SEO_PKG)}
@@ -108,7 +108,7 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
     `)
 
     writeFileSync(join(dir, 'src/routes/services.tsx'), `
-      import { Head } from 'kay'
+      import { Head } from '@kayjs/kay'
       export default async function Services() {
         return (
           <main>

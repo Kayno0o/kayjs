@@ -1,4 +1,4 @@
-import { signal } from 'kay'
+import { signal } from '@kayjs/kay'
 
 export function CopyCommand({ command }: { command: string }) {
   const copied = signal(false)

@@ -1,10 +1,11 @@
-// Resolves an import the way kay build follows it: relative files, then packages through Bun's resolver; kay, node:, bun and ~ aliases stay unresolved.
+// Resolves an import the way kay build follows it: relative files, then packages through Bun's resolver; @kayjs/kay, node:, bun and ~ aliases stay unresolved.
 
 import { statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import pkg from '../../package.json' with { type: 'json' }
 
 export const KAY_SRC_ROOT = resolve(import.meta.dir, '..')
+
 
 export function resolveImportPath(fromFile: string, specifier: string): string | undefined {
   if (specifier.startsWith('.')) {
@@ -17,9 +18,7 @@ export function resolveImportPath(fromFile: string, specifier: string): string |
     return undefined
   }
   if (
-    specifier === 'kay'
-    || specifier.startsWith('kay/')
-    || specifier === '@kayjs/kay'
+    specifier === '@kayjs/kay'
     || specifier.startsWith('@kayjs/kay/')
     || specifier.startsWith('node:')
     || specifier === 'bun'
@@ -39,13 +38,13 @@ export function resolveImportPath(fromFile: string, specifier: string): string |
 
 const KAY_SPECIFIER_FILES = new Map<string, string>(
   Object.entries(pkg.exports as Record<string, string>).map(([subpath, target]) => [
-    subpath === '.' ? 'kay' : `kay/${subpath.slice(2)}`,
+    subpath === '.' ? '@kayjs/kay' : `@kayjs/kay/${subpath.slice(2)}`,
     target.replace(/^\.\/src\//, ''),
   ]),
 )
 
-/** Maps `kay`, `kay/<subpath>` and the `@kayjs/kay` spelling of both to their source file. */
+/** Maps `@kayjs/kay` and its subpaths to their source file. */
 export function resolveKaySpecifier(specifier: string): string | undefined {
-  const file = KAY_SPECIFIER_FILES.get(specifier.startsWith('@kayjs/') ? specifier.slice('@kayjs/'.length) : specifier)
+  const file = KAY_SPECIFIER_FILES.get(specifier)
   return file === undefined ? undefined : join(KAY_SRC_ROOT, file)
 }

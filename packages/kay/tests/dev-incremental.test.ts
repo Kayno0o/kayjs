@@ -14,7 +14,6 @@ function makeTemp(prefix: string): string {
 const repoRoot = join(import.meta.dir, '../../..')
 function linkKay(dir: string): void {
   mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
-  symlinkSync(join(repoRoot, 'packages/kay'), join(dir, 'node_modules/kay'))
   symlinkSync(join(repoRoot, 'packages/kay'), join(dir, 'node_modules/@kayjs/kay'))
 }
 
@@ -32,7 +31,7 @@ describe('kay dev incremental client/server split, build-driven watch set, strea
 
     writeFileSync(join(dir, 'src/app.css'), 'body { color: rgb(1, 2, 3); }\n')
     writeFileSync(join(dir, 'src/components/Counter.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export default function Counter() {
         const count = signal(0)
         return <button onClick={() => count.value++}>{count.value}</button>
@@ -133,7 +132,7 @@ describe('kay dev incremental client/server split, build-driven watch set, strea
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
-      import { Suspense } from 'kay'
+      import { Suspense } from '@kayjs/kay'
 
       async function SlowPanel() {
         await Bun.sleep(120)

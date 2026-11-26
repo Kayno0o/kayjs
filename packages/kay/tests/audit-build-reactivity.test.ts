@@ -30,7 +30,7 @@ describe('audit #3526 — Box 30: plain component rendering an island & imported
     mkdirSync(join(dir, 'src/components'), { recursive: true })
 
     writeFileSync(join(dir, 'src/components/InnerCounter.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function InnerCounter({ start = 0 }: { start?: number }) {
         const count = signal(start)
         return <button class="inner" onClick={() => { count.value++ }}>Inner {count.value}</button>
@@ -45,7 +45,7 @@ describe('audit #3526 — Box 30: plain component rendering an island & imported
     `)
 
     writeFileSync(join(dir, 'src/components/OuterPanel.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       import { Card } from './Card'
       export function OuterPanel() {
         const open = signal(true)
@@ -251,7 +251,7 @@ describe('audit #3526 — Box 34: NODE_ENV=production during kay build client bu
     mkdirSync(join(dir, 'src/components'), { recursive: true })
 
     writeFileSync(join(dir, 'src/components/EnvWidget.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function EnvWidget() {
         const mode = signal(process.env.NODE_ENV ?? 'unset')
         return <button onClick={() => { mode.value = 'clicked' }}>{mode.value}</button>
@@ -492,7 +492,7 @@ describe('audit #3526 — Box 41: build-time precompression of hashed client ass
     `)
 
     writeFileSync(join(dir, 'src/components/RichWidget.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       import './RichWidget.css'
       export function RichWidget() {
         const count = signal(0)

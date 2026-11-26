@@ -1,5 +1,5 @@
-import type { LayoutProps } from 'kay'
-import { Head } from 'kay'
+import type { LayoutProps } from '@kayjs/kay'
+import { Head } from '@kayjs/kay'
 import { Toaster } from '@kayjs/ui'
 import { GrammarSwitcher } from '../components/GrammarSwitcher'
 

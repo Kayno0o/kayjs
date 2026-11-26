@@ -19,7 +19,7 @@ function getServerBridge(): ServerContextBridge | undefined {
   return (globalThis as Record<symbol, ServerContextBridge | undefined>)[BRIDGE_KEY]
 }
 
-/** Internal: registered by `kay/ssr` on the server so `Head`, `Suspense`, `useContext`, and `useId` stay request-scoped without pulling `node:async_hooks` into client bundles. */
+/** Internal: registered by kay's SSR runtime on the server so `Head`, `Suspense`, `useContext`, and `useId` stay request-scoped without pulling `node:async_hooks` into client bundles. */
 export function registerServerContextBridge(bridge: ServerContextBridge): void {
   ;(globalThis as Record<symbol, ServerContextBridge | undefined>)[BRIDGE_KEY] = bridge
 }

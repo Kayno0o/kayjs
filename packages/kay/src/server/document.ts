@@ -5,7 +5,7 @@ import type { RenderContext } from '../ssr/context'
 import type { RequestContext } from './http'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
 import { extractRenderedIslands, makeRequestContext } from './http'
-import { KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, resolveCspPolicy, withCspHashes } from './security'
+import { inlineStyleHashes, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, resolveCspPolicy, withCspHashes } from './security'
 
 const TITLE_INNER_RE = /^<title\b[^>]*>([\s\S]*?)<\/title>$/i
 
@@ -59,6 +59,18 @@ export function createHtmlHeaders(security: SecurityHeadersOptions | false | und
     }
     return headers
   }
+}
+
+/** A plugin's HTML page without a CSP of its own gets the app's, its `<style>` blocks hashed like a rendered page's. */
+export async function withPluginHtmlCsp(res: Response, htmlHeaders: HtmlHeaders): Promise<Response> {
+  if (res.body === null || res.headers.has('content-security-policy') || !(res.headers.get('content-type') ?? '').startsWith('text/html'))
+    return res
+  const html = await res.text()
+  const headers = new Headers(res.headers)
+  const csp = htmlHeaders(false, false, true, inlineStyleHashes(html))['content-security-policy']
+  if (csp !== undefined)
+    headers.set('content-security-policy', csp)
+  return new Response(html, { status: res.status, statusText: res.statusText, headers })
 }
 
 export function resolveRenderedIslands(rctx: RenderContext, body: string): { hasIslands: boolean, eagerChunks: string[] } {

@@ -1,4 +1,4 @@
-import type { PageProps } from 'kay'
+import type { PageProps } from '@kayjs/kay'
 import { Badge, Button, Card, CardBody, CardFooter, CardHeader, Stack } from '@kayjs/ui'
 
 export default async function AccountPage({ locals }: PageProps) {

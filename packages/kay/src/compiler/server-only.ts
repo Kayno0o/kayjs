@@ -5,8 +5,11 @@ import { loadDeclarations } from './analyze'
 import { collectPatternNames } from './shared'
 
 export const SERVER_ONLY_MODULES = new Set([
-  'kay/server',
   '@kayjs/kay/server',
+  '@kayjs/kay/config',
+  '@kayjs/kay/internal/server',
+  '@kayjs/kay/build',
+  '@kayjs/kay/test',
   'bun',
   'bun:sqlite',
   'bun:sql',

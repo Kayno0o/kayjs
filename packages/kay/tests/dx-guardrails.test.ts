@@ -30,7 +30,7 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     // 1. Interactive island importing server-only bun:sqlite
     writeFileSync(join(dir, 'src/components/BadIsland.tsx'), `
       import { Database } from 'bun:sqlite'
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       export function BadIsland({ format, createdAt, client }: { format?: (x: number) => string, createdAt?: Date, client?: unknown }) {
         const n = signal(0)
         void Database
@@ -78,7 +78,7 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     writeFileSync(join(dir, 'packages/shared-db/index.ts'), `import { Database } from 'bun:sqlite'\nexport const open = () => new Database(':memory:')`)
     symlinkSync(join(dir, 'packages/shared-db'), join(dir, 'node_modules/shared-db'), 'dir')
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       import { open } from 'shared-db'
       export default function Home() { const n = signal(0); return <button type="button" onClick={() => { open(); n.value++ }}>{n.value}</button> }
     `)
@@ -101,7 +101,7 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
       export const label = (n: number) => db ? \`#\${n}\` : ''
     `)
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
-      import { signal } from 'kay'
+      import { signal } from '@kayjs/kay'
       import { label } from '../lib/format'
       function Counter() {
         const n = signal(0)
@@ -176,7 +176,7 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
 
     writeFileSync(join(dir, 'src/actions/signup.ts'), `
-      import { action } from 'kay/server'
+      import { action } from '@kayjs/kay/server'
       const schema = {
         '~standard': {
           version: 1 as const,
@@ -195,7 +195,7 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     `)
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
-      import { getActionError } from 'kay/server'
+      import { getActionError } from '@kayjs/kay/server'
       import { signup } from '../actions/signup'
       export default function Page({ locals }: { locals: Record<string, unknown> }) {
         const err = getActionError(locals)
@@ -268,5 +268,20 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     })
     expect(resolved.length).toBe(1)
     expect((resolved[0] as { name: string }).name).toBe('mock-tw')
+  })
+})
+
+describe('kay is imported as @kayjs/kay (#3578)', () => {
+  it('fails the build on the bare kay spelling, naming the file and the scoped one', async () => {
+    const dir = makeTemp('kay-bare-import-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { signal } from 'kay/server'
+      void signal
+      export default function Home() { return <p>home</p> }
+    `)
+    const message = `kay compiler: import from 'kay/server' in src/routes/index.tsx: write '@kayjs/kay/server'.`
+    await expect(build({ root: dir, prerender: false })).rejects.toThrow(message)
+    expect((await checkProject(dir, { skipTypecheck: true })).errors).toContain(`src/routes/index.tsx:1:1: error: ${message}`)
   })
 })
