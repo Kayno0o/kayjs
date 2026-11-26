@@ -37,6 +37,8 @@ export interface RenderContext {
   /** Maps island chunk URL -> eager (true if hydrate is undefined/'load'). */
   renderedIslands: Map<string, boolean>
   hasIslands: boolean
+  /** True once an island's props hold a tagged value (a Date, Map, Set…), whose page preloads the revivers. */
+  revives: boolean
   htmlAttrs: Record<string, string>
   /** The region a request asked for alone (`x-kay-region`). */
   region: string | undefined
@@ -147,6 +149,7 @@ export function createRenderContext(
     island: undefined,
     renderedIslands: new Map(),
     hasIslands: false,
+    revives: false,
     htmlAttrs: {},
     region,
     regionHtml: undefined,

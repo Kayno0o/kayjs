@@ -9,7 +9,7 @@ import type { DocumentHooks, HtmlHeaders } from './document'
 import type { RequestContext } from './http'
 import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { raw, renderDocument, ssrChild } from '../ssr/index'
-import { addedInlineStyleHashes, headTagStyleHashes, mergeStyleHashes, resolveRenderedIslands } from './document'
+import { addedInlineStyleHashes, headTagStyleHashes, mergeStyleHashes, resolveRenderedIslands, revivePreload } from './document'
 import { wantsJson } from './http'
 import { styleHashesOf } from './security'
 
@@ -120,7 +120,7 @@ export function createFallbackPages(options: FallbackPagesOptions) {
           head: docHead.head,
           lang: docHead.lang,
           htmlAttrs: docHead.htmlAttrs,
-          preloadChunks: eagerChunks,
+          preloadChunks: [...eagerChunks, ...revivePreload(rctx, manifest.reviveScript)],
           hasIslands,
         })
         const html = await document.applyHtmlTransforms(docHtml, effUrl, req, ctx)

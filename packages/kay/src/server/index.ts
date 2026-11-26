@@ -26,7 +26,7 @@ import { createActionRegistry } from './action-registry'
 import { createAssets } from './assets'
 import { CompressionCache, compressedHtmlResponse, markCompressionHandled, maybeCompressResponse } from './compress'
 import { normalizeConsentConfig } from './consent'
-import { addedInlineStyleHashes, createDocumentHooks, createHtmlHeaders, headTagStyleHashes, mergeStyleHashes, resolveRenderedIslands, withPluginHtmlCsp } from './document'
+import { addedInlineStyleHashes, createDocumentHooks, createHtmlHeaders, headTagStyleHashes, mergeStyleHashes, resolveRenderedIslands, revivePreload, withPluginHtmlCsp } from './document'
 import { createErrorNotifier, createFallbackPages, devErrorResponse } from './errors'
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
 import { allowedMethodsHeader, mergedHeadTags, pickPageIslandProps, stripHeadBody } from './page'
@@ -358,7 +358,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
     if (canFastPath) {
       fastStaticPages.set(entry.path, createFastStaticPageHandler({
-        entry, mod, layouts, doc, hasIslands, hasLoad, trustProxy, consent, htmlHeaders, compressCache,
+        entry, mod, layouts, doc, reviveScript: manifest.reviveScript, hasIslands, hasLoad, trustProxy, consent, htmlHeaders, compressCache,
         actions, buildNotFoundResponse, renderError, notifyError, finish, withHsts,
       }))
     }
@@ -442,7 +442,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const isStreamed = rctx.pending.length > 0
     const hasIslands = renderedIslands.hasIslands || (isStreamed && entry.islandChunks.length > 0)
     // A streamed page preloads before its boundaries render, so it takes the route's eager islands: a lazy one loads when its strategy fires.
-    const preloadChunks = isStreamed ? entry.eagerIslandChunks ?? entry.islandChunks : renderedIslands.eagerChunks
+    const preloadChunks = [...isStreamed ? entry.eagerIslandChunks ?? entry.islandChunks : renderedIslands.eagerChunks, ...revivePreload(rctx, manifest.reviveScript)]
     const hasRegions = rctx.regionNames.size > 0
 
     const trustedStyleHashes = mergeStyleHashes(route.headStyleHashes, docHead.styleHashes, styleHashesOf(rctx.inlineStyles))

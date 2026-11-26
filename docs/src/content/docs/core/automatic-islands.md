@@ -74,7 +74,7 @@ The code that waits for a strategy ships only when an island of the app can use 
 
 Props passed from server code into an island are serialized into HTML and restored in the browser.
 
-- **Supported**: JSON primitives, arrays, plain objects, `Date`, `Map`, `Set`, `URL`, and `RegExp`.
+- **Supported**: JSON primitives, arrays, plain objects, `Date`, `Map`, `Set`, `URL`, and `RegExp`. Plain JSON costs no extra JS. A page whose props hold one of these classes also preloads a small file that turns them back into objects.
 - **Refused**: Functions, signals, and arbitrary class instances fail `kay check` and SSR. Define callbacks inside the island, or pass serializable IDs and data instead.
 - **JSX goes in children**: JSX in any other prop (`<Modal header={<h2>Hi</h2>} />`) fails `kay check` and SSR, because it would reach the browser as a plain object. Pass it as children, which render on the server, or build it inside the island.
 

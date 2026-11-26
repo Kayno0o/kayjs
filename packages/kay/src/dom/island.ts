@@ -1,13 +1,18 @@
 // Native <kay-island> Custom Element: the build defines which strategies an app uses, so the loader drops the code of the others.
 
 import { hydrate, mount } from './index'
-import { parseIslandProps } from './revive'
+
 
 declare const KAY_VISIBLE: boolean | undefined
 declare const KAY_IDLE: boolean | undefined
 declare const KAY_INTERACTION: boolean | undefined
 declare const KAY_MEDIA: boolean | undefined
 declare const KAY_CLIENT_ONLY: boolean | undefined
+/** The URL `kay build` gave the prop revivers; left undefined, they load from source. */
+declare const KAY_REVIVE: string | undefined
+
+// Only props holding a Date, Map, Set or another tagged value load the revivers: plain JSON parses with no extra file.
+const reviver = (): Promise<typeof import('./revive')> => typeof KAY_REVIVE === 'undefined' ? import('./revive') : import(KAY_REVIVE)
 
 type IslandModule = { default: (props: Record<string, unknown>) => Node | DocumentFragment | null }
 
@@ -234,7 +239,13 @@ export function defineIslandElement(): void {
       let dispose: (() => void) | undefined
       let mod: IslandModule | undefined
       try {
-        const loaded = await import(chunk) as IslandModule
+        const ps = findOwnPropsScript(this)
+        if (ps !== null) {
+          this._p = ps.textContent || '{}'
+          ps.remove()
+        }
+        const raw = this._p ?? this.getAttribute('p')
+        const [loaded, revive] = await Promise.all([import(chunk) as Promise<IslandModule>, raw?.includes('"__k":') ? reviver() : undefined])
         mod = loaded
         if (!this.isConnected || token !== this._t || this._d !== undefined) {
           this._clearStrategy()
@@ -242,20 +253,7 @@ export function defineIslandElement(): void {
         }
         this._clearStrategy()
 
-        let props: Record<string, unknown> = {}
-        const ps = findOwnPropsScript(this)
-        if (ps !== null) {
-          this._p = ps.textContent || '{}'
-          ps.remove()
-        }
-        if (this._p !== undefined) {
-          props = parseIslandProps(this._p)
-        }
-        else {
-          const p = this.getAttribute('p')
-          if (p)
-            props = parseIslandProps(p)
-        }
+        const props = (raw ? revive?.parseIslandProps(raw) ?? JSON.parse(raw) : {}) as Record<string, unknown>
         const slot = extractOwnSlot(this) ?? this._slot ?? null
         if (slot !== null) {
           this._slot = slot

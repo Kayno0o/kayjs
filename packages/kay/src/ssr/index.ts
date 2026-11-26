@@ -380,6 +380,8 @@ export function ssrIsland(
   let propsScript = ''
   if (Object.keys(props).length > 0) {
     const json = serializeIslandProps(props)
+    if (ctx !== undefined && json.includes('"__k":'))
+      ctx.revives = true
     if (scriptProps)
       propsScript = `<script type="application/json" data-kay-props>${safeJsonScript(json)}</script>`
     else

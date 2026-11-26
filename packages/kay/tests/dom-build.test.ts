@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
+import { chromium } from 'playwright-core'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -464,6 +465,62 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
       expect(preloaded).toEqual(route.eagerIslandChunks!)
     }
     finally {
+      await app.dispose?.()
+    }
+  })
+
+  test('only a page whose island props hold a tagged value loads the revivers, and the island gets its Date back (#3662)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-revive-'))
+    tempDirs.push(dir)
+    mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
+    symlinkSync(resolve(import.meta.dir, '..'), join(dir, 'node_modules/@kayjs/kay'))
+    const files: Record<string, string> = {
+      'src/components/Kind.tsx': `
+        import { signal } from '@kayjs/kay'
+        export function Kind(props: { at: Date | number }) {
+          const shown = signal('server')
+          return <button onClick={() => { shown.value = props.at instanceof Date ? 'date ' + props.at.getUTCFullYear() : typeof props.at }}>{shown.value}</button>
+        }`,
+      'src/routes/index.tsx': `import { Kind } from '../components/Kind'\nexport default function Home() { return <main><Kind at={7} /></main> }`,
+      'src/routes/dated.tsx': `import { Kind } from '../components/Kind'\nexport default function Dated() { return <main><Kind at={new Date('2024-05-01T00:00:00Z')} /></main> }`,
+      'src/routes/streamed.tsx': `
+        import { Suspense } from '@kayjs/kay'
+        import { Kind } from '../components/Kind'
+        async function Slow() { await Bun.sleep(5); return <p>slow</p> }
+        export default function Streamed() { return <main><Kind at={new Date(0)} /><Suspense fallback={<p>wait</p>}><Slow /></Suspense></main> }`,
+      'src/routes/_404.tsx': `import { Kind } from '../components/Kind'\nexport default function Missing() { return <main><Kind at={new Date(0)} /></main> }`,
+    }
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(join(dir, file, '..'), { recursive: true })
+      writeFileSync(join(dir, file), text)
+    }
+    const manifest = await build({ root: dir, minify: true, prerender: false })
+    const runtime = readFileSync(join(dir, 'dist/client', manifest.runtimeScript!.replace(/^\/_kay\//, '')), 'utf8')
+    const app = await createServer({ root: dir })
+    const server = app.serve(0)
+    const browser = await chromium.launch({ headless: true, executablePath: process.env.BUN_CHROME_PATH || chromium.executablePath() })
+    try {
+      const visit = async (path: string) => {
+        const page = await browser.newPage()
+        const requested: string[] = []
+        page.on('request', req => requested.push(new URL(req.url()).pathname))
+        const html = await (await page.goto(`http://localhost:${server.port}${path}`))!.text()
+        await page.click('button')
+        await page.waitForFunction(() => document.querySelector('button')?.textContent !== 'server')
+        const shown = await page.textContent('button')
+        await page.close()
+        return { shown, preloadsRevivers: html.includes(`href="${manifest.reviveScript}"`), loadedRevivers: requested.includes(manifest.reviveScript!) }
+      }
+
+      const preloads = async (path: string) => (await (await app.handle(new Request(`http://localhost${path}`))).text()).includes(`<link rel="modulepreload" href="${manifest.reviveScript}">`)
+      expect(runtime).not.toContain('fromEntries')
+      expect({ streamed: await preloads('/streamed'), missing: await preloads('/missing') }).toEqual({ streamed: true, missing: true })
+      expect(await visit('/')).toEqual({ shown: 'number', preloadsRevivers: false, loadedRevivers: false })
+      expect(await visit('/dated')).toEqual({ shown: 'date 2024', preloadsRevivers: true, loadedRevivers: true })
+    }
+    finally {
+      await browser.close()
+      server.stop(true)
       await app.dispose?.()
     }
   })

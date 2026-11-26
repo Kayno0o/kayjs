@@ -131,6 +131,11 @@ export async function withPluginHtmlCsp(res: Response, htmlHeaders: HtmlHeaders)
   return new Response(html, { status: res.status, statusText: res.statusText, headers })
 }
 
+/** The revivers, for a page whose island props need them; nothing otherwise. */
+export function revivePreload(rctx: RenderContext, reviveScript: string | undefined): string[] {
+  return rctx.revives && reviveScript !== undefined ? [reviveScript] : []
+}
+
 export function resolveRenderedIslands(rctx: RenderContext, body: string): { hasIslands: boolean, eagerChunks: string[] } {
   if (rctx.hasIslands) {
     const eagerChunks: string[] = []

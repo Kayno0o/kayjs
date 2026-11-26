@@ -427,7 +427,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   host.precompressAssets()
 
   const manifest: BuildManifest = {
-    runtimeScript: client.runtimeScript, regionScript: client.regionScript,
+    runtimeScript: client.runtimeScript, regionScript: client.regionScript, reviveScript: client.reviveScript,
     styles: client.styleUrls,
     globalStyles,
     ...(host.headTags.length > 0 ? { headTags: host.headTags } : {}),

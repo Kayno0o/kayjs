@@ -24,6 +24,7 @@ export interface CachedClientBuild {
   styleUrls: string[]
   runtimeScript: string | undefined
   regionScript: string | undefined
+  reviveScript: string | undefined
 }
 
 export interface CachedServerBuild {

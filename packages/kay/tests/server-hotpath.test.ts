@@ -292,6 +292,7 @@ describe('#3604 — createFastStaticPageHandler parity with renderCompiledRoute'
       mod: opts.mod,
       layouts: opts.layouts ?? [],
       doc: { body: '', lang: 'en', styles: [] },
+      reviveScript: undefined,
       hasIslands: Boolean(opts.entry?.islandChunks?.length),
       hasLoad: opts.hasLoad ?? false,
       trustProxy: false,

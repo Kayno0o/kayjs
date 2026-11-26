@@ -46,6 +46,8 @@ export interface BuildManifest {
   runtimeScript: string | undefined
   /** The plugins' `regionClientEntry`, loaded by the routes with `usesRegion`. */
   regionScript?: string | undefined
+  /** The prop revivers, preloaded by a page whose island props hold a Date, Map, Set or another tagged value. */
+  reviveScript?: string | undefined
   styles: string[]
   /** Stylesheets applied globally (plugin CSS, ctx.addStyle, and root layout CSS) — used by _error/_404. */
   globalStyles?: string[] | undefined

@@ -6,13 +6,14 @@ import type { BuildPluginTarget, KayPlugin } from '../plugins/index'
 import type { ClientTransforms } from './client-plugin'
 import type { BuildCache, ModuleGraph } from './graph'
 import type { ActionsByFile, IslandPlan } from './islands'
-import { copyFileSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, linkSync, mkdirSync, readdirSync, realpathSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { compileSsr } from '../compiler/index'
 import { readsPrivateEnv } from '../compiler/server-only'
 import { clientPlugin, KAY_SPECIFIER_FILTER, localIslandExports, TS_FILTER } from './client-plugin'
 import { formatBunBuildLogs, isInNodeModules, isOutsideRoot, isTsFile, relPosix } from './files'
 import { stampFiles, stampsMatch } from './graph'
+import { hydrateStrategies, writeClientEntries } from './client-entries'
 import { clientLeakError, islandKey } from './islands'
 import { pluginHookError } from './plugin-host'
 import { KAY_SRC_ROOT, resolveKaySpecifier } from './resolve'
@@ -149,24 +150,23 @@ export interface ClientBuild {
   styleUrls: string[]
   runtimeScript: string | undefined
   regionScript: string | undefined
+  /** The prop revivers, which the loader imports for an island whose props hold a Date, Map, Set or another tagged value. */
+  reviveScript: string | undefined
   metafile: Bun.BuildOutput['metafile']
 }
 
-/** The lazy strategies some island of the app hydrates with, so the loader keeps only theirs. A mode computed at runtime (`*`) may be any of them. */
-function hydrateStrategies(analyses: Iterable<{ defaultHydrate?: string | undefined, hydrateModes: Set<string> }>): { strategies: Record<'visible' | 'idle' | 'interaction' | 'media', boolean>, hasClientOnlyHydrate: boolean } {
-  const strategies = { visible: false, idle: false, interaction: false, media: false }
-  let hasClientOnlyHydrate = false
-  for (const analysis of analyses) {
-    for (const mode of [analysis.defaultHydrate, ...analysis.hydrateModes]) {
-      const any = mode === '*'
-      hasClientOnlyHydrate ||= any || mode === 'client'
-      strategies.visible ||= any || mode === 'visible'
-      strategies.idle ||= any || mode === 'idle'
-      strategies.interaction ||= any || mode === 'interaction'
-      strategies.media ||= any || (mode?.startsWith('media(') ?? false)
-    }
-  }
-  return { strategies, hasClientOnlyHydrate }
+/** Builds the prop revivers on their own, so the loader names the file through `KAY_REVIVE` and imports it only for the props that need it. */
+async function buildReviver(env: BundleEnv): Promise<{ url: string, file: string }> {
+  const built = await runBunBuild('client', env.root, () => {}, {
+    entrypoints: [join(KAY_SRC_ROOT, 'dom/revive.ts')],
+    outdir: env.clientDir,
+    target: 'browser',
+    format: 'esm',
+    minify: env.minify,
+    naming: '[name]-[hash].[ext]',
+  })
+  const file = relPosix(env.clientDir, built.outputs[0]!.path)
+  return { url: `${env.assetPrefix}/${file}`, file }
 }
 
 function publicEnvDefines(): Record<string, string> {
@@ -178,58 +178,6 @@ function publicEnvDefines(): Record<string, string> {
   return defines
 }
 
-// Another build of the same app (`kay build` beside `kay dev`) may be reading the file, hence the rename.
-function writeEntry(path: string, contents: string): void {
-  if (existsSync(path) && readFileSync(path, 'utf8') === contents)
-    return
-  const tmpPath = `${path}.${process.pid}.tmp`
-  writeFileSync(tmpPath, contents)
-  renameSync(tmpPath, path)
-}
-
-interface ClientEntryFiles {
-  entryPoints: string[]
-  islandEntryToKey: Map<string, string>
-  runtimeEntryPath: string | undefined
-  /** The plugins' `regionClientEntry` modules, bundled apart so only the routes that render a `<Region>` load them. */
-  regionEntryPath: string | undefined
-}
-
-function writeClientEntries(env: BundleEnv, entriesDir: string, options: { pluginClientEntries: string[], regionClientEntries: string[], hasClientOnlyHydrate: boolean, standaloneCss: string[] }): ClientEntryFiles {
-  const { pluginClientEntries, regionClientEntries, hasClientOnlyHydrate } = options
-  const out: ClientEntryFiles = { entryPoints: [], islandEntryToKey: new Map(), runtimeEntryPath: undefined, regionEntryPath: undefined }
-  if (env.islands.targets.size > 0 || pluginClientEntries.length > 0) {
-    const runtimeLines: string[] = []
-    if (env.islands.targets.size > 0) {
-      runtimeLines.push(`import { defineIslandElement } from '@kayjs/kay/internal/island';`)
-      runtimeLines.push(`export { hydrate${hasClientOnlyHydrate ? ', mount' : ''} } from '@kayjs/kay/internal/dom';`)
-      runtimeLines.push(`defineIslandElement();`)
-    }
-    for (const pe of pluginClientEntries)
-      runtimeLines.push(`import ${JSON.stringify(pe)};`)
-    out.runtimeEntryPath = join(entriesDir, 'runtime.ts')
-    writeEntry(out.runtimeEntryPath, `${runtimeLines.join('\n')}\n`)
-    out.entryPoints.push(out.runtimeEntryPath)
-  }
-  if (regionClientEntries.length > 0) {
-    out.regionEntryPath = join(entriesDir, 'regions.ts')
-    writeEntry(out.regionEntryPath, `${regionClientEntries.map(pe => `import ${JSON.stringify(pe)};`).join('\n')}\n`)
-    out.entryPoints.push(out.regionEntryPath)
-  }
-
-  out.entryPoints.push(...options.standaloneCss)
-
-  for (const [key, target] of env.islands.targets) {
-    const entryPath = join(entriesDir, `${target.id}.ts`)
-    const exportStmt = target.exportName === 'default'
-      ? `export { default } from ${JSON.stringify(target.file)};\n`
-      : `export { ${target.exportName} as default } from ${JSON.stringify(target.file)};\n`
-    writeEntry(entryPath, exportStmt)
-    out.entryPoints.push(entryPath)
-    out.islandEntryToKey.set(entryPath, key)
-  }
-  return out
-}
 
 export async function buildClient(env: BundleEnv, standaloneCss: string[]): Promise<ClientBuild> {
   const { root, clientDir, assetPrefix, graph, cache, actionsByFile, islands } = env
@@ -241,6 +189,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     styleUrls: [],
     runtimeScript: undefined,
     regionScript: undefined,
+    reviveScript: undefined,
     metafile: undefined,
   }
   const pluginClientEntries = env.plugins.map(p => p.clientEntry).filter((e): e is string => Boolean(e))
@@ -295,6 +244,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
       styleUrls: [...cache.lastClient.styleUrls],
       runtimeScript: cache.lastClient.runtimeScript,
       regionScript: cache.lastClient.regionScript,
+      reviveScript: cache.lastClient.reviveScript,
       metafile: undefined,
     }
   }
@@ -307,6 +257,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   const clientLeaks = new Set<string>()
   const inlinedEnvKey = (key: string): boolean => key === 'NODE_ENV' || `process.env.${key}` in envDefines
   const plugin = clientPlugin({ root, graph, cache, actionsByFile, transforms, leaks: clientLeaks, localExports: localIslandExports(islands.targets.values()), clientKeep: islands.clientKeep })
+  const reviver = islands.targets.size > 0 ? await buildReviver(env) : undefined
 
   const clientResult = await runBunBuild('client', env.root, () => {
     if (clientLeaks.size > 0)
@@ -322,7 +273,9 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     minify: env.minify,
     metafile: true,
     naming: '[name]-[hash].[ext]',
+    external: reviver === undefined ? [] : [reviver.url],
     define: {
+      ...(reviver === undefined ? {} : { KAY_REVIVE: JSON.stringify(reviver.url) }),
       KAY_VISIBLE: String(strategies.visible),
       KAY_IDLE: String(strategies.idle),
       KAY_INTERACTION: String(strategies.interaction),
@@ -401,33 +354,47 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     if (relFile.endsWith('.css'))
       result.styleUrls.push(`${assetPrefix}/${relFile}`)
   }
-
-  if (cache !== undefined) {
-    cache.stats.clientBuilds++
-    const inputFiles = new Set<string>([...standaloneCss, ...pluginClientEntries, ...regionClientEntries])
-    for (const inKey of Object.keys(metafile?.inputs ?? {})) {
-      const abs = resolveMetaPath(inKey)
-      // Skip generated entry shims and stubbed action files (whose signature tracks exported action names/URLs, not server body).
-      if (abs.startsWith(entriesDir))
-        continue
-      if (actionsByFile.has(abs) && !graph.analyses.get(abs)?.isInteractive)
-        continue
-      inputFiles.add(abs)
-    }
-    cache.lastClient = {
-      signature: clientSignature,
-      clientDir,
-      inputStamps: stampFiles(inputFiles),
-      islandChunks: new Map(result.islandChunks),
-      srcCssToUrl: new Map(result.srcCssToUrl),
-      islandCssUrl: new Map(result.islandCssUrl),
-      assetFiles: [...result.assetFiles],
-      styleUrls: [...result.styleUrls],
-      runtimeScript: result.runtimeScript,
-      regionScript: result.regionScript,
-    }
+  if (reviver !== undefined) {
+    result.reviveScript = reviver.url
+    result.assetFiles.push(reviver.file)
   }
+
+  if (cache !== undefined)
+    rememberClientBuild(cache, result, { signature: clientSignature, clientDir, inputFiles: [...standaloneCss, ...pluginClientEntries, ...regionClientEntries], entriesDir, actionsByFile, graph, resolveMetaPath })
   return result
+}
+
+/** Keeps what a client build produced, so the next build with the same signature and unchanged inputs reuses its files. */
+function rememberClientBuild(
+  cache: BuildCache,
+  result: ClientBuild,
+  options: { signature: string, clientDir: string, inputFiles: string[], entriesDir: string, actionsByFile: ActionsByFile, graph: ModuleGraph, resolveMetaPath: (p: string) => string },
+): void {
+  const { signature, clientDir, entriesDir, actionsByFile, graph, resolveMetaPath } = options
+  cache.stats.clientBuilds++
+  const inputFiles = new Set<string>(options.inputFiles)
+  for (const inKey of Object.keys(result.metafile?.inputs ?? {})) {
+    const abs = resolveMetaPath(inKey)
+    // Skip generated entry shims and stubbed action files (whose signature tracks exported action names/URLs, not server body).
+    if (abs.startsWith(entriesDir))
+      continue
+    if (actionsByFile.has(abs) && !graph.analyses.get(abs)?.isInteractive)
+      continue
+    inputFiles.add(abs)
+  }
+  cache.lastClient = {
+    signature,
+    clientDir,
+    inputStamps: stampFiles(inputFiles),
+    islandChunks: new Map(result.islandChunks),
+    srcCssToUrl: new Map(result.srcCssToUrl),
+    islandCssUrl: new Map(result.islandCssUrl),
+    assetFiles: [...result.assetFiles],
+    styleUrls: [...result.styleUrls],
+    runtimeScript: result.runtimeScript,
+    regionScript: result.regionScript,
+    reviveScript: result.reviveScript,
+  }
 }
 
 // Where the server build takes each import from: `@kayjs/kay` from its source, packages that render components bundled for the SSR compiler, the rest external.

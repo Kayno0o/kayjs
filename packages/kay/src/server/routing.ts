@@ -213,6 +213,8 @@ export interface FastStaticPageOptions {
   mod: LoadedPageModule
   layouts: LoadedLayoutModule[]
   doc: DocumentOptions
+  /** The prop revivers, preloaded by the responses whose island props need them. */
+  reviveScript: string | undefined
   hasIslands: boolean
   hasLoad: boolean
   trustProxy: TrustProxy
@@ -234,6 +236,7 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
     mod,
     layouts,
     doc,
+    reviveScript,
     hasIslands,
     hasLoad,
     trustProxy,
@@ -248,10 +251,14 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
     withHsts,
   } = options
 
-  const shell = renderDocument({ ...doc, body: '\0', preloadChunks: entry.eagerIslandChunks ?? entry.islandChunks, hasIslands })
-  const splitAt = shell.indexOf('\0')
-  const docPrefix = shell.slice(0, splitAt)
-  const docSuffix = shell.slice(splitAt + 1)
+  const eagerChunks = entry.eagerIslandChunks ?? entry.islandChunks
+  const shellAround = (preloadChunks: string[]): [string, string] => {
+    const shell = renderDocument({ ...doc, body: '\0', preloadChunks, hasIslands })
+    const splitAt = shell.indexOf('\0')
+    return [shell.slice(0, splitAt), shell.slice(splitAt + 1)]
+  }
+  const [docPrefix, docSuffix] = shellAround(eagerChunks)
+  const revivingPrefix = reviveScript === undefined ? docPrefix : shellAround([...eagerChunks, reviveScript])[0]
   const headStyleHashes = headTagStyleHashes(doc.headTags)
   const singleLayout = layouts.length === 1 ? layouts[0]! : undefined
 
@@ -260,7 +267,7 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
     return renderError(error, cookieStore, url, request, ctx)
   }
   const respondHtml = (body: string, request: Request, rctx: RenderContext, cookieStore?: CookieStore): Response => {
-    const html = docPrefix + body + keepScrollTag(body) + docSuffix
+    const html = (rctx.revives ? revivingPrefix : docPrefix) + body + keepScrollTag(body) + docSuffix
     const styleHashes = mergeStyleHashes(headStyleHashes, styleHashesOf(rctx.inlineStyles))
     const headers = withRegionVary(htmlHeaders(hasIslands, false, true, styleHashes), rctx.regionNames.size > 0)
     const res = compressedHtmlResponse(html, 200, headers, request, compressCache, !hasLoad)
