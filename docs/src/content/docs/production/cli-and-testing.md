@@ -21,7 +21,7 @@ order: 4
 | `kay mcp-footprint` | Print `@kayjs/mcp` tool sizes in bytes and estimated tokens |
 | `kay i18n-check` | List missing translation keys across `@kayjs/i18n` locales |
 
-Plugins can register additional commands via `KayPlugin.commands`. They are read from `kay.config.ts` only when the first word is not a built-in command, and they take `--root <dir>` to name the app folder.
+Plugins can register additional commands via `KayPlugin.commands`. They are read from `kay.config.ts` only when the first word is not a built-in command, and they take `--root <dir>` to name the app folder and `--help`. A `kay.config.ts` that fails to load leaves `kay --help` and the built-in commands working; a plugin command typed then prints the error and exits 1.
 
 ## Help, completion and exit codes
 
@@ -73,7 +73,7 @@ describe('app routes', () => {
 
 ## Testing islands in a browser
 
-`testBrowser()` builds the app for production, serves it on a loopback port it picks itself and opens pages in Chromium with their islands hydrated. It needs `playwright-core` (`bun add -d playwright-core`) and a Chrome or Chromium, found through `BUN_CHROME_PATH`, Playwright's own install or `/usr/bin`.
+`testBrowser()` builds the app for production, serves it on a loopback port it picks itself and opens pages in Chromium with their islands hydrated: `open()` resolves once the page has loaded and every island that hydrates on load has done so. It does not wait for the network to go quiet, so a page that polls opens as fast as any other. It needs `playwright-core` (`bun add -d playwright-core`) and a Chrome or Chromium, found through `BUN_CHROME_PATH`, Playwright's own install or `/usr/bin`.
 
 ```ts
 import { expect, it } from 'bun:test'

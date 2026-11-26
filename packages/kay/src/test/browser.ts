@@ -1,6 +1,5 @@
 // @kayjs/kay/test browser tests: the built app served on a loopback port of its own, its pages opened in Chromium with islands hydrated.
 
-import type { Browser, BrowserContext, Page } from 'playwright-core'
 import type { TestApp, TestAppOptions } from './index'
 import { existsSync } from 'node:fs'
 import { testApp } from './index'
@@ -32,13 +31,38 @@ export interface BrowserTest {
   readonly app: TestApp
   /** `http://127.0.0.1:<port>`, a port the test owns. */
   readonly origin: string
-  /** Opens `path` and resolves once the page and its islands' scripts have loaded. */
+  /** Opens `path` and resolves once the page has loaded and the islands that hydrate on load have hydrated. */
   open(path: string): Promise<BrowserPage>
   /** Closes the browser and the server. */
   close(): Promise<void>
 }
 
 const DEFAULT_TIMEOUT_MS = 10_000
+
+// The few playwright-core types used here, so an app's typecheck never needs playwright-core installed.
+interface Page {
+  on(event: 'pageerror', listener: (error: Error) => void): void
+  on(event: 'response', listener: (response: { status: () => number, url: () => string }) => void): void
+  on(event: 'console', listener: (message: { type: () => string, text: () => string }) => void): void
+  goto(url: string, options: { waitUntil: 'load', timeout: number }): Promise<unknown>
+  evaluate<T>(fn: string | (() => T | Promise<T>)): Promise<T>
+  waitForSelector(selector: string, options: { timeout: number }): Promise<unknown>
+  waitForFunction(fn: string | (() => unknown), arg: undefined, options: { timeout: number }): Promise<unknown>
+  click(selector: string, options: { timeout: number }): Promise<void>
+  fill(selector: string, value: string, options: { timeout: number }): Promise<void>
+  locator(selector: string): { first: () => { innerText: (options: { timeout: number }) => Promise<string> } }
+}
+interface BrowserContext {
+  newPage(): Promise<Page>
+  close(): Promise<void>
+}
+interface Browser {
+  newContext(): Promise<BrowserContext>
+  close(): Promise<void>
+}
+
+// True once every island that hydrates on load has hydrated; the ones waiting to be seen, idle or touched are left to the test.
+const ISLANDS_HYDRATED = `[...document.querySelectorAll('kay-island')].every(e => ['visible', 'idle', 'interaction'].includes(e.getAttribute('h')) || e._d !== undefined)`
 
 interface PlaywrightCore {
   chromium: { launch: (options: { headless: boolean, executablePath: string }) => Promise<Browser>, executablePath: () => string }
@@ -113,12 +137,16 @@ export async function testBrowser(options: BrowserTestOptions): Promise<BrowserT
   const app = await testApp({ ...options, minify: options.minify ?? true })
   const server = app.app.serve(0, '127.0.0.1')
   const origin = `http://127.0.0.1:${server.port}`
+  const stop = async () => {
+    server.stop(true)
+    await app.app.dispose?.()
+  }
   let browser: Browser
   try {
     browser = await playwright.chromium.launch({ headless: true, executablePath })
   }
   catch (error) {
-    server.stop(true)
+    await stop()
     throw error
   }
   return {
@@ -129,12 +157,24 @@ export async function testBrowser(options: BrowserTestOptions): Promise<BrowserT
       const page = await context.newPage()
       const url = new URL(path, origin).href
       const wrapped = wrapPage(page, context, timeout, url)
-      await page.goto(url, { waitUntil: 'networkidle', timeout })
+      // Not `networkidle`: a page that polls or streams never goes idle.
+      await page.goto(url, { waitUntil: 'load', timeout })
+      try {
+        await page.waitForFunction(ISLANDS_HYDRATED, undefined, { timeout })
+      }
+      catch (error) {
+        const seen = wrapped.errors.length > 0 ? `; the page reported: ${wrapped.errors.join('; ')}` : ''
+        throw new Error(`kay: the islands of ${url} did not hydrate within ${timeout} ms${seen}.`, { cause: error })
+      }
       return wrapped
     },
     async close() {
-      await browser.close()
-      server.stop(true)
+      try {
+        await browser.close()
+      }
+      finally {
+        await stop()
+      }
     },
   }
 }

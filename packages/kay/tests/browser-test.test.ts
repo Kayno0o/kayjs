@@ -36,6 +36,19 @@ beforeAll(async () => {
       )
     }
   `)
+  // A page that polls never goes network-idle.
+  writeFileSync(join(dir, 'src/components/Poll.tsx'), `
+    import { onMount, signal } from '@kayjs/kay'
+    export function Poll() {
+      const polls = signal(0)
+      onMount(() => { const id = setInterval(async () => { await fetch('/'); polls.value++ }, 100); return () => clearInterval(id) })
+      return <output id="polls">{polls.value}</output>
+    }
+  `)
+  writeFileSync(join(dir, 'src/routes/live.tsx'), `
+    import { Poll } from '../components/Poll'
+    export default function Live() { return <main><Poll /></main> }
+  `)
   writeFileSync(join(dir, 'src/routes/index.tsx'), `
     import { Counter } from '../components/Counter'
     import { Panel } from '../components/Panel'
@@ -70,6 +83,12 @@ describe('testBrowser (#3595)', () => {
     await page.click('#toggle')
     await page.waitFor(() => document.getElementById('color-row') === null)
     expect(await page.text('#panel')).toContain('Copies: 2')
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
+  it('opens a page that keeps polling once its islands have hydrated', async () => {
+    const page = await browser.open('/live')
+    await page.waitFor(() => Number(document.getElementById('polls')?.textContent) > 0)
     expect(page.errors).toEqual([])
   }, 30_000)
 })
