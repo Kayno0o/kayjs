@@ -24,6 +24,8 @@ interface Swap {
   /** Moves focus into the region (a link did it), not for a form the user is typing in. */
   focus?: boolean
   trigger?: Element
+  /** Skips the prefetch cache: the region is redrawn because the server's state changed. */
+  fresh?: boolean
 }
 
 function stateOf(state: unknown): RegionState | undefined {
@@ -51,9 +53,9 @@ function pathOf(region: HTMLElement): string {
   return names.join('/')
 }
 
-async function load(url: URL, region: string, signal: AbortSignal): Promise<PrefetchEntry | undefined> {
+async function load(url: URL, region: string, signal: AbortSignal, fresh: boolean | undefined): Promise<PrefetchEntry | undefined> {
   const key = fetchKeyOf(url, region)
-  const ready = getCachedHtml(key) ?? await inflightPrefetch.get(key)
+  const ready = fresh === true ? undefined : getCachedHtml(key) ?? await inflightPrefetch.get(key)
   if (ready !== undefined) {
     prefetchCache.delete(key)
     return ready
@@ -168,33 +170,29 @@ function apply(region: HTMLElement, found: { content: DocumentFragment, title: s
   window.dispatchEvent(new CustomEvent('kay:region', { detail: { name: swap.region, url: location.href } }))
 }
 
-async function swapRegion(swap: Swap): Promise<void> {
+// Resolves false when the region could not be swapped: no such region, a failed fetch, or an answer without it.
+async function swapRegion(swap: Swap): Promise<boolean> {
   const name = swap.region
-  if (findRegion(name) === null) {
-    location.assign(swap.url.href)
-    return
-  }
+  if (findRegion(name) === null)
+    return false
   controllers.get(name)?.abort()
   const controller = new AbortController()
   controllers.set(name, controller)
   const path = pathOf(findRegion(name)!)
   const busy = setTimeout(() => findRegion(name)?.setAttribute('aria-busy', 'true'), BUSY_DELAY)
   try {
-    const entry = await load(swap.url, path, controller.signal)
+    const entry = await load(swap.url, path, controller.signal, swap.fresh)
     if (controller.signal.aborted)
-      return
+      return true
     const content = entry === undefined ? undefined : contentOf(entry, path)
     const region = findRegion(name)
-    if (content === undefined || region === null) {
-      location.assign(swap.url.href)
-      return
-    }
+    if (content === undefined || region === null)
+      return false
     apply(region, content, swap)
+    return true
   }
   catch (err) {
-    if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError'))
-      return
-    location.assign(swap.url.href)
+    return controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')
   }
   finally {
     clearTimeout(busy)
@@ -203,6 +201,18 @@ async function swapRegion(swap: Swap): Promise<void> {
       findRegion(name)?.removeAttribute('aria-busy')
     }
   }
+}
+
+// A swap a link, a form or history asked for: what cannot be swapped loads the whole page.
+async function navigate(swap: Swap): Promise<void> {
+  if (!await swapRegion(swap))
+    location.assign(swap.url.href)
+}
+
+/** Redraws region `name` from the server at the current address, with no history entry and focus left where it is; rejects when the page has no such region, the fetch fails or the answer lacks it. */
+export async function refreshRegion(name: string): Promise<void> {
+  if (!await swapRegion({ url: new URL(location.href), region: name, history: 'none', fresh: true }))
+    throw new Error(`kay: region "${name}" could not be redrawn from ${location.href}: render a <Region name="${name}"> on this page, and check the server answers it.`)
 }
 
 function formUrl(form: HTMLFormElement, submitter?: HTMLElement | null): URL {
@@ -240,7 +250,7 @@ if (typeof document !== 'undefined') {
       return
     event.preventDefault()
     const append = link.hasAttribute('data-kay-append')
-    void swapRegion({ url, region: name, append, history: append ? 'replace' : 'push', focus: true, trigger: link })
+    void navigate({ url, region: name, append, history: append ? 'replace' : 'push', focus: true, trigger: link })
   }, true)
 
   document.addEventListener('submit', (event) => {
@@ -250,7 +260,7 @@ if (typeof document !== 'undefined') {
       return
     event.preventDefault()
     clearTimeout(liveTimer)
-    void swapRegion({ url: formUrl(form, (event as SubmitEvent).submitter), region: name, history: 'push' })
+    void navigate({ url: formUrl(form, (event as SubmitEvent).submitter), region: name, history: 'push' })
   }, true)
 
   document.addEventListener('input', (event) => {
@@ -261,7 +271,7 @@ if (typeof document !== 'undefined') {
     liveTimer = setTimeout(() => {
       const name = form.getAttribute('data-kay-target')!
       if (!missingRegion(name, '<form>'))
-        void swapRegion({ url: formUrl(form), region: name, history: 'burst' })
+        void navigate({ url: formUrl(form), region: name, history: 'burst' })
     }, LIVE_DEBOUNCE)
   })
 
@@ -294,6 +304,6 @@ if (typeof document !== 'undefined') {
     burstOpen = false
     if (name === undefined || sameDocument)
       return
-    void swapRegion({ url: new URL(location.href), region: name, history: 'none' })
+    void navigate({ url: new URL(location.href), region: name, history: 'none' })
   })
 }

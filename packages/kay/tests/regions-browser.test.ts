@@ -64,25 +64,39 @@ beforeAll(async () => {
     }
   `)
   // A live-search region around a sidebar and a list, and Load more appending to the list alone (#3621); its title follows the query (#3622).
+  // Hands refreshRegion to the test's scripts, the way an app's island imports it (#3624).
+  writeFileSync(join(dir, 'src/components/Refresher.tsx'), `
+    import { onMount } from '@kayjs/kay'
+    import { prefetch } from ${JSON.stringify(join(SPA, '../prefetch.ts'))}
+    import { refreshRegion } from ${JSON.stringify(join(SPA, '../regions.ts'))}
+    export function Refresher() {
+      onMount(() => { Object.assign(window, { __refresh: refreshRegion, __prefetch: prefetch }) })
+      return <span id="refresher" />
+    }
+  `)
   writeFileSync(join(dir, 'src/routes/sets.tsx'), `
     import { Head, Region } from '@kayjs/kay'
     import type { RequestContext } from '@kayjs/kay/server'
+    import { Refresher } from '../components/Refresher'
     const FRUIT = ['apple', 'apricot', 'banana', 'blueberry', 'cherry', 'cranberry', 'date']
+    let renders = 0
     export function load(ctx: RequestContext) {
       const q = ctx.url.searchParams.get('q') ?? ''
       const page = Number(ctx.url.searchParams.get('page') ?? 1)
       const all = FRUIT.filter(f => f.includes(q))
-      return { q, page, items: all.slice((page - 1) * 2, page * 2), more: all.length > page * 2 }
+      return { q, page, items: all.slice((page - 1) * 2, page * 2), more: all.length > page * 2, renders: ++renders }
     }
-    export default function Sets({ data }: { data: { q: string, page: number, items: string[], more: boolean } }) {
+    export default function Sets({ data }: { data: { q: string, page: number, items: string[], more: boolean, renders: number } }) {
       return (
         <main>
+          <Refresher />
           <Head><title>{'Sets: ' + data.q}</title></Head>
           <form id="search" method="get" data-kay-target="results" data-kay-live>
             <input id="q" type="search" name="q" value={data.q} data-kay-sync />
           </form>
           <Region name="results" id="results">
             <aside id="side">side {data.q}</aside>
+            <Region name="count"><output id="count">{data.renders}</output></Region>
             <Region name="sets" id="sets">
               <ul>{data.items.map(i => <li>{i}</li>)}</ul>
               {data.more && <a id="more" href={'/sets?q=' + data.q + '&page=' + (data.page + 1)} data-kay-target="sets" data-kay-append>More</a>}
@@ -292,6 +306,23 @@ describe('regions() swaps one region of a page (#3597)', () => {
       await page.evaluate('history.back()')
       await page.waitFor(() => document.getElementById('side')?.textContent === 'side a')
       expect(await page.evaluate('location.search')).toBe('?q=a')
+    }, 30_000)
+
+    it('redraws a region of the current address from script: no history entry, focus kept, kay:region fired (#3624)', async () => {
+      const page = await open('/sets?q=a')
+      await page.waitFor(() => typeof (window as unknown as Record<string, unknown>).__refresh === 'function')
+      const before = await page.evaluate<string>('document.getElementById("count").textContent')
+      // A prefetched answer predates the change the refresh is for, so it is skipped.
+      await page.evaluate('window.__prefetch(location.href, "results/count")')
+      await page.evaluate('window.__events = []; addEventListener("kay:region", e => window.__events.push(e.detail.name)); window.__length = history.length; document.getElementById("q").focus()')
+      await page.evaluate('window.__refresh("count")')
+      expect(Number(await page.evaluate<string>('document.getElementById("count").textContent'))).toBe(Number(before) + 2)
+      expect(await page.evaluate('history.length === window.__length')).toBe(true)
+      expect(await page.evaluate('document.activeElement?.id')).toBe('q')
+      expect(await page.evaluate('window.__events')).toEqual(['count'])
+
+      expect(await page.evaluate('window.__refresh("nowhere").then(() => "resolved", e => e.message)')).toMatch(/kay: region "nowhere"/)
+      expect(await marker(page)).toBe(true)
     }, 30_000)
 
     it('drops an inner fetch that is still out when the outer region is swapped', async () => {
