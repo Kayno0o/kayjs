@@ -1,0 +1,75 @@
+// #3598: one tree builds into one chunk layout, so a before/after page weight compares the change and nothing else.
+
+import { afterAll, describe, expect, test } from 'bun:test'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { build } from '../src/build/index'
+
+const dir = mkdtempSync(join(tmpdir(), 'kay-3598-'))
+afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+function write(rel: string, code: string): void {
+  mkdirSync(join(dir, rel, '..'), { recursive: true })
+  writeFileSync(join(dir, rel), code)
+}
+
+write('src/actions/notes.ts', `
+  import { action } from '@kayjs/kay/server'
+  export const addNote = action(async () => ({ ok: true }))
+`)
+write('src/components/NoteForm.tsx', `
+  import { useAction } from '@kayjs/kay'
+  import { addNote } from '../actions/notes'
+  export function NoteForm() {
+    const add = useAction(addNote)
+    return <button type="button" onClick={() => add.call({})}>{add.pending.value ? '...' : 'Add'}</button>
+  }
+`)
+for (const name of ['Counter', 'Toggle']) {
+  write(`src/components/${name}.tsx`, `
+    import { effect, signal } from '@kayjs/kay'
+    export function ${name}() {
+      const n = signal(0)
+      effect(() => { document.title = String(n.value) })
+      return <button type="button" onClick={() => n.value++}>${name} {n.value}</button>
+    }
+  `)
+}
+write('src/routes/index.tsx', `
+  import { Counter } from '../components/Counter'
+  import { Toggle } from '../components/Toggle'
+  export default function Home() { return <main><Counter /><Toggle /></main> }
+`)
+write('src/routes/notes.tsx', `
+  import { Counter } from '../components/Counter'
+  import { NoteForm } from '../components/NoteForm'
+  export default function Notes() { return <main><Counter /><NoteForm /></main> }
+`)
+
+async function buildOnce(i: number): Promise<{ report: string, homeJs: string }> {
+  const outDir = `dist-${i}`
+  const log = console.log
+  let report = ''
+  console.log = (...args: unknown[]) => { report += `${args.join(' ')}\n` }
+  try {
+    const manifest = await build({ root: dir, outDir, minify: true, prerender: false, copyPublic: false, analyze: true })
+    const home = manifest.routes.find(r => r.path === '/')!
+    const homeJs = home.islandChunks.map(url => readFileSync(join(dir, outDir, 'client', url.replace(/^\/_kay\//, '')), 'utf8')).join('\n')
+    return { report, homeJs }
+  }
+  finally {
+    console.log = log
+  }
+}
+
+describe('#3598 reproducible client chunks', () => {
+  test('six builds of one app print the same weight report, and a page without actions loads no action code', async () => {
+    const runs = []
+    for (let i = 0; i < 6; i++)
+      runs.push(await buildOnce(i))
+    expect(new Set(runs.map(r => r.report)).size).toBe(1)
+    for (const run of runs)
+      expect(run.homeJs).not.toContain('application/json')
+  }, 60_000)
+})

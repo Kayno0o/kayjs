@@ -3,12 +3,14 @@
 import type { BunPlugin } from 'bun'
 import type { IslandBinding } from '../compiler/index'
 import type { BuildPluginTarget, KayPlugin } from '../plugins/index'
+import type { ClientTransforms } from './client-plugin'
 import type { BuildCache, ModuleGraph } from './graph'
 import type { ActionsByFile, IslandPlan } from './islands'
 import { copyFileSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
-import { compileDom, compileSsr } from '../compiler/index'
-import { readsPrivateEnv, SERVER_ONLY_FILTER } from '../compiler/server-only'
+import { compileSsr } from '../compiler/index'
+import { readsPrivateEnv } from '../compiler/server-only'
+import { clientPlugin, KAY_SPECIFIER_FILTER, TS_FILTER } from './client-plugin'
 import { formatBunBuildLogs, isOutsideRoot, isTsFile, relPosix } from './files'
 import { stampFiles, stampsMatch } from './graph'
 import { islandKey } from './islands'
@@ -64,8 +66,6 @@ function reuseDirFiles(srcDir: string, dstDir: string, relFiles?: readonly strin
   return count > 0
 }
 
-const KAY_SPECIFIER_FILTER = /^@kayjs\/kay(?:\/.*)?$/
-const TS_FILTER = /\.(?:ts|tsx)$/
 const KAY_SCOPE_RE = /^@kayjs\//
 const LEADING_DOT_SLASH_RE = /^\.\//
 const EXTERNAL_KAY_SPECIFIERS = new Set(['@kayjs/kay/build', '@kayjs/kay/test'])
@@ -79,7 +79,7 @@ export function pluginBunPlugins(env: Pick<BundleEnv, 'plugins' | 'root' | 'asse
 }
 
 /** Plugin `transform` hooks, applied in order to every module the bundles load. */
-function pluginTransforms(plugins: KayPlugin[]): { active: boolean, key: string, apply: (code: string, id: string, target: 'server' | 'client') => string } {
+function pluginTransforms(plugins: KayPlugin[]): ClientTransforms {
   const list = plugins.filter(p => typeof p.transform === 'function')
   return {
     active: list.length > 0,
@@ -251,47 +251,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
 
   const clientLeaks = new Set<string>()
   const inlinedEnvKey = (key: string): boolean => key === 'NODE_ENV' || `process.env.${key}` in envDefines
-  const clientPlugin: BunPlugin = {
-    name: 'kay-v2-client',
-    setup(b) {
-      // Bun swaps node built-ins for empty shims in a browser build, so a server-only import would ship silently.
-      b.onResolve({ filter: SERVER_ONLY_FILTER }, (args) => {
-        if (!args.importer.includes('/node_modules/'))
-          clientLeaks.add(`${relPosix(root, args.importer)} imports server-only module "${args.path}"`)
-        return undefined
-      })
-      b.onResolve({ filter: KAY_SPECIFIER_FILTER }, (args) => {
-        const resolved = resolveKaySpecifier(args.path)
-        return resolved !== undefined ? { path: resolved } : undefined
-      })
-      b.onLoad({ filter: TS_FILTER }, (args) => {
-        const actions = actionsByFile.get(args.path)
-        if (actions !== undefined && !graph.analyses.get(args.path)?.isInteractive) {
-          const lines = [`import { actionStub } from '@kayjs/kay/internal/action';`]
-          for (const a of actions)
-            lines.push(`export const ${a.exportName} = actionStub(${JSON.stringify(a.url)});`)
-          return { contents: `${lines.join('\n')}\n`, loader: 'ts' }
-        }
-
-        if (!args.path.endsWith('.tsx')) {
-          if (!transforms.active || args.path.includes('/node_modules/'))
-            return undefined
-          const raw = graph.source(args.path)
-          const transformed = transforms.apply(raw, args.path, 'client')
-          return transformed !== raw ? { contents: transformed, loader: 'ts' } : undefined
-        }
-
-        const stamp = graph.stamp(args.path)
-        const cachedDom = stamp !== undefined ? cache?.domCompiled.get(args.path) : undefined
-        if (cachedDom !== undefined && cachedDom.mtimeMs === stamp!.mtimeMs && cachedDom.size === stamp!.size && (cachedDom.key ?? '') === transforms.key)
-          return { contents: cachedDom.code, loader: 'tsx' }
-        const compiled = transforms.apply(compileDom(args.path, graph.source(args.path), { analysis: graph.analyses.get(args.path) }).code, args.path, 'client')
-        if (cache !== undefined && stamp !== undefined)
-          cache.domCompiled.set(args.path, { mtimeMs: stamp.mtimeMs, size: stamp.size, key: transforms.key, code: compiled })
-        return { contents: compiled, loader: 'tsx' }
-      })
-    },
-  }
+  const plugin = clientPlugin({ root, graph, cache, actionsByFile, transforms, leaks: clientLeaks })
 
   let clientResult: Awaited<ReturnType<typeof Bun.build>>
   try {
@@ -310,7 +270,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
         'process.env.NODE_ENV': JSON.stringify(env.isDev ? 'development' : 'production'),
         ...envDefines,
       },
-      plugins: [clientPlugin, ...pluginBunPlugins(env, 'client')],
+      plugins: [plugin, ...pluginBunPlugins(env, 'client')],
     })
   }
   catch (err) {
