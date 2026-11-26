@@ -120,6 +120,7 @@ export interface ClientBuild {
   assetFiles: string[]
   styleUrls: string[]
   runtimeScript: string | undefined
+  regionScript: string | undefined
   metafile: Bun.BuildOutput['metafile']
 }
 
@@ -132,6 +133,59 @@ function publicEnvDefines(): Record<string, string> {
   return defines
 }
 
+// Another build of the same app (`kay build` beside `kay dev`) may be reading the file, hence the rename.
+function writeEntry(path: string, contents: string): void {
+  if (existsSync(path) && readFileSync(path, 'utf8') === contents)
+    return
+  const tmpPath = `${path}.${process.pid}.tmp`
+  writeFileSync(tmpPath, contents)
+  renameSync(tmpPath, path)
+}
+
+interface ClientEntryFiles {
+  entryPoints: string[]
+  islandEntryToKey: Map<string, string>
+  runtimeEntryPath: string | undefined
+  /** The plugins' `regionClientEntry` modules, bundled apart so only the routes that render a `<Region>` load them. */
+  regionEntryPath: string | undefined
+}
+
+function writeClientEntries(env: BundleEnv, entriesDir: string, options: { pluginClientEntries: string[], regionClientEntries: string[], hasClientOnlyHydrate: boolean, standaloneCss: string[] }): ClientEntryFiles {
+  const { pluginClientEntries, regionClientEntries, hasClientOnlyHydrate } = options
+  const out: ClientEntryFiles = { entryPoints: [], islandEntryToKey: new Map(), runtimeEntryPath: undefined, regionEntryPath: undefined }
+  if (env.islands.targets.size > 0 || pluginClientEntries.length > 0) {
+    const runtimeLines: string[] = []
+    if (env.islands.targets.size > 0) {
+      runtimeLines.push(`import { defineIslandElement } from '@kayjs/kay/internal/island';`)
+      runtimeLines.push(`export { hydrate${hasClientOnlyHydrate ? ', mount' : ''} } from '@kayjs/kay/internal/dom';`)
+      runtimeLines.push(`defineIslandElement();`)
+    }
+    for (const pe of pluginClientEntries)
+      runtimeLines.push(`import ${JSON.stringify(pe)};`)
+    out.runtimeEntryPath = join(entriesDir, 'runtime.ts')
+    writeEntry(out.runtimeEntryPath, `${runtimeLines.join('\n')}\n`)
+    out.entryPoints.push(out.runtimeEntryPath)
+  }
+  if (regionClientEntries.length > 0) {
+    out.regionEntryPath = join(entriesDir, 'regions.ts')
+    writeEntry(out.regionEntryPath, `${regionClientEntries.map(pe => `import ${JSON.stringify(pe)};`).join('\n')}\n`)
+    out.entryPoints.push(out.regionEntryPath)
+  }
+
+  out.entryPoints.push(...options.standaloneCss)
+
+  for (const [key, target] of env.islands.targets) {
+    const entryPath = join(entriesDir, `${target.id}.ts`)
+    const exportStmt = target.exportName === 'default'
+      ? `export { default } from ${JSON.stringify(target.file)};\n`
+      : `export { ${target.exportName} as default } from ${JSON.stringify(target.file)};\n`
+    writeEntry(entryPath, exportStmt)
+    out.entryPoints.push(entryPath)
+    out.islandEntryToKey.set(entryPath, key)
+  }
+  return out
+}
+
 export async function buildClient(env: BundleEnv, standaloneCss: string[]): Promise<ClientBuild> {
   const { root, clientDir, assetPrefix, graph, cache, actionsByFile, islands } = env
   const result: ClientBuild = {
@@ -141,10 +195,12 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     assetFiles: [],
     styleUrls: [],
     runtimeScript: undefined,
+    regionScript: undefined,
     metafile: undefined,
   }
   const pluginClientEntries = env.plugins.map(p => p.clientEntry).filter((e): e is string => Boolean(e))
-  if (islands.targets.size === 0 && pluginClientEntries.length === 0 && standaloneCss.length === 0) {
+  const regionClientEntries = env.plugins.map(p => p.regionClientEntry).filter((e): e is string => Boolean(e))
+  if (islands.targets.size === 0 && pluginClientEntries.length === 0 && regionClientEntries.length === 0 && standaloneCss.length === 0) {
     if (cache !== undefined)
       cache.lastClient = undefined
     return result
@@ -173,6 +229,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
         hasDeferredHydrate,
         hasClientOnlyHydrate,
         pluginClientEntries,
+        regionClientEntries,
         standaloneCss: [...standaloneCss].sort(),
         islands: [...islands.targets.entries()]
           .sort(([a], [b]) => a.localeCompare(b))
@@ -202,6 +259,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
       assetFiles: [...cache.lastClient.assetFiles],
       styleUrls: [...cache.lastClient.styleUrls],
       runtimeScript: cache.lastClient.runtimeScript,
+      regionScript: cache.lastClient.regionScript,
       metafile: undefined,
     }
   }
@@ -209,43 +267,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   // Bun hashes an entry's path into its chunk name, so the entries sit at one path per app: a dev rebuild or a static stage then keeps every unchanged chunk name.
   const entriesDir = join(root, 'node_modules/.cache/kay/entries')
   mkdirSync(entriesDir, { recursive: true })
-  // Another build of the same app (`kay build` beside `kay dev`) may be reading the file, hence the rename.
-  const writeEntry = (path: string, contents: string): void => {
-    if (existsSync(path) && readFileSync(path, 'utf8') === contents)
-      return
-    const tmpPath = `${path}.${process.pid}.tmp`
-    writeFileSync(tmpPath, contents)
-    renameSync(tmpPath, path)
-  }
-  const entryPoints: string[] = []
-  const islandEntryToKey = new Map<string, string>()
-  let runtimeEntryPath: string | undefined
-
-  if (islands.targets.size > 0 || pluginClientEntries.length > 0) {
-    const runtimeLines: string[] = []
-    if (islands.targets.size > 0) {
-      runtimeLines.push(`import { defineIslandElement } from '@kayjs/kay/internal/island';`)
-      runtimeLines.push(`export { hydrate${hasClientOnlyHydrate ? ', mount' : ''} } from '@kayjs/kay/internal/dom';`)
-      runtimeLines.push(`defineIslandElement();`)
-    }
-    for (const pe of pluginClientEntries)
-      runtimeLines.push(`import ${JSON.stringify(pe)};`)
-    runtimeEntryPath = join(entriesDir, 'runtime.ts')
-    writeEntry(runtimeEntryPath, `${runtimeLines.join('\n')}\n`)
-    entryPoints.push(runtimeEntryPath)
-  }
-
-  entryPoints.push(...standaloneCss)
-
-  for (const [key, target] of islands.targets) {
-    const entryPath = join(entriesDir, `${target.id}.ts`)
-    const exportStmt = target.exportName === 'default'
-      ? `export { default } from ${JSON.stringify(target.file)};\n`
-      : `export { ${target.exportName} as default } from ${JSON.stringify(target.file)};\n`
-    writeEntry(entryPath, exportStmt)
-    entryPoints.push(entryPath)
-    islandEntryToKey.set(entryPath, key)
-  }
+  const { entryPoints, islandEntryToKey, runtimeEntryPath, regionEntryPath } = writeClientEntries(env, entriesDir, { pluginClientEntries, regionClientEntries, hasClientOnlyHydrate, standaloneCss })
 
   const clientLeaks = new Set<string>()
   const inlinedEnvKey = (key: string): boolean => key === 'NODE_ENV' || `process.env.${key}` in envDefines
@@ -294,7 +316,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     let abs = metaPaths.get(p)
     if (abs === undefined) {
       const fromCwd = resolve(process.cwd(), p)
-      abs = existsSync(fromCwd) || islandEntryToKey.has(fromCwd) || fromCwd === runtimeEntryPath ? fromCwd : resolve(clientDir, p)
+      abs = existsSync(fromCwd) || islandEntryToKey.has(fromCwd) || fromCwd === runtimeEntryPath || fromCwd === regionEntryPath ? fromCwd : resolve(clientDir, p)
       metaPaths.set(p, abs)
     }
     return abs
@@ -329,6 +351,8 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
     const entry = info.entryPoint === undefined ? undefined : resolveMetaPath(info.entryPoint)
     if (entry !== undefined && entry === runtimeEntryPath && relOut.endsWith('.js'))
       result.runtimeScript = url
+    if (entry !== undefined && entry === regionEntryPath && relOut.endsWith('.js'))
+      result.regionScript = url
     const entryKey = entry === undefined ? undefined : islandEntryToKey.get(entry)
     if (entryKey !== undefined && relOut.endsWith('.js'))
       result.islandChunks.set(entryKey, url)
@@ -354,7 +378,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
 
   if (cache !== undefined) {
     cache.stats.clientBuilds++
-    const inputFiles = new Set<string>([...standaloneCss, ...pluginClientEntries])
+    const inputFiles = new Set<string>([...standaloneCss, ...pluginClientEntries, ...regionClientEntries])
     for (const inKey of Object.keys(metafile?.inputs ?? {})) {
       const abs = resolveMetaPath(inKey)
       // Skip generated entry shims and stubbed action files (whose signature tracks exported action names/URLs, not server body).
@@ -374,6 +398,7 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
       assetFiles: [...result.assetFiles],
       styleUrls: [...result.styleUrls],
       runtimeScript: result.runtimeScript,
+      regionScript: result.regionScript,
     }
   }
   return result

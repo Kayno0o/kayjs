@@ -401,6 +401,8 @@ export interface DocumentOptions {
   htmlAttrs?: Record<string, string> | undefined
   runtimeScript?: string | undefined
   alwaysLoadRuntime?: boolean | undefined
+  /** Set on a route that renders a `<Region>`: the plugins' `regionClientEntry` bundle. */
+  regionScript?: string | undefined
   preloadChunks?: Iterable<string> | undefined
   styles?: Iterable<string> | undefined
   hasIslands?: boolean | undefined
@@ -410,7 +412,7 @@ export interface DocumentOptions {
 }
 
 export function renderDocument(options: DocumentOptions): string {
-  const { body, head = '', headTags, lang = 'en', htmlAttrs, runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands, hasSuspense, navigation } = options
+  const { body, head = '', headTags, lang = 'en', htmlAttrs, runtimeScript, alwaysLoadRuntime, regionScript, preloadChunks, styles, hasIslands, hasSuspense, navigation } = options
   let headExtra = head
 
   if (headTags !== undefined) {
@@ -439,6 +441,8 @@ export function renderDocument(options: DocumentOptions): string {
 
   if (runtimeScript !== undefined && (hasIslands || alwaysLoadRuntime))
     headExtra += `<script type="module" src="${escAttr(runtimeScript)}"></script>`
+  if (regionScript !== undefined)
+    headExtra += `<script type="module" src="${escAttr(regionScript)}"></script>`
 
   let attrStr = ''
   const effectiveLang = htmlAttrs?.lang ?? lang

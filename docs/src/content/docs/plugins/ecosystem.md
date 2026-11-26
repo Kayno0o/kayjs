@@ -90,7 +90,7 @@ tailwind({ css: 'src/app.css' })
 
 ## `@kayjs/spa`
 
-Multi-page navigation (`0 KB` JS) is the default. Add `spa()` to `plugins` to opt into in-place HTML swaps:
+Multi-page navigation (`0 KB` JS) is the default, and most apps are best served by it plus [`regions()`](#regions) for the parts of a page that change in place. Add `spa()` only when an island must stay alive from one page to the next:
 
 ```ts
 import { spa } from '@kayjs/spa'
@@ -104,6 +104,9 @@ export default defineConfig({
 - **Prefetch on hover/focus**: Add `data-kay-prefetch` to internal links (respects `Save-Data`).
 - **Opt-out**: Add `data-no-spa` to any link that should trigger a full page load.
 - **Accessibility**: Updates `<title>`, `<html lang>`, head metadata, scroll position, focus, and a polite `aria-live` route announcer.
+- **Styles**: after a swap the head's stylesheets are in the order the next page serves them, so the cascade is the one a full load gives. Links it adds keep every attribute.
+- **Scroll**: the browser's own scroll restoring is turned off, and back and forward restore the saved offset once. An element with `data-kay-keep-scroll="key"` keeps its own offset across a swap and per history entry.
+- **Motion**: the swap runs in a view transition, and not when the user asks for reduced motion.
 
 ### Regions
 
@@ -139,7 +142,10 @@ export default function Icons({ data }) {
 The browser asks for `x-kay-region: pane`. The server skips the layouts and every other region, and sends only the inside of `pane`. Without JavaScript the link is a normal link and the whole page loads. History works as usual: each swap is an entry, and back and forward restore the region. `ctx.region` is the name asked for, so `load()` can skip data the region does not show.
 
 - **Append**: add `data-kay-append` to a "Load more" link. The next page is added to the region and the link goes. The history entry is replaced, not pushed.
-- **Forms**: a `<form method="get" data-kay-target="results">` swaps on submit. Add `data-kay-live` to swap while the user types. A typing burst makes one history entry, and a pause of one second ends the burst.
+- **Forms**: a `<form method="get" data-kay-target="results">` swaps on submit, and empty fields stay out of the URL. Add `data-kay-live` to swap while the user types. A typing burst makes one history entry, and a pause of one second ends the burst. A `<form method="post" data-kay-target="x">` posts in the background, follows the redirect and swaps region `x` from the page it lands on. Without JavaScript it posts normally.
+- **Motion and scroll**: a swap runs in a view transition where the browser has them, and not when the user asks for reduced motion. Each history entry remembers the scroll of the window and of the regions, and back and forward restore both. A new swap leaves the page where it is and puts the region back at its top, unless the region has `data-kay-keep-scroll`. A `#hash` link to something already on the page scrolls to it without a fetch, and after a swap the page scrolls to the hash of the new address.
+- **Current page**: after a swap, links whose `href` is the new address get `aria-current="page"`, and the others lose it.
+- **Weight**: the regions client is loaded only by pages that render a `<Region>`. Every other page ships none of it.
 - **Keep links in step**: `data-kay-sync="q icon"` on a link copies those query params from the current URL after each swap. On an input or select it keeps the field equal to the param of its name.
 - **Prefetch**: put the link inside `data-kay-prefetch` and its region is fetched on hover or focus, with the same cache as `spa()`.
 - **Nesting**: a region can sit inside another, as long as each has its own name. A "Load more" link can then append to an inner list while a live search swaps the outer region. Asking for the inner region renders it alone, and the outer one is never sent. Asking for the outer region renders it with a fresh inner region, and any fetch still running for the old inner one is dropped. Back and forward work across both. The server still builds the other children of an outer region when only the inner one is asked for, but does not send them.

@@ -106,6 +106,71 @@ beforeAll(async () => {
       )
     }
   `)
+  // A page that swaps a body region: two scrollers in it, nav links outside it, a hash target, a POST form (#3640).
+  writeFileSync(join(dir, 'src/swap.css'), '#inner, #kept, #scrolled { height: 100px; overflow: auto; }\n')
+  writeFileSync(join(dir, 'src/routes/swap.tsx'), `
+    import '../swap.css'
+    import { Region } from '@kayjs/kay'
+    import type { RequestContext } from '@kayjs/kay/server'
+    export function load(ctx: RequestContext) {
+      return { n: ctx.url.searchParams.get('n') ?? '1', saved: ctx.url.searchParams.get('saved') ?? '' }
+    }
+    const lines = (count: number) => Array.from({ length: count }, (_, i) => <p>line {i}</p>)
+    export default function Swap({ data }: { data: { n: string, saved: string } }) {
+      return (
+        <main>
+          <nav>
+            <a id="n1" href="/swap?n=1">One</a>
+            <a id="n2" href="/swap?n=2">Two</a>
+          </nav>
+          <a id="push" href="/swap?n=2" data-kay-target="body">Go two</a>
+          <a id="pushk" href="/swap?n=2" data-kay-target="kept">Go two kept</a>
+          <a id="pushs" href="/swap?n=2" data-kay-target="scrolled">Go two scrolled</a>
+          <a id="jump" href="/swap?n=1#sec" data-kay-target="body">Jump</a>
+          <a id="jumpfar" href="/swap?n=3#far" data-kay-target="body">Jump far</a>
+          <form id="filter" method="get" action="/swap" data-kay-target="body" data-kay-live>
+            <input name="a" value="" />
+            <input name="b" value="x" />
+          </form>
+          <form id="post" method="post" action="/swap-save" data-kay-target="body">
+            <input name="v" value="42" />
+            <button type="submit">Save</button>
+          </form>
+          <Region name="body" id="body">
+            <div id="inner" data-kay-keep-scroll="inner">{lines(40)}</div>
+            <div id="plain">{lines(40)}</div>
+            <h2 id="sec">Section</h2>
+            <p id="state">n={data.n} saved={data.saved}</p>
+            {data.n === '3' && <h2 id="far">Far</h2>}
+            {lines(60)}
+          </Region>
+          <Region name="kept" id="kept" data-kay-keep-scroll="kept">
+            <p id="kstate">n={data.n}</p>
+            {lines(40)}
+          </Region>
+          <Region name="scrolled" id="scrolled">
+            <p id="sstate">n={data.n}</p>
+            {lines(40)}
+          </Region>
+          {lines(80)}
+        </main>
+      )
+    }
+  `)
+  writeFileSync(join(dir, 'src/routes/swap-save.ts'), `
+    import type { RequestContext } from '@kayjs/kay/server'
+    export function POST(ctx: RequestContext) { return ctx.redirect('/swap?saved=1', 303) }
+  `)
+  // Pages with no region, and one whose region sits in a component: only the second kind loads the regions client (#3640).
+  writeFileSync(join(dir, 'src/routes/plain.tsx'), `export default function Plain() { return <main><h1>Plain</h1><a href="/swap">Swap</a></main> }`)
+  writeFileSync(join(dir, 'src/components/Panel.tsx'), `
+    import { Region } from '@kayjs/kay'
+    export function Panel() { return <Region name="panel"><p>panel</p></Region> }
+  `)
+  writeFileSync(join(dir, 'src/routes/composed.tsx'), `
+    import { Panel } from '../components/Panel'
+    export default function Composed() { return <main><Panel /></main> }
+  `)
   browser = await testBrowser({ root: dir })
 }, 90_000)
 
@@ -348,4 +413,126 @@ describe('regions() swaps one region of a page (#3597)', () => {
       await page.waitFor(() => document.title === 'Sets: b')
     }, 30_000)
   })
+})
+
+describe('a region swap keeps the page in place (#3640)', () => {
+  const scripts = (page: BrowserPage) => page.evaluate<string[]>(`performance.getEntriesByType('resource').filter(e => e.name.endsWith('.js')).map(e => new URL(e.name).pathname)`)
+  const state = (page: BrowserPage, text: string) => page.waitFor(`#state[data-t="${text}"]`)
+  // A swapped page shows its state from the region alone, so the tests wait on a mark the swap leaves.
+  async function swapPage(path = '/swap?n=1'): Promise<BrowserPage> {
+    const page = await open(path)
+    await page.evaluate(`(() => {
+      new MutationObserver(() => { const s = document.getElementById('state'); if (s) s.dataset.t = s.textContent }).observe(document.body, { childList: true, subtree: true })
+      const s = document.getElementById('state'); s.dataset.t = s.textContent
+      window.__vt = 0; const start = document.startViewTransition?.bind(document)
+      if (start) document.startViewTransition = (cb) => { window.__vt++; return start(cb) }
+      window.__fetches = 0; window.fetch = (f => (u, o) => { window.__fetches++; return f(u, o) })(window.fetch)
+    })()`)
+    return page
+  }
+  const click = (page: BrowserPage, id: string) => page.evaluate(`document.getElementById(${JSON.stringify(id)}).click()`)
+
+  it('loads the regions client only on routes whose tree renders a <Region>', async () => {
+    const plain = await open('/plain')
+    expect((await scripts(plain)).filter(s => s.includes('/regions-'))).toEqual([])
+    expect((await scripts(plain)).length).toBeGreaterThan(0)
+    expect((await scripts(await open('/swap'))).filter(s => s.includes('/regions-'))).toHaveLength(1)
+    expect((await scripts(await open('/composed'))).filter(s => s.includes('/regions-'))).toHaveLength(1)
+  }, 30_000)
+
+  it('swaps inside a view transition, but not under reduced motion nor while typing', async () => {
+    const page = await swapPage()
+    await click(page, 'push')
+    await state(page, 'n=2 saved=')
+    expect(await page.evaluate('window.__vt')).toBe(1)
+    await page.evaluate('history.back()')
+    await state(page, 'n=1 saved=')
+    expect(await page.evaluate('window.__vt')).toBe(2)
+    await page.evaluate('const input = document.querySelector("#filter input[name=b]"); input.value = "y"; input.dispatchEvent(new Event("input", { bubbles: true }))')
+    await page.waitFor(() => location.search.includes('b=y'))
+    await Bun.sleep(300)
+    expect(await page.evaluate('window.__vt')).toBe(2)
+    await page.evaluate('window.matchMedia = q => ({ matches: q.includes("reduce") })')
+    await click(page, 'push')
+    await state(page, 'n=2 saved=')
+    expect(await page.evaluate('window.__vt')).toBe(2)
+  }, 30_000)
+
+  it('keeps the scroll of a data-kay-keep-scroll element and of the window, and resets the region\'s own', async () => {
+    const page = await swapPage()
+    await page.evaluate('window.scrollTo(0, 150); document.getElementById("inner").scrollTop = 40; document.getElementById("scrolled").scrollTop = 60; document.getElementById("kept").scrollTop = 25')
+    await click(page, 'push')
+    await state(page, 'n=2 saved=')
+    expect(await page.evaluate('document.getElementById("inner").scrollTop')).toBe(40)
+    expect(await page.evaluate('Math.round(window.scrollY)')).toBe(150)
+    await click(page, 'pushk')
+    await page.waitFor(() => document.getElementById('kstate')?.textContent === 'n=2')
+    expect(await page.evaluate('document.getElementById("kept").scrollTop')).toBe(25)
+    await click(page, 'pushs')
+    await page.waitFor(() => document.getElementById('sstate')?.textContent === 'n=2')
+    expect(await page.evaluate('document.getElementById("scrolled").scrollTop')).toBe(0)
+  }, 30_000)
+
+  it('restores the scroll an entry had on back and forward', async () => {
+    const page = await swapPage()
+    await page.evaluate('window.scrollTo(0, 150); document.getElementById("inner").scrollTop = 40; document.getElementById("scrolled").scrollTop = 60')
+    await Bun.sleep(300)
+    await click(page, 'pushs')
+    await page.waitFor(() => document.getElementById('sstate')?.textContent === 'n=2')
+    await page.evaluate('window.scrollTo(0, 320); document.getElementById("inner").scrollTop = 10; document.getElementById("scrolled").scrollTop = 30')
+    await Bun.sleep(300)
+    await page.evaluate('history.back()')
+    await page.waitFor(() => document.getElementById('sstate')?.textContent === 'n=1')
+    await page.waitFor(() => document.getElementById('scrolled')!.scrollTop === 60)
+    expect(await page.evaluate('document.getElementById("inner").scrollTop')).toBe(40)
+    expect(await page.evaluate('Math.round(window.scrollY)')).toBe(150)
+    await page.evaluate('history.forward()')
+    await page.waitFor(() => document.getElementById('sstate')?.textContent === 'n=2')
+    await page.waitFor(() => document.getElementById('scrolled')!.scrollTop === 30)
+    expect(await page.evaluate('document.getElementById("inner").scrollTop')).toBe(10)
+    expect(await page.evaluate('Math.round(window.scrollY)')).toBe(320)
+  }, 30_000)
+
+  it('marks the links to the new URL aria-current, wherever they are, and clears the others', async () => {
+    const page = await swapPage()
+    await page.evaluate('document.getElementById("n1").setAttribute("aria-current", "page")')
+    await click(page, 'push')
+    await state(page, 'n=2 saved=')
+    expect(await page.evaluate('document.getElementById("n2").getAttribute("aria-current")')).toBe('page')
+    expect(await page.evaluate('document.getElementById("n1").hasAttribute("aria-current")')).toBe(false)
+    expect(await page.evaluate('document.getElementById("push").getAttribute("aria-current")')).toBe('page')
+  }, 30_000)
+
+  it('scrolls to a #hash already on the page without a fetch, and to the hash of a swapped-in page', async () => {
+    const page = await swapPage()
+    await click(page, 'jump')
+    await page.waitFor(() => location.hash === '#sec')
+    expect(await page.evaluate('window.__fetches')).toBe(0)
+    expect(await page.evaluate('window.scrollY > 100')).toBe(true)
+    await page.evaluate('window.scrollTo(0, 0)')
+    await click(page, 'jumpfar')
+    await state(page, 'n=3 saved=')
+    await page.waitFor(() => window.scrollY > 100)
+    expect(await page.evaluate('location.search + location.hash')).toBe('?n=3#far')
+    expect(await page.evaluate('window.__fetches')).toBe(1)
+    expect(await marker(page)).toBe(true)
+  }, 30_000)
+
+  it('drops the empty fields of a GET form from the URL', async () => {
+    const page = await swapPage()
+    await page.evaluate('document.getElementById("filter").requestSubmit()')
+    await page.waitFor(() => location.search === '?b=x')
+    expect(await marker(page)).toBe(true)
+  }, 30_000)
+
+  it('posts a form with a target through fetch, follows the redirect and swaps the region', async () => {
+    const page = await swapPage()
+    const before = await page.evaluate<number>('history.length')
+    await page.evaluate('document.getElementById("post").requestSubmit()')
+    await state(page, 'n=1 saved=1')
+    expect(await page.evaluate('location.pathname + location.search')).toBe('/swap?saved=1')
+    expect(await page.evaluate('history.length')).toBe(before + 1)
+    expect(await marker(page)).toBe(true)
+    expect(page.errors).toEqual([])
+  }, 30_000)
 })

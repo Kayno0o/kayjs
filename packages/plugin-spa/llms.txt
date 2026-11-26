@@ -17,11 +17,24 @@ Pair `regions()` in `kay.config.ts` with `<Region name="pane" as="section" ...at
 - `<form method="get" data-kay-target="results">`: swaps on submit; add `data-kay-live` to also swap while typing (200 ms debounce, one history entry per typing burst).
 - `data-kay-sync="q tag"` on a link or input/select: keeps query params or field values outside the region in sync after every swap.
 - `[data-kay-prefetch]` ancestor: prefetches targeted links on hover/focus (`data-no-prefetch` opts a link out).
+- `<form method="post" data-kay-target="results">`: posts through `fetch`, follows the redirect and swaps the region from the final page; without JS it posts normally. `data-kay-live` is refused on it.
+- Empty fields are dropped from the URL of a GET form.
+- Swaps run in `document.startViewTransition` where supported, and not under `prefers-reduced-motion: reduce`. `append`, `refreshRegion()` and live typing swap without one.
+- Each history entry remembers the window's scroll and the scrolled regions' scroll, and back/forward restores both. A pushed swap leaves the window's scroll alone and resets the region's own scroll, unless the region carries `data-kay-keep-scroll`.
+- After a swap, links whose `href` matches the new URL get `aria-current="page"`, others lose it.
+- A `#hash` link to an element already on the page scrolls to it with no fetch; after a swap the page scrolls to the URL's hash.
+- The regions client loads only on routes whose tree renders a `<Region>`: every other page ships none of it (plugin field `regionClientEntry`).
 - Dispatches `window` event `kay:region` with `{ detail: { name, url } }`. `kay check` verifies every `data-kay-target` matches a `<Region>` in `src/`.
+- `data-kay-keep-scroll="<key>"` on any element: its scroll offset survives region swaps and `spa()` swaps, and is kept per history entry.
+
+## Default: MPA plus `regions()`
+
+Most apps want plain page loads (with the browser's cross-document view transitions) and `regions()` for the fragments that change in place. Add `spa()` only when islands must stay alive across pages (`[data-persist]`).
 
 ## Full-Page SPA Navigation (`spa()`)
 
-- Intercepts same-origin `<a>` clicks, diffs `<head>` stylesheets (zero-FOUC) and meta/title/lang, preserves `[data-persist]` islands alive across navigations, restores scroll on back/forward, focuses `<main>`/`<h1>`, and dispatches `kay:navigate`.
+- Intercepts same-origin `<a>` clicks, diffs `<head>` stylesheets (zero-FOUC, in the order the next page serves them, every attribute kept) and meta/title/lang, preserves `[data-persist]` islands alive across navigations, focuses `<main>`/`<h1>`, and dispatches `kay:navigate`.
+- Sets `history.scrollRestoration = 'manual'` and restores the saved window and `data-kay-keep-scroll` offsets once on back/forward. Runs the swap in a view transition unless the user prefers reduced motion. Loads the regions client of a page it swaps to.
 - Attributes: `data-no-spa` opts a link out; `[data-kay-prefetch]` enables hover/focus prefetch; `[data-persist]` preserves an island DOM subtree.
 
 ## Snippets

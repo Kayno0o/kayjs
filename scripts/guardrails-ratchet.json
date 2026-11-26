@@ -20,7 +20,7 @@
     "packages/plugin-live/src/index.ts": 1,
     "packages/plugin-mcp/src/format.ts": 2,
     "packages/plugin-mcp/src/schema.ts": 2,
-    "packages/plugin-spa/src/client.ts": 2,
+    "packages/plugin-spa/src/client.ts": 1,
     "packages/plugin-tailwind/src/index.ts": 1
   }
 }

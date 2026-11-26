@@ -6,6 +6,8 @@ import { join, relative } from 'node:path'
 import { islandKey } from './islands'
 import { ancestorFiles, fileToRoutePath, MIDDLEWARE_NAMES } from './routes'
 
+const REGION_SOURCES = new Set(['@kayjs/kay', '@kayjs/kay/internal/ssr'])
+
 export interface ActionManifestEntry {
   url: string
   file: string
@@ -32,6 +34,8 @@ export interface RouteManifestEntry {
   /** Per-route raw <head> HTML tags injected by plugins via `ctx.addRouteHead()`. */
   headTags?: string[] | undefined
   usesRenderContext?: boolean | undefined
+  /** The route, a layout or a component it renders imports `<Region>`. */
+  usesRegion?: boolean | undefined
   prerender?: boolean | undefined
   prerendered?: Record<string, string> | undefined
   /** CSP hashes of the app's `<style>` blocks per prerendered URL, for the pages that have any. */
@@ -40,6 +44,8 @@ export interface RouteManifestEntry {
 
 export interface BuildManifest {
   runtimeScript: string | undefined
+  /** The plugins' `regionClientEntry`, loaded by the routes with `usesRegion`. */
+  regionScript?: string | undefined
   styles: string[]
   /** Stylesheets applied globally (plugin CSS, ctx.addStyle, and root layout CSS) — used by _error/_404. */
   globalStyles?: string[] | undefined
@@ -64,6 +70,7 @@ interface FileReach {
   eager: Set<string>
   styles: Set<string>
   usesRenderContext: boolean
+  usesRegion: boolean
 }
 
 /** Walks what a module renders and imports to find the island chunks, stylesheets and render-context use behind it. */
@@ -139,15 +146,28 @@ function createReachWalker(graph: ModuleGraph, islands: IslandPlan, islandChunks
     return analysis.usesRenderContext || graph.localDeps(file).some(dep => walkRenderContext(dep, seen))
   }
 
+  // A namespace import of kay may render `NS.Region`, so it counts.
+  function walkRegion(file: string, seen: Set<string>): boolean {
+    if (seen.has(file))
+      return false
+    seen.add(file)
+    const analysis = analyses.get(file)
+    if (analysis === undefined)
+      return false
+    return analysis.imports.some(imp => REGION_SOURCES.has(imp.source) && imp.specifiers.some(s => s.imported === 'Region' || s.imported === '*'))
+      || graph.localDeps(file).some(dep => walkRegion(dep, seen))
+  }
+
   // Layouts are shared by many routes, so each file is walked once.
   const memo = new Map<string, FileReach>()
   return (file: string): FileReach => {
     let reach = memo.get(file)
     if (reach === undefined) {
-      reach = { chunks: new Set(), eager: new Set(), styles: new Set(), usesRenderContext: false }
+      reach = { chunks: new Set(), eager: new Set(), styles: new Set(), usesRenderContext: false, usesRegion: false }
       walkIslands(file, new Set(), reach)
       walkStyles(file, new Set(), reach.styles)
       reach.usesRenderContext = walkRenderContext(file, new Set())
+      reach.usesRegion = walkRegion(file, new Set())
       memo.set(file, reach)
     }
     return reach
@@ -190,6 +210,7 @@ export function buildRouteEntries(options: {
     const eagerChunks = new Set<string>()
     const styles = new Set<string>(globalPluginStyles)
     let usesRenderContext = false
+    let usesRegion = false
     for (const src of [...layoutSrcs, file]) {
       const reach = reachOf(src)
       for (const chunk of reach.chunks)
@@ -199,6 +220,7 @@ export function buildRouteEntries(options: {
       for (const style of reach.styles)
         styles.add(style)
       usesRenderContext ||= reach.usesRenderContext
+      usesRegion ||= reach.usesRegion
     }
     return {
       path: fileToRoutePath(routesDir, file),
@@ -214,6 +236,7 @@ export function buildRouteEntries(options: {
       eagerIslandChunks: [...eagerChunks],
       styles: [...styles],
       usesRenderContext,
+      usesRegion,
       prerender: analysis?.hasPrerender || options.isStatic,
     }
   })

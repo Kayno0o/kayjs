@@ -24,7 +24,7 @@ export function spa(): KayPlugin {
 export function regions(): KayPlugin {
   return definePlugin({
     name: '@kayjs/spa/regions',
-    clientEntry: resolve(import.meta.dir, 'regions.ts'),
+    regionClientEntry: resolve(import.meta.dir, 'regions.ts'),
     build: emitIslandStylesheet,
     check: checkRegionTargets,
   })

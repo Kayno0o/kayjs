@@ -131,6 +131,8 @@ export function analyzeBundleWeights(
     const eagerJsRoots: string[] = []
     if (r.islandChunks.length > 0 && manifest.runtimeScript !== undefined)
       eagerJsRoots.push(manifest.runtimeScript)
+    if (r.usesRegion === true && manifest.regionScript !== undefined)
+      eagerJsRoots.push(manifest.regionScript)
     const eager = r.eagerIslandChunks ?? r.islandChunks
     for (const c of eager)
       eagerJsRoots.push(c)

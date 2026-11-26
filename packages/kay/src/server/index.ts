@@ -5,7 +5,7 @@
 // - <Head> collection + cancel-safe streaming <Suspense> (0-overhead fast path when unused)
 // - Hybrid prerendered HTML serving + embedded single-executable mode
 
-import type { RouteManifestEntry } from '../build/index'
+import type { BuildManifest, RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
 import type { DocumentOptions } from '../ssr/index'
 import type { ActionRegistry, RegisteredAction } from './action-registry'
@@ -106,6 +106,19 @@ async function renderRouteBody(route: CompiledRoute, data: unknown, pageProps: R
   for (let i = layouts.length - 1; i >= 0; i--)
     inner = ssrChild(await layouts[i]!.default({ children: raw(inner), url: ctx.url, params: ctx.params, locals: ctx.locals }) as Html)
   return inner
+}
+
+function routeDocument(manifest: BuildManifest, entry: RouteManifestEntry, lang: string, alwaysLoadRuntime: boolean, navigation: DocumentOptions['navigation']): DocumentOptions {
+  return {
+    body: '',
+    headTags: mergedHeadTags(manifest, entry),
+    lang,
+    runtimeScript: manifest.runtimeScript,
+    alwaysLoadRuntime,
+    navigation,
+    regionScript: entry.usesRegion === true ? manifest.regionScript : undefined,
+    styles: entry.styles ?? manifest.styles,
+  }
 }
 
 interface ActionDispatcherDeps {
@@ -328,15 +341,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const fastPluginMiddlewares = middlewaresFor(entry.path, !hasLoad)
     const dynamic = entry.path.includes(':') || entry.path.includes('*')
     const hasIslands = entry.islandChunks.length > 0
-    const doc: DocumentOptions = {
-      body: '',
-      headTags: mergedHeadTags(manifest, entry),
-      lang,
-      runtimeScript: manifest.runtimeScript,
-      alwaysLoadRuntime,
-      navigation: navigation.html,
-      styles: entry.styles ?? manifest.styles,
-    }
+    const doc = routeDocument(manifest, entry, lang, alwaysLoadRuntime, navigation.html)
     const headStyleHashes = headTagStyleHashes(doc.headTags)
 
     // Zero-overhead path for a static route with no middleware, no <Head>/<Suspense>, and no intercepting plugin hook

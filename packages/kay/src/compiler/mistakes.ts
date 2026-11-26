@@ -445,11 +445,11 @@ function checkRegionMarkup(
     return
   const target = staticAttr(attributes, 'data-kay-target')
   if (target !== undefined && tag !== 'a' && tag !== 'form')
-    throw mistake(`data-kay-target on <${tag}>`, filename, 'put it on the <a href> or the <form method="get"> that should swap the region')
+    throw mistake(`data-kay-target on <${tag}>`, filename, 'put it on the <a href> or the <form> that should swap the region')
   const method = tag === 'form' && target !== undefined ? staticAttr(attributes, 'method') : undefined
   const methodText = method === undefined ? undefined : literalText(method)
-  if (methodText !== undefined && methodText.toLowerCase() !== 'get')
-    throw mistake(`data-kay-target on a <form method="${methodText}">`, filename, 'a region swaps from a GET: use method="get", or drop data-kay-target and post to an action')
+  if (methodText !== undefined && methodText.toLowerCase() !== 'get' && staticAttr(attributes, 'data-kay-live') !== undefined)
+    throw mistake(`data-kay-live on a <form method="${methodText}">`, filename, 'a form that swaps while typing is a GET: use method="get", or drop data-kay-live')
   if (target === undefined && staticAttr(attributes, 'data-kay-append') !== undefined)
     throw mistake('data-kay-append without data-kay-target', filename, 'name the region the next page is appended to: data-kay-target="results"')
   if (staticAttr(attributes, 'data-kay-live') !== undefined && (tag !== 'form' || target === undefined))

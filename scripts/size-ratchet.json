@@ -1,7 +1,7 @@
 {
   "files": {},
   "functionLines": {
-    "packages/kay/src/build/bundle.ts::buildClient": 226,
+    "packages/kay/src/build/bundle.ts::buildClient": 201,
     "packages/kay/src/build/bundle.ts::buildServer": 191,
     "packages/kay/src/build/index.ts::runBuild": 246,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys": 192,
@@ -20,7 +20,7 @@
     "packages/kay/src/dom/loop.ts::loop": 247,
     "packages/kay/src/dom/loop.ts::loop.effect()": 200,
     "packages/kay/src/dom/loop.ts::loop.effect().untrack()": 183,
-    "packages/kay/src/server/index.ts::createServerFromEmbedded": 423,
+    "packages/kay/src/server/index.ts::createServerFromEmbedded": 422,
     "packages/plugin-auth/src/index.ts::createAuth": 309,
     "packages/plugin-auth/src/routes.ts::registerAuthRoutes": 199,
     "packages/plugin-auth/src/session.ts::createSessionManager": 249,
@@ -33,7 +33,7 @@
     "packages/ui/src/CommandPalette.tsx::CommandPalette": 163
   },
   "functionComplexity": {
-    "packages/kay/src/build/bundle.ts::buildClient": 75,
+    "packages/kay/src/build/bundle.ts::buildClient": 72,
     "packages/kay/src/build/index.ts::runBuild": 64,
     "packages/kay/src/cli/check.ts::checkProject": 44,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys.walkWithParents": 72,

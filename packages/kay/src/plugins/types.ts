@@ -163,6 +163,8 @@ export interface KayPlugin {
   prerenderPaths?: (paths: string[], route: RouteManifestEntry) => string[] | Promise<string[]>
   /** Client bootstrap module path — bundled ONLY when this plugin is active. */
   clientEntry?: string | undefined
+  /** Client module bundled on its own and loaded only on routes whose tree renders a `<Region>`; every other page stays free of it. */
+  regionClientEntry?: string | undefined
   /** Validate plugin-specific invariants during `kay check` (e.g. missing i18n keys, content frontmatter). */
   check?: (ctx: CheckPluginContext) => void | Promise<void>
   /** Extra directories or files (relative to app root or absolute) for `kay dev` to watch. */

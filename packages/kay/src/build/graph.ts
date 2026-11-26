@@ -21,6 +21,7 @@ export interface CachedClientBuild {
   assetFiles: string[]
   styleUrls: string[]
   runtimeScript: string | undefined
+  regionScript: string | undefined
 }
 
 export interface CachedServerBuild {

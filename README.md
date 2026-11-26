@@ -101,7 +101,7 @@ Core holds the compiler, runtime, router, SSR and build. Every optional capabili
 | **`@kayjs/icons`** | Virtual `~icons/<set>/<name>` imports + browser-pure `<Icon>`, your `.svg` folders as sets, `kay icons-find` search by related word or typo | Iconify JSON sets |
 | **`@kayjs/seo`** | `titleTemplate`, OpenGraph/Twitter meta, JSON-LD, sitemap, redirects, self-hosted fonts | Zero external deps |
 | **`@kayjs/tailwind`** | Tailwind v4 CSS integration (auto-loads `bun-plugin-tailwind`) | Opt-in |
-| **`@kayjs/spa`** | Opt-in SPA navigation with persistent `[data-persist]` islands and `[data-kay-prefetch]`, and `regions()` to swap one `<Region>` of a page without downloading the rest | Opt-in |
+| **`@kayjs/spa`** | `regions()` swaps one `<Region>` of a page in a view transition and keeps its scroll per history entry, shipping its client only on pages that render one (the default beside plain page loads); opt-in `spa()` navigation for apps that need `[data-persist]` islands kept alive | Opt-in |
 | **`@kayjs/i18n`** | Locale URL rewriting, dictionary lookup, localized HTML & `kay i18n-check` | Zero external deps |
 
 ---

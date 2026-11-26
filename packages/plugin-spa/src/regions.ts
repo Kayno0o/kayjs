@@ -2,12 +2,17 @@
 // - a[data-kay-target] replaces the region; with data-kay-append the response is added to it and the clicked link goes (Load more)
 // - form[data-kay-target] swaps on submit; with data-kay-live also while typing: one history entry per typing burst
 // - [data-kay-sync="a b"] copies those query params of the current URL into links and fields outside the region
+// - form[method=post][data-kay-target] posts through fetch, follows the redirect and swaps the region with the page it lands on
 // - history push and back/forward re-fetch the region the entry changed; aria-busy while a fetch is slow
+// - a swap runs in a view transition (not under reduced motion), keeps the scroll of [data-kay-keep-scroll] elements, resets the region's own, and moves aria-current to the links that match the new URL
+// - a link to a #hash already on the page scrolls to it without a fetch; after a swap the page scrolls to the URL's hash
 // - prefetch on hover and focus inside [data-kay-prefetch], through the cache spa() shares
 
 import type { PrefetchEntry } from './prefetch'
+import type { EntryScroll } from './swap'
 import { announce } from './announcer'
 import { fetchKeyOf, getCachedHtml, getDocId, inflightPrefetch, isSameDocRegionState, prefetch, prefetchCache } from './prefetch'
+import { entryScroll, readScrolls, restoreScroll, saveScroll, swapInTransition, trackScroll, writeScrolls } from './swap'
 
 const BUSY_DELAY = 150
 const LIVE_DEBOUNCE = 200
@@ -30,6 +35,12 @@ interface Swap {
   trigger?: Element
   /** Skips the prefetch cache: the region is redrawn because the server's state changed. */
   fresh?: boolean
+  /** A form posted to `url`: the swap shows the page its redirect lands on. */
+  post?: { form: HTMLFormElement, body: FormData }
+  /** Where the post's redirect ended, once it did. */
+  landed?: string
+  /** The scroll a back or forward entry had, put back after the swap. */
+  restore?: EntryScroll
 }
 
 function stateOf(state: unknown): RegionState | undefined {
@@ -57,14 +68,17 @@ function pathOf(region: HTMLElement): string {
   return names.join('/')
 }
 
-async function load(url: URL, region: string, signal: AbortSignal, fresh: boolean | undefined): Promise<PrefetchEntry | undefined> {
+async function load(swap: Swap, region: string, signal: AbortSignal): Promise<PrefetchEntry | undefined> {
+  const { url, post } = swap
   const key = fetchKeyOf(url, region)
-  const ready = fresh === true ? undefined : getCachedHtml(key) ?? await inflightPrefetch.get(key)
+  const ready = swap.fresh === true || post !== undefined ? undefined : getCachedHtml(key) ?? await inflightPrefetch.get(key)
   if (ready !== undefined) {
     prefetchCache.delete(key)
     return ready
   }
-  const res = await fetch(fetchKeyOf(url), { headers: { 'x-kay-region': region }, signal })
+  const res = await fetch(fetchKeyOf(url), { headers: { 'x-kay-region': region }, signal, ...(post === undefined ? {} : { method: 'POST', body: post.body }) })
+  if (post !== undefined)
+    swap.landed = res.url
   if (!res.ok || !(res.headers.get('content-type') ?? '').includes('text/html'))
     return undefined
   return { html: await res.text(), url: res.url || fetchKeyOf(url), ts: Date.now(), region: res.headers.get('x-kay-region'), title: res.headers.get('x-kay-title') }
@@ -148,31 +162,68 @@ function syncParams(): void {
   }
 }
 
-function apply(region: HTMLElement, found: { content: DocumentFragment, title: string | undefined }, swap: Swap, finalUrl: URL): void {
+// The links that point at the page the swap landed on say so; the ones that did and no longer do stop.
+function syncCurrent(): void {
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('a[href]')) {
+    if (link.origin === location.origin && link.hash === '' && link.pathname + link.search === location.pathname + location.search)
+      link.setAttribute('aria-current', 'page')
+    else if (link.getAttribute('aria-current') === 'page')
+      link.removeAttribute('aria-current')
+  }
+}
+
+function elementOfHash(hash: string): HTMLElement | null {
+  const raw = hash.slice(1)
+  let id: string
+  try {
+    id = decodeURIComponent(raw)
+  }
+  catch {
+    id = raw
+  }
+  return id === '' ? null : document.getElementById(id)
+}
+
+async function apply(region: HTMLElement, found: { content: DocumentFragment, title: string | undefined }, swap: Swap, finalUrl: URL): Promise<void> {
   const { content, title } = found
-  if (swap.history !== 'none')
-    record(finalUrl, swap.region, swap.history)
-  const first = content.firstElementChild
-  if (swap.append) {
-    if (swap.trigger !== undefined && region.contains(swap.trigger))
-      swap.trigger.remove()
-    region.append(content)
-  }
-  else {
-    // A fetch for a region about to be replaced must not land in the new one.
-    for (const inner of region.querySelectorAll('[data-kay-region]'))
-      controllers.get(inner.getAttribute('data-kay-region')!)?.abort()
-    region.replaceChildren(content)
-  }
-  if (title !== undefined)
-    document.title = title
-  syncParams()
-  if (swap.focus === true)
-    focusNode(swap.append ? first : region)
-  const label = region.getAttribute('aria-label')
-  if (label !== null)
-    announce(label)
-  window.dispatchEvent(new CustomEvent('kay:region', { detail: { name: swap.region, url: location.href } }))
+  // A typing burst and an append stay put: a transition freezes the page, and the field being typed in with it.
+  const animate = !swap.append && swap.history !== 'burst' && swap.fresh !== true
+  await swapInTransition(() => {
+    if (swap.history !== 'none') {
+      saveScroll()
+      record(finalUrl, swap.region, swap.history)
+    }
+    const kept = readScrolls(false)
+    const first = content.firstElementChild
+    if (swap.append) {
+      if (swap.trigger !== undefined && region.contains(swap.trigger))
+        swap.trigger.remove()
+      region.append(content)
+    }
+    else {
+      // A fetch for a region about to be replaced must not land in the new one.
+      for (const inner of region.querySelectorAll('[data-kay-region]'))
+        controllers.get(inner.getAttribute('data-kay-region')!)?.abort()
+      region.replaceChildren(content)
+      writeScrolls(kept)
+      if (swap.history !== 'none' && !region.hasAttribute('data-kay-keep-scroll'))
+        region.scrollTop = 0
+    }
+    if (title !== undefined)
+      document.title = title
+    syncParams()
+    syncCurrent()
+    if (swap.restore !== undefined)
+      restoreScroll(swap.restore)
+    else if (!swap.append && swap.history !== 'none')
+      elementOfHash(finalUrl.hash)?.scrollIntoView()
+    if (swap.focus === true)
+      focusNode(swap.append ? first : region)
+    const label = region.getAttribute('aria-label')
+    if (label !== null)
+      announce(label)
+    window.dispatchEvent(new CustomEvent('kay:region', { detail: { name: swap.region, url: location.href } }))
+  }, animate)
 }
 
 // Resolves false when the region could not be swapped: no such region, a failed fetch, or an answer without it.
@@ -186,7 +237,7 @@ async function swapRegion(swap: Swap): Promise<boolean> {
   const path = pathOf(findRegion(name)!)
   const busy = setTimeout(() => findRegion(name)?.setAttribute('aria-busy', 'true'), BUSY_DELAY)
   try {
-    const entry = await load(swap.url, path, controller.signal, swap.fresh)
+    const entry = await load(swap, path, controller.signal)
     if (controller.signal.aborted)
       return true
     const content = entry === undefined ? undefined : contentOf(entry, path)
@@ -198,7 +249,7 @@ async function swapRegion(swap: Swap): Promise<boolean> {
       return false
     if (swap.url.hash && !finalUrl.hash)
       finalUrl.hash = swap.url.hash
-    apply(region, content, swap, finalUrl)
+    await apply(region, content, swap, finalUrl)
     return true
   }
   catch (err) {
@@ -213,10 +264,16 @@ async function swapRegion(swap: Swap): Promise<boolean> {
   }
 }
 
-// A swap a link, a form or history asked for: what cannot be swapped loads the whole page.
+// A swap a link, a form or history asked for: what cannot be swapped loads the whole page. A form already posted loads the page its redirect reached, never posts twice; one whose post never got an answer posts the plain way.
 async function navigate(swap: Swap): Promise<void> {
-  if (!await swapRegion(swap))
+  if (await swapRegion(swap))
+    return
+  if (swap.post === undefined)
     location.assign(swap.url.href)
+  else if (swap.landed)
+    location.assign(swap.landed)
+  else
+    swap.post.form.submit()
 }
 
 /** Redraws region `name` from the server at the current address, with no history entry and focus left where it is; rejects when the page has no such region, the fetch fails or the answer lacks it. */
@@ -232,15 +289,20 @@ function formMethod(form: HTMLFormElement, submitter?: HTMLElement | null): stri
   return rawMethod.toLowerCase()
 }
 
-function formUrl(form: HTMLFormElement, submitter?: HTMLElement | null): URL {
+function formAction(form: HTMLFormElement, submitter?: HTMLElement | null): URL {
   // Read raw attributes via Element.prototype.getAttribute so <input name="action"> cannot DOM-clobber form.action.
   const rawAction = (submitter !== null && submitter !== undefined ? safeGetAttribute(submitter, 'formaction') : null)
     ?? safeGetAttribute(form, 'action')
     ?? ''
-  const url = new URL(rawAction, location.href)
+  return new URL(rawAction, location.href)
+}
+
+function formUrl(form: HTMLFormElement, submitter?: HTMLElement | null): URL {
+  const url = formAction(form, submitter)
+  // A field left empty stays out of the address, so it names only the filters in use.
   const params = new URLSearchParams()
   for (const [key, value] of new FormData(form, submitter ?? undefined)) {
-    if (typeof value === 'string')
+    if (typeof value === 'string' && value !== '')
       params.append(key, value)
   }
   url.search = params.toString()
@@ -267,10 +329,15 @@ if (typeof document !== 'undefined') {
       return
     const url = new URL(link.href, location.href)
     const name = link.getAttribute('data-kay-target')!
+    const append = link.hasAttribute('data-kay-append')
     if (url.origin !== location.origin || missingRegion(name, `<a href="${link.getAttribute('href')}">`))
       return
     event.preventDefault()
-    const append = link.hasAttribute('data-kay-append')
+    // A hash already on the page is a scroll, with the address keeping its page.
+    if (!append && url.pathname === location.pathname && elementOfHash(url.hash) !== null) {
+      location.hash = url.hash
+      return
+    }
     void navigate({ url, region: name, append, history: append ? 'replace' : 'push', focus: true, trigger: link })
   }, true)
 
@@ -280,11 +347,15 @@ if (typeof document !== 'undefined') {
       return
     const submitter = (event as SubmitEvent).submitter
     const name = safeGetAttribute(form, 'data-kay-target')
-    if (event.defaultPrevented || name === null || formMethod(form, submitter) !== 'get' || missingRegion(name, '<form>'))
+    const method = formMethod(form, submitter)
+    if (event.defaultPrevented || name === null || (method !== 'get' && method !== 'post') || missingRegion(name, '<form>'))
       return
     event.preventDefault()
     clearTimeout(liveTimer)
-    void navigate({ url: formUrl(form, submitter), region: name, history: 'push' })
+    if (method === 'get')
+      void navigate({ url: formUrl(form, submitter), region: name, history: 'push' })
+    else
+      void navigate({ url: formAction(form, submitter), region: name, history: 'push', post: { form, body: new FormData(form, submitter ?? undefined) } })
   }, true)
 
   document.addEventListener('input', (event) => {
@@ -334,8 +405,14 @@ if (typeof document !== 'undefined') {
     idx = state.__kayIdx
     lastRegion = state.__kayRegion
     burstOpen = false
-    if (name === undefined || sameDocument)
+    const restore = entryScroll(event.state)
+    if (name === undefined || sameDocument) {
+      // With spa() the browser leaves the scroll to the page, a swap or not.
+      if (restore !== undefined && history.scrollRestoration === 'manual')
+        restoreScroll(restore)
       return
-    void navigate({ url: new URL(location.href), region: name, history: 'none' })
+    }
+    void navigate({ url: new URL(location.href), region: name, history: 'none', ...(restore === undefined ? {} : { restore }) })
   })
+  trackScroll()
 }
