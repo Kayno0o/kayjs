@@ -6,7 +6,6 @@ export type PrecompressedEncoding = 'br' | 'gzip'
 
 const MIN_COMPRESS_BYTES = 256
 const DEFAULT_MAX_CACHE_BYTES = 2 * 1024 * 1024
-const encoder = new TextEncoder()
 
 const COMPRESSIBLE_EXACT = new Set([
   'application/javascript',
@@ -190,18 +189,18 @@ function hasToken(haystack: string, token: string): boolean {
   return false
 }
 
-function compressBuffer(bytes: Uint8Array<ArrayBuffer>, encoding: CompressionEncoding): Uint8Array<ArrayBuffer> {
-  if (encoding === 'zstd')
-    return Bun.zstdCompressSync(bytes, { level: 3 }) as Uint8Array<ArrayBuffer>
-  return Bun.gzipSync(bytes, { level: 6 }) as Uint8Array<ArrayBuffer>
-}
+// A variant compressed once and served many times takes gzip 6; one compressed for a single response takes gzip 3, about a quarter of the CPU for some 9% more bytes.
+const GZIP_KEPT = 6
+const GZIP_PER_RESPONSE = 3
+type GzipLevel = typeof GZIP_KEPT | typeof GZIP_PER_RESPONSE
 
-// `undefined` when the input is too small to be worth compressing or does not shrink.
-function shrink(bytes: Uint8Array<ArrayBuffer>, encoding: CompressionEncoding): Uint8Array<ArrayBuffer> | undefined {
-  if (bytes.byteLength < MIN_COMPRESS_BYTES)
+// `undefined` when the input is too small to be worth compressing or does not shrink. A string goes to the compressor as is: encoding it first costs more than compressing it.
+function shrink(input: Uint8Array<ArrayBuffer> | string, encoding: CompressionEncoding, gzipLevel: GzipLevel): Uint8Array<ArrayBuffer> | undefined {
+  const size = typeof input === 'string' ? Buffer.byteLength(input) : input.byteLength
+  if (size < MIN_COMPRESS_BYTES)
     return undefined
-  const compressed = compressBuffer(bytes, encoding)
-  return compressed.byteLength < bytes.byteLength ? compressed : undefined
+  const compressed = (encoding === 'zstd' ? Bun.zstdCompressSync(input, { level: 3 }) : Bun.gzipSync(input, { level: gzipLevel })) as Uint8Array<ArrayBuffer>
+  return compressed.byteLength < size ? compressed : undefined
 }
 
 const DEFAULT_MAX_FILE_CACHE_BYTES = 8 * 1024 * 1024
@@ -257,13 +256,13 @@ export class CompressionCache {
     }
   }
 
-  /** Compresses `bytes`, kept in the LRU under `staticKey` when given; without one nothing is stored. */
-  compress(bytes: Uint8Array<ArrayBuffer>, encoding: CompressionEncoding, staticKey?: string): Uint8Array<ArrayBuffer> | undefined {
+  /** Compresses `input`, kept in the LRU under `staticKey` when given; without one nothing is stored. */
+  compress(input: Uint8Array<ArrayBuffer> | string, encoding: CompressionEncoding, staticKey?: string): Uint8Array<ArrayBuffer> | undefined {
     const cacheKey = staticKey !== undefined ? `${encoding}:${staticKey}` : undefined
     const cached = cacheKey !== undefined ? this.get(cacheKey) : undefined
     if (cached !== undefined)
       return cached
-    const compressed = shrink(bytes, encoding)
+    const compressed = shrink(input, encoding, cacheKey !== undefined ? GZIP_KEPT : GZIP_PER_RESPONSE)
     if (compressed !== undefined && cacheKey !== undefined)
       this.set(cacheKey, compressed)
     return compressed
@@ -285,7 +284,7 @@ export class CompressionCache {
 
     const task = (async () => {
       const bytes = await read()
-      const variant = shrink(bytes, encoding) ?? null
+      const variant = shrink(bytes, encoding, GZIP_KEPT) ?? null
       if (variant === null) {
         this.#files.set(variantKey, null)
         return undefined
@@ -372,7 +371,7 @@ export function compressedHtmlResponse(
       const staticKey = reuse ? `s:${Bun.hash.wyhash(html).toString(36)}:${html.length}` : undefined
       let compressed = staticKey !== undefined ? cache.get(`${enc}:${staticKey}`) : undefined
       if (compressed === undefined)
-        compressed = cache.compress(encoder.encode(html), enc, staticKey)
+        compressed = cache.compress(html, enc, staticKey)
       if (compressed !== undefined) {
         const headers = withVaryAcceptEncoding(baseHeaders)
         headers['content-encoding'] = enc

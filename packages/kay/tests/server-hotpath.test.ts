@@ -416,3 +416,26 @@ describe('#3604 — createFastStaticPageHandler parity with renderCompiledRoute'
     expect(errors.length).toBe(1)
   })
 })
+
+describe('per-response HTML compression (#3652)', () => {
+  const html = `<!doctype html><main>${Array.from({ length: 300 }, (_, i) => `<p id="r${i}">Café ${i * 7919 % 1000} - été, 漢字 ✓</p>`).join('\n')}</main>`
+  const headers = { 'content-type': 'text/html; charset=utf-8' }
+  const requestFor = (encoding: string): Request => new Request('http://localhost/', { headers: { 'accept-encoding': encoding } })
+  const bodyOf = async (res: Response): Promise<Uint8Array<ArrayBuffer>> => new Uint8Array(await res.arrayBuffer())
+
+  it('round-trips non-ASCII HTML through zstd and gzip', async () => {
+    const zstd = compressedHtmlResponse(html, 200, headers, requestFor('zstd'), new CompressionCache())
+    const gzip = compressedHtmlResponse(html, 200, headers, requestFor('gzip'), new CompressionCache())
+    expect(zstd.headers.get('content-encoding')).toBe('zstd')
+    expect(new TextDecoder().decode(Bun.zstdDecompressSync(await bodyOf(zstd)))).toBe(html)
+    expect(gzip.headers.get('content-encoding')).toBe('gzip')
+    expect(new TextDecoder().decode(Bun.gunzipSync(await bodyOf(gzip)))).toBe(html)
+  })
+
+  it('gzips a page served once at level 3 and a page kept for reuse at level 6', async () => {
+    const once = compressedHtmlResponse(html, 200, headers, requestFor('gzip'), new CompressionCache())
+    const kept = compressedHtmlResponse(html, 200, headers, requestFor('gzip'), new CompressionCache(), true)
+    expect(await bodyOf(once)).toEqual(Bun.gzipSync(html, { level: 3 }))
+    expect(await bodyOf(kept)).toEqual(Bun.gzipSync(html, { level: 6 }))
+  })
+})
