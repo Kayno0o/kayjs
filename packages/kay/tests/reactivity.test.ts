@@ -843,8 +843,8 @@ describe('reactivity regressions (#3628)', () => {
 
   test('5. onMount skips during renderOnServer even when document exists', async () => {
     const prevDoc = (globalThis as { document?: unknown }).document
-    const hadDoc = 'document' in globalThis
-    if (!hadDoc)
+    const hadDoc = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+    if (prevDoc === undefined)
       (globalThis as { document?: unknown }).document = {}
     let ssrRan = false
     let clientRan = false
