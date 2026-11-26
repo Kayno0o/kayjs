@@ -174,8 +174,7 @@ export async function fromMeaning(keys: string[], candidates: string[], keep: nu
   return related
 }
 
-async function nearest(keys: string[], allCandidates: string[], keep: number, floor: number): Promise<Related> {
-  const candidates = allCandidates.filter(word => !NO_MEANING.has(word))
+async function nearest(keys: string[], candidates: string[], keep: number, floor: number): Promise<Related> {
   const all = await vectors([...new Set([...keys, ...candidates])])
   // One flat matrix, as a loop over a single typed array is several times faster than one array per word.
   const matrix = new Float32Array(candidates.length * DIMENSIONS)
@@ -200,8 +199,11 @@ async function nearest(keys: string[], allCandidates: string[], keep: number, fl
         best.push([candidates[i]!, (dot - floor) / (1 - floor)])
     }
 
-    for (const [word, weight] of best.sort((x, y) => y[1] - x[1]).slice(0, keep))
-      add(related, key, word, weight)
+    // Words of no meaning are dropped after the nearest are picked, not before, so they do not hand their place to weaker neighbours.
+    for (const [word, weight] of best.sort((x, y) => y[1] - x[1]).slice(0, keep)) {
+      if (!NO_MEANING.has(word))
+        add(related, key, word, weight)
+    }
   }
 
   return related
