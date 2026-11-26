@@ -69,7 +69,14 @@ Your own icons go in `src/icons` as `.svg` files: `src/icons/logo.svg` imports a
 
 An import of an icon or set that does not exist fails `kay check` and the build, naming the file and the closest icons that do.
 
-`kay icons-find garbage` prints the icons of the installed sets that match, such as `~icons/tabler/trash`, so an agent imports a name that exists. It searches `@iconify-json/*` packages, `@iconify/json`, your `.svg` folders and the sets passed to `icons({ sets })`, ten icons per set unless `--limit` says otherwise; `--set tabler` searches one. It also matches related words, typos, other forms of a word, half-typed words and two words typed apart (`sign out` finds `logout`). An app's own icon picker gets the same search from `findIcons(set, query, { limit, offset })` in `@kayjs/icons/search`, which ranks icons answering more of the query's words first and throws on a negative or fractional page; `relatedWords(word)` lists the words a query also searched, with their strength. Call it on the server: it reads a 1.7 MB word table on first use, and `kay build` warns when an island imports it.
+`kay icons-find garbage` prints the icons of the installed sets that match, such as `~icons/tabler/trash`, so an agent imports a name that exists. It searches `@iconify-json/*` packages, `@iconify/json` (hoisted installs included), your `.svg` folders and the sets passed to `icons({ sets })`, ten icons per set unless `--limit` says otherwise; `--set tabler` searches one. Matching is English-only and covers related words (`garbage` finds `trash`), typos (`calnedar`), other forms of a word (`searching`), half-typed words (`shopp`) and two words typed apart (`sign out` finds `logout`).
+
+An app's own icon picker gets the same search from `@kayjs/icons/search`:
+
+- `findIcons(set, query, { limit, offset })` ranks names holding the query as whole words first (in any word order), then related words — icons answering more query words rank ahead of partial matches — and mid-word hits (`pin` in `spinner`) last. It throws on a negative or fractional `offset` (`< 0`) or `limit` (`< 1`).
+- `relatedWords(word)` returns `[word, strength]` pairs for an "also searched" list.
+
+Keep `@kayjs/icons/search` server-side: it reads a ~1.7 MB word table on first call, and `kay build` warns when an island imports it.
 
 ## `@kayjs/tailwind`
 
