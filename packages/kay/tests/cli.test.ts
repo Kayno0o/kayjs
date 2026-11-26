@@ -6,61 +6,80 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { checkJsBudget } from '../src/build/report'
-import { parseCliArgs, runCli } from '../src/cli/index'
+import { runCli } from '../src/cli/index'
 import { devServer } from '../src/dev/index'
 
 const KAY_PKG_DIR = resolve(import.meta.dir, '..')
+const CLI = resolve(import.meta.dir, '../src/cli/index.ts')
+
+async function kay(args: string[], cwd = process.cwd()): Promise<{ code: number, out: string, err: string }> {
+  const proc = Bun.spawn(['bun', CLI, ...args], { cwd, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NO_COLOR: '1' } })
+  const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+  return { code, out, err }
+}
+
 const UI_PLUGIN_MOD = resolve(import.meta.dir, '../../ui/src/plugin.ts')
 
 describe('#3568 CLI argument parsing, plugin commands & dev config fidelity', () => {
-  test('parseCliArgs handles built-in commands, boolean flags, --compile, --root, and unknown flags', () => {
-    const cwd = '/tmp/proj'
+  test('--help lists the commands, and a command answers --help with its own options and exit codes', async () => {
+    const top = await kay(['--help'])
+    expect(top.code).toBe(0)
+    expect(top.out).toContain('check')
+    expect(top.out).toContain('--completions')
+    const check = await kay(['check', '--help'])
+    expect(check.code).toBe(0)
+    expect(check.out).toContain('--no-typecheck')
+    expect(check.out).toContain('Exit codes:')
+    expect((await kay(['upgrade', '--help'])).out).toContain('Exit codes:')
+  })
 
-    const buildStatic = parseCliArgs(['build', '--static', 'subapp'], cwd)
-    expect(buildStatic.error).toBeUndefined()
-    expect(buildStatic.flags.get('--static')).toBe(true)
-    expect(buildStatic.dirArg).toBe('subapp')
-    expect(buildStatic.root).toBe(resolve(cwd, 'subapp'))
+  test('an unknown option is a usage error that exits 2 and names the option', async () => {
+    const res = await kay(['check', '--nope'])
+    expect(res.code).toBe(2)
+    expect(res.err).toContain('--nope')
+    expect((await kay(['build', '--max-js', 'lots'])).code).toBe(2)
+    expect((await kay(['dev', '--port', 'notanumber'])).code).toBe(2)
+    expect((await kay(['new'])).code).toBe(2)
+    expect((await kay(['new', 'x', '--template', 'nope'])).err).toContain('minimal')
+  })
 
-    const buildCompileFlagOnly = parseCliArgs(['build', 'subapp', '--compile'], cwd)
-    expect(buildCompileFlagOnly.error).toBeUndefined()
-    expect(buildCompileFlagOnly.dirArg).toBe('subapp')
-    expect(buildCompileFlagOnly.flags.get('--compile')).toBe(true)
+  test('a typo\'d command names the one meant and exits 2', async () => {
+    const res = await kay(['chekc'])
+    expect(res.code).toBe(2)
+    expect(res.err).toContain('did you mean check?')
+  })
 
-    const buildCompileOut = parseCliArgs(['build', '--compile', 'dist/my-bin'], cwd)
-    expect(buildCompileOut.error).toBeUndefined()
-    expect(buildCompileOut.dirArg).toBeUndefined()
-    expect(buildCompileOut.flags.get('--compile')).toBe('dist/my-bin')
+  test('--completions prints a shell script', async () => {
+    const res = await kay(['--completions', 'fish'])
+    expect(res.code).toBe(0)
+    expect(res.out).toContain('complete')
+  })
 
-    const pluginCmd = parseCliArgs(['ui-eject', 'editorial', 'src/styles/ui.css'], cwd)
-    expect(pluginCmd.isBuiltin).toBe(false)
-    expect(pluginCmd.root).toBe(resolve(cwd))
-    expect(pluginCmd.pluginArgs).toEqual(['editorial', 'src/styles/ui.css'])
-
-    const pluginWithRoot = parseCliArgs(['ui-eject', '--root', 'apps/web', 'editorial', 'src/ui.css'], cwd)
-    expect(pluginWithRoot.root).toBe(resolve(cwd, 'apps/web'))
-    expect(pluginWithRoot.pluginArgs).toEqual(['editorial', 'src/ui.css'])
-
-    const unknownFlag = parseCliArgs(['dev', '--bogus'], cwd)
-    expect(unknownFlag.error).toContain('unknown option "--bogus"')
+  test('a plugin command runs from the CLI process, takes --root, and is listed by --help', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3593-'))
+    try {
+      mkdirSync(join(dir, 'app'))
+      writeFileSync(join(dir, 'app/kay.config.ts'), `export default { plugins: [{ name: 'hello', commands: { hello: (args: string[], root: string) => console.log(JSON.stringify({ args, root })) } }] }\n`)
+      const res = await kay(['hello', '--root', 'app', 'a', '-x'], dir)
+      expect(res.code).toBe(0)
+      expect(JSON.parse(res.out)).toEqual({ args: ['a', '-x'], root: join(dir, 'app') })
+      expect((await kay(['--help'], join(dir, 'app'))).out).toContain('hello')
+      expect((await kay(['helo'], join(dir, 'app'))).err).toContain('did you mean hello?')
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   test('runCli runs plugin commands with positional arguments (kay ui-eject editorial src/styles/ui.css)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-3568-cli-'))
-    const logs: string[] = []
-    const errs: string[] = []
     try {
       writeFileSync(join(dir, 'kay.config.ts'), `
 import { ui } from ${JSON.stringify(UI_PLUGIN_MOD)}
 export default { plugins: [ui({ grammar: 'editorial' })] }
 `)
-      const code = await runCli(['ui-eject', 'editorial', 'src/styles/ui.css'], {
-        cwd: dir,
-        stdout: l => logs.push(l),
-        stderr: l => errs.push(l),
-      })
+      const code = await runCli(['ui-eject', 'editorial', 'src/styles/ui.css'], { cwd: dir })
       expect(code).toBe(0)
-      expect(errs).toEqual([])
       expect(existsSync(join(dir, 'src/styles/ui.css'))).toBe(true)
       expect(readFileSync(join(dir, 'src/styles/ui.css'), 'utf8')).toContain('@layer kui')
     }
@@ -71,50 +90,26 @@ export default { plugins: [ui({ grammar: 'editorial' })] }
 
   test('runCli runs built-in new, check, and build commands in-process and rejects invalid ports / unknown commands', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-3568-builtin-'))
-    const logs: string[] = []
-    const errs: string[] = []
     try {
       const appDir = join(dir, 'demo-app')
-      const newCode = await runCli(['new', 'demo-app', '--template', 'minimal'], {
-        cwd: dir,
-        stdout: l => logs.push(l),
-        stderr: l => errs.push(l),
-      })
+      const newCode = await runCli(['new', 'demo-app', '--template', 'minimal'], { cwd: dir })
       expect(newCode).toBe(0)
       expect(existsSync(join(appDir, 'src/routes/index.tsx'))).toBe(true)
       mkdirSync(join(appDir, 'node_modules/@kayjs'), { recursive: true })
       symlinkSync(KAY_PKG_DIR, join(appDir, 'node_modules/@kayjs/kay'), 'dir')
 
-      const checkCode = await runCli(['check', 'demo-app', '--no-typecheck'], {
-        cwd: dir,
-        stdout: l => logs.push(l),
-        stderr: l => errs.push(l),
-      })
+      const checkCode = await runCli(['check', 'demo-app', '--no-typecheck'], { cwd: dir })
       expect(checkCode).toBe(0)
 
-      const buildCode = await runCli(['build', 'demo-app'], {
-        cwd: dir,
-        stdout: l => logs.push(l),
-        stderr: l => errs.push(l),
-      })
+      const buildCode = await runCli(['build', 'demo-app'], { cwd: dir })
       expect(buildCode).toBe(0)
       expect(existsSync(join(appDir, 'dist/manifest.json'))).toBe(true)
 
-      const badPortCode = await runCli(['dev', '--port', 'notanumber'], {
-        cwd: appDir,
-        stdout: l => logs.push(l),
-        stderr: l => errs.push(l),
-      })
-      expect(badPortCode).toBe(1)
-      expect(errs.some(e => e.includes('invalid port'))).toBe(true)
+      const badPortCode = await runCli(['dev', '--port', 'notanumber'], { cwd: appDir })
+      expect(badPortCode).toBe(2)
 
-      const unknownCode = await runCli(['nonexistent-cmd'], {
-        cwd: appDir,
-        stdout: l => logs.push(l),
-        stderr: l => errs.push(l),
-      })
-      expect(unknownCode).toBe(1)
-      expect(errs.some(e => e.includes('unknown command "nonexistent-cmd"'))).toBe(true)
+      const unknownCode = await runCli(['nonexistent-cmd'], { cwd: appDir })
+      expect(unknownCode).toBe(2)
     }
     finally {
       rmSync(dir, { recursive: true, force: true })
@@ -183,8 +178,9 @@ describe('kay build names the islands behind each route\'s JS (#3585)', () => {
 
   test('--analyze lists each island with why it is one, and --max-js fails a route over the size, naming its eager islands', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-3585-'))
+    const io = { cwd: dir }
     const errs: string[] = []
-    const io = { cwd: dir, stdout: () => {}, stderr: (line: string) => errs.push(line) }
+    const err = spyOn(process.stderr, 'write').mockImplementation((text: string | Uint8Array) => { errs.push(String(text)); return true })
     const logs: string[] = []
     const log = spyOn(console, 'log').mockImplementation((line: string) => logs.push(line))
     try {
@@ -195,7 +191,8 @@ describe('kay build names the islands behind each route\'s JS (#3585)', () => {
       mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
       symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/@kayjs/kay'), 'dir')
 
-      await expect(runCli(['build', '--analyze', '--max-js', '1000'], io)).rejects.toThrow(/^kay build: eager JS over --max-js 0\.98 KB \(gzip\) on one route:\n {2}\/ ships \d+\.\d\d KB of eager JS: Clicker \(src\/components\/Count\.tsx\) uses onClick; Total \(src\/components\/Count\.tsx\) reads count from '\.\.\/stores\/count'\nDefer an island/)
+      expect(await runCli(['build', '--analyze', '--max-js', '1000'], io)).toBe(1)
+      expect(errs.join('')).toMatch(/kay build: eager JS over --max-js 0\.98 KB \(gzip\) on one route:\n {2}\/ ships \d+\.\d\d KB of eager JS: Clicker \(src\/components\/Count\.tsx\) uses onClick; Total \(src\/components\/Count\.tsx\) reads count from '\.\.\/stores\/count'\nDefer an island/)
       const report = logs.join('\n').split('\n')
       expect(report.filter(line => line.startsWith('  island'))).toEqual([
         '  island: Clicker (src/components/Count.tsx) uses onClick',
@@ -204,11 +201,13 @@ describe('kay build names the islands behind each route\'s JS (#3585)', () => {
       ])
 
       expect(await runCli(['build', '--max-js', '100KB'], io)).toBe(0)
-      expect(await runCli(['build', '--max-js', 'lots'], io)).toBe(1)
-      expect(errs).toEqual(['kay: invalid --max-js "lots": give the gzipped size of a route\'s eager JS in bytes or KB, e.g. --max-js 40kb'])
+      errs.length = 0
+      expect(await runCli(['build', '--max-js', 'lots'], io)).toBe(2)
+      expect(errs.join('')).toContain('invalid --max-js "lots"')
     }
     finally {
       log.mockRestore()
+      err.mockRestore()
       rmSync(dir, { recursive: true, force: true })
     }
   })

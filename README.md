@@ -87,7 +87,7 @@ Core holds the compiler, runtime, router, SSR and build. Every optional capabili
 
 | Package | Purpose | Notes |
 | :--- | :--- | :--- |
-| **`@kayjs/kay`** | Compiler, linked-list signals, DOM runtime, router, SSR/Suspense, actions, build/compile, `@kayjs/kay/test` | 1 runtime dep (`oxc-parser`) |
+| **`@kayjs/kay`** | Compiler, linked-list signals, DOM runtime, router, SSR/Suspense, actions, build/compile, `@kayjs/kay/test` | 2 runtime deps (`oxc-parser`, `@kaynooo/cli-kit` for the CLI) |
 | **`@kayjs/ui`** | Platform-first headless primitives + 5 structurally distinct pure CSS `@layer kui` Grammars (`editorial`, `workshop`, `console`, `soft`, `orbit`) + `kay ui-eject` | Zero JS recipe engine, zero Tailwind lock-in |
 | **`@kayjs/auth`** | Argon2id passwords, hashed DB sessions, email verification, magic links, OAuth 2.0 + PKCE (GitHub/Discord/Google), `auth.guard()`, RGPD helpers, `bun:sqlite` store | Zero external deps |
 | **`@kayjs/live`** | Typed real-time SSE rooms, microtask-coalesced presence, `useLive()` browser signal hook | Zero external deps |
@@ -126,4 +126,7 @@ kay start [--port 3000] [--host [addr]] # Serve built production app
 kay upgrade [--no-install]             # Move an app onto the current kay APIs
 kay ui-eject <grammar> [dest]          # Eject a standalone @kayjs/ui CSS Grammar
 kay mcp-footprint                      # Inspect @kayjs/mcp tool byte & token budgets
+kay --completions fish                 # Shell completion script (also bash, zsh)
 ```
+
+Every command answers `--help`. Exit codes: 0 done, 1 a finding or failure (`kay check` found an error), 2 a usage error.
