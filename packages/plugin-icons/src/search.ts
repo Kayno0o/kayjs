@@ -1,6 +1,6 @@
-import { nameParts, nameWords } from './name-words'
+import { byStem, nameParts, nameWords, stem } from './name-words'
 import { completions, MOST, respellings } from './spelling'
-import { relatedWords, tableCompletions, tableRespellings } from './table'
+import { relatedWords, tableCompletions, tableForm, tableRespellings } from './table'
 
 export { relatedWords }
 
@@ -20,6 +20,8 @@ interface Index {
   byWord: Map<string, string[]>
   wordCount: Map<string, number>
   order: Map<string, number>
+  // Each stem of the names' words to its plain form, made on the first word the names and the table both miss.
+  stems?: Map<string, string>
 }
 
 const SPACES = /\s+/g
@@ -69,6 +71,20 @@ function isNames(source: readonly string[] | IconifyNames): source is readonly s
   return Array.isArray(source)
 }
 
+// The bit of the query word at `at`, words past the 31st sharing the last bit a number holds.
+function bit(at: number): number {
+  return 1 << Math.min(at, 30)
+}
+
+function ones(bits: number): number {
+  let count = 0
+
+  for (let rest = bits; rest !== 0; rest &= rest - 1)
+    count++
+
+  return count
+}
+
 
 // What a typed word stands for, with its weight: itself when the names or the table know it, else the three most used of its completions and the three closest of its respellings, the most used first among equals.
 // The table's side of a typed word is read once for every set; a word reached both ways keeps the larger weight.
@@ -76,10 +92,21 @@ function readings(word: string, index: Index): Map<string, number> {
   if (index.byWord.has(word) || relatedWords(word).length > 0)
     return new Map([[word, 1]])
 
+  index.stems ??= byStem(index.byWord.keys())
+  const form = index.stems.get(stem(word)) ?? tableForm(word)
+
+  if (form !== undefined)
+    return new Map([[form, 1]])
+
   const uses = (candidate: string) => index.byWord.get(candidate)?.length ?? 0
+  // A word of the names comes first, by how many hold it; a word only the table knows, by how many names its related words reach.
   const completed = [...new Set([...completions(word, index.byWord.keys()), ...tableCompletions(word)])]
-    .sort((a, b) => uses(b) - uses(a) || a.length - b.length)
+    .map(candidate => index.byWord.has(candidate)
+      ? { candidate, named: 1, reached: uses(candidate) }
+      : { candidate, named: 0, reached: relatedWords(candidate).reduce((reached, [related]) => reached + uses(related), 0) })
+    .sort((a, b) => b.named - a.named || b.reached - a.reached || a.candidate.length - b.candidate.length)
     .slice(0, MOST)
+    .map(({ candidate }) => candidate)
   const respelled = [...new Map([...tableRespellings(word), ...respellings(word, index.byWord.keys())])]
     .sort((a, b) => a[1] - b[1] || uses(b[0]) - uses(a[0]) || (a[0] < b[0] ? -1 : 1))
     .slice(0, MOST)
@@ -162,10 +189,9 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
   }
 
   const literals = byHeld.slice(0, Held.InsideWord).flat()
-  // Each credited name's score, how many of the query's words it answers, and the last word that counted.
-  const scores = new Map<string, { score: number, answered: number, lastTyped: number }>()
-  let typedAt = 0
-  let typedWorth = 1
+  // Each credited name's score, and the query words it answers as one bit each, so a word counts once however many readings reach it.
+  const scores = new Map<string, { score: number, answered: number }>()
+  let answering = 0
 
   const credit = (word: string, weight: number) => {
     for (const name of index.byWord.get(word) ?? []) {
@@ -173,38 +199,40 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
       const known = scores.get(name)
 
       if (known === undefined) {
-        scores.set(name, { score: gained, answered: typedWorth, lastTyped: typedAt })
+        scores.set(name, { score: gained, answered: answering })
       }
       else {
         known.score += gained
-        if (known.lastTyped !== typedAt) {
-          known.lastTyped = typedAt
-          known.answered += typedWorth
-        }
+        known.answered |= answering
       }
     }
   }
 
-  // Two neighbouring query words also stand for the word they make joined when it is known, as `sign out` for `signout`, answering both.
-  const joined = typedWords.slice(1).map((word, i) => typedWords[i]! + word).filter(word => index.byWord.has(word) || relatedWords(word).length > 0)
+  // Two neighbouring query words also stand for the word they make joined when it is known, as `sign out` for `signout`, answering both; its related words leave out those two, which answer one word only.
+  const apart = typedWords.map((typed, i) => ({ typed, bits: bit(i), parts: [] as string[] }))
+  const joined = typedWords.slice(1)
+    .map((word, i) => ({ typed: typedWords[i]! + word, bits: bit(i) | bit(i + 1), parts: [typedWords[i]!, word] }))
+    .filter(({ typed }) => index.byWord.has(typed) || relatedWords(typed).length > 0)
 
-  for (const typed of [...typedWords, ...joined]) {
-    typedAt++
-    typedWorth = typedAt > typedWords.length ? 2 : 1
+  for (const { typed, bits, parts } of [...apart, ...joined]) {
+    answering = bits
 
     for (const [reading, weight] of readings(typed, index)) {
       credit(reading, weight * OWN_WEIGHT)
 
-      for (const [related, strength] of relatedWords(reading))
-        credit(related, weight * strength)
+      for (const [related, strength] of relatedWords(reading)) {
+        if (!parts.includes(related))
+          credit(related, weight * strength)
+      }
     }
   }
 
   const shown = new Set(literals)
   const related = [...scores]
     .filter(([name]) => !shown.has(name))
-    .sort((a, b) => b[1].answered - a[1].answered || b[1].score - a[1].score || index.order.get(a[0])! - index.order.get(b[0])!)
-    .map(([name]) => name)
+    .map(([name, { score, answered }]) => ({ name, score, answered: ones(answered) }))
+    .sort((a, b) => b.answered - a.answered || b.score - a.score || index.order.get(a.name)! - index.order.get(b.name)!)
+    .map(({ name }) => name)
 
   // A name holding the query only inside a word, as `spinner` holds `pin`, comes last.
   const shownToo = new Set(related)

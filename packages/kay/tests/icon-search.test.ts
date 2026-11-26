@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { stem } from '../../plugin-icons/src/name-words'
 import { icons } from '../../plugin-icons/src/plugin'
 import { findIcons, relatedWords } from '../../plugin-icons/src/search'
 import { replaceTable } from '../../plugin-icons/src/table'
@@ -93,7 +94,7 @@ describe('findIcons', () => {
 
   // `dog` holds no name, so only the readings of `hous` answer: `house` by completion and respelling, `hour` by respelling.
   it('credits a word reached by both a completion and a respelling once', () => {
-    expect(findIcons(['hour', 'house'], 'hous dog')).toEqual(['hour', 'house'])
+    expect(findIcons(['hair', 'dairy'], 'dair dog')).toEqual(['hair', 'dairy'])
   })
 
   it('counts a word repeated in the query once', () => {
@@ -136,6 +137,14 @@ describe('findIcons', () => {
     expect(findIcons(['zoom-out', 'sign', 'logout'], 'sign out')).toEqual(['logout', 'sign', 'zoom-out'])
   })
 
+  it('leaves out the words a joined reading is made of from its related words', () => {
+    replaceTable({ signout: 'logout 100 sign 50' })
+
+    expect(findIcons(['direction-sign', 'logout'], 'sign out')).toEqual(['logout', 'direction-sign'])
+    replaceTable({ signout: 'logout 100 out 50' })
+    expect(findIcons(['sign', 'zoom-out', 'logout'], 'sign out')).toEqual(['logout', 'sign', 'zoom-out'])
+  })
+
   it('reads two query words joined when only the names know the joined word', () => {
     expect(findIcons(['sign', 'signout'], 'sign out')).toEqual(['signout', 'sign'])
   })
@@ -160,10 +169,30 @@ describe('findIcons', () => {
     expect(findIcons(['mark', 'dark', 'bark', 'park', 'park-car', 'park-bus'], 'tark')).toEqual(['dark', 'bark', 'park', 'park-car', 'park-bus'])
   })
 
-  it('counts a query word once for an icon however many of its readings name it', () => {
-    replaceTable({ bin: 'trash 90 delete 90', box: 'crate 10' })
+  it('reads a word nobody knows as the names\' or the table\'s form of it', () => {
+    replaceTable({ search: 'magnifier 80' })
 
-    expect(findIcons(['delete-trash', 'crate-delete'], 'bin box')).toEqual(['crate-delete', 'delete-trash'])
+    expect(findIcons(['magnifier', 'file'], 'searching')).toEqual(['magnifier'])
+    expect(findIcons(['magnifier', 'file'], 'filing')).toEqual(['file'])
+    expect(findIcons(['magnifier', 'file'], 'saving')).toEqual([])
+  })
+
+  it('completes a word into the table words reaching the most names', () => {
+    replaceTable({ trace: 'pen 50', track: 'road 50', trade: 'coin 50', transport: 'car 50 bus 50' })
+
+    expect(findIcons(['car', 'bus', 'pen'], 'tra')).toEqual(['car', 'bus', 'pen'])
+  })
+
+  it('completes a word into the names\' own words before the table\'s', () => {
+    replaceTable({ trace: 'pen 50 bus 50', track: 'pen 50 bus 50', trade: 'pen 50 bus 50' })
+
+    expect(findIcons(['pen', 'bus', 'trap-car'], 'tra car')).toEqual(['trap-car', 'pen', 'bus'])
+  })
+
+  it('counts a query word once for an icon however many of its readings name it', () => {
+    replaceTable({ bin: 'trash 90 delete 90 can 90', box: 'crate 10' })
+
+    expect(findIcons(['delete-trash-can', 'crate-delete'], 'bin box')).toEqual(['crate-delete', 'delete-trash-can'])
   })
 
   it('reads a table replaced after the names were first searched', () => {
@@ -186,6 +215,14 @@ describe('findIcons', () => {
     expect(() => findIcons(['home'], 'home', { limit: 1.5 })).toThrow(refusal)
     expect(() => findIcons(['home'], 'home', { limit: Number.NaN })).toThrow(refusal)
     expect(findIcons(['home'], 'home', { offset: 0, limit: 1 })).toEqual(['home'])
+  })
+})
+
+describe('stem', () => {
+  it('gives the forms of a word one stem, and keeps three letters at least', () => {
+    const words = ['batteries', 'boxes', 'switches', 'buses', 'users', 'glass', 'status', 'analysis', 'checked', 'speed', 'searching', 'running', 'added', 'watt', 'filled', 'saving', 'saved', 'save', 'eyes', 'ring', 'gas']
+
+    expect(words.map(stem)).toEqual(['battery', 'box', 'switch', 'bus', 'user', 'glass', 'status', 'analysis', 'check', 'speed', 'search', 'run', 'add', 'watt', 'fill', 'sav', 'sav', 'sav', 'eye', 'ring', 'gas'])
   })
 })
 

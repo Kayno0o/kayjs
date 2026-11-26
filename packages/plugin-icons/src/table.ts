@@ -1,8 +1,10 @@
 // words.json maps a word to its related icon-name words as `word percent word percent`, built by build/table.ts; read on the first search, as it weighs about 2 MB.
+import { byStem, stem } from './name-words'
 import { completions, respellings } from './spelling'
 
 let table: Record<string, string> | undefined
 let words: string[] | undefined
+let stems: Map<string, string> | undefined
 const decoded = new Map<string, [string, number][]>()
 // The readings of typed words, shared by every set searched; typed words are unbounded, so only the latest are kept.
 const completed = new Map<string, string[]>()
@@ -21,6 +23,7 @@ function load(): Record<string, string> {
 export function replaceTable(next: Record<string, string>): void {
   table = next
   words = undefined
+  stems = undefined
   decoded.clear()
   completed.clear()
   respelled.clear()
@@ -45,6 +48,13 @@ export function tableWords(): string[] {
   words ??= Object.keys(load())
 
   return words
+}
+
+// The table's form of `word` when the table knows another, as `search` for `searching`.
+export function tableForm(word: string): string | undefined {
+  stems ??= byStem(tableWords())
+
+  return stems.get(stem(word))
 }
 
 // The table words starting with `word`, unsorted.
