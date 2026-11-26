@@ -109,13 +109,8 @@ export function createPluginHost(options: PluginHostOptions) {
     }
   }
 
-  const pluginDataOwners = new Map<string, KayPlugin>()
+  // resolvePlugins() refuses two plugins sharing a name, so each name has one owner.
   const setDataFor = (plugin: KayPlugin) => (data: Record<string, unknown>): void => {
-    const existingOwner = pluginDataOwners.get(plugin.name)
-    if (existingOwner !== undefined && existingOwner !== plugin) {
-      throw new Error(`kay: duplicate pluginData key "${plugin.name}": two plugin instances share the name "${plugin.name}" and both call setData(). Give each plugin instance a distinct name.`)
-    }
-    pluginDataOwners.set(plugin.name, plugin)
     pluginData[plugin.name] = { ...pluginData[plugin.name], ...data }
   }
 

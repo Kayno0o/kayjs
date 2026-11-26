@@ -1,6 +1,7 @@
 // Plugin ordering: `enforce` buckets, `after` dependencies, and the `readsLocals`/`providesLocals` startup check.
 
 import type { KayPlugin } from './types'
+import { closestName } from './config'
 
 function enforceRank(plugin: KayPlugin): number {
   return plugin.enforce === 'pre' ? 0 : plugin.enforce === 'post' ? 2 : 1
@@ -21,15 +22,15 @@ export function resolvePlugins(plugins: readonly KayPlugin[] | undefined): KayPl
     .map(entry => entry.plugin)
 
   const n = base.length
-  const indicesByName = new Map<string, number[]>()
+  // `after` lists and `manifest.pluginData` both find a plugin by its name, so two plugins sharing one would trample each other.
+  const indexByName = new Map<string, number>()
   for (let i = 0; i < n; i++) {
     const name = base[i]!.name
-    const list = indicesByName.get(name)
-    if (list === undefined)
-      indicesByName.set(name, [i])
-    else
-      list.push(i)
+    if (indexByName.has(name))
+      throw new Error(`kay: two plugins are named "${name}" in kay.config.ts: register it once, or give each instance its own \`name\`.`)
+    indexByName.set(name, i)
   }
+  const names = [...indexByName.keys()]
 
   // Kahn's topological sort using min-index priority so `enforce` + declaration order stays deterministic.
   const inDegree = new Int32Array(n)
@@ -40,16 +41,19 @@ export function resolvePlugins(plugins: readonly KayPlugin[] | undefined): KayPl
       continue
     const seen = new Set<number>()
     for (const depName of deps) {
-      const targets = indicesByName.get(depName)
-      if (targets === undefined)
+      const depIdx = indexByName.get(depName)
+      // A name no plugin has is an optional dependency that is not installed, unless it is one typo away from one that is.
+      if (depIdx === undefined) {
+        const near = closestName(depName, names)
+        if (near !== undefined)
+          throw new Error(`kay: plugin "${base[i]!.name}" runs \`after\` "${depName}", which no plugin is named: did you mean "${near}"?`)
         continue
-      for (const depIdx of targets) {
-        if (depIdx === i || seen.has(depIdx))
-          continue
-        seen.add(depIdx)
-        edges[depIdx]!.push(i)
-        inDegree[i] = (inDegree[i] ?? 0) + 1
       }
+      if (depIdx === i || seen.has(depIdx))
+        continue
+      seen.add(depIdx)
+      edges[depIdx]!.push(i)
+      inDegree[i] = (inDegree[i] ?? 0) + 1
     }
   }
 

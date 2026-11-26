@@ -296,7 +296,7 @@ describe('Cross-plugin audit part 3 (#3635): @kayjs/i18n & plugin host safety', 
       expect(await (await app.fetch('/shared/hook', { method: 'POST' })).text()).toBe('post')
     })
 
-    it('throws when two distinct plugin instances collide on the same pluginData key while allowing one plugin to merge across build & afterPrerender', async () => {
+    it('refuses two plugin instances sharing a name, and merges one plugin\'s setData() across build & afterPrerender', async () => {
       const dir = appWith('kay-plugindata-collision-', {
         'src/routes/index.tsx': `export default function Home() { return <p>ok</p> }`,
       })
@@ -313,16 +313,7 @@ describe('Cross-plugin audit part 3 (#3635): @kayjs/i18n & plugin host safety', 
           ctx.setData({ b: 2 })
         },
       })
-      await expect(build({ root: dir, plugins: [dup1, dup2] })).rejects.toThrow(/kay: duplicate pluginData key "shared-name"/)
-
-      // Collision across build() and afterPrerender() from two distinct instances also throws
-      const dup3 = definePlugin({
-        name: 'shared-name',
-        afterPrerender(ctx) {
-          ctx.setData({ c: 3 })
-        },
-      })
-      await expect(build({ root: dir, plugins: [dup1, dup3] })).rejects.toThrow(/kay: duplicate pluginData key "shared-name"/)
+      await expect(build({ root: dir, plugins: [dup1, dup2] })).rejects.toThrow('kay: two plugins are named "shared-name" in kay.config.ts: register it once, or give each instance its own `name`.')
 
       // Single plugin merging data across build() and afterPrerender() succeeds cleanly
       const single = definePlugin({

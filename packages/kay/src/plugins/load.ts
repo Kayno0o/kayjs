@@ -4,6 +4,7 @@ import type { AppRuntimeContext } from './context'
 import type { KayConfig } from './types'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { assertKnownConfigKeys } from './config'
 import { createAppContext, getAppContext, runWithAppContext } from './context'
 
 let configReloadSeq = 0
@@ -48,7 +49,9 @@ export async function loadConfig(
     const first: unknown = (error as AggregateError).errors?.[0] ?? error
     throw new Error(`kay: ${configErrorLocation(first, configPath, absRoot)}: ${first instanceof Error ? first.message : String(first)}`, { cause: error })
   }
-  return mod.default ?? {}
+  const config = mod.default ?? {}
+  assertKnownConfigKeys(config)
+  return config
 }
 
 const STACK_LOCATION_RE = /:(\d+):(\d+)\)?$/

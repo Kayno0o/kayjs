@@ -25,6 +25,8 @@ export default defineConfig({
 
 ## `kay.config.ts` options
 
+A key kay does not read fails the build, `kay check` and `kay dev`, naming the key you most likely meant (`outDirr` points at `outDir`).
+
 | Option | Default | Purpose |
 | :--- | :--- | :--- |
 | `lang` | `'en'` | Default `<html lang="...">` attribute. |

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { i18n } from '../../plugin-i18n/src/index'
 import { seo } from '../../plugin-seo/src/index'
-import { definePlugin, resolvePlugins } from '../src/plugins/index'
+import { definePlugin, loadConfig, resolvePlugins } from '../src/plugins/index'
 import { testApp } from '../src/test/index'
 
 const tempDirs: string[] = []
@@ -40,6 +40,28 @@ describe('Plugin ordering, definePlugin & locals validation (#3550)', () => {
     expect(() => resolvePlugins([reader, provider])).toThrow(
       /plugin "early-reader" reads ctx\.locals\.tenant before "late-provider" provides it/,
     )
+  })
+
+  it('refuses two plugins sharing a name, and an `after` name one typo away from a registered plugin (#3657)', () => {
+    expect(() => resolvePlugins([definePlugin({ name: 'cache' }), definePlugin({ name: 'other' }), definePlugin({ name: 'cache' })])).toThrow('kay: two plugins are named "cache" in kay.config.ts: register it once, or give each instance its own `name`.')
+    const images = definePlugin({ name: '@kayjs/images' })
+    expect(() => resolvePlugins([images, definePlugin({ name: 'gallery', after: ['@kayjs/imgaes'] })])).toThrow('kay: plugin "gallery" runs `after` "@kayjs/imgaes", which no plugin is named: did you mean "@kayjs/images"?')
+    expect(() => resolvePlugins([definePlugin({ name: 'ui' }), definePlugin({ name: 'theme', after: ['uix'] })])).toThrow('did you mean "ui"?')
+    expect(() => resolvePlugins([definePlugin({ name: 'ui' }), definePlugin({ name: 'theme', after: ['iu'] })])).toThrow('did you mean "ui"?')
+    expect(resolvePlugins([definePlugin({ name: 'uixy' }), definePlugin({ name: 'theme', after: ['ui'] })]).map(p => p.name)).toEqual(['uixy', 'theme'])
+    expect(() => resolvePlugins([images, definePlugin({ name: 'gallery', after: ['@kayjs/imagexy'] })])).toThrow('did you mean "@kayjs/images"?')
+    expect(resolvePlugins([images, definePlugin({ name: 'gallery', after: ['@kayjs/imagesxyz'] })]).map(p => p.name)).toEqual(['@kayjs/images', 'gallery'])
+    expect(resolvePlugins([definePlugin({ name: 'gallery', after: ['@kayjs/i18n', '@kayjs/images'] }), images]).map(p => p.name)).toEqual(['@kayjs/images', 'gallery'])
+  })
+
+  it('refuses a kay.config.ts key kay does not read, naming the one it most likely meant (#3657)', async () => {
+    const dir = makeTemp('kay-config-keys-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <h1>Hi</h1> }\n')
+    writeFileSync(join(dir, 'kay.config.ts'), 'export default { outDirr: \'out\', lang: \'fr\', plugns: [], zzz: 1 }\n')
+    await expect(loadConfig(dir, { fresh: true })).rejects.toThrow('kay: "outDirr" is not a kay.config.ts key: did you mean "outDir"?\nkay: "plugns" is not a kay.config.ts key: did you mean "plugins"?\nkay: "zzz" is not a kay.config.ts key: remove it (the keys are site, lang, assetPrefix, security, trustedOrigins, trustProxy, maxRequestBodySize, navigation, streamTimeout, consent, compress, onError, plugins, port, routesDir, outDir, publicDir, compliance)')
+    writeFileSync(join(dir, 'kay.config.ts'), 'export default { outDir: \'out\', compliance: {}, port: 3000 }\n')
+    expect(await loadConfig(dir, { fresh: true })).toEqual({ outDir: 'out', compliance: {}, port: 3000 })
   })
 
   it('automatically orders @kayjs/seo after @kayjs/i18n even when seo() is listed first', async () => {

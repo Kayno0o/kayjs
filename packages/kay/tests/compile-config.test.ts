@@ -28,7 +28,7 @@ describe('#3549 compiled binary forwards runtime config', () => {
     expect(picked.customFlag).toBe('keep-me')
   })
 
-  test('a --compile binary receives a newly added config key and omits build-only keys', async () => {
+  test('a --compile binary receives the runtime config keys and omits build-only keys', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-3549-'))
     const binPath = join(dir, 'server-bin')
     try {
@@ -42,7 +42,6 @@ export default {
   port: 4123,
   lang: 'fr',
   streamTimeout: 12345,
-  customRuntimeKey: 'forwarded-to-binary',
   plugins: [
     {
       name: 'inspect-cfg',
@@ -50,7 +49,7 @@ export default {
         api.route('GET', '/__cfg', () => Response.json({
           lang: api.config?.lang,
           streamTimeout: api.config?.streamTimeout,
-          customRuntimeKey: api.config?.customRuntimeKey,
+
           hasRoutesDir: 'routesDir' in (api.config ?? {}),
           hasOutDir: 'outDir' in (api.config ?? {}),
           hasPublicDir: 'publicDir' in (api.config ?? {}),
@@ -96,7 +95,6 @@ export default {
         expect(cfg).toEqual({
           lang: 'fr',
           streamTimeout: 12345,
-          customRuntimeKey: 'forwarded-to-binary',
           hasRoutesDir: false,
           hasOutDir: false,
           hasPublicDir: false,
