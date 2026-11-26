@@ -20,7 +20,7 @@ import { buildClient, buildServer, linkOrCopyFile, pluginBunPlugins, standaloneC
 import { compileExecutable } from './compile'
 import { assertSafeOutDir, fileSize, relPosix, walkAllFiles, walkRoutes } from './files'
 import { ModuleGraph } from './graph'
-import { islandPropProblems } from './island-props'
+import { renderProblems } from './render-rules'
 import { planIslands } from './islands'
 import { buildActionEntries, buildRouteEntries } from './manifest'
 import { createPluginHost, createPublicFiles } from './plugin-host'
@@ -214,9 +214,8 @@ function emitBuildWarnings(run: BuildRun, graph: ModuleGraph, routeFiles: readon
 }
 
 const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
-const NO_ISLAND_TAGS = new Map<string, unknown>()
 
-/** Plans the islands, then runs the rules `kay check` also runs on the whole graph: props an island cannot receive, and dynamic prerendered routes with no `paths()`. Throws them all at once, each placed with a code frame. */
+/** Plans the islands, then runs the rules `kay check` also runs on the whole graph: what server code renders wrong, and dynamic prerendered routes with no `paths()`. Throws them all at once, each placed with a code frame. */
 function planCheckedIslands(root: string, routesDir: string, graph: ModuleGraph, pageFiles: string[], specialFiles: string[], isStatic: boolean): ReturnType<typeof planIslands> {
   const islands = planIslands(graph, root, pageFiles, specialFiles)
   const placed: string[] = []
@@ -227,7 +226,7 @@ function planCheckedIslands(root: string, routesDir: string, graph: ModuleGraph,
   for (const [file, analysis] of graph.analyses) {
     if (!file.endsWith('.tsx') || NODE_MODULES_RE.test(file))
       continue
-    for (const problem of islandPropProblems(analysis, islands.pageBindings.get(file) ?? NO_ISLAND_TAGS, relPosix(root, file), 'kay build'))
+    for (const problem of renderProblems(analysis, islands, file, relPosix(root, file), 'kay build'))
       place(file, problem.offset, problem.message)
   }
   for (const file of pageFiles) {

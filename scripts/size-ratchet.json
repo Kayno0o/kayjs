@@ -34,7 +34,7 @@
   "functionComplexity": {
     "packages/kay/src/build/bundle.ts::buildClient": 66,
     "packages/kay/src/build/index.ts::runBuild": 62,
-    "packages/kay/src/cli/check.ts::checkProject": 42,
+    "packages/kay/src/cli/check.ts::checkProject": 41,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys.walkWithParents": 72,
     "packages/kay/src/compiler/dom-attrs.ts::compileElementAttributes": 59,
     "packages/kay/src/compiler/scope.ts::isSafeLazyJsxRef.visit": 48,

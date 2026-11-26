@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
 import { isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
-import { islandPropProblems } from '../build/island-props'
+import { renderProblems } from '../build/render-rules'
 import { analyzeIslands } from '../build/islands'
 import { fileToRoutePath, hasRouteHandlerExport, missingPathsProblem, normalizeRoutePattern, routeExportProblemLocation, routeFileProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
 import { analyzeModule } from '../compiler/analyze'
@@ -43,7 +43,6 @@ export function diagnosticData(text: string, severity: 'error' | 'warning'): Che
 }
 
 const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
-const EMPTY_ISLAND_TAGS = new Map<string, unknown>()
 
 function walkTsFiles(dir: string): string[] {
   return walkFiles(dir, {
@@ -256,7 +255,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     const rel = relPosix(root, file)
 
     if (file.endsWith('.tsx')) {
-      for (const problem of islandPropProblems(analysis, islands.pageBindings.get(file) ?? EMPTY_ISLAND_TAGS, rel, 'kay check'))
+      for (const problem of renderProblems(analysis, islands, file, rel, 'kay check'))
         errors.push(formatDiagnostic(locOf(root, file, sources, problem.offset), problem.message))
     }
 

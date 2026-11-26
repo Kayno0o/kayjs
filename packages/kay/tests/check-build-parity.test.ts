@@ -224,7 +224,7 @@ describe('kay check and kay build decide islands per component (#3587)', () => {
       'src/ui/Panel.tsx': [
         'import { Clicker, Label } from \'./Count\'',
         'export function Live() { return <div onClick={() => 1}><Clicker onDone={() => 2} /></div> }',
-        'export function Shell() { return <section><Clicker onDone={() => 3} /><Label onPick={() => 4} /></section> }',
+        'export function Shell() { return <section><Clicker onDone={() => 3} /><Label render={() => 4} /></section> }',
       ].join('\n'),
       'src/routes/index.tsx': 'import { Live, Shell } from \'../ui/Panel\'\nexport default function Home() { return <main><Live /><Shell /></main> }\n',
     })
@@ -269,6 +269,65 @@ describe('a dynamic route that cannot be prerendered without paths() (#3657)', (
     expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([])
     await build({ root: dir, minify: false, static: true })
     expect(existsSync(join(dir, 'dist/post/1/index.html'))).toBe(true)
+  })
+})
+
+describe('a handler or an async component the server cannot render (#3657)', () => {
+  const button = 'export function Button(props: Record<string, unknown>) { return <button type="button" {...props}>b</button> }\n'
+  const late = 'export async function Late() { await Bun.sleep(1); return <p>late</p> }\n'
+
+  async function expectRefused(files: Record<string, string>, error: string): Promise<void> {
+    const dir = appWith('kay-3657-render-', files)
+    expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([error])
+    await expect(build({ root: dir, minify: false })).rejects.toThrow(error.replace('kay check:', 'kay build:'))
+  }
+
+  async function expectAccepted(files: Record<string, string>): Promise<void> {
+    const dir = appWith('kay-3657-render-ok-', files)
+    expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([])
+    await build({ root: dir, minify: false })
+  }
+
+  it('refuses an inline handler passed to an imported component that is not an island', async () => {
+    await expectRefused({
+      'src/ui/Button.tsx': button,
+      'src/routes/index.tsx': 'import { Button } from \'../ui/Button\'\nexport default function Home() { return <main><Button onClick={() => 1} /></main> }\n',
+    }, 'src/routes/index.tsx:2:55: error: kay check: cannot pass event handler "onClick" to <Button>, which is not an island: the server renders it as HTML, so the handler never runs. Write the handler inside <Button>, or render <Button> from an island.')
+  })
+
+  it('refuses a named handler passed to a component of the same file', async () => {
+    await expectRefused({
+      'src/routes/index.tsx': `const go = () => 1\n${button}export default function Home() { return <main><Button onPointerDown={go} /></main> }\n`,
+    }, 'src/routes/index.tsx:3:55: error: kay check: cannot pass event handler "onPointerDown" to <Button>, which is not an island: the server renders it as HTML, so the handler never runs. Write the handler inside <Button>, or render <Button> from an island.')
+  })
+
+  it('accepts a function prop not named like an event, and a handler passed from inside an island', async () => {
+    await expectAccepted({
+      'src/ui/Button.tsx': button,
+      'src/ui/List.tsx': 'export function List({ format }: { format: (n: number) => string }) { return <ul><li>{format(1)}</li></ul> }\n',
+      'src/ui/Counter.tsx': 'import { signal } from \'@kayjs/kay\'\nimport { Button } from \'./Button\'\nexport function Counter() { const n = signal(0); return <Button onClick={() => n.value++} /> }\n',
+      'src/routes/index.tsx': 'import { Counter } from \'../ui/Counter\'\nimport { List } from \'../ui/List\'\nexport default function Home() { return <main><List format={n => `#${n}`} /><Counter /></main> }\n',
+    })
+  })
+
+  it('refuses an imported async component rendered outside <Suspense>, even from an async page', async () => {
+    await expectRefused({
+      'src/ui/Late.tsx': late,
+      'src/routes/index.tsx': 'import { Late } from \'../ui/Late\'\nexport default async function Home() { return <main><Late /></main> }\n',
+    }, 'src/routes/index.tsx:2:53: error: kay check: async component <Late> must be the only child of <Suspense>, or the page fails at its first request: render it as <Suspense fallback={...}><Late /></Suspense>.')
+  })
+
+  it('refuses an async component of the same file wrapped in an element inside <Suspense>', async () => {
+    await expectRefused({
+      'src/routes/index.tsx': `import { Suspense } from '@kayjs/kay'\n${late}export default function Home() { return <Suspense fallback={<p>wait</p>}><div><Late /></div></Suspense> }\n`,
+    }, 'src/routes/index.tsx:3:79: error: kay check: async component <Late> must be the only child of <Suspense>, or the page fails at its first request: render it as <Suspense fallback={...}><Late /></Suspense>.')
+  })
+
+  it('accepts an async component as the only child of <Suspense>, and an async page', async () => {
+    await expectAccepted({
+      'src/ui/Late.tsx': late,
+      'src/routes/index.tsx': 'import { Suspense } from \'@kayjs/kay\'\nimport { Late } from \'../ui/Late\'\nexport default async function Home() { return <main><Suspense fallback={<p>wait</p>}>\n  <Late />\n</Suspense></main> }\n',
+    })
   })
 })
 

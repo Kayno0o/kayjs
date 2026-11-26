@@ -53,6 +53,8 @@ export interface ModuleAnalysis extends Interactivity {
   hydrateModes: Set<string>
   /** Component tags the module renders, `NS.Tag` included. */
   jsxTags: Set<string>
+  /** Top-level names bound to an async function, `default` for an anonymous async default export. */
+  asyncLocals: Set<string>
   /** Exported names bound to reactive state (`export const count = signal(0)` or `{ count: signal(0) }`). */
   stateExports: string[]
   /** Exported names bound directly to a `signal()` or `computed()` (read via `.value`). */
@@ -592,6 +594,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
     deferredIslandTags: body.deferredIslandTags,
     hydrateModes: body.hydrateModes,
     jsxTags: body.jsxTags,
+    asyncLocals: decls.hasAsyncDefault ? new Set([...decls.asyncLocals, decls.exportLocals.get('default') ?? 'default']) : decls.asyncLocals,
     stateExports: stateExportsOf(decls, imports.stateCallees, true),
     signalExports: stateExportsOf(decls, imports.signalCallees, false),
     defaultDataKeys: page?.interactive === true ? analyzeDefaultDataKeys(program, decls.defaultLocal, decls.localInits) : undefined,

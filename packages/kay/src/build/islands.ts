@@ -11,6 +11,9 @@ import { findPrivateEnv, isServerOnlyModule } from '../compiler/server-only'
 import { checkBareSignals } from '../compiler/signal-reads'
 import { isTsFile, relPosix } from './files'
 
+/** A component that is not an island, as a module renders it. */
+export interface StaticTag { async: boolean }
+
 export interface IslandTarget {
   id: string
   file: string
@@ -35,6 +38,8 @@ export interface IslandPlan {
   targets: Map<string, IslandTarget>
   /** Per static module, the island each rendered tag stands for. */
   pageBindings: Map<string, Map<string, IslandTarget>>
+  /** Per static module, the imported components its server code renders that are not islands, each with whether it is async. */
+  staticTags: Map<string, Map<string, StaticTag>>
   /** CSS files imported (transitively) by an island: bundled with it, not as standalone styles. */
   cssFiles: Set<string>
   /** Modules the client compiles for an island, whose SSR must emit hydration markers too. */
@@ -322,8 +327,9 @@ function discoverBindings(
   loadPromoted: LoadModule,
   pageSet: ReadonlySet<string>,
   registerIsland: (file: string, exportName: string) => IslandTarget,
-): Map<string, Map<string, IslandTarget>> {
+): Pick<IslandPlan, 'pageBindings' | 'staticTags'> {
   const pageBindings = new Map<string, Map<string, IslandTarget>>()
+  const staticTags = new Map<string, Map<string, StaticTag>>()
   for (const file of [...graph.analyses.keys()]) {
     if (!file.endsWith('.tsx'))
       continue
@@ -338,6 +344,7 @@ function discoverBindings(
 
     // Only names rendered as tags from server-side code become islands: `<Counter />`, or `<UI.Counter />` through a namespace import.
     const bindings = new Map<string, IslandTarget>()
+    const statics = new Map<string, StaticTag>()
     for (const imp of analysis.imports) {
       const resolved = graph.resolve(file, imp.source)
       if (resolved === undefined || !isTsFile(resolved))
@@ -348,15 +355,22 @@ function discoverBindings(
           : analysis.staticJsxTags.has(spec.local) ? [[spec.local, spec.imported] as const] : []
         for (const [tag, exportName] of tags) {
           const target = resolveExportTarget(graph, load, resolved, exportName)
-          if (target !== undefined && target.file.endsWith('.tsx') && loadPromoted(target.file)?.exports.get(target.exportName)?.interactive === true)
+          const component = target?.file.endsWith('.tsx') === true ? loadPromoted(target.file) : undefined
+          if (target === undefined || component === undefined)
+            continue
+          if (component.exports.get(target.exportName)?.interactive === true)
             bindings.set(tag, registerIsland(target.file, target.exportName))
+          else
+            statics.set(tag, { async: component.asyncLocals.has(component.exportLocals.get(target.exportName) ?? target.exportName) })
         }
       }
     }
     if (bindings.size > 0)
       pageBindings.set(file, bindings)
+    if (statics.size > 0)
+      staticTags.set(file, statics)
   }
-  return pageBindings
+  return { pageBindings, staticTags }
 }
 
 function checkReachEdges(
@@ -517,7 +531,7 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
   checkImportedBareSignals(graph, load, root, issues)
   checkCrossFileServerOnlyTags(graph, load, issues)
 
-  const pageBindings = discoverBindings(graph, load, loadPromoted, pageSet, registerIsland)
+  const { pageBindings, staticTags } = discoverBindings(graph, load, loadPromoted, pageSet, registerIsland)
 
   // A layout, error or 404 page renders on the server only, so interactivity written in it would never run.
   for (const file of specialFiles) {
@@ -546,7 +560,7 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
   }
 
   const { reach, cssFiles } = walkIslandReach(graph, load, [...rootFiles], options.checkLeaks === true, issues)
-  return { targets, pageBindings, cssFiles, reach, issues }
+  return { targets, pageBindings, staticTags, cssFiles, reach, issues }
 }
 
 export function planIslands(graph: ModuleGraph, root: string, pageFiles: string[], specialFiles: string[]): IslandPlan {

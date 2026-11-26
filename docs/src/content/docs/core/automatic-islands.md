@@ -17,6 +17,8 @@ You never write `'use client'` or `client:load`. A component becomes an island a
 
 kay decides this for each component, not for each file. A static component exported beside an island stays static and ships no JS. A helper or component of the same file that needs the browser makes every component calling or rendering it an island. Code at the top of a file that calls a primitive, such as `effect(...)`, makes every component of that file an island.
 
+A handler passed from server code to a component that is not an island would never reach the browser, so `kay build` and `kay check` refuse `<Button onClick={...}>` there. Write the handler inside `Button`, which makes it an island, or render `Button` from an island.
+
 <Callout title="Zero-JS guarantee" tone="tip">
 When a route renders only static components and native HTML forms, Kay omits the client runtime completely. Zero `<script>` tags are emitted in the HTML.
 </Callout>

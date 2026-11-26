@@ -28,7 +28,7 @@ export default function Layout({ children, url }: { children: KayChild, url: URL
             <a class="docs-nav-hide-sm" href="/#ecosystem">Ecosystem</a>
             <a class="docs-nav-hide-sm" href="/#benchmarks">Benchmarks</a>
             <a class="docs-nav-hide-sm" href="/llms.txt" style="font-family:var(--ui-font-mono);font-size:0.8rem">llms.txt</a>
-            <SearchIsland items={searchItems} $hydrate="idle" />
+            <SearchIsland items={searchItems} />
           </nav>
         </div>
       </header>

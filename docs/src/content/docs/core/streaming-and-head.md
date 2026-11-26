@@ -49,7 +49,7 @@ export default function Dashboard() {
 }
 ```
 
-- **One child per boundary**: Give each `<Suspense>` a single child (use one `<Suspense>` per async component). Nested `<Suspense>` boundaries inside a resolved chunk stream as well.
+- **One child per boundary**: Give each `<Suspense>` a single child (use one `<Suspense>` per async component). An async component renders only as that child. Anywhere else, even inside an async page or inside an element in the boundary, `kay build` and `kay check` fail with its file and line. Nested `<Suspense>` boundaries inside a resolved chunk stream as well.
 - **Error handling**: If the child throws, the boundary renders its `error` prop (markup or `(err) => Html`) in place of the fallback, the rest of the page keeps streaming, and `onError` in `kay.config.ts` is notified. Without `error`, the failed boundary renders nothing.
 - **Timeout**: A boundary that does not resolve within `30` seconds fails so the response always finishes. Change the limit with `streamTimeout` (in milliseconds) in `kay.config.ts`.
 
