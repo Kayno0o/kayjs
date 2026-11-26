@@ -33,7 +33,6 @@ export interface ServerPluginHostOptions {
   trustProxy: TrustProxy
   trustedOriginsList: readonly string[]
   trustedOrigins: Set<string> | undefined
-  invokeAction: ServerPluginAPI['invokeAction']
 }
 
 function middlewareAppliesToPath(scope: ScopedMiddleware['scope'], path: string, isStaticFast: boolean): boolean {
@@ -127,7 +126,6 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
         onShutdown(fn) {
           shutdownHooks.push(fn)
         },
-        invokeAction: options.invokeAction,
       }
       await runWithAppContext(appCtx, () => plugin.server!(pluginApi))
     }

@@ -84,6 +84,23 @@ export function QuickSave() {
 
 The call always resolves to an `ActionResult`: `{ ok: true, data }` or `{ ok: false, status, error, fieldErrors?, issues? }`. A network failure returns `{ ok: false, status: 0, error }`. Pass a `FormData` object to upload files. If the action returns a redirect, the browser navigates there and the promise never resolves.
 
+## 3. Calls from server code
+
+A route, a `load()`, a middleware or another action can call an action directly. The call runs in the current request: it validates its input, runs the `_middleware.ts` chain of the action's folder, and resolves to the same `ActionResult`.
+
+```ts
+// src/routes/api/notes.ts
+import type { RequestContext } from '@kayjs/kay/server'
+import { addNote } from '../../actions/notes'
+
+export async function POST(ctx: RequestContext) {
+  const res = await addNote({ title: 'From the API' })
+  return res.ok ? ctx.json(res.data) : ctx.json(res, { status: res.status })
+}
+```
+
+Called outside a request, at a module's top level or from a timer, the action throws and names itself. In a test, submit it with `app.submit(action, input)`.
+
 ## Middleware & CSRF order
 
 Every action `POST` runs in this order:

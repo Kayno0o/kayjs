@@ -143,7 +143,6 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     trustProxy,
     trustedOriginsList,
     trustedOrigins,
-    invokeAction: actions.invoke,
   })
   const { router: pluginRouter, middlewaresFor } = pluginHost
   const hasPluginRewrites = pluginHost.rewrites.length > 0
@@ -153,7 +152,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const mod = modules[entry.file] as Record<string, unknown> | undefined
     const act = mod?.[entry.exportName]
     if (isServerAction(act))
-      actions.register(act, entry.url, entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default), middlewaresFor(entry.url))
+      actions.register(act, entry.exportName, entry.url, entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default), middlewaresFor(entry.url))
   }
 
   const { all: prerenderedMap, fast: fastPrerenderedMap } = files.collectPrerendered(manifest.routes, {
@@ -290,7 +289,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           const { ctx, cookieStore } = makeRequestContext(request, {}, { trustProxy, remoteIp, url })
           return (async () => {
             try {
-              const loaded = await mod.load!(ctx)
+              const loaded = await actions.run(ctx, () => mod.load!(ctx))
               if (isNotFound(loaded))
                 return finish(await buildNotFoundResponse(url, request, ctx), request, cookieStore)
               if (loaded instanceof Response)
@@ -479,7 +478,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         const { act, middlewares } = actionHandler
         const { ctx, cookieStore } = makeRequestContext(req, {}, { trustProxy, remoteIp, url })
         try {
-          return finish(await runChain(ctx, middlewares, () => executeAction(act, req, ctx, trustedOrigins, trustProxy)), req, cookieStore)
+          return finish(await actions.run(ctx, () => runChain(ctx, middlewares, () => executeAction(act, req, ctx, trustedOrigins, trustProxy))), req, cookieStore)
         }
         catch (error) {
           notifyError(error, req, 'action')
@@ -523,7 +522,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         }
         ctx.params = pluginMatch.params
         try {
-          let res = await runChain(ctx, pluginHost.allMiddlewares, () => routeDef.handler(ctx))
+          let res = await actions.run(ctx, () => runChain(ctx, pluginHost.allMiddlewares, () => routeDef.handler(ctx)))
           if (headFallbackPluginDef !== undefined)
             res = stripHeadBody(res)
           else if (isEventStream(res))
@@ -565,7 +564,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
 
       try {
-        const res = await runChain(ctx, route.middlewares, () => renderCompiledRoute(route, ctx, disableTimeout))
+        const res = await actions.run(ctx, () => runChain(ctx, route.middlewares, () => renderCompiledRoute(route, ctx, disableTimeout)))
         if (isEventStream(res))
           disableTimeout?.()
         // Compress uncompressed API/middleware responses after the middleware chain unwinds.

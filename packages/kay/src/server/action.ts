@@ -5,6 +5,7 @@ import type { KayLocals } from './index'
 import type { TrustProxy } from './security'
 import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult } from './standard-schema'
 import { wantsJson } from './http'
+import { currentRequest } from './request-scope'
 import { isTrustedOrigin } from './security'
 import { validateSchema } from './standard-schema'
 
@@ -86,11 +87,16 @@ export function action(
     : ((_input: never, ctx: ActionContext) => (schemaOrHandler as (c: ActionContext) => unknown)(ctx))
   const options = hasSchema ? maybeOpts : (maybeHandlerOrOpts as ActionOptions | undefined)
 
-  const fn = (async () => {
-    throw new Error('kay: server action cannot be called directly without a request context; invoke it from an island or via HTTP POST')
+  const fn = (async (input: unknown) => {
+    const scope = currentRequest()
+    if (scope === undefined)
+      throw new Error(`kay: ${fn.name || 'a server action'} was called outside a request; call it from a route, load(), middleware or another action, or with app.submit in a test.`)
+    return scope.actions.invoke(fn, input, scope.ctx)
   }) as unknown as ServerAction<unknown, unknown> & { url: string }
 
   Object.defineProperties(fn, {
+    // The registry names it after its export.
+    name: { value: '', configurable: true },
     __kayAction: { value: true, enumerable: false },
     schema: { value: schema, enumerable: false },
     flashFields: { value: options?.flashFields, enumerable: false },

@@ -2,7 +2,7 @@
 // Exposes typed Kay v2 server `action()` handlers (and standalone tool handlers) as MCP tools
 // over a bearer-authenticated endpoint via `KayPlugin.server`, keeping core free of MCP code.
 
-import type { KayPlugin, ServerPluginAPI } from '@kayjs/kay/config'
+import type { KayPlugin } from '@kayjs/kay/config'
 import type { ActionContext, InferOutput, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
 import type { McpBudgetOptions, McpFootprint } from './footprint'
 import type { McpPruneMode, McpToolResult } from './format'
@@ -422,8 +422,6 @@ export function mcp(options: McpOptions): KayPlugin {
     ? options.budget.onWarn
     : (msg: string) => console.warn(msg)
 
-  let serverApi: ServerPluginAPI | undefined
-
   const rpc = createRpcDispatcher({
     serverName,
     serverVersion,
@@ -434,7 +432,6 @@ export function mcp(options: McpOptions): KayPlugin {
     listedResources,
     formatResult: options.formatResult,
     mapError: options.mapError,
-    getServerApi: () => serverApi,
   })
 
   async function authorize(request: Request): Promise<Response | undefined> {
@@ -456,7 +453,6 @@ export function mcp(options: McpOptions): KayPlugin {
     name: '@kayjs/mcp',
 
     server(api) {
-      serverApi = api
       if (api.dev || nodeEnv() !== 'production') {
         for (const msg of collectBudgetViolations(footprint, options.budget))
           warnSink(msg)

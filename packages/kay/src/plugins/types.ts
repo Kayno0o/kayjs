@@ -2,7 +2,6 @@
 
 import type { BunPlugin } from 'bun'
 import type { RouteManifestEntry } from '../build/index'
-import type { ActionResult, ServerAction } from '../server/action'
 import type { Middleware, RequestContext } from '../server/index'
 import type { SecurityHeadersOptions, TrustProxy } from '../server/security'
 import type { ServiceKey } from './services'
@@ -108,8 +107,6 @@ export interface ServerPluginAPI {
   getBuildData<T = Record<string, unknown>>(pluginName?: string): T | undefined
   /** Register a shutdown cleanup callback run when `app.dispose()` is called (dev reloads, tests, graceful exit). */
   onShutdown(fn: () => void | Promise<void>): void
-  /** Invoke a ServerAction with Standard Schema validation and directory-scoped `_middleware.ts` checks. */
-  invokeAction<I, O>(action: ServerAction<I, O>, input: I, ctx: RequestContext): Promise<ActionResult<O>>
 }
 
 export interface ServerErrorInfo {

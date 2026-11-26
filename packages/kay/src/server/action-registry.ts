@@ -4,6 +4,7 @@ import type { ActionResult, ServerAction } from './action'
 import type { Middleware, RequestContext } from './http'
 import { invokeActionCore } from './action'
 import { runChain } from './http'
+import { runInRequest } from './request-scope'
 
 export interface RegisteredAction {
   act: ServerAction<unknown, unknown>
@@ -12,11 +13,13 @@ export interface RegisteredAction {
 }
 
 export interface ActionRegistry {
-  /** Gives `act` its live URL and records the middlewares a request to it runs behind. */
-  register: (act: ServerAction<unknown, unknown>, url: string, dirMiddlewares: Middleware[], pluginMiddlewares: readonly Middleware[]) => void
+  /** Gives `act` its name and live URL and records the middlewares a request to it runs behind. */
+  register: (act: ServerAction<unknown, unknown>, name: string, url: string, dirMiddlewares: Middleware[], pluginMiddlewares: readonly Middleware[]) => void
   byUrl: (url: string) => RegisteredAction | undefined
   /** Runs an action with schema validation behind its folder's `_middleware.ts` chain, as an island call would. */
   invoke: <I, O>(act: ServerAction<I, O>, input: I, ctx: RequestContext) => Promise<ActionResult<O>>
+  /** Runs `fn` as part of the request `ctx`, so the actions it calls run in that request. */
+  run: <T>(ctx: RequestContext, fn: () => T) => T
 }
 
 export function createActionRegistry(): ActionRegistry {
@@ -60,13 +63,16 @@ export function createActionRegistry(): ActionRegistry {
     }
   }
 
-  return {
-    register(act, url, dirMiddlewares, pluginMiddlewares) {
+  const registry: ActionRegistry = {
+    register(act, name, url, dirMiddlewares, pluginMiddlewares) {
       ;(act as { url: string }).url = url
+      Object.defineProperty(act, 'name', { value: name, configurable: true })
       dirMiddlewaresByRef.set(act, dirMiddlewares)
       handlers.set(url, { act, middlewares: [...pluginMiddlewares, ...dirMiddlewares] })
     },
     byUrl: url => handlers.get(url),
     invoke,
+    run: (ctx, fn) => runInRequest({ ctx, actions: registry }, fn),
   }
+  return registry
 }
