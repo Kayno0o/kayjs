@@ -165,6 +165,7 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
   // Each credited name's score, how many of the query's words it answers, and the last word that counted.
   const scores = new Map<string, { score: number, answered: number, lastTyped: number }>()
   let typedAt = 0
+  let typedWorth = 1
 
   const credit = (word: string, weight: number) => {
     for (const name of index.byWord.get(word) ?? []) {
@@ -172,20 +173,24 @@ export function findIcons(source: readonly string[] | IconifyNames, query: strin
       const known = scores.get(name)
 
       if (known === undefined) {
-        scores.set(name, { score: gained, answered: 1, lastTyped: typedAt })
+        scores.set(name, { score: gained, answered: typedWorth, lastTyped: typedAt })
       }
       else {
         known.score += gained
         if (known.lastTyped !== typedAt) {
           known.lastTyped = typedAt
-          known.answered++
+          known.answered += typedWorth
         }
       }
     }
   }
 
-  for (const typed of typedWords) {
+  // Two neighbouring query words also stand for the word they make joined when it is known, as `sign out` for `signout`, answering both.
+  const joined = typedWords.slice(1).map((word, i) => typedWords[i]! + word).filter(word => index.byWord.has(word) || relatedWords(word).length > 0)
+
+  for (const typed of [...typedWords, ...joined]) {
     typedAt++
+    typedWorth = typedAt > typedWords.length ? 2 : 1
 
     for (const [reading, weight] of readings(typed, index)) {
       credit(reading, weight * OWN_WEIGHT)

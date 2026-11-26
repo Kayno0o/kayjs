@@ -130,6 +130,20 @@ describe('findIcons', () => {
     expect(findIcons(['arrow-west', 'chevron-left', 'arrow-big-left-line'], 'left arrow')).toEqual(['arrow-big-left-line', 'arrow-west', 'chevron-left'])
   })
 
+  it('reads two query words as the word they make joined, answering both', () => {
+    replaceTable({ signout: 'logout 100' })
+
+    expect(findIcons(['zoom-out', 'sign', 'logout'], 'sign out')).toEqual(['logout', 'sign', 'zoom-out'])
+  })
+
+  it('reads two query words joined when only the names know the joined word', () => {
+    expect(findIcons(['sign', 'signout'], 'sign out')).toEqual(['signout', 'sign'])
+  })
+
+  it('neither completes nor respells two query words joined', () => {
+    expect(findIcons(['zoom', 'zoomouts'], 'zoom out')).toEqual(['zoom'])
+  })
+
   it('finds an icon named by one letter through a related word', () => {
     replaceTable({ close: 'x 80' })
 
