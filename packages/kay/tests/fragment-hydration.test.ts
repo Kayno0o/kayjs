@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { compileDom, compileSsr } from '../src/compiler/index'
 import * as domExtras from '../src/dom/extras'
 import * as domCore from '../src/dom/index'
-import { signal } from '../src/reactivity/index'
+import * as domLoop from '../src/dom/loop'
+import { onCleanup, signal } from '../src/reactivity/index'
 import * as ssrRt from '../src/ssr/index'
 
 const PANEL = `
@@ -26,10 +27,10 @@ const PANEL = `
 
 // Runs one compiled module and returns its default export, the kay runtime bound to the `__name` imports the compilers emit.
 function load(code: string): (props: object) => unknown {
-  const runtime: Record<string, unknown> = { ...domCore, ...domExtras, ...ssrRt }
+  const runtime: Record<string, unknown> = { ...domCore, ...domExtras, ...domLoop, ...ssrRt }
   const names = Object.keys(runtime)
   const body = code.replace(/^\s*import .*\n/gm, '').replace('export default function', 'return function')
-  return new Function(...names.map(n => `__${n}`), 'signal', body)(...names.map(n => runtime[n]), signal)
+  return new Function(...names.map(n => `__${n}`), 'signal', 'onCleanup', body)(...names.map(n => runtime[n]), signal, onCleanup)
 }
 
 function ssr(props: object): string {
@@ -158,5 +159,106 @@ describe('#3596 fragments nested in ranges', () => {
     expect(host.querySelector('div')!.children.length).toBe(0)
     show.value = true
     expect([...host.querySelector('div')!.children].map(e => e.tagName)).toEqual(['P', 'I', 'SPAN'])
+  })
+
+  test('#3629: string expressions & adjacent static text in fragments match SSR hydration markers', () => {
+    const sole = hydrated(`export default function X() { return <>{"hello"}</> }`)
+    expect(sole.textContent).toBe('hello')
+
+    const mixed = hydrated(`
+      export default function X() {
+        const c = signal(1)
+        return <><span>a</span>{"b"}<span>{c.value}</span><button onClick={() => c.value++}>+</button></>
+      }
+    `)
+    expect(mixed.textContent).toBe('ab1+')
+    mixed.querySelector('button')!.click()
+    expect(mixed.textContent).toBe('ab2+')
+
+    const adjacent = hydrated(`
+      export default function X() {
+        const c = signal(10)
+        return <>a{"b"}c<span>{c.value}</span><button onClick={() => c.value++}>+</button></>
+      }
+    `)
+    expect(adjacent.textContent).toBe('abc10+')
+    adjacent.querySelector('button')!.click()
+    expect(adjacent.textContent).toBe('abc11+')
+  })
+
+  test('#3629: keyed .map() inside fragments uses __loop, hydrates in place, preserves row identity, and mounts cleanly', () => {
+    const src = `
+      export default function X({ rows }) {
+        const n = signal(0)
+        return (
+          <>
+            <h1>List</h1>
+            {rows.value.map(r => <p key={r.id}>{r.name}</p>)}
+            <button onClick={() => n.value++}>n={n.value}</button>
+          </>
+        )
+      }
+    `
+    const domCompiled = compileDom('X.tsx', src).code
+    expect(domCompiled).toContain('__loop(')
+    expect(domCompiled).not.toContain('__fragInsert(')
+
+    // 1. SSR + hydration preserves row DOM identity across reorder & updates
+    const rows = signal([{ id: 1, name: 'A' }, { id: 2, name: 'B' }])
+    const host = document.createElement('kay-island')
+    host.innerHTML = (load(compileSsr('X.tsx', src, { isIsland: true }).code)({ rows }) as { __html: string }).__html
+    document.body.appendChild(host)
+    const p1 = host.querySelectorAll('p')[0]!
+    const p2 = host.querySelectorAll('p')[1]!
+    const X = load(domCompiled)
+    domCore.hydrate(host, () => X({ rows }) as Node)
+
+    expect(host.querySelectorAll('p')[0]).toBe(p1)
+    expect(host.querySelectorAll('p')[1]).toBe(p2)
+    rows.value = [{ id: 2, name: 'B2' }, { id: 1, name: 'A2' }, { id: 3, name: 'C' }]
+    const ps = [...host.querySelectorAll('p')]
+    expect(ps.map(e => e.textContent)).toEqual(['B2', 'A2', 'C'])
+    expect(ps[0]).toBe(p2)
+    expect(ps[1]).toBe(p1)
+    host.querySelector('button')!.click()
+    expect(host.querySelector('button')!.textContent).toBe('n=1')
+
+    // 2. Client mount (including clear & append & outer conditional removal)
+    const mRows = signal([{ id: 1, name: 'X' }])
+    const mHost = document.createElement('div')
+    document.body.appendChild(mHost)
+    const dispose = domCore.mount(mHost, () => X({ rows: mRows }) as Node)
+    const firstP = mHost.querySelector('p')!
+    mRows.value = [{ id: 1, name: 'X2' }, { id: 2, name: 'Y' }]
+    expect(mHost.querySelectorAll('p')[0]).toBe(firstP)
+    expect([...mHost.querySelectorAll('p')].map(e => e.textContent)).toEqual(['X2', 'Y'])
+    mRows.value = []
+    expect(mHost.querySelectorAll('p').length).toBe(0)
+    dispose()
+  })
+
+  test('#3629: conditionals inside fragments use __show and dispose inner cleanups', () => {
+    const src = `
+      function Kid({ log }) {
+        onCleanup(() => log.push('disposed'))
+        return <span>kid</span>
+      }
+      export default function X({ open, log }) {
+        return <><b>head</b>{open.value && <Kid log={log} />}<i>tail</i></>
+      }
+    `
+    const domCompiled = compileDom('X.tsx', src).code
+    expect(domCompiled).toContain('__show(')
+
+    const log: string[] = []
+    const open = signal(true)
+    const host = document.createElement('div')
+    const dispose = domCore.mount(host, () => load(domCompiled)({ open, log }) as Node)
+    expect(host.textContent).toBe('headkidtail')
+    expect(log).toEqual([])
+    open.value = false
+    expect(host.textContent).toBe('headtail')
+    expect(log).toEqual(['disposed'])
+    dispose()
   })
 })

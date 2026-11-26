@@ -85,6 +85,11 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     accepts('<Region name="a"><Region name="b"><p>x</p></Region></Region>', region)
     refuses('<Region name="a"><div><Region name="a"><p>x</p></Region></div></Region>', /<Region name="a"> inside <Region name="a"> in Page\.tsx: give the inner one its own name/, region)
     accepts('<Region {...{ name: \'pane\' }}><p>x</p></Region>', region)
+    // Aliased and namespaced <Region> (#3629)
+    refuses('<R><p>x</p></R>', /<Region> without a name/, 'import { Region as R } from \'@kayjs/kay\'')
+    refuses('<R name="a"><R name="a"><p>x</p></R></R>', /<Region name="a"> inside <Region name="a">/, 'import { Region as R } from \'@kayjs/kay\'')
+    refuses('<kay.Region><p>x</p></kay.Region>', /<Region> without a name/, 'import * as kay from \'@kayjs/kay\'')
+    refuses('<kay.Region name="a"><kay.Region name="a"><p>x</p></kay.Region></kay.Region>', /<Region name="a"> inside <Region name="a">/, 'import * as kay from \'@kayjs/kay\'')
     refuses('<button data-kay-target="pane">x</button>', /data-kay-target on <button> in Page\.tsx: put it on the <a href>/)
     refuses('<form method="post" data-kay-target="pane"></form>', /data-kay-target on a <form method="post"> in Page\.tsx: a region swaps from a GET/)
     accepts('<form method="get" data-kay-target="pane" data-kay-live></form>')
@@ -98,6 +103,9 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
   test('<Suspense> with several children, which renders none of them', () => {
     refuses('<Suspense fallback={<p>...</p>}><A /><B /></Suspense>', /<Suspense> with 2 children in Page\.tsx: give it one child/, 'import { Suspense } from \'@kayjs/kay\'\nconst A = () => <p>a</p>\nconst B = () => <p>b</p>')
     accepts('<Suspense fallback={<p>...</p>}>\n  <A />\n</Suspense>', 'import { Suspense } from \'@kayjs/kay\'\nconst A = () => <p>a</p>')
+    // Aliased and namespaced <Suspense> (#3629)
+    refuses('<S fallback={<p>...</p>}><A /><B /></S>', /<Suspense> with 2 children/, 'import { Suspense as S } from \'@kayjs/kay\'\nconst A = () => <p>a</p>\nconst B = () => <p>b</p>')
+    refuses('<kay.Suspense fallback={<p>...</p>}><A /><B /></kay.Suspense>', /<Suspense> with 2 children/, 'import * as kay from \'@kayjs/kay\'\nconst A = () => <p>a</p>\nconst B = () => <p>b</p>')
   })
 
   test('a signal used without .value, which renders [object Object] or is always truthy', () => {

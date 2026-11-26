@@ -9,15 +9,17 @@ import type {
   Statement,
   VariableDeclaration,
 } from 'oxc-parser'
-import { parseSync, visitorKeys } from 'oxc-parser'
-import { walk } from './ast'
+import { parseSync } from 'oxc-parser'
+import { computeJsxNodes, walk } from './ast'
 import type { BindingFacts, Interactivity } from './interactivity'
 import type { CompilerWarning } from './mistakes'
 import { analyzeDefaultDataKeys } from './data-keys'
 import { resolveInteractivity } from './interactivity'
 import { assertScopedKayImport, checkHabits, checkHydrateMode, checkMistakes, guarded, islandRemoved, mistake, serverOnlyTagError } from './mistakes'
-import { calleeName, EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, unwrapTsExpr } from './shared'
+import { calleeName, EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, resolveKayTag, unwrapTsExpr } from './shared'
 import { checkBareSignals } from './signal-reads'
+
+export { computeJsxNodes } from './ast'
 
 
 const REACTIVE_IMPORTS = new Set([
@@ -84,49 +86,6 @@ export interface ModuleAnalysis extends Interactivity {
   exportLocals: Map<string, string>
   /** Code that compiles but usually means something else, worded for build and `kay check` to print. */
   warnings: CompilerWarning[]
-}
-
-export function computeJsxNodes(program: Program): WeakSet<Node> {
-  const jsxNodes = new WeakSet<Node>()
-  const visit = (node: unknown): boolean => {
-    if (node === null || typeof node !== 'object')
-      return false
-    if (Array.isArray(node)) {
-      let any = false
-      for (let i = 0; i < node.length; i++) {
-        if (visit(node[i]))
-          any = true
-      }
-      return any
-    }
-    const ast = node as Node
-    const type = ast.type
-    if (typeof type !== 'string')
-      return false
-    let found = isJsxNode(ast)
-    const keys = visitorKeys[type]
-    if (keys !== undefined) {
-      const rec = ast as unknown as Record<string, unknown>
-      for (let i = 0; i < keys.length; i++) {
-        const val = rec[keys[i]!]
-        if (val !== null && typeof val === 'object' && visit(val))
-          found = true
-      }
-    }
-    else {
-      for (const [key, val] of Object.entries(ast)) {
-        if (key === 'start' || key === 'end' || key === 'type')
-          continue
-        if (val !== null && typeof val === 'object' && visit(val))
-          found = true
-      }
-    }
-    if (found)
-      jsxNodes.add(ast)
-    return found
-  }
-  visit(program)
-  return jsxNodes
 }
 
 function exportedName(node: { type: string, name?: string, value?: string }): string | undefined {
@@ -482,12 +441,13 @@ function scanBody(program: Program, filename: string, code: string, imports: Imp
     if (tracked.has(name) && !binding.refs.has(name))
       binding.refs.set(name, offset)
   }
+  const resolveTag = (tag: string): string | undefined => resolveKayTag(tag, imports.imports)
   const visit = (node: Node): void => {
     const binding = current!
     if (isJsxNode(node))
       body.hasJsx = true
     if (node.type === 'JSXElement')
-      checkMistakes(node, filename, code, warnings)
+      checkMistakes(node, filename, code, warnings, resolveTag)
     checkHabits(node, isEffect, filename)
     if (checkActions && isActionCall(node, imports.actionLocalName, imports.serverNamespaces) && !decls.registeredActions.has(node))
       guarded(node.start, () => { throw mistake('action() not declared as export const', filename, `write export const ${actionVariable(program, node) ?? 'name'} = ${imports.actionLocalName ?? 'action'}(...) at the top level, only those get a URL`) })

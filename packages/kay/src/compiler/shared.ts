@@ -1,21 +1,13 @@
 // Shared compiler helpers & JSX child/hydration IR classification used by both `ssr.ts` and `dom.ts`.
 
 import type {
-  ArrowFunctionExpression,
   BlockStatement,
-  CallExpression,
-  ConditionalExpression,
-  Expression,
-  Function as OxcFunction,
   JSXChild,
   JSXElement,
   JSXElementName,
-  JSXExpressionContainer,
   JSXFragment,
   JSXNamespacedName,
-  LogicalExpression,
   Node,
-  ParamPattern,
   Program,
 } from 'oxc-parser'
 import { walk } from './ast'
@@ -305,109 +297,6 @@ export function filterMeaningfulChildren(children: readonly JSXChild[]): JSXChil
   })
 }
 
-export interface MapCallMatch {
-  call: CallExpression
-  target: Expression
-  cb: ArrowFunctionExpression | OxcFunction
-  body: JSXElement | JSXFragment | BlockStatement
-  isJsxBody: boolean
-  params: readonly ParamPattern[]
-}
-
-/** Recognizes `arr.map((item, idx?) => <jsx> | { ... return <jsx> })` identically in SSR and DOM compilers. */
-export function matchJsxMapCall(expr: Node, jsxNodes?: WeakSet<Node>): MapCallMatch | undefined {
-  if (
-    expr.type !== 'CallExpression'
-    || expr.callee.type !== 'MemberExpression'
-    || expr.callee.computed
-    || expr.callee.property.type !== 'Identifier'
-    || expr.callee.property.name !== 'map'
-    || expr.arguments.length !== 1
-  ) {
-    return undefined
-  }
-  const arg = expr.arguments[0]
-  if (arg === undefined || (arg.type !== 'ArrowFunctionExpression' && arg.type !== 'FunctionExpression'))
-    return undefined
-  if (arg.async || arg.body === null)
-    return undefined
-  // 3rd `(item, idx, arr)` param or rest param cannot be mapped cleanly to `(item, idx)` loop signals.
-  if (arg.params.length > 2 || arg.params.some(p => p.type === 'RestElement'))
-    return undefined
-  const body = unwrapParens(arg.body)
-  if (isJsxNode(body))
-    return { call: expr, target: expr.callee.object, cb: arg, body, isJsxBody: true, params: arg.params }
-  if (body.type === 'BlockStatement' && blockReturnsJsx(body, jsxNodes))
-    return { call: expr, target: expr.callee.object, cb: arg, body, isJsxBody: false, params: arg.params }
-  return undefined
-}
-
-export function isStaticBranch(node: Node): boolean {
-  const n = unwrapParens(node)
-  if (isJsxNode(n))
-    return true
-  if (n.type === 'Identifier' && n.name === 'undefined')
-    return true
-  return staticLiteral(n).ok
-}
-
-export type ChildSlotKind =
-  | { kind: 'static-text', text: string, fromLiteral: boolean }
-  | { kind: 'element', node: JSXElement }
-  | { kind: 'component', node: JSXElement }
-  | { kind: 'fragment', node: JSXFragment }
-  | { kind: 'loop', match: MapCallMatch }
-  | { kind: 'and-show', expr: LogicalExpression, right: JSXElement | JSXFragment }
-  | { kind: 'ternary-show', expr: ConditionalExpression, cons: Node, alt: Node }
-  | { kind: 'expr', container: JSXExpressionContainer, expr: Expression }
-
-/**
- * Single shared child classifier for SSR & DOM codegen.
- * Both emitters derive exact hydration marker placement (`<!--k[-->...<!--k]-->` vs `<!---->`) from this classification.
- */
-export function classifyJsxChild(child: JSXChild, jsxNodes?: WeakSet<Node>): ChildSlotKind | undefined {
-  if (child.type === 'JSXText') {
-    const text = cleanJsxText(child.value)
-    return text === '' ? undefined : { kind: 'static-text', text, fromLiteral: false }
-  }
-  if (child.type === 'JSXFragment')
-    return { kind: 'fragment', node: child }
-  if (child.type === 'JSXElement') {
-    const tag = jsxTagName(child.openingElement.name)
-    return isComponentTag(tag)
-      ? { kind: 'component', node: child }
-      : { kind: 'element', node: child }
-  }
-  if (child.type === 'JSXExpressionContainer') {
-    if (child.expression.type === 'JSXEmptyExpression')
-      return undefined
-    const expr = child.expression
-    if (expr.type === 'Literal' && typeof expr.value === 'string') {
-      return expr.value === ''
-        ? undefined
-        : { kind: 'static-text', text: expr.value, fromLiteral: true }
-    }
-    const mapMatch = matchJsxMapCall(expr, jsxNodes)
-    if (mapMatch !== undefined)
-      return { kind: 'loop', match: mapMatch }
-    if (expr.type === 'LogicalExpression' && expr.operator === '&&') {
-      const right = unwrapParens(expr.right)
-      if (isJsxNode(right))
-        return { kind: 'and-show', expr, right }
-    }
-    if (expr.type === 'ConditionalExpression') {
-      const cons = unwrapParens(expr.consequent)
-      const alt = unwrapParens(expr.alternate)
-      // Use `show()` only when at least one branch is JSX and the other branch is JSX or a static literal/nullish;
-      // mixed dynamic text (`cond ? <span/> : count.value`) goes through `expr` (`insert`) so both branches stay reactive.
-      if ((isJsxNode(cons) && isStaticBranch(alt)) || (isJsxNode(alt) && isStaticBranch(cons)))
-        return { kind: 'ternary-show', expr, cons, alt }
-    }
-    return { kind: 'expr', container: child, expr }
-  }
-  return undefined
-}
-
 /** Collects every identifier name bound by a destructuring/parameter pattern. */
 export function collectPatternNames(pattern: Node | null | undefined, out: Set<string>): void {
   if (pattern === null || pattern === undefined)
@@ -441,145 +330,38 @@ export function collectPatternNames(pattern: Node | null | undefined, out: Set<s
   }
 }
 
-const PRIMITIVE_GLOBALS = new Set([
-  'String', 'Number', 'Boolean', 'parseInt', 'parseFloat',
-  'encodeURI', 'encodeURIComponent', 'decodeURI', 'decodeURIComponent',
-])
-
-const PRIMITIVE_METHODS = new Set([
-  'toString', 'toFixed', 'toPrecision', 'toExponential', 'toLocaleString',
-  'toLocaleDateString', 'toLocaleTimeString', 'toISOString', 'toUpperCase',
-  'toLowerCase', 'toLocaleUpperCase', 'toLocaleLowerCase', 'trim', 'trimStart',
-  'trimEnd', 'join', 'padStart', 'padEnd', 'repeat', 'replace', 'replaceAll',
-  'substring', 'substr', 'charAt', 'charCodeAt', 'codePointAt', 'indexOf',
-  'lastIndexOf', 'includes', 'startsWith', 'endsWith', 'getTime', 'getFullYear',
-  'getMonth', 'getDate', 'getHours', 'getMinutes', 'getSeconds',
-])
-
-function isKnownPrimitiveCall(node: CallExpression): boolean {
-  const callee = node.callee
-  if (callee.type === 'Identifier' && PRIMITIVE_GLOBALS.has(callee.name))
-    return true
-  if (callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier') {
-    const prop = callee.property.name
-    if (callee.object.type === 'Identifier') {
-      const obj = callee.object.name
-      if (obj === 'Math' || (obj === 'JSON' && prop === 'stringify') || (obj === 'Date' && prop === 'now'))
-        return true
-    }
-    if (PRIMITIVE_METHODS.has(prop))
-      return true
-  }
-  return false
+export interface KayTagBinding {
+  source: string
+  specifiers: readonly { local: string, imported: string }[]
 }
 
-export function mayReturnNode(node: Node): boolean {
-  const cur = unwrapTsExpr(node)
-  if (cur.type === 'CallExpression')
-    return !isKnownPrimitiveCall(cur)
-  if (cur.type === 'LogicalExpression')
-    return mayReturnNode(cur.left) || mayReturnNode(cur.right)
-  if (cur.type === 'ConditionalExpression')
-    return mayReturnNode(cur.consequent) || mayReturnNode(cur.alternate)
-  return false
-}
+const KAY_SERVER_TAGS = new Set(['Head', 'Region', 'Suspense'])
 
-/** Shared SSR/DOM check for whether a dynamic expression slot may produce DOM nodes/fragments (requiring balanced `<!--k[-->...<!--k]-->` markers). */
-export function isNodeCapableExpr(expr: Expression, jsxNodes?: WeakSet<Node>): boolean {
-  const isChildrenExpr = (expr.type === 'Identifier' && expr.name === 'children')
-    || (expr.type === 'MemberExpression' && !expr.computed && expr.property.type === 'Identifier' && expr.property.name === 'children')
-  return isChildrenExpr || containsJsx(expr, jsxNodes) || mayReturnNode(expr)
-}
-
-export type HydrationMarker = 'none' | 'text-open' | 'text' | 'range-open' | 'range'
-
-export interface PlannedChildSlot {
-  child: JSXChild
-  slot: ChildSlotKind
-  marker: HydrationMarker
-  open: string
-  close: string
-  nodeCapable: boolean
-}
-
-export interface PlanChildSlotsOptions {
-  jsxNodes?: WeakSet<Node> | undefined
-  emitMarkers?: boolean | undefined
-  inFragment?: boolean | undefined
-}
-
-const MARKER_DELIMITERS: Record<HydrationMarker, readonly [open: string, close: string]> = {
-  'none': ['', ''],
-  'text-open': ['<!---->', ''],
-  'text': ['<!---->', '<!---->'],
-  'range-open': ['<!--k[-->', ''],
-  'range': ['<!--k[-->', '<!--k]-->'],
-}
-
-/**
- * Single hydration-marker planner shared by SSR and DOM compilers.
- * Computes each child slot's marker shape once so SSR markup and DOM hydration walks stay in lockstep.
- */
-export function planChildSlots(children: readonly JSXChild[], options: PlanChildSlotsOptions = {}): PlannedChildSlot[] {
-  const { jsxNodes, emitMarkers = true, inFragment = false } = options
-  const rawSlots: { child: JSXChild, slot: ChildSlotKind }[] = []
-  for (const child of filterMeaningfulChildren(children)) {
-    const slot = classifyJsxChild(child, jsxNodes)
-    if (slot !== undefined)
-      rawSlots.push({ child, slot })
-  }
-
-  const hasSiblings = rawSlots.length > 1
-  // A fragment may sit inside another range, so its dynamic slots are bracketed even alone and always closed, for the markers to balance (#3596).
-  const bracketed = emitMarkers && (hasSiblings || inFragment)
-  const planned: PlannedChildSlot[] = []
-  let hadVariableRange = false
-
-  for (let i = 0; i < rawSlots.length; i++) {
-    const { child, slot } = rawSlots[i]!
-    const isLast = i === rawSlots.length - 1
-    let marker: HydrationMarker = 'none'
-    let nodeCapable = false
-
-    switch (slot.kind) {
-      case 'static-text':
-      case 'element':
-        break
-      case 'component':
-      case 'fragment':
-        if (emitMarkers && hasSiblings)
-          marker = !isLast || inFragment ? 'range' : 'range-open'
-        hadVariableRange = true
-        break
-      case 'loop':
-        if (emitMarkers && (inFragment || !isLast || hadVariableRange))
-          marker = 'range'
-        hadVariableRange = true
-        break
-      case 'and-show':
-      case 'ternary-show':
-        if (bracketed)
-          marker = 'range'
-        hadVariableRange = true
-        break
-      case 'expr':
-        nodeCapable = isNodeCapableExpr(slot.expr, jsxNodes)
-        if (nodeCapable) {
-          if (bracketed)
-            marker = !isLast || inFragment ? 'range' : 'range-open'
-          hadVariableRange = true
+/** Resolves a JSX tag (direct, aliased, or namespaced via `@kayjs/kay`) to its canonical Kay tag (`Head` | `Region` | `Suspense`). */
+export function resolveKayTag(tag: string, imports: readonly KayTagBinding[]): 'Head' | 'Region' | 'Suspense' | undefined {
+  let boundElsewhere = false
+  for (const imp of imports) {
+    const isKay = imp.source === '@kayjs/kay'
+    for (const spec of imp.specifiers) {
+      if (isKay) {
+        if (spec.local === tag && KAY_SERVER_TAGS.has(spec.imported))
+          return spec.imported as 'Head' | 'Region' | 'Suspense'
+        if (spec.imported === '*' && tag.startsWith(`${spec.local}.`)) {
+          const member = tag.slice(spec.local.length + 1)
+          if (KAY_SERVER_TAGS.has(member))
+            return member as 'Head' | 'Region' | 'Suspense'
         }
-        else if (bracketed) {
-          marker = !isLast || inFragment ? 'text' : 'text-open'
-        }
-        break
+      }
+      else if (spec.local === tag) {
+        boundElsewhere = true
+      }
     }
-
-    const [open, close] = MARKER_DELIMITERS[marker]
-    planned.push({ child, slot, marker, open, close, nodeCapable })
   }
-
-  return planned
+  if (!boundElsewhere && KAY_SERVER_TAGS.has(tag))
+    return tag as 'Head' | 'Region' | 'Suspense'
+  return undefined
 }
 
+export type { ChildSlotKind, ExprContext, HydrationMarker, MapCallMatch, PlanChildSlotsOptions, PlannedChildSlot } from './slots'
+export { classifyJsxChild, createExprContext, isDefinitelyPrimitive, isNodeCapableExpr, isStaticBranch, matchJsxMapCall, mayReturnNode, planChildSlots } from './slots'
 export type { Program }

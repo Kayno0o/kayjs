@@ -2,58 +2,41 @@
 // static attribute literal folding, compile-time static island props, and shared balanced hydration markers.
 
 import type {
-  JSXAttributeItem,
   JSXChild,
   JSXElement,
   JSXFragment,
   Node,
 } from 'oxc-parser'
 import type { ModuleAnalysis } from './analyze'
+import type { SelectValueBinding } from './ssr-helpers'
 import { analyzeModule, parseTsx } from './analyze'
 import { walk } from './ast'
 import { mistake } from './mistakes'
 import { SourceEditor } from './patch'
 import {
+  cleanJsxText,
   containsJsx,
+  createExprContext,
   decodeHtmlEntities,
   escapeRawText,
   escapeStaticAttr,
   escapeStaticText,
-  EVENT_ATTR,
   filterMeaningfulChildren,
-  isBlockedAttr,
   isComponentTag,
   isJsxNode,
-  isStringBoolAttr,
-  isUnsafeUrlAttr,
   jsxTagName,
   planChildSlots,
   RAW_TEXT_ELEMENTS,
-  staticLiteral,
+  resolveKayTag,
   unwrapParens,
   VOID_ELEMENTS,
 } from './shared'
-
-function containsDirectAwait(root: Node): boolean {
-  let found = false
-  walk(root, (child) => {
-    if (found)
-      return false
-    if (child !== root && (
-      child.type === 'FunctionDeclaration'
-      || child.type === 'FunctionExpression'
-      || child.type === 'ArrowFunctionExpression'
-    )) {
-      return false
-    }
-    if (child.type === 'AwaitExpression') {
-      found = true
-      return false
-    }
-    return undefined
-  })
-  return found
-}
+import {
+  containsDirectAwait,
+  emitSsrElementAttrs,
+  serializeComponentProps,
+  StringParts,
+} from './ssr-helpers'
 
 export interface IslandBinding {
   id: string
@@ -73,65 +56,6 @@ export interface CompileResult {
   analysis: ModuleAnalysis
 }
 
-class StringParts {
-  #parts: { static: boolean, value: string }[] = []
-
-  pushStatic(str: string): void {
-    if (str === '')
-      return
-    const last = this.#parts[this.#parts.length - 1]
-    if (last !== undefined && last.static)
-      last.value += str
-    else
-      this.#parts.push({ static: true, value: str })
-  }
-
-  pushExpr(code: string): void {
-    this.#parts.push({ static: false, value: code })
-  }
-
-  isEmpty(): boolean {
-    return this.#parts.length === 0
-  }
-
-  clear(): void {
-    this.#parts.length = 0
-  }
-
-  toExpr(): string {
-    if (this.#parts.length === 0)
-      return '""'
-    return this.#parts
-      .map(p => (p.static ? JSON.stringify(p.value) : `(${p.value})`))
-      .join(' + ')
-  }
-}
-
-function isStaticNullish(node: Node): boolean {
-  return (node.type === 'Identifier' && node.name === 'undefined')
-    || (node.type === 'Literal' && node.value === null)
-}
-
-function formatStaticAttrBranch(attrName: string, node: Node): string | undefined {
-  if (isBlockedAttr(attrName))
-    return '""'
-  if (isStaticNullish(node))
-    return '""'
-  if (node.type === 'Literal') {
-    if (typeof node.value === 'boolean') {
-      if (isStringBoolAttr(attrName))
-        return JSON.stringify(` ${attrName}="${node.value ? 'true' : 'false'}"`)
-      return node.value ? JSON.stringify(` ${attrName}`) : '""'
-    }
-    if (typeof node.value === 'string' || typeof node.value === 'number') {
-      if (isUnsafeUrlAttr(attrName, node.value))
-        return '""'
-      return JSON.stringify(` ${attrName}="${escapeStaticAttr(String(node.value))}"`)
-    }
-  }
-  return undefined
-}
-
 export function compileSsr(filename: string, code: string, options: CompileSsrOptions = {}): CompileResult {
   const program = options.analysis?.program ?? parseTsx(filename, code)
   const analysis = options.analysis ?? analyzeModule(filename, code, program)
@@ -142,6 +66,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   const editor = new SourceEditor(code)
   const used = new Set<string>()
   let loopCounter = 0
+  let activeSelectValue: SelectValueBinding | undefined
 
   const use = (name: string): string => {
     used.add(name)
@@ -151,6 +76,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   const islands = options.islands
   const emitMarkers = options.emitMarkers ?? options.isIsland ?? analysis.isInteractive
   const jsxNodes = analysis.jsxNodes
+  const exprContext = createExprContext(program, jsxNodes)
 
   function compileSubExpression(node: Node): string {
     if (!containsJsx(node, jsxNodes))
@@ -166,62 +92,6 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       return undefined
     })
     return sub.toString()
-  }
-
-  function serializeComponentProps(attrs: readonly JSXAttributeItem[]): {
-    propEntries: string[]
-    allStaticProps: boolean
-    staticPropsObj: Record<string, unknown>
-    hydrateExpr: string | undefined
-    staticHydrate: string | undefined
-  } {
-    const propEntries: string[] = []
-    let allStaticProps = true
-    const staticPropsObj: Record<string, unknown> = {}
-    let hydrateExpr: string | undefined
-    let staticHydrate: string | undefined
-
-    for (const attr of attrs) {
-      if (attr.type === 'JSXSpreadAttribute') {
-        allStaticProps = false
-        propEntries.push(`...(${compileSubExpression(attr.argument)})`)
-        continue
-      }
-      const name = jsxTagName(attr.name)
-      if (name === 'key')
-        continue
-      if (name === '$hydrate') {
-        if (attr.value?.type === 'Literal' && typeof attr.value.value === 'string') {
-          staticHydrate = attr.value.value
-          hydrateExpr = JSON.stringify(attr.value.value)
-        }
-        else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
-          hydrateExpr = compileSubExpression(attr.value.expression)
-        }
-        continue
-      }
-
-      const propKey = /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name)
-      if (attr.value === null) {
-        propEntries.push(`${propKey}: true`)
-        staticPropsObj[name] = true
-      }
-      else if (attr.value.type === 'Literal') {
-        propEntries.push(`${propKey}: ${JSON.stringify(attr.value.value)}`)
-        staticPropsObj[name] = attr.value.value
-      }
-      else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
-        const expr = attr.value.expression
-        const lit = staticLiteral(expr)
-        if (lit.ok)
-          staticPropsObj[name] = lit.value
-        else
-          allStaticProps = false
-        propEntries.push(`${propKey}: ${compileSubExpression(expr)}`)
-      }
-    }
-
-    return { propEntries, allStaticProps, staticPropsObj, hydrateExpr, staticHydrate }
   }
 
   function compileChildrenListToStringExpr(children: readonly JSXChild[], slotMarkers = emitMarkers): string {
@@ -258,64 +128,45 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     }
 
     parts.pushStatic(`<${tag}`)
-    let innerHtmlExpr: string | undefined
-
-    for (const attr of node.openingElement.attributes) {
-      if (attr.type === 'JSXSpreadAttribute') {
-        parts.pushExpr(`${use('ssrSpread')}(${compileSubExpression(attr.argument)})`)
-        continue
-      }
-      const rawName = jsxTagName(attr.name)
-      if (rawName === 'key' || rawName === 'ref' || rawName === '$hydrate' || EVENT_ATTR.test(rawName))
-        continue
-      if (rawName === 'innerHTML') {
-        if (attr.value?.type === 'Literal')
-          innerHtmlExpr = JSON.stringify(String(attr.value.value))
-        else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
-          innerHtmlExpr = `${use('ssrRaw')}(${compileSubExpression(attr.value.expression)})`
-        continue
-      }
-
-      const name = rawName === 'className' ? 'class' : rawName === 'htmlFor' ? 'for' : rawName
-      if (isBlockedAttr(name))
-        continue
-
-      if (attr.value === null) {
-        parts.pushStatic(isStringBoolAttr(name) ? ` ${name}="true"` : ` ${name}`)
-      }
-      else if (attr.value.type === 'Literal') {
-        if (!isUnsafeUrlAttr(name, attr.value.value))
-          parts.pushStatic(` ${name}="${escapeStaticAttr(String(attr.value.value))}"`)
-      }
-      else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
-        const expr = attr.value.expression
-
-        // Fold static ternary attribute branches (`class={cond ? 'stock out' : 'stock in'}`) with 0 runtime escaping!
-        if (name !== 'style' && expr.type === 'ConditionalExpression') {
-          const cons = formatStaticAttrBranch(name, expr.consequent)
-          const alt = formatStaticAttrBranch(name, expr.alternate)
-          if (cons !== undefined && alt !== undefined) {
-            parts.pushExpr(`${compileSubExpression(expr.test)} ? ${cons} : ${alt}`)
-            continue
-          }
-        }
-
-        const exprCode = compileSubExpression(expr)
-        if (name === 'style')
-          parts.pushExpr(`${use('ssrStyle')}(${exprCode})`)
-        else
-          parts.pushExpr(`${use('ssrAttr')}(${JSON.stringify(name)}, ${exprCode})`)
-      }
-    }
+    const isTextarea = tag === 'textarea'
+    const isSelect = tag === 'select'
+    const { innerHtmlExpr, textareaValue, nextSelectValue } = emitSsrElementAttrs({
+      node,
+      tag,
+      parts,
+      activeSelectValue,
+      flushParts,
+      pushStmt,
+      nextId: () => loopCounter++,
+      use,
+      compileSubExpression,
+    })
 
     parts.pushStatic('>')
     if (VOID_ELEMENTS.has(tag))
       return
 
-    if (innerHtmlExpr !== undefined)
-      parts.pushExpr(innerHtmlExpr)
-    else
-      emitChildrenIntoBuffer(node.children, bufVar, parts, flushParts, pushStmt, RAW_TEXT_ELEMENTS.has(tag) ? tag as 'style' | 'script' : undefined)
+    const prevSelectValue = activeSelectValue
+    if (isSelect)
+      activeSelectValue = nextSelectValue
+
+    try {
+      if (innerHtmlExpr !== undefined) {
+        parts.pushExpr(innerHtmlExpr)
+      }
+      else if (isTextarea && textareaValue !== undefined && filterMeaningfulChildren(node.children).length === 0) {
+        if (textareaValue.staticText !== undefined)
+          parts.pushStatic(escapeStaticText(textareaValue.staticText))
+        else if (textareaValue.expr !== undefined)
+          parts.pushExpr(`${use('esc')}(${textareaValue.expr})`)
+      }
+      else {
+        emitChildrenIntoBuffer(node.children, bufVar, parts, flushParts, pushStmt, RAW_TEXT_ELEMENTS.has(tag) ? tag as 'style' | 'script' : undefined)
+      }
+    }
+    finally {
+      activeSelectValue = prevSelectValue
+    }
     parts.pushStatic(`</${tag}>`)
   }
 
@@ -329,7 +180,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     slotMarkers = emitMarkers,
     inFragment = false,
   ): void {
-    const planned = planChildSlots(children, { jsxNodes, emitMarkers: slotMarkers, inFragment })
+    const planned = planChildSlots(children, { jsxNodes, exprContext, emitMarkers: slotMarkers, inFragment })
 
     for (const { child, slot, open, close } of planned) {
       if (slot.kind === 'static-text') {
@@ -439,18 +290,18 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   }
 
   function emitComponent(node: JSXElement, tag: string, parts: StringParts): void {
-    const { propEntries, allStaticProps, staticPropsObj, hydrateExpr, staticHydrate } = serializeComponentProps(node.openingElement.attributes)
+    const { propEntries, allStaticProps, staticPropsObj, hydrateExpr, staticHydrate } = serializeComponentProps(node.openingElement.attributes, compileSubExpression)
     const childNodes = node.children
     const meaningfulChildren = filterMeaningfulChildren(childNodes)
     const hasChildren = meaningfulChildren.length > 0
 
-    // Special case: <Suspense fallback={...}><AsyncComp .../></Suspense> passes the raw component call/Promise!
-    if (tag === 'Suspense') {
+    // Special case: <Suspense fallback={...}><AsyncComp .../></Suspense> (including aliased/namespaced imports) passes the raw component call/Promise!
+    if (resolveKayTag(tag, analysis.imports) === 'Suspense') {
       if (meaningfulChildren.length === 1) {
         const only = meaningfulChildren[0]!
         if (only.type === 'JSXElement' && isComponentTag(jsxTagName(only.openingElement.name))) {
           const innerTag = jsxTagName(only.openingElement.name)
-          const inner = serializeComponentProps(only.openingElement.attributes)
+          const inner = serializeComponentProps(only.openingElement.attributes, compileSubExpression)
           const innerMeaningful = filterMeaningfulChildren(only.children)
           if (innerMeaningful.length > 0) {
             const innerChildExpr = compileChildrenListToStringExpr(only.children)
@@ -461,6 +312,9 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         }
         else if (only.type === 'JSXExpressionContainer' && only.expression.type !== 'JSXEmptyExpression') {
           propEntries.push(`children: ${compileSubExpression(only.expression)}`)
+        }
+        else if (only.type === 'JSXText') {
+          propEntries.push(`children: ${JSON.stringify(decodeHtmlEntities(cleanJsxText(only.value)))}`)
         }
         else if (isJsxNode(only)) {
           propEntries.push(`children: ${use('raw')}(${compileJsxToStringExpr(only)})`)

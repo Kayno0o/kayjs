@@ -10,34 +10,28 @@ import type {
   Node,
 } from 'oxc-parser'
 import type { ModuleAnalysis } from './analyze'
+import type { WalkItem } from './emit'
+import type { HydrationMarker, MapCallMatch } from './shared'
 
 import { analyzeModule, loadDeclarations, parseTsx } from './analyze'
 import { walk } from './ast'
+import { compileElementAttributes, compileRawTextChildren, resolveComponentCallee } from './dom-attrs'
+import { emitWalkStatements, moduleHeader, SVG_CHILD_TAGS } from './emit'
 import { SourceEditor } from './patch'
-import type { WalkItem } from './emit'
-import { DELEGATED_EVENTS, emitWalkStatements, moduleHeader, SVG_CHILD_TAGS } from './emit'
 import { createPropCompiler, isStaticPropExpr, withoutBindings } from './props'
 import { extractBlockKeyExpr, extractKeyExpr, literalArrayConsts, rewriteFreeIdentifiers } from './scope'
-import type { HydrationMarker } from './shared'
 import {
   cleanJsxText,
   containsJsx,
+  createExprContext,
   decodeHtmlEntities,
-  DOM_PROPS,
-  escapeRawText,
-  escapeStaticAttr,
   escapeStaticText,
-  EVENT_ATTR,
   filterMeaningfulChildren,
-  isBlockedAttr,
   isComponentTag,
   isJsxNode,
-  isStringBoolAttr,
-  isUnsafeUrlAttr,
   jsxTagName,
   planChildSlots,
   RAW_TEXT_ELEMENTS,
-  staticLiteral,
   VOID_ELEMENTS,
 } from './shared'
 
@@ -60,6 +54,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   const staticArrays = literalArrayConsts(program)
   const loadNodes = new Set<Node>(loadDeclarations(program))
   const jsxNodes = analysis.jsxNodes
+  const exprContext = createExprContext(program, jsxNodes)
 
   const editor = new SourceEditor(code)
   const used = new Set<string>()
@@ -74,7 +69,6 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     return `__${name}`
   }
   const freshVar = (prefix = '_e'): string => `${prefix}${varCounter++}`
-
 
   // Client builds keep the `load` binding, so every export form stays valid, and drop its server-only code.
   for (const node of loadNodes) {
@@ -109,6 +103,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   function compileComponentCall(node: JSXElement, scopeRewrites: ReadonlyMap<string, string>): string {
     const tag = jsxTagName(node.openingElement.name)
+    const callee = resolveComponentCallee(tag, scopeRewrites)
     const attrs = node.openingElement.attributes
     const hasSpread = attrs.some(a => a.type === 'JSXSpreadAttribute')
     const segments: string[] = []
@@ -176,11 +171,60 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
     if (!hasSpread) {
       const propsObj = segments[0] ?? '{}'
-      return `${tag}(${propsObj})`
+      return `${callee}(${propsObj})`
     }
     if (segments.length === 1)
-      return `${tag}(${segments[0]!})`
-    return `${tag}(${use('mergeProps')}(${segments.join(', ')}))`
+      return `${callee}(${segments[0]!})`
+    return `${callee}(${use('mergeProps')}(${segments.join(', ')}))`
+  }
+
+  /** Compiles a `.map()` JSX loop into either `__eachStatic` or keyed `__loop`, reusable for both element children and fragments. */
+  function compileLoopCall(
+    match: MapCallMatch,
+    scopeRewrites: ReadonlyMap<string, string>,
+    parentExpr: string,
+    anchorExpr: string,
+    skipArg = '',
+  ): { isStatic: boolean, call: (p: string, a: string) => string } {
+    const eachCode = compileExpression(match.target, scopeRewrites)
+    const params = match.params
+    const firstParam = params[0]
+    const secondParam = params[1]
+    const idxParam = secondParam?.type === 'Identifier'
+      ? secondParam.name
+      : secondParam?.type === 'AssignmentPattern' && secondParam.left.type === 'Identifier'
+        ? secondParam.left.name
+        : undefined
+
+    // Fast path: a const array literal (e.g. `NAV.map(...)`) renders once through `eachStatic`.
+    const isStaticArr = match.target.type === 'Identifier' && staticArrays.has(match.target.name) && !scopeRewrites.has(match.target.name)
+    if (isStaticArr) {
+      const rawParams = params.map(p => code.slice(p.start, p.end)).join(', ')
+      const shadowed = withoutBindings(scopeRewrites, params)
+      const rowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, shadowed) : compileExpression(match.body, shadowed)
+      return {
+        isStatic: true,
+        call: (p, a) => `${use('eachStatic')}(${p}, ${a}, ${eachCode}, (${rawParams}) => ${rowBody}${skipArg})`,
+      }
+    }
+
+    const keyAst = match.isJsxBody ? extractKeyExpr(match.body) : extractBlockKeyExpr(match.body as BlockStatement)
+    const rowSig = freshVar('_r')
+    const idxSig = idxParam !== undefined ? freshVar('_i') : undefined
+    const keyRewrites = withoutBindings(scopeRewrites, params)
+    const { keyFn, rowRewrites, prelude } = compileLoopRow({ firstParam, idxParam, keyAst, rowSig, scopeRewrites, keyRewrites })
+    if (idxParam !== undefined && idxSig !== undefined)
+      rowRewrites.set(idxParam, `${idxSig}.value`)
+
+    const rawRowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, rowRewrites) : compileExpression(match.body, rowRewrites)
+    const rowBody = withPrelude(rawRowBody, match.body, prelude)
+    const rowParams = idxSig !== undefined ? `${rowSig}, ${idxSig}` : rowSig
+    void parentExpr
+    void anchorExpr
+    return {
+      isStatic: false,
+      call: (p, a) => `${use('loop')}(${p}, ${a}, () => ${eachCode}, ${keyFn}, (${rowParams}) => ${rowBody}${skipArg})`,
+    }
   }
 
   function compileElementTree(rootEl: JSXElement, scopeRewrites: ReadonlyMap<string, string>): string {
@@ -224,92 +268,31 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     function buildHtml(el: JSXElement, elVar: string): string {
       const tag = jsxTagName(el.openingElement.name)
       const rawTextTag = RAW_TEXT_ELEMENTS.has(tag) ? tag as 'style' | 'script' : undefined
-      let html = `<${tag}`
+      const postChildOps: string[] = []
+      const attrHtml = compileElementAttributes({
+        el,
+        tag,
+        elVar,
+        scopeRewrites,
+        ops,
+        postChildOps,
+        delegatedEvents,
+        use,
+        freshVar,
+        compileExpression,
+      })
 
-      for (const attr of el.openingElement.attributes) {
-        if (attr.type === 'JSXSpreadAttribute') {
-          ops.push(`${use('spread')}(${elVar}, () => (${compileExpression(attr.argument, scopeRewrites)}));`)
-          continue
-        }
-        const rawName = jsxTagName(attr.name)
-        if (rawName === 'key' || rawName === '$hydrate')
-          continue
-
-        if (rawName === 'ref') {
-          if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
-            const refCode = compileExpression(attr.value.expression, scopeRewrites)
-            ops.push(`(${refCode})(${elVar});`)
-          }
-          continue
-        }
-
-        if (rawName === 'innerHTML') {
-          if (attr.value?.type === 'Literal')
-            ops.push(`${use('setInnerHtml')}(${elVar}, ${JSON.stringify(String(attr.value.value))});`)
-          else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
-            ops.push(`${use('effect')}(() => ${use('setInnerHtml')}(${elVar}, ${compileExpression(attr.value.expression, scopeRewrites)}));`)
-          continue
-        }
-
-        const eventMatch = EVENT_ATTR.exec(rawName)
-        if (eventMatch !== null) {
-          if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
-            const eventName = eventMatch[1]!.toLowerCase()
-            const handlerCode = compileExpression(attr.value.expression, scopeRewrites)
-            if (DELEGATED_EVENTS.has(eventName)) {
-              delegatedEvents.add(eventName)
-              ops.push(`${elVar}.$$${eventName} = ${handlerCode};`)
-            }
-            else {
-              ops.push(`${use('on')}(${elVar}, ${JSON.stringify(eventName)}, ${handlerCode});`)
-            }
-          }
-          continue
-        }
-
-        const name = rawName === 'className' ? 'class' : rawName === 'htmlFor' ? 'for' : rawName
-        if (isBlockedAttr(name))
-          continue
-
-        if (attr.value === null) {
-          html += isStringBoolAttr(name) ? ` ${name}="true"` : ` ${name}`
-        }
-        else if (attr.value.type === 'Literal') {
-          if (!isUnsafeUrlAttr(name, attr.value.value))
-            html += ` ${name}="${escapeStaticAttr(String(attr.value.value))}"`
-        }
-        else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
-          const expr = attr.value.expression
-          const lit = !DOM_PROPS.has(name) ? staticLiteral(expr) : { ok: false as const }
-          if (lit.ok) {
-            if (typeof lit.value === 'boolean') {
-              if (isStringBoolAttr(name))
-                html += ` ${name}="${lit.value ? 'true' : 'false'}"`
-              else if (lit.value === true)
-                html += ` ${name}`
-            }
-            else if (lit.value !== null && !isUnsafeUrlAttr(name, lit.value)) {
-              html += ` ${name}="${escapeStaticAttr(String(lit.value))}"`
-            }
-            continue
-          }
-          const exprCode = compileExpression(expr, scopeRewrites)
-          if (name === 'class')
-            ops.push(`${use('effect')}(() => ${use('setClass')}(${elVar}, ${exprCode}));`)
-          else if (name === 'style')
-            ops.push(`${use('effect')}(() => ${use('setStyle')}(${elVar}, ${exprCode}));`)
-          else if (DOM_PROPS.has(name))
-            ops.push(`${use('effect')}(() => ${use('setProp')}(${elVar}, ${JSON.stringify(name)}, ${exprCode}));`)
-          else
-            ops.push(`${use('effect')}(() => ${use('setAttr')}(${elVar}, ${JSON.stringify(name)}, ${exprCode}));`)
-        }
-      }
-
-      html += '>'
+      let html = `<${tag}${attrHtml}>`
       if (VOID_ELEMENTS.has(tag))
         return html
 
-      const planned = planChildSlots(el.children, { jsxNodes })
+      if (rawTextTag !== undefined) {
+        html += compileRawTextChildren(el, rawTextTag, elVar, scopeRewrites, ops, use, compileExpression)
+        html += `</${tag}>`
+        return html
+      }
+
+      const planned = planChildSlots(el.children, { jsxNodes, exprContext })
       let domIndex = 0
       let prevWasStaticText = false
 
@@ -352,10 +335,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       try {
         for (const { slot, marker, open, close, nodeCapable } of planned) {
           if (slot.kind === 'static-text') {
-            if (rawTextTag !== undefined)
-              html += escapeRawText(slot.text, rawTextTag)
-            else
-              html += escapeStaticText(slot.fromLiteral ? slot.text : decodeHtmlEntities(slot.text))
+            html += escapeStaticText(slot.fromLiteral ? slot.text : decodeHtmlEntities(slot.text))
             if (!prevWasStaticText) {
               domIndex++
               prevWasStaticText = true
@@ -404,42 +384,10 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           }
 
           if (slot.kind === 'loop') {
-            const { match } = slot
             const anchorVar = claimRangeAnchor(marker, open, close)
             const skipArg = marker === 'none' && domIndex > 0 ? `, ${domIndex}` : ''
-
-            const eachCode = compileExpression(match.target, scopeRewrites)
-            const params = match.params
-            const firstParam = params[0]
-            const secondParam = params[1]
-            const idxParam = secondParam?.type === 'Identifier'
-              ? secondParam.name
-              : secondParam?.type === 'AssignmentPattern' && secondParam.left.type === 'Identifier'
-                ? secondParam.left.name
-                : undefined
-
-            // Fast path: a const array literal (e.g. `NAV.map(...)`) renders once through `eachStatic`.
-            const isStaticArr = match.target.type === 'Identifier' && staticArrays.has(match.target.name) && !scopeRewrites.has(match.target.name)
-            if (isStaticArr) {
-              const rawParams = params.map(p => code.slice(p.start, p.end)).join(', ')
-              const shadowed = withoutBindings(scopeRewrites, params)
-              const rowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, shadowed) : compileExpression(match.body, shadowed)
-              ops.push(`${use('eachStatic')}(${elVar}, ${anchorVar}, ${eachCode}, (${rawParams}) => ${rowBody}${skipArg});`)
-              continue
-            }
-
-            const keyAst = match.isJsxBody ? extractKeyExpr(match.body) : extractBlockKeyExpr(match.body as BlockStatement)
-            const rowSig = freshVar('_r')
-            const idxSig = idxParam !== undefined ? freshVar('_i') : undefined
-            const keyRewrites = withoutBindings(scopeRewrites, params)
-            const { keyFn, rowRewrites, prelude } = compileLoopRow({ firstParam, idxParam, keyAst, rowSig, scopeRewrites, keyRewrites })
-            if (idxParam !== undefined && idxSig !== undefined)
-              rowRewrites.set(idxParam, `${idxSig}.value`)
-
-            const rawRowBody = match.isJsxBody ? compileRootJsx(match.body as JSXElement | JSXFragment, rowRewrites) : compileExpression(match.body, rowRewrites)
-            const rowBody = withPrelude(rawRowBody, match.body, prelude)
-            const rowParams = idxSig !== undefined ? `${rowSig}, ${idxSig}` : rowSig
-            ops.push(`${use('loop')}(${elVar}, ${anchorVar}, () => ${eachCode}, ${keyFn}, (${rowParams}) => ${rowBody}${skipArg});`)
+            const compiled = compileLoopCall(slot.match, scopeRewrites, elVar, anchorVar, skipArg)
+            ops.push(`${compiled.call(elVar, anchorVar)};`)
             continue
           }
 
@@ -497,6 +445,9 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         svgDepth = prevSvgDepth
       }
 
+      for (const op of postChildOps)
+        ops.push(op)
+
       html += `</${tag}>`
       return html
     }
@@ -515,39 +466,90 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     return `(() => { const ${rootVar} = ${tmplName}(); ${walkStmts.join(' ')} ${ops.join(' ')} return ${rootVar}; })()`
   }
 
-  function compileRootJsx(node: JSXElement | JSXFragment, scopeRewrites: ReadonlyMap<string, string>): string {
-    if (node.type === 'JSXFragment') {
-      const planned = planChildSlots(node.children, { jsxNodes, inFragment: true })
-      if (planned.length === 0)
-        return 'null'
-      if (planned.length === 1) {
-        const { child, slot } = planned[0]!
-        if (slot.kind === 'static-text')
-          return `${use('fragText')}(${JSON.stringify(slot.fromLiteral ? slot.text : decodeHtmlEntities(slot.text))})`
-        if (slot.kind === 'element' || slot.kind === 'component' || slot.kind === 'fragment')
-          return compileRootJsx(slot.node, scopeRewrites)
-        if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression')
-          return `${use('fragInsert')}(() => (${compileExpression(child.expression, scopeRewrites)}))`
-      }
+  function compileFragment(node: JSXFragment, scopeRewrites: ReadonlyMap<string, string>): string {
+    const planned = planChildSlots(node.children, { jsxNodes, exprContext, inFragment: true })
+    if (planned.length === 0)
+      return 'null'
 
-      // Each child claims its own SSR nodes while hydrating, so the siblings after a dynamic one keep theirs (#3596).
-      const items = planned.map(({ child, slot, marker }) => {
-        if (slot.kind === 'static-text')
-          return `${use('fragText')}(${JSON.stringify(slot.fromLiteral ? slot.text : decodeHtmlEntities(slot.text))})`
-        if (slot.kind === 'element')
-          return compileRootJsx(slot.node, scopeRewrites)
-        if (slot.kind === 'component' || slot.kind === 'fragment')
-          return `${use('fragInsert')}(() => ${compileRootJsx(slot.node, scopeRewrites)})`
-        if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression') {
-          const exprCode = compileExpression(child.expression, scopeRewrites)
-          if (marker === 'range')
-            return `${use('fragInsert')}(() => (${exprCode}))`
-          return `(() => { const _t = ${use('fragText')}("", true); ${use('effect')}(() => ${use('setText')}(_t, (${exprCode}))); return _t; })()`
-        }
-        return 'document.createTextNode("")'
-      })
-      return `${use('frag')}(${items.join(', ')})`
+    const hasSiblings = planned.length > 1
+    // Coalesce consecutive static-text slots (e.g. `<>a{"b"}c</>`) so DOM matches the single merged SSR text node.
+    const items: string[] = []
+    let pendingStatic: string | undefined
+    const flushStatic = () => {
+      if (pendingStatic !== undefined) {
+        items.push(`${use('fragText')}(${JSON.stringify(pendingStatic)})`)
+        pendingStatic = undefined
+      }
     }
+
+    const emitFragRangeOp = (hydrateCall: string, mountCall: string, needsRemoveChild: boolean): string => {
+      const removeProp = needsRemoveChild ? ', removeChild: (n) => n.parentNode && n.parentNode.removeChild(n)' : ''
+      return `(() => { const _s = ${use('claimRange')}(); if (_s !== null) { ${hydrateCall}; return null; } const _f = document.createDocumentFragment(); _f.appendChild(document.createComment("")); const _m = _f.appendChild(document.createComment("")); const _p = { insertBefore: (n, r) => (_m.parentNode || _f).insertBefore(n, r)${removeProp} }; ${mountCall}; return _f; })()`
+    }
+
+    for (const { slot, marker } of planned) {
+      if (slot.kind === 'static-text') {
+        const decoded = slot.fromLiteral ? slot.text : decodeHtmlEntities(slot.text)
+        pendingStatic = pendingStatic === undefined ? decoded : pendingStatic + decoded
+        continue
+      }
+      flushStatic()
+
+      if (slot.kind === 'element') {
+        items.push(compileRootJsx(slot.node, scopeRewrites))
+      }
+      else if (slot.kind === 'component' || slot.kind === 'fragment') {
+        const rendered = compileRootJsx(slot.node, scopeRewrites)
+        items.push(hasSiblings ? `${use('fragInsert')}(() => ${rendered})` : rendered)
+      }
+      else if (slot.kind === 'loop') {
+        const compiled = compileLoopCall(slot.match, scopeRewrites, '_s.parentNode', '_s')
+        if (compiled.isStatic)
+          items.push(`(() => { const _s = ${use('claimRange')}(); if (_s !== null) { ${compiled.call('_s.parentNode', '_s')}; return null; } const _f = document.createDocumentFragment(); ${compiled.call('_f', 'null')}; return _f; })()`)
+        else
+          items.push(emitFragRangeOp(compiled.call('_s.parentNode', '_s'), compiled.call('_p', '_m'), true))
+      }
+      else if (slot.kind === 'and-show') {
+        const whenCode = compileExpression(slot.expr.left, scopeRewrites)
+        const trueCode = compileRootJsx(slot.right, scopeRewrites)
+        items.push(emitFragRangeOp(
+          `${use('show')}(_s.parentNode, _s, () => ${whenCode}, () => ${trueCode})`,
+          `${use('show')}(_p, _m, () => ${whenCode}, () => ${trueCode})`,
+          false,
+        ))
+      }
+      else if (slot.kind === 'ternary-show') {
+        const whenCode = compileExpression(slot.expr.test, scopeRewrites)
+        const trueCode = isJsxNode(slot.cons)
+          ? compileRootJsx(slot.cons, scopeRewrites)
+          : compileExpression(slot.cons, scopeRewrites)
+        const falseCode = isJsxNode(slot.alt)
+          ? compileRootJsx(slot.alt, scopeRewrites)
+          : compileExpression(slot.alt, scopeRewrites)
+        items.push(emitFragRangeOp(
+          `${use('show')}(_s.parentNode, _s, () => ${whenCode}, () => ${trueCode}, () => ${falseCode})`,
+          `${use('show')}(_p, _m, () => ${whenCode}, () => ${trueCode}, () => ${falseCode})`,
+          false,
+        ))
+      }
+      else {
+        const exprCode = compileExpression(slot.expr, scopeRewrites)
+        if (marker === 'range')
+          items.push(`${use('fragInsert')}(() => (${exprCode}))`)
+        else
+          items.push(`(() => { const _t = ${use('fragText')}("", true); ${use('effect')}(() => ${use('setText')}(_t, (${exprCode}))); return _t; })()`)
+      }
+    }
+    flushStatic()
+
+    if (items.length === 1)
+      return items[0]!
+    return `${use('frag')}(${items.join(', ')})`
+  }
+
+  function compileRootJsx(node: JSXElement | JSXFragment, scopeRewrites: ReadonlyMap<string, string>): string {
+    if (node.type === 'JSXFragment')
+      return compileFragment(node, scopeRewrites)
 
     const tag = jsxTagName(node.openingElement.name)
     if (isComponentTag(tag))

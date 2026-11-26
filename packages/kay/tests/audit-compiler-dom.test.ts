@@ -1160,4 +1160,365 @@ describe('destructured loop rows and component props in an island', () => {
     // key={item.id} does NOT reference block-local `id` (it's a non-computed member property), so loop key is hoisted!
     expect(out).toContain('(item) => item.id')
   })
+
+  // ---- #3629 Regression Suite ----
+
+  test('#3629 item 1: non-children JSX variables, destructured props, and plain props render DOM nodes and hydrate cleanly', async () => {
+    const src = `
+      function Card({ header }) { return <article>{header}<p class="body">body</p></article> }
+      function PlainCard(props) { return <section>{props.header}<i>end</i></section> }
+      export function App() {
+        const badge = <span class="badge">New</span>
+        return (
+          <div>
+            <div id="local">{badge}<em>after</em></div>
+            <Card header={<h2>Title</h2>} />
+            <Card header="StringTitle" />
+            <PlainCard header={<b>Bold</b>} />
+          </div>
+        )
+      }
+    `
+    const ssrCode = compileSsr('Slots.tsx', src, { isIsland: true }).code
+    const domCode = compileDom('Slots.tsx', src).code
+
+    await withDom(() => {
+      const ssrBody = ssrCode.replace(/^import .*\n/gm, '').replace(/export function /g, 'function ')
+      const ssrHtml = (new Function(...Object.keys(ssrRt).map(n => `__${n}`), `${ssrBody}\nreturn App().__html`)(...Object.values(ssrRt))) as string
+
+      // 1. Client mount: real DOM nodes, never "[object HTML...Element]"
+      const { host: mounted, dispose: d1 } = mountIsland(src, 'App', {})
+      expect(mounted.innerHTML).not.toContain('[object ')
+      expect(mounted.querySelector('#local .badge')?.textContent).toBe('New')
+      expect(mounted.querySelector('#local em')?.textContent).toBe('after')
+      expect(mounted.querySelector('article h2')?.textContent).toBe('Title')
+      expect(mounted.querySelectorAll('article')[1]?.textContent).toBe('StringTitlebody')
+      expect(mounted.querySelector('section b')?.textContent).toBe('Bold')
+      expect(mounted.querySelector('section i')?.textContent).toBe('end')
+      d1()
+
+      // 2. SSR + hydration: claims existing SSR nodes without duplicating or corrupting siblings
+      const host = document.createElement('div')
+      host.innerHTML = ssrHtml
+      const ssrBadge = host.querySelector('#local .badge')!
+      const ssrH2 = host.querySelector('article h2')!
+      const runtime = Object.entries({ ...domCore, ...domExtras, loop }).map(([name, value]) => [`__${name}`, value] as const)
+      const domBody = domCode.replace(/^import .*\n/gm, '').replace(/export function /g, 'function ')
+      const render = new Function(...runtime.map(([n]) => n), `${domBody}\nreturn App()`)
+      const d2 = domCore.hydrate(host, () => render(...runtime.map(([, v]) => v)) as Node)
+      expect(host.querySelectorAll('#local .badge').length).toBe(1)
+      expect(host.querySelector('#local .badge')).toBe(ssrBadge)
+      expect(host.querySelectorAll('article h2').length).toBe(1)
+      expect(host.querySelector('article h2')).toBe(ssrH2)
+      expect(host.querySelector('#local em')?.textContent).toBe('after')
+      d2()
+    })
+  })
+
+  test('#3629 item 2: destructured and loop-item component tags rewrite via scopeRewrites without ReferenceError', async () => {
+    await withDom(() => {
+      const src = `
+        export function Wrap({ Icon, ui, comps }) {
+          return (
+            <div>
+              <Icon label="direct" />
+              <ui.Icon label="member" />
+              <section>{comps.value.map(Comp => <Comp label="loop" />)}</section>
+            </div>
+          )
+        }
+      `
+      const IconA = ({ label }: { label: string }) => {
+        const el = document.createElement('span')
+        el.textContent = `A:${label}`
+        return el
+      }
+      const IconB = ({ label }: { label: string }) => {
+        const el = document.createElement('b')
+        el.textContent = `B:${label}`
+        return el
+      }
+      const comps = signal([IconA, IconB])
+      const { host, dispose } = mountIsland(src, 'Wrap', { Icon: IconA, ui: { Icon: IconB }, comps })
+      expect(host.textContent).toBe('A:directB:memberA:loopB:loop')
+      comps.value = [IconB]
+      expect(host.querySelector('section')?.textContent).toBe('B:loop')
+      dispose()
+    })
+  })
+
+  test('#3629 item 3: <textarea value>, <select value>, and setProp nullish/cursor handling in SSR and DOM', async () => {
+    const src = `
+      export function Form({ text, choice, opts }) {
+        return (
+          <form>
+            <textarea id="ta-lit" value="a < b" />
+            <textarea id="ta-dyn" value={text.value} />
+            <select id="sel-lit" value="b">
+              <option value="a">A</option>
+              <option value="b">B</option>
+            </select>
+            <select id="sel-text" value="Two">
+              <option>One</option>
+              <option>Two</option>
+            </select>
+            <select id="sel-dyn" value={choice.value}>
+              {opts.value.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </form>
+        )
+      }
+    `
+    // 1. SSR output
+    const ssrCode = compileSsr('Form.tsx', src, { isIsland: true }).code
+    const ssrBody = ssrCode.replace(/^import .*\n/gm, '').replace(/export function /g, 'function ')
+    const ssrHtml = (new Function(
+      ...Object.keys(ssrRt).map(n => `__${n}`),
+      'text', 'choice', 'opts',
+      `${ssrBody}\nreturn Form({ text, choice, opts }).__html`,
+    )(...Object.values(ssrRt), signal('hello & <world>'), signal('opt2'), signal([{ id: 'opt1', label: 'One' }, { id: 'opt2', label: 'Two' }]))) as string
+
+    expect(ssrHtml).toContain('<textarea id="ta-lit">a &lt; b</textarea>')
+    expect(ssrHtml).not.toContain('<textarea id="ta-lit" value=')
+    expect(ssrHtml).toContain('<textarea id="ta-dyn">hello &amp; &lt;world&gt;</textarea>')
+    expect(ssrHtml).not.toContain('<select id="sel-lit" value=')
+    expect(ssrHtml).toContain('<option value="b" selected>B</option>')
+    expect(ssrHtml).toContain('<option selected>Two</option>')
+    expect(ssrHtml).not.toContain('<select id="sel-dyn" value=')
+    expect(ssrHtml).toContain('<option value="opt2" selected>Two</option>')
+
+    // 2. DOM mount + dynamic updates + setProp edge cases
+    await withDom(() => {
+      const text = signal<string | undefined>('init')
+      const choice = signal('opt2')
+      const opts = signal([{ id: 'opt1', label: 'One' }, { id: 'opt2', label: 'Two' }])
+      const { host, dispose } = mountIsland(src, 'Form', { text, choice, opts })
+
+      const taLit = host.querySelector('#ta-lit') as HTMLTextAreaElement
+      const taDyn = host.querySelector('#ta-dyn') as HTMLTextAreaElement
+      const selLit = host.querySelector('#sel-lit') as HTMLSelectElement
+      const selDyn = host.querySelector('#sel-dyn') as HTMLSelectElement
+
+      expect(taLit.value).toBe('a < b')
+      expect(taLit.getAttribute('value')).toBeNull()
+      expect(taDyn.value).toBe('init')
+      expect(selLit.value).toBe('b')
+      expect(selLit.getAttribute('value')).toBeNull()
+      // select.value MUST be applied AFTER child <option> loop mounts!
+      expect(selDyn.value).toBe('opt2')
+
+      // setProp writes '' on undefined/null (never "undefined")
+      text.value = undefined
+      expect(taDyn.value).toBe('')
+      choice.value = 'opt1'
+      expect(selDyn.value).toBe('opt1')
+
+      // setProp skips unchanged writes (preserving input cursor) and coerces booleans
+      const inp = document.createElement('input')
+      let writes = 0
+      let cur = 'abc'
+      Object.defineProperty(inp, 'value', {
+        get: () => cur,
+        set: (v: string) => { writes++; cur = v },
+      })
+      domCore.setProp(inp, 'value', 'abc')
+      expect(writes).toBe(0)
+      domCore.setProp(inp, 'value', 'abcd')
+      expect(writes).toBe(1)
+      domCore.setProp(inp, 'value', null)
+      expect(cur).toBe('')
+
+      const chk = document.createElement('input')
+      chk.type = 'checkbox'
+      chk.checked = true
+      domCore.setProp(chk, 'checked', undefined)
+      expect(chk.checked).toBe(false)
+      dispose()
+    })
+  })
+
+  test('#3629 item 5: dynamic <style> and <script> interpolation updates textContent without comments on mount and hydration', async () => {
+    const src = `
+      export function Theme({ color, num }) {
+        return (
+          <div>
+            <style>{'.box { color: '}{color.value}{'; }'}</style>
+            <script>window.__n = {num.value};</script>
+            <p>ok</p>
+          </div>
+        )
+      }
+    `
+    await withDom(() => {
+      const color = signal('red')
+      const num = signal(1)
+      const { host, dispose } = mountIsland(src, 'Theme', { color, num })
+      const style = host.querySelector('style')!
+      const script = host.querySelector('script')!
+      expect(style.textContent).toBe('.box { color: red; }')
+      expect(script.textContent).toBe('window.__n = 1;')
+      color.value = 'blue'
+      num.value = 2
+      expect(style.textContent).toBe('.box { color: blue; }')
+      expect(script.textContent).toBe('window.__n = 2;')
+      dispose()
+
+      // SSR + hydration must not crash with textAfter(null)
+      const ssrCode = compileSsr('Theme.tsx', src, { isIsland: true }).code
+      const ssrBody = ssrCode.replace(/^import .*\n/gm, '').replace(/export function /g, 'function ')
+      const ssrHtml = (new Function(...Object.keys(ssrRt).map(n => `__${n}`), 'color', 'num', `${ssrBody}\nreturn Theme({ color, num }).__html`)(...Object.values(ssrRt), color, num)) as string
+      const hHost = document.createElement('div')
+      hHost.innerHTML = ssrHtml
+      const domCode = compileDom('Theme.tsx', src).code
+      const runtime = Object.entries({ ...domCore, ...domExtras, loop }).map(([name, value]) => [`__${name}`, value] as const)
+      const domBody = domCode.replace(/^import .*\n/gm, '').replace(/export function /g, 'function ')
+      const render = new Function(...runtime.map(([n]) => n), 'props', `${domBody}\nreturn Theme(props)`)
+      const d2 = domCore.hydrate(hHost, () => render(...runtime.map(([, v]) => v), { color, num }) as Node)
+      expect(hHost.querySelector('style')?.textContent).toBe('.box { color: blue; }')
+      color.value = 'green'
+      expect(hHost.querySelector('style')?.textContent).toBe('.box { color: green; }')
+      d2()
+    })
+  })
+
+  test('#3629 item 7: nested fn param/id shadowing, multi-declarator, switch cases, prop mutation, and computed-key + rest JSX', async () => {
+    await withDom(() => {
+      // 1. Named FunctionExpression.id + params.slice(1) shadowing in buildCompiledFunction
+      const shadowSrc = `
+        export function Outer({ x }) {
+          const ByParam = ({ a }, x) => <span class="p">{a}:{x}</span>
+          const ById = function x({ a }) { return <span class="id">{a}:{x.name}</span> }
+          return <div>{ByParam({ a: 'A' }, 'second')}{ById({ a: 'B' })}<i>{x}</i></div>
+        }
+      `
+      const { host: h1, dispose: d1 } = mountIsland(shadowSrc, 'Outer', { x: 'outer' })
+      expect(h1.querySelector('.p')?.textContent).toBe('A:second')
+      expect(h1.querySelector('.id')?.textContent).toBe('B:x')
+      expect(h1.querySelector('i')?.textContent).toBe('outer')
+      d1()
+
+      // 2. Multi-declarator shadowing `const x = 1, y = x + 1` and switch case bindings
+      const multiSwitchSrc = `
+        export function Multi({ x, mode }) {
+          const x = 1, y = x + 1
+          return <p>{x}:{y}</p>
+        }
+        export function Switcher({ x, mode }) {
+          switch (mode) {
+            case 1:
+              const x = 'local'
+              return <p>{x}</p>
+            default:
+              return <p>{x}</p>
+          }
+        }
+      `
+      const { host: h2, dispose: d2 } = mountIsland(multiSwitchSrc, 'Multi', { x: 100, mode: 1 })
+      expect(h2.textContent).toBe('1:2')
+      d2()
+
+      const { host: h3, dispose: d3 } = mountIsland(multiSwitchSrc, 'Switcher', { x: 'outer', mode: 1 })
+      expect(h3.textContent).toBe('local')
+      d3()
+
+      // 3. Mutating destructured prop with default emits valid JS
+      const mutateSrc = `
+        export function Mut({ label = 'init', count = 0 }) {
+          if (label === 'init') label = 'changed'
+          count++
+          return <p>{label}:{count}</p>
+        }
+      `
+      const { host: h4, dispose: d4 } = mountIsland(mutateSrc, 'Mut', {})
+      expect(h4.textContent).toBe('changed:1')
+      d4()
+
+      // 4. Computed-key + rest with JSX default compiles cleanly (no raw uncompiled JSX)
+      const compRestSrc = `
+        export function DynKey({ [KEY]: val = <b>fallback</b>, ...rest }) {
+          return <div>{val}<span>{Object.keys(rest).join(',')}</span></div>
+        }
+      `
+      const compiled = compileDom('DynKey.tsx', compRestSrc).code
+      expect(() => parseTsx('DynKey.compiled.ts', compiled)).not.toThrow()
+      expect(compiled).not.toContain('= <b>fallback</b>')
+      const { host: h5, dispose: d5 } = mountIsland(compRestSrc, 'DynKey', { keep: 1, drop: undefined }, { KEY: 'drop' })
+      expect(h5.querySelector('b')?.textContent).toBe('fallback')
+      expect(h5.querySelector('span')?.textContent).toBe('keep')
+      d5()
+    })
+  })
+
+  test('#3629 item 8: optional ref guard, reactive dynamic event handlers, and spread precedence without double-binding', async () => {
+    await withDom(() => {
+      // 1. Optional ref={maybeRef} works when undefined and when defined
+      const refSrc = `export function Box({ maybeRef }) { return <div ref={maybeRef}>ok</div> }`
+      const { dispose: dRef1 } = mountIsland(refSrc, 'Box', { maybeRef: undefined })
+      dRef1()
+      const gotEls: Element[] = []
+      const { dispose: dRef2 } = mountIsland(refSrc, 'Box', { maybeRef: (el: Element) => { gotEls.push(el) } })
+      expect(gotEls[0]?.tagName).toBe('DIV')
+      dRef2()
+
+      // 2. Dynamic delegated (`onClick`) & non-delegated (`onChange`) event handlers reactively swap
+      const evSrc = `
+        export function DynEv({ cond, a, b }) {
+          return <input onClick={cond.value ? a : b} onChange={cond.value ? a : b} />
+        }
+      `
+      const calls: string[] = []
+      const cond = signal(true)
+      const host = document.body.appendChild(document.createElement('div'))
+      const { dispose: dEv } = mountIsland(evSrc, 'DynEv', { cond, a: () => calls.push('a'), b: () => calls.push('b') }, {}, host)
+      const inp = host.querySelector('input')!
+      inp.click()
+      inp.dispatchEvent(new Event('change'))
+      cond.value = false
+      inp.click()
+      inp.dispatchEvent(new Event('change'))
+      expect(calls).toEqual(['a', 'a', 'b', 'b'])
+      dEv()
+
+      // 3. Spread + explicit event/class precedence without double-binding
+      const spreadSrc = `
+        export function SpreadBtn({ rest, explicitClick }) {
+          return (
+            <div>
+              <button id="after" {...rest} onClick={explicitClick} class="override">after</button>
+              <button id="before" onClick={explicitClick} class="default" {...rest}>before</button>
+            </div>
+          )
+        }
+      `
+      const log: string[] = []
+      const sHost = document.body.appendChild(document.createElement('div'))
+      const { dispose: dSp } = mountIsland(
+        spreadSrc,
+        'SpreadBtn',
+        { rest: { onClick: () => log.push('rest'), class: 'from-rest' }, explicitClick: () => log.push('explicit') },
+        {},
+        sHost,
+      )
+      const afterBtn = sHost.querySelector('#after') as HTMLButtonElement
+      const beforeBtn = sHost.querySelector('#before') as HTMLButtonElement
+      expect(afterBtn.className).toBe('override')
+      expect(beforeBtn.className).toBe('from-rest')
+      afterBtn.click()
+      beforeBtn.click()
+      // Each click fires ONLY the winning handler (zero double-binding!)
+      expect(log).toEqual(['explicit', 'rest'])
+      dSp()
+    })
+
+    // 4. SSR spread precedence
+    const ssrSpreadSrc = `
+      export function SsrSpread({ rest }) {
+        return <><div {...rest} class="override" /><div class="default" {...rest} /></>
+      }
+    `
+    const ssrOut = compileSsr('SsrSpread.tsx', ssrSpreadSrc).code
+    const ssrBody = ssrOut.replace(/^import .*\n/gm, '').replace(/export function /g, 'function ')
+    const html = (new Function(...Object.keys(ssrRt).map(n => `__${n}`), `${ssrBody}\nreturn SsrSpread({ rest: { class: 'from-rest' } }).__html`)(...Object.values(ssrRt))) as string
+    expect(html).toBe('<div class="override"></div><div class="from-rest"></div>')
+  })
 })

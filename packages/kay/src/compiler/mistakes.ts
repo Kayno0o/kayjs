@@ -300,17 +300,24 @@ function checkFocusAndChange(tag: string, attributes: readonly JSXAttributeItem[
 }
 
 /** Throws when a JSX element would compile into something other than what its author meant, and adds to `warnings` what may be meant but usually is not. */
-export function checkMistakes(element: JSXElement, filename: string, code: string, warnings: CompilerWarning[]): void {
+export function checkMistakes(
+  element: JSXElement,
+  filename: string,
+  code: string,
+  warnings: CompilerWarning[],
+  resolveTag: (tag: string) => string | undefined = t => (t === 'Suspense' || t === 'Region' ? t : undefined),
+): void {
   const tag = jsxTagName(element.openingElement.name)
+  const canonical = resolveTag(tag)
   const isElement = tag !== '' && !isComponentTag(tag)
   const isCustomElement = tag.includes('-')
-  if (tag === 'Suspense') {
+  if (canonical === 'Suspense') {
     const children = filterMeaningfulChildren(element.children).length
     if (children > 1)
       guarded(element.start, () => { throw mistake(`<Suspense> with ${children} children`, filename, 'give it one child, and one <Suspense> per async component') })
   }
   const attributes = element.openingElement.attributes
-  guarded(element.start, () => checkRegionMarkup(tag, isElement, attributes, filename, element))
+  guarded(element.start, () => checkRegionMarkup(tag, canonical, isElement, attributes, filename, element, resolveTag))
   const className = isElement && staticAttr(attributes, 'class') !== undefined ? staticAttr(attributes, 'className') : undefined
   if (className !== undefined)
     guarded(className.start, () => { throw mistake('class and className', filename, 'keep one, they set the same attribute') })
@@ -336,13 +343,18 @@ function literalText(attr: JSXAttribute): string | undefined {
 }
 
 // A region may hold others, each under its own name: the page tells a region from the one around it by name.
-function checkRegionNesting(element: JSXElement, attributes: readonly JSXAttributeItem[], filename: string): void {
+function checkRegionNesting(
+  element: JSXElement,
+  attributes: readonly JSXAttributeItem[],
+  filename: string,
+  resolveTag: (tag: string) => string | undefined,
+): void {
   const outer = staticAttr(attributes, 'name')
   const name = outer === undefined ? undefined : literalText(outer)
   if (name === undefined)
     return
   walk(element.children, (node) => {
-    if (node.type !== 'JSXElement' || jsxTagName(node.openingElement.name) !== 'Region')
+    if (node.type !== 'JSXElement' || resolveTag(jsxTagName(node.openingElement.name)) !== 'Region')
       return
     const inner = staticAttr(node.openingElement.attributes, 'name')
     if (inner !== undefined && literalText(inner) === name)
@@ -351,10 +363,18 @@ function checkRegionNesting(element: JSXElement, attributes: readonly JSXAttribu
 }
 
 // The markup `regions()` from `@kayjs/spa` reads: <Region name>, and data-kay-target, data-kay-append and data-kay-live on the elements that can use them.
-function checkRegionMarkup(tag: string, isElement: boolean, attributes: readonly JSXAttributeItem[], filename: string, element: JSXElement): void {
-  if (tag === 'Region')
-    checkRegionNesting(element, attributes, filename)
-  if (tag === 'Region' && staticAttr(attributes, 'name') === undefined && !attributes.some(a => a.type === 'JSXSpreadAttribute'))
+function checkRegionMarkup(
+  tag: string,
+  canonical: string | undefined,
+  isElement: boolean,
+  attributes: readonly JSXAttributeItem[],
+  filename: string,
+  element: JSXElement,
+  resolveTag: (tag: string) => string | undefined,
+): void {
+  if (canonical === 'Region')
+    checkRegionNesting(element, attributes, filename, resolveTag)
+  if (canonical === 'Region' && staticAttr(attributes, 'name') === undefined && !attributes.some(a => a.type === 'JSXSpreadAttribute'))
     throw mistake('<Region> without a name', filename, 'write <Region name="pane">, the name a link names in data-kay-target')
   if (!isElement)
     return

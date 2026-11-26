@@ -352,7 +352,12 @@ export function setAttr(el: Element, name: string, value: unknown): void {
 }
 
 export function setProp(el: Element, name: string, value: unknown): void {
-  ;(el as unknown as Record<string, unknown>)[name] = value
+  const next = name === 'value'
+    ? (value == null ? '' : String(value))
+    : Boolean(value)
+  const rec = el as unknown as Record<string, unknown>
+  if (rec[name] !== next)
+    rec[name] = next
 }
 
 export function setStyle(el: HTMLElement, value: unknown): void {

@@ -2,8 +2,8 @@
 
 import type { ArrowFunctionExpression, Function as OxcFunction, Node, Program } from 'oxc-parser'
 import { visitorKeys } from 'oxc-parser'
-import { walk } from './ast'
-import { unwrapTsExpr } from './shared'
+import { collectPatternNames, unwrapTsExpr } from './shared'
+
 function staticPropKey(prop: Node): string | undefined {
   if (prop.type !== 'Property')
     return undefined
@@ -76,6 +76,14 @@ function resolveDefaultFunction(
   return undefined
 }
 
+const TS_EXPR_WRAPPERS = new Set([
+  'TSAsExpression',
+  'TSNonNullExpression',
+  'TSSatisfiesExpression',
+  'TSTypeAssertion',
+  'TSInstantiationExpression',
+])
+
 /** Statically bounds which top-level keys of `props.data` a page island reads; returns `undefined` if `data` escapes. */
 export function analyzeDefaultDataKeys(
   program: Program,
@@ -99,7 +107,11 @@ export function analyzeDefaultDataKeys(
     for (const prop of firstParam.properties) {
       if (prop.type === 'RestElement')
         return undefined
-      if (staticPropKey(prop) === 'data')
+      const key = staticPropKey(prop)
+      // A computed/non-static key in the props pattern might bind `data`, so bail out safely instead of stripping live keys.
+      if (key === undefined)
+        return undefined
+      if (key === 'data')
         dataProp = prop
     }
     if (dataProp === undefined || dataProp.type !== 'Property')
@@ -122,7 +134,7 @@ export function analyzeDefaultDataKeys(
     return undefined
   }
 
-  // Walk the function body tracking parent chains so every reference to `dataVar` or `propsVar` is verified.
+  // Walk expressions tracking parent chains so every reference to `dataVar` or `propsVar` is verified.
   const ancestors: Node[] = []
   const walkWithParents = (node: unknown): void => {
     if (escaped || node === null || typeof node !== 'object')
@@ -137,17 +149,31 @@ export function analyzeDefaultDataKeys(
     if (typeof type !== 'string')
       return
 
-    // Respect inner function parameters that shadow `dataVar` or `propsVar`.
+    if (type.startsWith('TS')) {
+      if (TS_EXPR_WRAPPERS.has(type))
+        walkWithParents((ast as { expression?: unknown }).expression)
+      return
+    }
+
+    // Respect inner function parameters (and named FunctionExpression ids) that shadow `dataVar` or `propsVar`,
+    // walking parameter defaults before each parameter's bound names enter scope.
     if (ast !== fn && (type === 'FunctionDeclaration' || type === 'FunctionExpression' || type === 'ArrowFunctionExpression')) {
+      const innerFn = ast as OxcFunction | ArrowFunctionExpression
       const shadowed = new Set<string>()
-      for (const p of (ast as OxcFunction).params) {
-        walk(p, (pn) => {
-          if (pn.type === 'Identifier')
-            shadowed.add(pn.name)
-        })
+      if (innerFn.type !== 'ArrowFunctionExpression' && innerFn.id !== null)
+        shadowed.add(innerFn.id.name)
+      let isShadowed = (dataVar !== undefined && shadowed.has(dataVar)) || (propsVar !== undefined && shadowed.has(propsVar))
+      for (const p of innerFn.params) {
+        if (isShadowed)
+          return
+        walkPatternDefaults(p)
+        collectPatternNames(p, shadowed)
+        if ((dataVar !== undefined && shadowed.has(dataVar)) || (propsVar !== undefined && shadowed.has(propsVar)))
+          isShadowed = true
       }
-      if ((dataVar !== undefined && shadowed.has(dataVar)) || (propsVar !== undefined && shadowed.has(propsVar)))
-        return
+      if (!isShadowed && innerFn.body !== null)
+        walkWithParents(innerFn.body)
+      return
     }
 
     if (type === 'Identifier') {
@@ -227,6 +253,42 @@ export function analyzeDefaultDataKeys(
     }
     ancestors.pop()
   }
+
+  const walkPatternDefaults = (pattern: Node | null | undefined): void => {
+    if (escaped || pattern === null || pattern === undefined)
+      return
+    switch (pattern.type) {
+      case 'AssignmentPattern':
+        walkPatternDefaults(pattern.left)
+        walkWithParents(pattern.right)
+        return
+      case 'RestElement':
+        walkPatternDefaults(pattern.argument)
+        return
+      case 'TSParameterProperty':
+        walkPatternDefaults(pattern.parameter)
+        return
+      case 'ArrayPattern':
+        for (const el of pattern.elements)
+          walkPatternDefaults(el)
+        return
+      case 'ObjectPattern':
+        for (const prop of pattern.properties) {
+          if (prop.type === 'RestElement') {
+            walkPatternDefaults(prop.argument)
+          }
+          else {
+            if (prop.computed)
+              walkWithParents(prop.key)
+            walkPatternDefaults(prop.value)
+          }
+        }
+    }
+  }
+
+  // Walk outer parameter defaults (e.g. `function Page({ data, title = data.title })`) before the body.
+  for (const p of fn.params)
+    walkPatternDefaults(p)
 
   walkWithParents(fn.body)
   return escaped ? undefined : [...keys].sort()

@@ -2,7 +2,8 @@
 
 import type { ArrowFunctionExpression, Function as OxcFunction, Node, ObjectPattern, ParamPattern } from 'oxc-parser'
 import { SourceEditor } from './patch'
-import { collectPatternNames, containsJsx, unwrapTsExpr } from './shared'
+import { collectMutatedNames, isSafeLazyJsxRef } from './scope'
+import { collectPatternNames, containsJsx, isJsxNode, unwrapParens, unwrapTsExpr } from './shared'
 
 export function withoutBindings(rewrites: ReadonlyMap<string, string>, patterns: readonly Node[]): Map<string, string> {
   const names = new Set<string>()
@@ -115,32 +116,32 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
         return
       }
       if (pat.type === 'ObjectPattern') {
-        const staticKeys: string[] = []
-        let allStaticKeys = true
+        const excludedKeys: string[] = []
+        let canOmit = hoisted !== undefined
         for (const prop of pat.properties) {
           if (prop.type === 'RestElement') {
-            if (hoisted !== undefined && prop.argument.type === 'Identifier' && allStaticKeys) {
-              const restRead = `${use('omit')}(${src}, ${JSON.stringify(staticKeys)})`
-              reads.set(prop.argument.name, restRead)
-              running.set(prop.argument.name, restRead)
+            if (canOmit) {
+              const restRead = `${use('omit')}(${src}, [${excludedKeys.join(', ')}])`
+              bindPattern(prop.argument, restRead)
             }
             continue
           }
           let propSrc: string | undefined
           if (!prop.computed && prop.key.type === 'Identifier') {
-            staticKeys.push(prop.key.name)
+            excludedKeys.push(JSON.stringify(prop.key.name))
             propSrc = `${src}.${prop.key.name}`
           }
           else if (!prop.computed && prop.key.type === 'Literal' && (typeof prop.key.value === 'string' || typeof prop.key.value === 'number')) {
-            staticKeys.push(String(prop.key.value))
+            excludedKeys.push(JSON.stringify(String(prop.key.value)))
             propSrc = `${src}[${JSON.stringify(prop.key.value)}]`
           }
+          else if (prop.computed && hoisted !== undefined) {
+            const keyVar = hoist(compileExpression(prop.key, running))
+            excludedKeys.push(`typeof ${keyVar} === 'symbol' ? ${keyVar} : String(${keyVar})`)
+            propSrc = `${src}[${keyVar}]`
+          }
           else {
-            allStaticKeys = false
-            if (prop.computed && hoisted !== undefined) {
-              const keyVar = hoist(compileExpression(prop.key, running))
-              propSrc = `${src}[${keyVar}]`
-            }
+            canOmit = false
           }
           if (propSrc !== undefined)
             bindPattern(prop.value, propSrc)
@@ -162,6 +163,45 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
 
     bindPattern(pattern, source)
 
+    const compilePatternSource = (patNode: Node): string => {
+      const sub = new SourceEditor(code.slice(patNode.start, patNode.end))
+      const base = patNode.start
+      const patchPattern = (p: Node | null | undefined): void => {
+        if (p === null || p === undefined)
+          return
+        if ('typeAnnotation' in p && p.typeAnnotation != null) {
+          const ann = p.typeAnnotation as Node
+          sub.remove(ann.start - base, ann.end - base)
+        }
+        switch (p.type) {
+          case 'AssignmentPattern':
+            patchPattern(p.left)
+            sub.replace(p.right.start - base, p.right.end - base, compileExpression(p.right, outerRewrites))
+            return
+          case 'RestElement':
+            patchPattern(p.argument)
+            return
+          case 'ArrayPattern':
+            for (const el of p.elements)
+              patchPattern(el)
+            return
+          case 'ObjectPattern':
+            for (const prop of p.properties) {
+              if (prop.type === 'RestElement') {
+                patchPattern(prop.argument)
+              }
+              else {
+                if (prop.computed)
+                  sub.replace(prop.key.start - base, prop.key.end - base, compileExpression(prop.key, outerRewrites))
+                patchPattern(prop.value)
+              }
+            }
+        }
+      }
+      patchPattern(patNode)
+      return sub.toString()
+    }
+
     const names = new Set<string>()
     collectPatternNames(pattern, names)
     // The pattern a read runs: only the property binding `name`, so another property's default does not run on this read.
@@ -170,11 +210,17 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
         for (const prop of (pattern as ObjectPattern).properties) {
           const bound = new Set<string>()
           collectPatternNames(prop.type === 'RestElement' ? prop.argument : prop.value, bound)
-          if (prop.type === 'Property' && bound.has(name))
-            return `{ ${code.slice(prop.start, prop.end)} }`
+          if (prop.type === 'Property' && bound.has(name)) {
+            const sub = new SourceEditor(code.slice(prop.start, prop.end))
+            const base = prop.start
+            if (prop.computed)
+              sub.replace(prop.key.start - base, prop.key.end - base, compileExpression(prop.key, outerRewrites))
+            sub.replace(prop.value.start - base, prop.value.end - base, compilePatternSource(prop.value))
+            return `{ ${sub.toString()} }`
+          }
         }
       }
-      return code.slice(pattern.start, pattern.end)
+      return compilePatternSource(pattern)
     }
     for (const name of names) {
       if (reads.has(name))
@@ -206,15 +252,58 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
     return undefined
   }
 
+  function patchParamDefaults(param: Node | null | undefined, rewrites: ReadonlyMap<string, string>, targetEditor: SourceEditor, offset: number): void {
+    if (param === null || param === undefined)
+      return
+    switch (param.type) {
+      case 'AssignmentPattern':
+        patchParamDefaults(param.left, rewrites, targetEditor, offset)
+        targetEditor.replace(param.right.start - offset, param.right.end - offset, compileExpression(param.right, rewrites))
+        return
+      case 'RestElement':
+        patchParamDefaults(param.argument, rewrites, targetEditor, offset)
+        return
+      case 'TSParameterProperty':
+        patchParamDefaults(param.parameter, rewrites, targetEditor, offset)
+        return
+      case 'ArrayPattern':
+        for (const el of param.elements)
+          patchParamDefaults(el, rewrites, targetEditor, offset)
+        return
+      case 'ObjectPattern':
+        for (const prop of param.properties) {
+          if (prop.type === 'RestElement') {
+            patchParamDefaults(prop.argument, rewrites, targetEditor, offset)
+          }
+          else {
+            if (prop.computed)
+              targetEditor.replace(prop.key.start - offset, prop.key.end - offset, compileExpression(prop.key, rewrites))
+            patchParamDefaults(prop.value, rewrites, targetEditor, offset)
+          }
+        }
+    }
+  }
+
   function computePropRewrites(
     destructured: { pattern: ObjectPattern, defaultExpr: Node | undefined },
     pVar: string,
     outerRewrites: ReadonlyMap<string, string>,
+    body: Node | null,
   ): { rewrites: Map<string, string>, prelude: string } {
     const rewrites = new Map(outerRewrites)
     const hoisted: string[] = []
-    for (const [name, read] of patternReads(destructured.pattern, pVar, outerRewrites, hoisted))
-      rewrites.set(name, read)
+    const propReads = patternReads(destructured.pattern, pVar, outerRewrites, hoisted)
+    const mutated = collectMutatedNames(body, new Set(propReads.keys()))
+    for (const [name, read] of propReads) {
+      if (mutated.has(name)) {
+        // A mutated destructured prop becomes a local `let` binding initialized once, avoiding invalid assignment targets like `(a === undefined ? b : a) = c`.
+        hoisted.push(`let ${name} = ${read};`)
+        rewrites.delete(name)
+      }
+      else {
+        rewrites.set(name, read)
+      }
+    }
     return { rewrites, prelude: hoisted.join(' ') }
   }
 
@@ -230,15 +319,24 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
     const offset = fn.start
     const destructured = extractDestructuredParam(fn.params[0])
     const pVar = freshVar('__p')
-    let propRewrites = new Map(outerRewrites)
+    const baseRewrites = new Map(outerRewrites)
+    if (fn.type !== 'ArrowFunctionExpression' && fn.id !== null)
+      baseRewrites.delete(fn.id.name)
+    let propRewrites = baseRewrites
     let prelude = ''
 
     if (destructured !== undefined) {
       const defSuffix = destructured.defaultExpr !== undefined
-        ? ` = ${compileExpression(destructured.defaultExpr, outerRewrites)}`
+        ? ` = ${compileExpression(destructured.defaultExpr, baseRewrites)}`
         : ''
       fnEditor.replace(destructured.replaceStart - offset, destructured.replaceEnd - offset, `${pVar}${destructured.typeAnn}${defSuffix}`)
-      ;({ rewrites: propRewrites, prelude } = computePropRewrites(destructured, pVar, outerRewrites))
+      ;({ rewrites: propRewrites, prelude } = computePropRewrites(destructured, pVar, baseRewrites, fn.body))
+    }
+
+    for (let i = 1; i < fn.params.length; i++) {
+      const extraParam = fn.params[i]!
+      patchParamDefaults(extraParam, propRewrites, fnEditor, offset)
+      propRewrites = withoutBindings(propRewrites, [extraParam])
     }
 
     if (fn.body !== null)
@@ -261,10 +359,22 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
         ? ` = ${compileExpression(destructured.defaultExpr, new Map())}`
         : ''
       editor.replace(destructured.replaceStart, destructured.replaceEnd, `${pVar}${destructured.typeAnn}${defSuffix}`)
-      ;({ rewrites: propRewrites, prelude } = computePropRewrites(destructured, pVar, new Map()))
+      ;({ rewrites: propRewrites, prelude } = computePropRewrites(destructured, pVar, new Map(), fn.body))
     }
 
-    if (propRewrites.size > 0 && fn.body.type === 'BlockStatement') {
+    for (let i = 1; i < fn.params.length; i++) {
+      const extraParam = fn.params[i]!
+      patchParamDefaults(extraParam, propRewrites, editor, 0)
+      propRewrites = withoutBindings(propRewrites, [extraParam])
+    }
+
+    const hasLazyJsxDecl = fn.body.type === 'BlockStatement' && fn.body.body.some(s =>
+      s.type === 'VariableDeclaration' && s.kind === 'const' && s.declarations.length === 1
+      && s.declarations[0]!.id.type === 'Identifier' && s.declarations[0]!.init !== null
+      && isJsxNode(unwrapParens(s.declarations[0]!.init)),
+    )
+
+    if ((propRewrites.size > 0 || hasLazyJsxDecl) && fn.body.type === 'BlockStatement') {
       if (prelude !== '')
         editor.replace(fn.body.start + 1, fn.body.start + 1, ` ${prelude}`)
       const shadowed = new Set<string>()
@@ -274,11 +384,28 @@ export function createPropCompiler(ctx: PropCompilerContext): PropCompiler {
         else if (stmt.type === 'ClassDeclaration' && stmt.id !== null)
           shadowed.add(stmt.id.name)
       }
-      for (const stmt of fn.body.body) {
+      const stmts = fn.body.body
+      for (let i = 0; i < stmts.length; i++) {
+        const stmt = stmts[i]!
         const active = new Map<string, string>()
         for (const [k, v] of propRewrites) {
           if (!shadowed.has(k))
             active.set(k, v)
+        }
+        // Defer `const badge = <span />` to `const badge = () => _t0()` when only used in JSX slots so SSR hydration claims the outer element before the slot's nodes.
+        if (
+          stmt.type === 'VariableDeclaration' && stmt.kind === 'const' && stmt.declarations.length === 1
+          && stmt.declarations[0]!.id.type === 'Identifier' && stmt.declarations[0]!.init !== null
+        ) {
+          const decl = stmt.declarations[0]!
+          const jsxInit = unwrapParens(decl.init!)
+          const varName = (decl.id as Extract<Node, { type: 'Identifier' }>).name
+          if (isJsxNode(jsxInit) && isSafeLazyJsxRef(varName, stmts.slice(i + 1))) {
+            editor.replace(stmt.start, stmt.end, `const ${varName} = () => ${compileExpression(jsxInit, active)};`)
+            propRewrites.set(varName, `${varName}()`)
+            shadowed.delete(varName)
+            continue
+          }
         }
         if (active.size > 0 || containsJsx(stmt, jsxNodes))
           editor.replace(stmt.start, stmt.end, compileExpression(stmt, active))

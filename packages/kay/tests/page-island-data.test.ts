@@ -51,6 +51,62 @@ export default function Page({ data }: { data: Record<string, unknown> }) {
     expect(escaped.defaultDataKeys).toBeUndefined()
   })
 
+  test('#3629 data-keys: inner TS types, renamed keys, defaults, outer param defaults, and computed keys', () => {
+    // Inner function TS type annotation `(x: { data: string }) => data.title` must NOT shadow `data`
+    const tsType = analyzeModule('ts-type.tsx', `
+import { signal } from '@kayjs/kay'
+export default function Page({ data }: { data: { title: string, secret: string } }) {
+  const n = signal(0)
+  const fmt = (x: { data: string }) => x.data + data.title
+  return <button onClick={() => n.value++}>{fmt({ data: 'a' })}{n.value}</button>
+}
+`)
+    expect(tsType.defaultDataKeys).toEqual(['title'])
+
+    // Inner function renamed destructuring `({ data: item }) => data.title` binds `item`, NOT `data`
+    const renamed = analyzeModule('renamed.tsx', `
+import { signal } from '@kayjs/kay'
+export default function Page({ data }: { data: { title: string, secret: string } }) {
+  const n = signal(0)
+  const fmt = ({ data: item }: { data: string }) => item + data.title
+  return <button onClick={() => n.value++}>{fmt({ data: 'a' })}{n.value}</button>
+}
+`)
+    expect(renamed.defaultDataKeys).toEqual(['title'])
+
+    // Inner function default `(x = data.title, data = { secret: 'x' }) => x + data.secret` reads outer `data.title` and shadows inner `data.secret`
+    const innerDefault = analyzeModule('inner-def.tsx', `
+import { signal } from '@kayjs/kay'
+export default function Page({ data }: { data: { title: string, secret: string } }) {
+  const n = signal(0)
+  const fmt = (x = data.title, data = { secret: 'local' }) => x + data.secret
+  return <button onClick={() => n.value++}>{fmt()}{n.value}</button>
+}
+`)
+    expect(innerDefault.defaultDataKeys).toEqual(['title'])
+
+    // Outer parameter default `{ data, title = data.title }` must be walked
+    const outerDefault = analyzeModule('outer-def.tsx', `
+import { signal } from '@kayjs/kay'
+export default function Page({ data, title = data.title }: { data: { title: string, secret: string }, title?: string }) {
+  const n = signal(0)
+  return <button onClick={() => n.value++}>{title}{n.value}</button>
+}
+`)
+    expect(outerDefault.defaultDataKeys).toEqual(['title'])
+
+    // Outer computed key `{ [KEY]: d }` must bail out to `undefined` (never return `[]` and strip live data)
+    const computedKey = analyzeModule('computed.tsx', `
+import { signal } from '@kayjs/kay'
+const KEY = 'data'
+export default function Page({ [KEY]: d }: Record<string, any>) {
+  const n = signal(0)
+  return <button onClick={() => n.value++}>{d?.title}{n.value}</button>
+}
+`)
+    expect(computedKey.defaultDataKeys).toBeUndefined()
+  })
+
   test('ssrIsland uses <script type="application/json"> for page/large payloads without &quot; bloat and escapes </script>', () => {
     const html = ssrIsland(
       '/_kay/page.js',

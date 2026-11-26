@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { JSXElement, JSXFragment } from 'oxc-parser'
 import { analyzeModule, compileDom, compileSsr } from '../src/compiler/index'
 import { readsPrivateEnv } from '../src/compiler/server-only'
-import { planChildSlots } from '../src/compiler/shared'
+import { planChildSlots, createExprContext } from '../src/compiler/shared'
 import { setInnerHtml } from '../src/dom/extras'
 import { raw, ssrRaw, ssrRawText } from '../src/ssr/index'
 
@@ -319,12 +319,14 @@ describe('islands per component, not per file (#3587)', () => {
 
 describe('shared hydration marker planner (#3600)', () => {
   function planJsx(jsx: string, options?: { emitMarkers?: boolean }) {
-    const src = `export function C({ a, b, show, items, children, pick }: any) { return (${jsx}) }`
+    const src = `export function C({ a, b, show, items, children, slot, pick }: { a: string, b: number, show: boolean, items: any[], children: any, slot: any, pick: () => any }) { return (${jsx}) }`
     const analysis = analyzeModule('Plan.tsx', src)
     const fn = analysis.program.body[0] as unknown as { declaration: { body: { body: [{ argument: { expression: JSXElement | JSXFragment } }] } } }
     const root = fn.declaration.body.body[0].argument.expression
+    const exprContext = createExprContext(analysis.program, analysis.jsxNodes)
     return planChildSlots(root.children, {
       jsxNodes: analysis.jsxNodes,
+      exprContext,
       emitMarkers: options?.emitMarkers,
       inFragment: root.type === 'JSXFragment',
     }).map(p => ({ kind: p.slot.kind, marker: p.marker, open: p.open, close: p.close, nodeCapable: p.nodeCapable }))
@@ -334,6 +336,7 @@ describe('shared hydration marker planner (#3600)', () => {
     for (const jsx of [
       '<p>{a}</p>',
       '<p>{children}</p>',
+      '<p>{slot}</p>',
       '<p><Kid /></p>',
       '<p><>a</></p>',
       '<ul>{items.map((x: any) => <li>{x}</li>)}</ul>',
@@ -352,6 +355,13 @@ describe('shared hydration marker planner (#3600)', () => {
       ['expr', 'text'],
       ['element', 'none'],
       ['expr', 'text-open'],
+    ])
+
+    // Untyped / non-primitive slots (`slot: any`) get balanced range markers just like `children` (#3629).
+    expect(planJsx('<div>{slot}<span>mid</span>{children}</div>').map(s => [s.kind, s.marker])).toEqual([
+      ['expr', 'range'],
+      ['element', 'none'],
+      ['expr', 'range-open'],
     ])
 
     expect(planJsx('<div><Kid /><span>mid</span>{children}</div>').map(s => [s.kind, s.marker])).toEqual([
@@ -383,6 +393,7 @@ describe('shared hydration marker planner (#3600)', () => {
     expect(planJsx('<><Kid /></>').map(s => [s.kind, s.marker])).toEqual([['component', 'none']])
     expect(planJsx('<>{show && <b />}</>').map(s => [s.kind, s.marker])).toEqual([['and-show', 'range']])
     expect(planJsx('<>{a}</>').map(s => [s.kind, s.marker])).toEqual([['expr', 'text']])
+    expect(planJsx('<>{slot}</>').map(s => [s.kind, s.marker])).toEqual([['expr', 'range']])
     expect(planJsx('<><span>s</span>{a}{pick()}<Kid /></>').map(s => [s.kind, s.marker])).toEqual([
       ['element', 'none'],
       ['expr', 'text'],
@@ -396,10 +407,10 @@ describe('shared hydration marker planner (#3600)', () => {
 
   test('SSR and DOM emit matching markers for mixed conditionals, loops, and fragments', () => {
     const src = `
-      export function Mix({ show, items, label }: any) {
+      export function Mix({ show, items, label }: { show: boolean, items: string[], label: string }) {
         return <div>{show && <p>hi</p>}{items.map((x: any) => <span>{x}</span>)}</div>
       }
-      export function Frag({ label, show }: any) {
+      export function Frag({ label, show }: { label: string, show: boolean }) {
         return <>{'static'}{label}{show && <b />}</>
       }
     `
@@ -412,5 +423,77 @@ describe('shared hydration marker planner (#3600)', () => {
     expect(dom).toContain('__template("<div><!--k[--><!--k]--><!--k[--><!--k]--></div>")')
     // Fragment static string literal emits plain text in both SSR and DOM (no comment markers).
     expect(dom).toContain('__fragText("static")')
+  })
+})
+
+describe('#3629 compiler correctness: slots, raw text, and aliased Suspense', () => {
+  test('non-children JSX variables and untyped props compile to insert while primitive expressions stay setText', () => {
+    const src = `
+      export function Card({ header, title, n, arr }: { header: any, title: string, n: number, arr: string[] }) {
+        const badge = <span>New</span>
+        return (
+          <div>
+            <section id="a">{badge}<i>after</i></section>
+            <section id="b">{header}<i>after</i></section>
+            <section id="c">{title}{n + 1}{\`x-\${n}\`}{arr.length}{n.toFixed(2)}</section>
+          </div>
+        )
+      }
+    `
+    const ssr = compileSsr('Card.tsx', src, { isIsland: true }).code
+    const dom = compileDom('Card.tsx', src).code
+    expect(dom).toContain('__insert(')
+    expect(dom).toContain('__setText(')
+    expect(dom).toContain('<!--k[--><!--k]--><i>after</i>')
+    expect(ssr).toContain('<!--k[-->')
+    expect(ssr).toContain('<!--k]--><i>after</i>')
+  })
+
+  test('dynamic <style> and <script> interpolation emits zero comment markers and updates textContent', () => {
+    const src = `
+      import { signal } from '@kayjs/kay'
+      export function Dyn() {
+        const c = signal('red')
+        const n = signal(1)
+        return (
+          <div>
+            <style>{'.box { color: '}{c.value}{'; }'}</style>
+            <script>const x = {n.value};</script>
+          </div>
+        )
+      }
+    `
+    const dom = compileDom('Dyn.tsx', src).code
+    expect(dom).not.toContain('<!---->')
+    expect(dom).toContain('.textContent')
+    expect(dom).not.toContain('__textAfter')
+  })
+
+  test('aliased and namespaced <Suspense> pass raw Promise children and allow plain JSXText children', () => {
+    const aliased = `
+      import { Suspense as S } from '@kayjs/kay'
+      async function Slow() { return <p>done</p> }
+      export default function Page() {
+        return (
+          <main>
+            <S fallback={<p>wait</p>}><Slow /></S>
+            <S fallback={<p>wait</p>}>Plain &amp; text</S>
+          </main>
+        )
+      }
+    `
+    const outAliased = compileSsr('Page.tsx', aliased).code
+    expect(outAliased).toContain('children: Slow({})')
+    expect(outAliased).toContain('children: "Plain & text"')
+
+    const namespaced = `
+      import * as kay from '@kayjs/kay'
+      async function Slow() { return <p>done</p> }
+      export default function Page() {
+        return <kay.Suspense fallback={<p>wait</p>}><Slow /></kay.Suspense>
+      }
+    `
+    const outNs = compileSsr('Page.tsx', namespaced).code
+    expect(outNs).toContain('children: Slow({})')
   })
 })
