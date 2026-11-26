@@ -56,3 +56,34 @@ describe('app routes', () => {
 - `app.fetch(pathOrRequest, init?)`: Low-level request helper with cookie jar persistence.
 - `app.cookies` / `app.clearCookies()`: Inspect or reset cookies between test cases.
 - Pass `prebuilt: true` to `testApp({ root, prebuilt: true })` to reuse an existing `dist/` build across tests.
+
+## Testing islands in a browser
+
+`testBrowser()` builds the app for production, serves it on a loopback port it picks itself and opens pages in Chromium with their islands hydrated. It needs `playwright-core` (`bun add -d playwright-core`) and a Chrome or Chromium, found through `BUN_CHROME_PATH`, Playwright's own install or `/usr/bin`.
+
+```ts
+import { expect, it } from 'bun:test'
+import { testBrowser } from '@kayjs/kay/test'
+
+it('counts clicks', async () => {
+  const browser = await testBrowser({ root: process.cwd() })
+  try {
+    const page = await browser.open('/')
+    await page.click('#counter')
+    await page.waitFor(() => document.getElementById('counter')?.textContent === '1')
+    expect(await page.text('#counter')).toBe('1')
+    expect(page.errors).toEqual([])
+  }
+  finally {
+    await browser.close()
+  }
+})
+```
+
+- `browser.open(path)`: Opens a page in its own context and resolves when it has loaded.
+- `page.click(selector)`, `page.fill(selector, value)`, `page.text(selector)`: Drive and read the page.
+- `page.waitFor(selector | fn)`: Waits for a selector to match, or for a function run in the page to return a truthy value.
+- `page.evaluate(fn | expression)`: Runs code in the page and returns its result.
+- `page.errors`: Page errors, `console.error` messages and failed requests collected since the page opened.
+- `browser.app`, `browser.origin`: The `testApp` of the build, and `http://127.0.0.1:<port>`.
+- Options are those of `testApp()`, plus `browserPath` and `timeout` (milliseconds, default 10000).

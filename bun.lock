@@ -23,6 +23,12 @@
       "dependencies": {
         "oxc-parser": "^0.155.0",
       },
+      "peerDependencies": {
+        "playwright-core": "^1.64.0",
+      },
+      "optionalPeers": [
+        "playwright-core",
+      ],
     },
     "packages/plugin-auth": {
       "name": "@kayjs/auth",
