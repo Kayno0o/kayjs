@@ -264,6 +264,7 @@ interface HtmlElementOverrides {
   area: { download?: string | boolean | undefined, referrerpolicy?: string | undefined }
   audio: { crossorigin?: string | undefined }
   button: {
+    form?: string | undefined
     type?: 'button' | 'submit' | 'reset' | undefined
     popovertarget?: string | undefined
     popoverTarget?: string | undefined
@@ -277,6 +278,7 @@ interface HtmlElementOverrides {
   }
   details: { name?: string | undefined, open?: boolean | undefined }
   dialog: { closedby?: 'any' | 'closerequest' | 'none' | undefined }
+  fieldset: { form?: string | undefined }
   form: {
     action?: string | ((...args: never[]) => unknown) | undefined
     method?: 'get' | 'post' | 'dialog' | 'GET' | 'POST' | undefined
@@ -307,6 +309,7 @@ interface HtmlElementOverrides {
     usemap?: string | undefined
   }
   input: {
+    form?: string | undefined
     value?: string | number | undefined
     autocomplete?: string | undefined
     maxlength?: number | string | undefined
@@ -338,9 +341,10 @@ interface HtmlElementOverrides {
     'http-equiv'?: string | undefined
     property?: string | undefined
   }
+  object: { form?: string | undefined }
   ol: { reversed?: boolean | undefined, start?: number | string | undefined }
   option: { value?: string | number | undefined, selected?: boolean | undefined, disabled?: boolean | undefined }
-  output: { for?: string | undefined, htmlFor?: string | undefined }
+  output: { form?: string | undefined, for?: string | undefined, htmlFor?: string | undefined }
   script: {
     crossorigin?: string | undefined
     fetchpriority?: 'high' | 'low' | 'auto' | undefined
@@ -348,6 +352,7 @@ interface HtmlElementOverrides {
     referrerpolicy?: string | undefined
   }
   select: {
+    form?: string | undefined
     value?: string | number | undefined
     autocomplete?: string | undefined
     multiple?: boolean | undefined
@@ -363,6 +368,7 @@ interface HtmlElementOverrides {
   }
   td: { colspan?: number | string | undefined, rowspan?: number | string | undefined, headers?: string | undefined }
   textarea: {
+    form?: string | undefined
     value?: string | number | undefined
     autocomplete?: string | undefined
     maxlength?: number | string | undefined

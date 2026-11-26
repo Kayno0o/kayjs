@@ -46,8 +46,18 @@ test('JSX types refuse unknown tags, unknown attrs, React/Solid spellings, and t
     <button onClik={() => {}} />,
     // @ts-expect-error href is not valid on <div>
     <div href="/nope" />,
+    // @ts-expect-error form is only valid on form-associated controls
+    <div form="filters" />,
     // @ts-expect-error React camelCase SVG attribute
     <svg><path strokeWidth="2" /></svg>,
+    // Form-associated controls accept the `form` content attribute (#3619)
+    <button form="filters" type="submit">Apply</button>,
+    <input form="filters" name="q" />,
+    <select form="filters" name="sort" />,
+    <textarea form="filters" name="note" />,
+    <fieldset form="filters" />,
+    <output form="filters" />,
+    <object form="filters" />,
     // Valid HTML + SVG + data-*/aria-* + typed currentTarget & ref (zero casts!)
     <div data-custom="1" aria-label="box" onScroll={() => {}} onWheel={() => {}} onDragStart={() => {}} onTouchStart={() => {}} onToggle={() => {}} />,
     <input
