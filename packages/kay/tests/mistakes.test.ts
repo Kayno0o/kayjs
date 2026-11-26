@@ -99,6 +99,16 @@ describe('kay refuses mistakes carried over from other frameworks', () => {
     expect(() => compileSsr('Page.tsx', `import { signal } from '@kayjs/kay'\nconst A = () => { const n = signal(0); return <p>{n.value}</p> }\nexport default function B({ n }: { n: number }) { return <p>{n}</p> }`)).not.toThrow()
   })
 
+  test('a bare signal in one of two components declaring the same name (#3603)', () => {
+    const two = (second: string): string => `import { signal } from '@kayjs/kay'\nexport function Menu() { const open = signal(false); return <p>{open.value}</p> }\nexport function Drawer() { const open = signal(false); return ${second} }`
+    expect(() => compileSsr('Page.tsx', two('<p>{open}</p>'))).toThrow(/open without \.value in Page\.tsx: write open\.value/)
+    expect(() => compileDom('Page.tsx', two('<p>{open}</p>'))).toThrow(/open without \.value/)
+    expect(() => compileSsr('Page.tsx', two('<p>{open.value}</p>'))).not.toThrow()
+    // A parameter or inner binding shadowing the signal is a plain value.
+    expect(() => compileSsr('Page.tsx', `import { signal } from '@kayjs/kay'\nexport function Menu() { const open = signal(false); return <ul>{[1].map(open => <li>{open}</li>)}{open.value}</ul> }`)).not.toThrow()
+    expect(() => compileSsr('Page.tsx', `import { signal } from '@kayjs/kay'\nexport function Menu() { const open = signal(false); { const open = 1; void open } return <p>{open}</p> }`)).toThrow(/open without \.value/)
+  })
+
   test('a ref that is not a function, which fails at hydration far from the cause', () => {
     refuses('<input ref={{ current: null }} />', /ref=\{\{ \.\.\. \}\} in Page\.tsx: pass a function, ref=\{el => \.\.\.\}/)
     refuses('<input ref="field" />', /ref="\.\.\." in Page\.tsx: pass a function/)

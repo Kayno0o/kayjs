@@ -1,5 +1,6 @@
 // `kay check [dir]`: validates routes, Kay compiler & island rules (unified with `kay build`), config, and TypeScript types.
 
+import type { Program } from 'oxc-parser'
 import type { ModuleAnalysis } from '../compiler/analyze'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
@@ -23,6 +24,38 @@ export interface CheckResult {
 
 const SERIALIZABLE_NEW_CTORS = new Set(['Date', 'Map', 'Set', 'URL', 'RegExp'])
 const NODE_MODULES_RE = /[\\/]node_modules[\\/]/
+
+// Names bound once in the file to a function; a name bound twice may be shadowed, so it is left out.
+function functionNames(program: Program): Set<string> {
+  const bindings = new Map<string, number>()
+  const functions = new Set<string>()
+  const bind = (name: string): void => {
+    bindings.set(name, (bindings.get(name) ?? 0) + 1)
+  }
+  walk(program, (node) => {
+    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
+      bind(node.id.name)
+      if (node.init?.type === 'ArrowFunctionExpression' || node.init?.type === 'FunctionExpression')
+        functions.add(node.id.name)
+    }
+    else if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+      if (node.type === 'FunctionDeclaration' && node.id !== null) {
+        bind(node.id.name)
+        functions.add(node.id.name)
+      }
+      for (const param of node.params)
+        walk(param, (p) => { if (p.type === 'Identifier') bind(p.name) })
+    }
+    else if (node.type === 'ImportSpecifier' || node.type === 'ImportDefaultSpecifier' || node.type === 'ImportNamespaceSpecifier') {
+      bind(node.local.name)
+    }
+  })
+  for (const name of functions) {
+    if (bindings.get(name) !== 1)
+      functions.delete(name)
+  }
+  return functions
+}
 
 function walkTsFiles(dir: string): string[] {
   return walkFiles(dir, {
@@ -297,6 +330,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       if (islandTags.size > 0 || islandNamespaces.size > 0) {
         // JSX inside the module's own islands runs in the browser, where any prop is fine.
         const inIsland = (offset: number): boolean => analysis.islandSpans.some(([start, end]) => offset >= start && offset < end)
+        const localFunctions = functionNames(analysis.program)
         walk(analysis.program, (node) => {
           if (node.type !== 'JSXOpeningElement')
             return
@@ -314,7 +348,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
             if (attr.value?.type !== 'JSXExpressionContainer' || attr.value.expression.type === 'JSXEmptyExpression')
               continue
             const expr = attr.value.expression
-            if (expr.type === 'ArrowFunctionExpression' || expr.type === 'FunctionExpression') {
+            if (expr.type === 'ArrowFunctionExpression' || expr.type === 'FunctionExpression' || (expr.type === 'Identifier' && localFunctions.has(expr.name))) {
               errors.push(formatDiagnostic(
                 locOf(root, file, sources, attr.start),
                 `kay check: cannot pass function prop "${attrName}" from a server component into island <${tag}>. Define the handler inside the island or pass serializable data.`,

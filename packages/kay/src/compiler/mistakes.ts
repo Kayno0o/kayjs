@@ -2,6 +2,7 @@
 
 import type { JSXAttribute, JSXAttributeItem, JSXElement, Node, Program } from 'oxc-parser'
 import type { ServerOnlyInIsland } from './interactivity'
+import { visitorKeys } from 'oxc-parser'
 import { walk } from './ast'
 import { EVENT_ATTR, filterMeaningfulChildren, isComponentTag, jsxTagName, unwrapParens, VOID_ELEMENTS } from './shared'
 
@@ -288,39 +289,113 @@ function calleeName(callee: Node): string {
   return ''
 }
 
-// Names bound once in the file to a signal() or computed() call; a name bound twice may be shadowed, so it is left out.
-function signalNames(program: Program, signalCallees: ReadonlySet<string>): Set<string> {
-  const bindings = new Map<string, number>()
-  const signals = new Set<string>()
-  const bind = (id: Node | null | undefined): void => {
-    if (id?.type === 'Identifier')
-      bindings.set(id.name, (bindings.get(id.name) ?? 0) + 1)
+// Each name a scope binds, true when it holds a signal() or computed().
+type Scope = Map<string, boolean>
+
+function bindPattern(scope: Scope, pattern: Node | null | undefined, isSignal = false): void {
+  if (pattern === null || pattern === undefined)
+    return
+  if (pattern.type === 'Identifier') {
+    scope.set(pattern.name, isSignal)
+    return
   }
-  walk(program, (node) => {
-    if (node.type === 'VariableDeclarator') {
-      bind(node.id)
-      if (node.id.type === 'Identifier' && node.init?.type === 'CallExpression' && signalCallees.has(calleeName(node.init.callee)))
-        signals.add(node.id.name)
-    }
-    else if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
-      if (node.type !== 'ArrowFunctionExpression')
-        bind(node.id)
-      for (const param of node.params)
-        walk(param, (p) => { if (p.type === 'Identifier') bind(p) })
-    }
+  walk(pattern, (node) => {
+    if (node.type === 'Identifier')
+      scope.set(node.name, false)
+    // A default value or a computed key reads names, it binds none.
+    if (node.type === 'AssignmentPattern')
+      bindPattern(scope, node.left)
+    else if (node.type === 'Property')
+      bindPattern(scope, node.value)
+    return node.type !== 'AssignmentPattern' && node.type !== 'Property'
   })
-  for (const name of signals) {
-    if (bindings.get(name) !== 1)
-      signals.delete(name)
+}
+
+function bindStatements(scope: Scope, statements: readonly Node[], signalCallees: ReadonlySet<string>): void {
+  for (const stmt of statements) {
+    const decl = (stmt.type === 'ExportNamedDeclaration' || stmt.type === 'ExportDefaultDeclaration') ? stmt.declaration : stmt
+    if (decl?.type === 'VariableDeclaration') {
+      for (const d of decl.declarations)
+        bindPattern(scope, d.id, d.init?.type === 'CallExpression' && signalCallees.has(calleeName(d.init.callee)))
+    }
+    else if ((decl?.type === 'FunctionDeclaration' || decl?.type === 'ClassDeclaration') && decl.id !== null) {
+      scope.set(decl.id.name, false)
+    }
+    else if (decl?.type === 'ImportDeclaration') {
+      for (const spec of decl.specifiers)
+        scope.set(spec.local.name, false)
+    }
   }
-  return signals
+}
+
+// The names a node opens a scope for, or undefined when it opens none.
+function scopeOf(node: Node, signalCallees: ReadonlySet<string>): Scope | undefined {
+  const scope: Scope = new Map()
+  switch (node.type) {
+    case 'Program':
+    case 'BlockStatement':
+    case 'StaticBlock':
+      bindStatements(scope, node.body, signalCallees)
+      return scope
+    case 'FunctionDeclaration':
+    case 'FunctionExpression':
+    case 'ArrowFunctionExpression':
+      if (node.type === 'FunctionExpression' && node.id !== null)
+        scope.set(node.id.name, false)
+      for (const param of node.params)
+        bindPattern(scope, param)
+      return scope
+    case 'ForStatement':
+    case 'ForInStatement':
+    case 'ForOfStatement': {
+      const head = node.type === 'ForStatement' ? node.init : node.left
+      if (head?.type === 'VariableDeclaration')
+        bindStatements(scope, [head], signalCallees)
+      return scope
+    }
+    case 'CatchClause':
+      bindPattern(scope, node.param)
+      return scope
+    case 'SwitchStatement':
+      for (const c of node.cases)
+        bindStatements(scope, c.consequent, signalCallees)
+      return scope
+    default:
+      return undefined
+  }
+}
+
+// Visits every JSX element or fragment of the program with the signals in scope there.
+function walkWithSignals(program: Program, signalCallees: ReadonlySet<string>, visit: (node: Node, isSignal: (name: string) => boolean) => void): void {
+  const scopes: Scope[] = []
+  const isSignal = (name: string): boolean => {
+    for (let i = scopes.length - 1; i >= 0; i--) {
+      const found = scopes[i]!.get(name)
+      if (found !== undefined)
+        return found
+    }
+    return false
+  }
+  const visitor = (node: Node): boolean | void => {
+    if (node.type === 'JSXElement' || node.type === 'JSXFragment')
+      visit(node, isSignal)
+    const scope = scopeOf(node, signalCallees)
+    if (scope === undefined)
+      return
+    scopes.push(scope)
+    for (const key of visitorKeys[node.type] ?? [])
+      walk((node as unknown as Record<string, unknown>)[key], visitor)
+    scopes.pop()
+    return false
+  }
+  walk(program, visitor)
 }
 
 // The signal an expression reads without `.value` where JSX would print or test it.
-function bareSignal(expr: Node, signals: ReadonlySet<string>): string | undefined {
+function bareSignal(expr: Node, signals: (name: string) => boolean): string | undefined {
   const node = unwrapParens(expr)
   if (node.type === 'Identifier')
-    return signals.has(node.name) ? node.name : undefined
+    return signals(node.name) ? node.name : undefined
   if (node.type === 'LogicalExpression' || node.type === 'BinaryExpression')
     return bareSignal(node.left, signals) ?? bareSignal(node.right, signals)
   if (node.type === 'ConditionalExpression')
@@ -341,17 +416,14 @@ function bareSignal(expr: Node, signals: ReadonlySet<string>): string | undefine
 export function checkBareSignals(program: Program, signalCallees: ReadonlySet<string>, filename: string): void {
   if (signalCallees.size === 0)
     return
-  const signals = signalNames(program, signalCallees)
-  if (signals.size === 0)
-    return
-  const refuse = (expr: Node): void => {
-    const name = bareSignal(expr, signals)
-    if (name !== undefined)
-      throw mistake(`${name} without .value`, filename, `write ${name}.value`)
-  }
-  walk(program, (node) => {
+  walkWithSignals(program, signalCallees, (node, signals) => {
     if (node.type !== 'JSXElement' && node.type !== 'JSXFragment')
       return
+    const refuse = (expr: Node): void => {
+      const name = bareSignal(expr, signals)
+      if (name !== undefined)
+        throw mistake(`${name} without .value`, filename, `write ${name}.value`)
+    }
     const tag = node.type === 'JSXElement' ? jsxTagName(node.openingElement.name) : ''
     if (isComponentTag(tag))
       return

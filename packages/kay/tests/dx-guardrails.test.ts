@@ -69,6 +69,32 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     expect(res.errors.some(e => e.includes('without exporting `paths()`'))).toBe(true)
   })
 
+  it('catches a local function passed by name from server code into an island (#3603)', async () => {
+    const dir = makeTemp('kay-check-named-fn-')
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/components/Saver.tsx'), `
+      import { signal } from '@kayjs/kay'
+      export function Saver({ onSave, label }: { onSave?: () => void, label?: string }) {
+        const n = signal(0)
+        return <button type="button" onClick={() => { n.value++; onSave?.() }}>{label}</button>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { Saver } from '../components/Saver'
+      function save(): void {}
+      const title = 'Save'
+      export default function Home() {
+        const reset = () => {}
+        return <main><Saver onSave={save} label={title} /><Saver onSave={reset} /></main>
+      }
+    `)
+
+    const res = await checkProject(dir, { skipTypecheck: true })
+    expect(res.errors.filter(e => e.includes('<Saver>')).map(e => /function prop "(\w+)"/.exec(e)?.[1])).toEqual(['onSave', 'onSave'])
+    expect(res.errors.some(e => e.includes('"label"'))).toBe(false)
+  })
+
   it('kay check follows an island into a workspace package the way the build does', async () => {
     const dir = makeTemp('kay-island-package-')
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
