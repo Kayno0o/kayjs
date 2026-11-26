@@ -1,0 +1,20 @@
+{
+  "id": "04-auth-crud-sqlite",
+  "title": "Authenticated Notes CRUD with SQLite & UI",
+  "description": "Authenticated notes app using @kayjs/auth (sqliteAuthStore + auth.guard), @kayjs/ui, bun:sqlite, protected /notes CRUD route, and testApp tests.",
+  "template": "app",
+  "maxJs": "20kb",
+  "packages": [
+    "@kayjs/kay",
+    "@kayjs/auth",
+    "@kayjs/ui"
+  ],
+  "tags": [
+    "auth",
+    "sqlite",
+    "crud",
+    "ui",
+    "middleware",
+    "testing"
+  ]
+}

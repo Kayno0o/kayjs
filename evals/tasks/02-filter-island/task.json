@@ -1,0 +1,18 @@
+{
+  "id": "02-filter-island",
+  "title": "Interactive Product Filter & Sort Island",
+  "description": "Server-loaded product catalog with an automatic interactive island using signal, computed, reactive .map(), and useId under a 15 KB eager JS budget.",
+  "template": "minimal",
+  "maxJs": "15kb",
+  "packages": [
+    "@kayjs/kay"
+  ],
+  "tags": [
+    "island",
+    "signals",
+    "computed",
+    "useId",
+    "load",
+    "budget"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "05-streaming-regions",
+  "title": "Streaming Suspense & Partial Region Swaps",
+  "description": "Search & detail page combining streaming <Suspense> and <Region> partial swaps with @kayjs/spa regions(), verifying x-kay-region responses, Vary header, and zero-JS fallback.",
+  "template": "minimal",
+  "maxJs": "15kb",
+  "packages": [
+    "@kayjs/kay",
+    "@kayjs/spa"
+  ],
+  "tags": [
+    "suspense",
+    "streaming",
+    "regions",
+    "spa",
+    "progressive-enhancement"
+  ]
+}

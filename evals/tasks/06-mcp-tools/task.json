@@ -1,0 +1,18 @@
+{
+  "id": "06-mcp-tools",
+  "title": "Typed MCP Tools with Bearer Auth & Footprint Budget",
+  "description": "Exposes typed Kay server action() endpoints as MCP Streamable HTTP tools via @kayjs/mcp with bearer auth, Standard Schema validation, and strict token budget.",
+  "template": "minimal",
+  "maxJs": "15kb",
+  "packages": [
+    "@kayjs/kay",
+    "@kayjs/mcp"
+  ],
+  "tags": [
+    "mcp",
+    "actions",
+    "auth",
+    "standard-schema",
+    "budget"
+  ]
+}

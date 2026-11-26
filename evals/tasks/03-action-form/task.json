@@ -1,0 +1,17 @@
+{
+  "id": "03-action-form",
+  "title": "Progressive Server Action Form & Flash Fallback",
+  "description": "Typed server action() with Standard Schema validation, useAction() progressive form with field errors, zero-JS POST flash redirect fallback, and testApp tests.",
+  "template": "minimal",
+  "maxJs": "15kb",
+  "packages": [
+    "@kayjs/kay"
+  ],
+  "tags": [
+    "actions",
+    "useAction",
+    "standard-schema",
+    "progressive-enhancement",
+    "testing"
+  ]
+}
