@@ -1,0 +1,49 @@
+# @kayjs/icons Reference
+
+> Compile-time Iconify & local SVG icon imports (`~icons/<set>/<name>`) with zero runtime set overhead, accessible `<Icon>`, CLI discovery, and server-side search.
+
+## Imports
+
+- `@kayjs/icons`: `Icon`, `iconData`; types `IconComponentProps`, `IconData`, `IconifyIcon`, `IconSet`.
+- `@kayjs/icons/plugin`: `icons(options?)`; type `IconsPluginOptions`. Registering it in `kay.config.ts` automatically loads ambient `~icons/*` types.
+- `@kayjs/icons/ambient`: `/// <reference types="@kayjs/icons/ambient" />` (only needed if `kay.config.ts` is outside your `tsconfig` include).
+- `@kayjs/icons/search` (server-only — 1.7 MB word table; build warns if imported in an island): `findIcons(source, query, { limit?, offset? }?)`, `relatedWords(word)`; types `IconifyNames`, `IconPage`.
+
+## Plugin Setup (`icons(options?)`)
+
+- `sets`: optional `Record<string, IconSet>` of custom in-memory sets keyed by prefix.
+- `dirs`: optional `Record<string, string>` mapping prefixes to local `.svg` folders relative to app root (e.g. `{ brand: 'assets/brand' }`). `src/icons` is automatically mounted as `~icons/local/<name>` unless overridden; edited files reload in `kay dev`.
+- Install Iconify icon packs as dev dependencies (e.g. `bun add -d @iconify-json/tabler`), then import `~icons/tabler/home`.
+- CLI & checks: run `kay icons-find <words> [--set <prefix>] [--limit <n>]` instead of guessing names. `kay check` and `kay build` fail on missing/invalid icons and suggest closest matches.
+
+## `<Icon>` Component
+
+- Props: `IconComponentProps = Omit<JSX.IntrinsicElements['svg'], 'children' | 'innerHTML'> & { icon: IconData }`.
+- Accessibility: when `aria-label` or `aria-labelledby` is provided, `<Icon>` sets `role="img"`; otherwise it sets `aria-hidden="true"`. Works in both static pages and client islands.
+
+## Snippets
+
+```ts
+// kay.config.ts
+import { icons } from '@kayjs/icons/plugin'
+import { defineConfig } from '@kayjs/kay/config'
+
+export default defineConfig({
+  plugins: [icons({ dirs: { brand: 'assets/brand' } })],
+})
+```
+
+```tsx
+import { Icon } from '@kayjs/icons'
+import check from '~icons/tabler/check'
+import logo from '~icons/brand/logo'
+
+export function Badge() {
+  return (
+    <span>
+      <Icon icon={logo} width={20} height={20} aria-label="Acme" />
+      <Icon icon={check} class="ok" /> Verified
+    </span>
+  )
+}
+```

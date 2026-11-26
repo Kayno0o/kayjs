@@ -1,0 +1,57 @@
+# @kayjs/spa Reference
+
+> Opt-in in-place navigation: `regions()` swaps individual `<Region>` fragments from the server, and `spa()` swaps whole pages with `[data-persist]` islands (`0 B` when uninstalled).
+
+## Imports
+
+- `@kayjs/spa`: `spa()`, `regions()` (both return `KayPlugin` for `kay.config.ts`).
+- `@kayjs/spa/regions`: `refreshRegion(name: string): Promise<void>` (redraws `<Region name>` from the current URL without touching history or focus; skips prefetch cache; rejects if region is missing or fetch fails).
+- `@kayjs/spa/client`: `prefetch(url: string, region?: string)` (populates the shared 8-entry / 15s prefetch cache; respects `Save-Data`).
+
+## Partial Swaps (`regions()`)
+
+Pair `regions()` in `kay.config.ts` with `<Region name="pane" as="section" ...attrs>` from `@kayjs/kay` (server-only):
+
+- `<a href="/items?p=2" data-kay-target="results">`: sends `x-kay-region: results` (or `outer/inner` for nested regions), swaps inner HTML, updates `document.title` from `x-kay-title`, pushes history, manages focus & `aria-label` announcement, sets `aria-busy="true"` after 150 ms.
+- `data-kay-append` on a targeted `<a>`: appends response HTML, removes clicked link (Load more), replaces history entry.
+- `<form method="get" data-kay-target="results">`: swaps on submit; add `data-kay-live` to also swap while typing (200 ms debounce, one history entry per typing burst).
+- `data-kay-sync="q tag"` on a link or input/select: keeps query params or field values outside the region in sync after every swap.
+- `[data-kay-prefetch]` ancestor: prefetches targeted links on hover/focus (`data-no-prefetch` opts a link out).
+- Dispatches `window` event `kay:region` with `{ detail: { name, url } }`. `kay check` verifies every `data-kay-target` matches a `<Region>` in `src/`.
+
+## Full-Page SPA Navigation (`spa()`)
+
+- Intercepts same-origin `<a>` clicks, diffs `<head>` stylesheets (zero-FOUC) and meta/title/lang, preserves `[data-persist]` islands alive across navigations, restores scroll on back/forward, focuses `<main>`/`<h1>`, and dispatches `kay:navigate`.
+- Attributes: `data-no-spa` opts a link out; `[data-kay-prefetch]` enables hover/focus prefetch; `[data-persist]` preserves an island DOM subtree.
+
+## Snippets
+
+```ts
+// kay.config.ts
+import { defineConfig } from '@kayjs/kay/config'
+import { regions, spa } from '@kayjs/spa'
+
+export default defineConfig({
+  plugins: [regions(), spa()],
+})
+```
+
+```tsx
+// src/routes/search.tsx
+import { Region } from '@kayjs/kay'
+import type { PageProps } from '@kayjs/kay'
+
+export default function Search({ url }: PageProps) {
+  const q = url.searchParams.get('q') ?? ''
+  return (
+    <>
+      <form method="get" data-kay-target="results" data-kay-live>
+        <input name="q" value={q} data-kay-sync />
+      </form>
+      <Region name="results" aria-label="Search results">
+        <p>Results for {q}</p>
+      </Region>
+    </>
+  )
+}
+```

@@ -1,0 +1,44 @@
+# @kayjs/mail Reference
+
+> Zero-dependency email delivery (Resend HTTP or custom transport) with a dev-only HTML/JSON outbox preview.
+
+## Imports
+
+- `@kayjs/mail`: `createMailer`, `resend`, `MailNotConfiguredError`; types `Mailer`, `MailerOptions`, `MailPreviewOptions`, `MailMessage`, `SentMail`, `MailAddress`, `MailTransport`.
+
+## Setup (`createMailer(options?)`)
+
+`createMailer()` returns a single object that is both the `KayPlugin` (register in `kay.config.ts`) and the handle routes/actions call `mail.send()` on:
+
+- `from`: default sender (`string | { name, address }`, falls back to `process.env.MAIL_FROM` or `'noreply@localhost'`).
+- `to`: default recipient(s) (falls back to `process.env.MAIL_TO` or `'dev@localhost'`).
+- `transport`: `MailTransport` (`{ send(mail: SentMail): Promise<void> }`). Defaults to `resend()` when `process.env.RESEND_API_KEY` is set.
+- `optional`: when `false`/omitted, calling `send()` in `NODE_ENV=production` without a transport throws `MailNotConfiguredError`.
+- `previewRoute`: dev outbox URL (default `'/_kay/mail'`). `preview: false` disables the preview.
+
+## Mounted Routes (dev/test only — never in production)
+
+- `GET /_kay/mail` — HTML outbox viewer (HTML bodies rendered in sandboxed `<iframe>`s).
+- `GET /_kay/mail.json` — `{ count, messages }` JSON dump of captured messages (up to 100 in memory; production keeps no copy).
+
+## Handle & Transport API
+
+- `await mail.send({ from?, to?, replyTo?, subject, text?, html? })` → `SentMail` (`{ id, from, to, replyTo?, subject, text?, html?, sentAt }`).
+- `mail.isConfigured()`: `boolean`. `mail.outbox`: `SentMail[]`. `mail.clearOutbox()`.
+- `resend({ apiKey?, endpoint? })`: built-in Resend HTTP transport using `fetch()`.
+- Works directly as `createAuth({ mailer: mail })` with `@kayjs/auth`.
+
+## Snippet
+
+```ts
+// src/mail.ts (and register `plugins: [mail]` in kay.config.ts)
+import { createMailer, resend } from '@kayjs/mail'
+
+export const mail = createMailer({
+  from: 'App <noreply@example.com>',
+  transport: process.env.RESEND_API_KEY ? resend() : undefined,
+})
+
+// In an action or route:
+await mail.send({ to: 'ada@example.com', subject: 'Welcome', text: 'Hello!' })
+```

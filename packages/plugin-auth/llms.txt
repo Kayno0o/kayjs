@@ -1,0 +1,65 @@
+# @kayjs/auth Reference
+
+> Zero-dependency Bun-native authentication: Argon2id passwords, hashed DB sessions, email verification, magic links, OAuth 2.0 + PKCE, route guards, and RGPD helpers.
+
+## Imports
+
+- `@kayjs/auth`: `createAuth`, `memoryAuthStore`, `normalizeEmail`, `toPublicUser`, `safeRedirect`, `createRateLimiter`, `github`, `discord`, `google`, `oauthProvider`; types `Auth`, `AuthOptions`, `GuardOptions`, `AuthStore`, `AuthUser`, `PublicUser`, `AuthSession`, `OAuthAccount`, `TokenKind`, `VerificationToken`, `UserExport`, `AuthMailPayload`, `AuthMailer`, `CreateUserInput`, `OAuthProvider`, `OAuthPresetConfig`, `OAuthProfile`, `RateLimiter`, `RateLimitOptions`.
+- `@kayjs/auth/sqlite`: `sqliteAuthStore(dbOrPath?: string | Database)` (returns `AuthStore & { readonly db: Database }`, uses `bun:sqlite` in WAL mode).
+- `@kayjs/auth/oauth`: `github`, `discord`, `google`, `oauthProvider`.
+
+## Configuration (`createAuth(options)`)
+
+`createAuth()` returns a single object that is both the `KayPlugin` (register in `kay.config.ts`) and the app handle (import in routes/middleware):
+
+- `store`: `AuthStore` (default `memoryAuthStore()`; use `sqliteAuthStore('./data/auth.sqlite')` in production).
+- `secret`: string (defaults to `process.env.AUTH_SECRET`; required and ≥32 UTF-8 bytes in `NODE_ENV=production`).
+- `site`: public origin (`https://example.com`, inherits `KayConfig.site`; required off localhost for mailed links & OAuth callbacks).
+- `basePath`: route prefix (default `'/auth'`).
+- `cookieName`: session cookie name (default `'kay_session'`).
+- `sessionTtlSeconds` (default 30 days), `renewalIntervalSeconds` (sliding renewal), `tokenTtlSeconds` (default 15 min).
+- `minPasswordLength`: default `12` (CNIL guidance). `defaultRole`: `'user'`. `defaultRedirect`: `'/'`.
+- `requireEmailVerification`: default `true` (signup sends verification link and returns `202` without opening a session; signin refuses unverified users with `403`).
+- `mailer`: pass a `@kayjs/mail` `Mailer` directly, or `sendMail(mail: AuthMailPayload)`.
+- `providers`: `[github({ clientId, clientSecret, scopes? }), discord(...), google(...), oauthProvider(...)]`.
+- `trustProxy`: inherits `KayConfig.trustProxy`. `trustedOrigins`: merged with `KayConfig.trustedOrigins`.
+- `rateLimit`: `RateLimitOptions | false`. `pruneIntervalMs`: default 15 min (`false` disables).
+- RGPD minimization: `storeIp`: `'truncate'` (default, /24 IPv4 and /48 IPv6) | `true` | `false`; `storeUserAgent`: `true` (default) | `false`.
+- `defaultUserFields`: extra columns/fields merged on user creation when extending `AuthUser`.
+
+## Mounted Routes (default `basePath = '/auth'`) & `ctx.locals`
+
+- `GET /auth/session` → `{ user, session }`
+- `POST /auth/signup`, `POST /auth/signin`, `POST /auth/signout` (accept form or JSON; redirect or JSON based on `Accept`)
+- `GET /auth/verify-email?token=...`, `POST /auth/verify-email`
+- `POST /auth/magic-link`, `GET /auth/magic-link/verify?token=...` (first claim of an unverified account drops prior password, sessions, and OAuth links)
+- `GET /auth/oauth/:provider`, `GET /auth/oauth/:provider/callback`
+- `ctx.locals.user` (`PublicUser | undefined`) and `ctx.locals.session` (`AuthSession | undefined`) — lazily resolved on first read.
+
+## Handle Methods (`auth`)
+
+- `auth.guard({ redirectTo?, role?, allow? })`: returns a `Middleware` (HTML redirects to `redirectTo?next=...`, JSON gets `401`, wrong role/predicate gets `403`).
+- `auth.getUser(ctx)`, `auth.getSession(ctx)`, `auth.resolve(ctx)`, `auth.createUser(input)`, `auth.createSessionForUser(userId, ctx)`, `auth.signOut(ctx)`, `auth.revokeAllSessions(userId)`, `auth.sendMagicLink(email, origin, redirectTo?)`, `auth.sendVerificationEmail(email, origin, redirectTo?)`.
+- RGPD & maintenance: `auth.listSessions(userId)`, `auth.exportUser(userId)`, `auth.deleteUser(userId)`, `auth.pruneExpired()`, `auth.dispose()`.
+
+## Snippets
+
+```ts
+// src/auth.ts
+import { createAuth, github } from '@kayjs/auth'
+import { sqliteAuthStore } from '@kayjs/auth/sqlite'
+import { mail } from './mail'
+
+export const auth = createAuth({
+  store: sqliteAuthStore('./data/app.sqlite'),
+  mailer: mail,
+  providers: [github({ clientId: process.env.GITHUB_ID!, clientSecret: process.env.GITHUB_SECRET! })],
+})
+```
+
+```ts
+// src/routes/app/_middleware.ts
+import { auth } from '../../auth'
+
+export default auth.guard({ redirectTo: '/login' })
+```

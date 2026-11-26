@@ -6,7 +6,8 @@
   "type": "module",
   "sideEffects": false,
   "files": [
-    "src"
+    "src",
+    "llms.txt"
   ],
   "exports": {
     ".": "./src/index.ts"

@@ -1,0 +1,51 @@
+# @kayjs/mcp Reference
+
+> Zero-dependency MCP Streamable HTTP (`2025-03-26`) plugin exposing typed Kay `action()` handlers and standalone handlers as bearer-authenticated AI agent tools and resources.
+
+## Imports
+
+- `@kayjs/mcp`: `mcp`, `mcpTool`, `inspectMcpFootprint`, `formatMcpFootprint`, `formatLines`, `formatTable`, `pruneEmpty`, `truncateOutput`, `compactSchema`, `schemaToJsonSchema`, `MCP_PROTOCOL_VERSION`, `MAX_BATCH_SIZE`; types `McpOptions`, `McpTool`, `McpActionTool`, `McpHandlerTool`, `McpToolsRecord`, `McpResource`, `McpTokenSource`, `McpToolAnnotations`, `McpBudgetOptions`, `McpFootprint`, `McpToolFootprint`, `McpContentBlock`, `McpToolResult`, `McpPruneMode`, `PruneEmptyOptions`, `CompactListOptions`, `CompactSchemaOptions`, `JsonSchemaObject`.
+
+## Plugin Setup (`mcp(options)`)
+
+- `name` (`'kay-mcp'`), `version` (`'1.0.0'`), `instructions` (returned in `initialize`).
+- `path`: HTTP endpoint (default `'/mcp/tools'`).
+- `token`: `string | { env: string } | { file: string } | (() => string | undefined | Promise<string | undefined>)`. Unconfigured token returns `404`; missing/invalid `Authorization: Bearer <token>` returns `401`.
+- `tools`: `Record<string, McpTool>` — each entry either wraps an existing Kay `action` (`{ action, description, ... }`) or defines `{ schema?, handler(input, ctx), description, ... }`. Wrap with `mcpTool(...)` for strict `format`/`handler` inference.
+  - Per-tool options: `inputSchema`, `schemaRef` (references `options.schemas` to emit a compact stub in `tools/list` while keeping full server validation), `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), `format(output, input)`, `maxOutputChars`, `pruneEmpty`.
+- `schemas`: shared schemas exposed on demand via auto-added `describe_schema` tool and `kay://schemas/<name>` resources.
+- `resources`: `Record<uri, { name?, description?, mimeType?, read: string | ((ctx) => string | Promise<string>) }>`.
+- Compact output & footprint options: `compactSchemas` (default `true`), `pruneEmpty` (`false | 'nullish' | true`), `maxOutputChars`, `formatResult(output, toolName, input)`, `mapError(err)`, `budget` (default `{ maxToolBytes: 2048 }`; `strict: true` fails `kay check`; `false` disables).
+
+## Mounted Routes & CLI
+
+- `POST /mcp/tools` (`csrf: false`, JSON-RPC 2.0: `initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `ping`), `GET /mcp/tools` (`405`), `DELETE /mcp/tools` (`204`, `csrf: false`).
+- `kay mcp-footprint` prints per-tool byte/token table; `kay check` and dev startup report `budget` violations.
+- Output helpers: `formatLines(items, render, { total?, nextCursor?, empty? })`, `formatTable(rows, columns?, opts?)`, `pruneEmpty(val, opts?)`, `truncateOutput(text, maxChars)`.
+
+## Snippet
+
+```ts
+// kay.config.ts
+import { defineConfig } from '@kayjs/kay/config'
+import { formatTable, mcp, mcpTool } from '@kayjs/mcp'
+import { createTodo, listTodos } from './src/actions/todos'
+
+export default defineConfig({
+  plugins: [
+    mcp({
+      name: 'todos',
+      token: { env: 'MCP_TOKEN' },
+      tools: {
+        list_todos: mcpTool({
+          action: listTodos,
+          description: 'List open todos',
+          annotations: { readOnlyHint: true },
+          format: rows => formatTable(rows, ['id', 'title', 'done']),
+        }),
+        create_todo: mcpTool({ action: createTodo, description: 'Create a todo' }),
+      },
+    }),
+  ],
+})
+```

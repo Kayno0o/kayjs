@@ -1,0 +1,69 @@
+# @kayjs/ui Reference
+
+> Platform-first headless UI primitives and pure CSS `@layer kui` Style Grammars (`0 KB` JS for static primitives; islands only for interactive widgets).
+
+## Imports
+
+- `@kayjs/ui`:
+  - Static layout primitives (`0 KB` JS): `Stack`, `Cluster`, `Grid`, `Sidebar`, `Split`
+  - Static & native-platform primitives (`0 KB` JS): `Button`, `Card`, `CardHeader`, `CardBody`, `CardFooter`, `Badge`, `Notice`, `Field`, `FieldContext`, `useFieldContext`, `Checkbox`, `Switch`, `RadioGroup`, `Accordion`, `AccordionItem`, `Popover`
+  - Interactive island primitives: `Dialog`, `Drawer`, `Tabs`, `Menu`, `Select`, `CommandPalette`, `DataTable`, `Toaster`
+  - Headless signal behaviors & helpers: `createDialog`, `createTabs`, `createDataTable`, `toast`, `handleListKeyDown`, `findFirstEnabledIndex`, `findLastEnabledIndex`, `findNextEnabledIndex`, `isDialogBackdropClick`, `syncDialogOpen`, `nextUiId`
+- `@kayjs/ui/plugin`: `ui(options?)`, `GRAMMAR_NAMES`, `grammarCssPath`, `renderGrammarCss`, `ejectGrammar`
+- CSS subpaths: `@kayjs/ui/bare.css`, `@kayjs/ui/grammars/{editorial,workshop,console,soft,orbit}.css`
+
+## Plugin Setup (`kay.config.ts`)
+
+```ts
+import { defineConfig } from '@kayjs/kay/config'
+import { ui } from '@kayjs/ui/plugin'
+
+export default defineConfig({
+  plugins: [ui({ grammar: 'editorial' })],
+})
+```
+
+- `grammar`: `'editorial'` (default) | `'workshop'` | `'console'` | `'soft'` | `'orbit'` | `'bare'` | `false` (skip injecting CSS when importing your own).
+- `emitGrammars`: `boolean | GrammarName[] | { dir?: string, grammars?: GrammarName[] }` — emits standalone CSS files to `/<dir>/<name>.css` (default `grammars/<name>.css`) for runtime theme switching.
+- CLI: `kay ui-eject <grammar> [dest]` copies a self-contained CSS grammar (with `bare.css` inlined) into your app (default `editorial` → `src/styles/ui.css`).
+
+## Key Props & Types
+
+- Shared tokens: `Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger'`, `ButtonVariant = 'solid' | 'outline' | 'ghost'`, `Size = 'sm' | 'md' | 'lg'`, `SpaceToken = 'none' | '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'`, `TrackSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'`.
+- Layout: `<Stack gap="md">`, `<Cluster gap="sm">`, `<Grid min="md" gap="md">`, `<Sidebar side="sm" gap="lg">`, `<Split gap="md">`.
+- `Button`: `{ variant?, tone?, size?, href?, type?, disabled?, class?, children? }` (renders `<a>` when `href` is set, else `<button>`).
+- `Field`: `{ id, label, hint?, error?, required?, class?, children? }` — auto-wires `for`, `id`, `aria-describedby`, `aria-invalid`, `required` onto its child control (and provides `FieldContext`).
+- `Checkbox` / `Switch`: `{ id?, name?, value?, label, checked?, disabled? }`; `RadioGroup`: `{ name, legend?, options: RadioOption[], defaultValue? }`.
+- `Accordion` + `AccordionItem`: `{ title, group?, open?, children? }` (native `<details name={group}>`).
+- `Popover`: `{ id, triggerLabel, triggerVariant?, children? }` (native Popover API).
+- `Dialog` / `Drawer`: `{ id?, title?, ariaLabel?, description?, triggerLabel?, triggerVariant?, closeLabel?, open?: Signal<boolean>, side?: 'right' | 'left' | 'bottom', children? }`.
+- `Tabs`: `{ id?, items: Array<{ id, label, content }>, defaultValue?, label? }`.
+- `Menu`: `{ id?, label, items: Array<{ id, label, href?, disabled?, onSelect? }>, variant?, onSelect? }`.
+- `Select`: `{ id?, options: Array<{ value, label, disabled? }>, value?: Signal<string>, defaultValue?, name?, placeholder?, ariaLabel?, onChange? }`.
+- `CommandPalette`: `{ id?, items: CommandItem[], shortcutKey? ('k'), open?: Signal<boolean>, onSelect?, ...labels }`.
+- `DataTable`: `{ rows, columns: Array<{ key, label, sortable? }>, rowKey? ('id'), pageSize? (10), searchable? (true), selectable? (false), ...labels }`.
+- `Toaster` + `toast`: mount `<Toaster dismissLabel? />` once in `_layout.tsx`; call `toast.show|info|success|warning|danger|error(title, description?, durationMs?)`, `toast.dismiss(id)`, `toast.clear()`.
+
+## Example
+
+```tsx
+import { Button, Card, CardBody, Field, Stack } from '@kayjs/ui'
+import { createPost } from '../actions/posts'
+
+export default function NewPostForm({ error }: { error?: string }) {
+  return (
+    <Card>
+      <CardBody>
+        <form action={createPost} method="post">
+          <Stack gap="md">
+            <Field id="title" label="Title" error={error} required>
+              <input name="title" type="text" />
+            </Field>
+            <Button type="submit" tone="accent">Publish</Button>
+          </Stack>
+        </form>
+      </CardBody>
+    </Card>
+  )
+}
+```

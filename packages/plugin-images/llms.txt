@@ -1,0 +1,52 @@
+# @kayjs/images Reference
+
+> Build-time AVIF/WebP responsive image pipeline with content-hashed disk cache, `<Picture>` / `image()` helpers, automatic `@kayjs/content` Markdown image optimization, and 1200×630 PNG OG `shareCard()`.
+
+## Imports
+
+- `@kayjs/images`: `images`, `image`, `Picture`, `shareCard`, `configureShareCard`, `optimizeImageFile`, `createMarkdownImageResolver`, `readImageDimensions`; types `ImagesPluginOptions`, `ImageAsset`, `ImageHelperOptions`, `ImgSpreadProps`, `PictureProps`, `ShareCardDefaults`, `ShareCardInput`, `OptimizeImageFileOptions`, `MarkdownImageResolverOptions`.
+- `@kayjs/images/ambient`: ambient module declarations for `.png`, `.jpg`, `.jpeg`, `.webp`, `.avif`, `.gif` imports as `ImageAsset` (auto-referenced when importing `@kayjs/images`).
+
+## Plugin Setup (`images(options?)`)
+
+- `widths`: responsive widths in px (default `[320, 640, 960, 1280, 1920]`).
+- `formats`: `('avif' | 'webp')[]` (default `['avif', 'webp']`; uses ImageMagick `magick` on `PATH`, falls back to original file with parsed dimensions when unavailable).
+- `quality` (WebP, default `80`), `avifQuality` (default `55`), `cacheDir` (default `'.kay-cache/images'`), `pruneCache` (default `true`).
+- `card`: `ShareCardDefaults` (`{ site?, publicDir?, cacheDir?, background?, color?, accent?, mutedColor?, fontFamily?, width? (1200), height? (630) }`).
+- `markdownSizes`: default `sizes` attribute for relative images inside `@kayjs/content` Markdown (auto-wired via `CONTENT_IMAGE_RESOLVER_SERVICE`).
+
+## Components & Helpers
+
+- `<Picture src={hero} alt="..." sizes? priority? class? pictureClass? ...imgAttrs />`: renders `<picture>` with `<source type="image/avif">`, `<source type="image/webp">`, and `<img>`.
+- `image(asset, { sizes?, priority? })`: returns `ImgSpreadProps` (`src`, `srcset`, `sizes`, `width`, `height`, `loading`, `decoding`, `fetchpriority`) for `<img {...image(hero)} alt="..." />`.
+- `shareCard({ title, subtitle?, badge?, image?, background?, color?, accent? })`: renders and caches a PNG card under `public/og/*.png` (via `rsvg-convert` or `magick`) and returns its URL (prefixed with `site` when configured).
+- `optimizeImageFile(absPath, options?)`: synchronously optimizes a local file into `dist/public/img/`.
+
+## Snippets
+
+```ts
+// kay.config.ts
+import { images } from '@kayjs/images'
+import { defineConfig } from '@kayjs/kay/config'
+
+export default defineConfig({
+  site: 'https://example.com',
+  plugins: [images({ card: { background: '#090c13', color: '#dbe0ea', accent: '#f5b83d' } })],
+})
+```
+
+```tsx
+import { Picture, shareCard } from '@kayjs/images'
+import { Head } from '@kayjs/kay'
+import hero from '../assets/hero.png'
+
+export default function Home() {
+  const og = shareCard({ title: 'Welcome', badge: 'Blog' })
+  return (
+    <>
+      <Head><meta property="og:image" content={og} /></Head>
+      <Picture src={hero} alt="Hero banner" sizes="(min-width: 60rem) 50vw, 100vw" priority />
+    </>
+  )
+}
+```

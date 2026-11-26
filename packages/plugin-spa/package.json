@@ -9,7 +9,8 @@
     "./src/regions.ts"
   ],
   "files": [
-    "src"
+    "src",
+    "llms.txt"
   ],
   "exports": {
     ".": "./src/index.ts",

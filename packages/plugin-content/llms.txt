@@ -1,0 +1,54 @@
+# @kayjs/content Reference
+
+> Zero-dependency `Bun.markdown` + `Bun.YAML` typed Markdown collections, Standard Schema frontmatter validation, lazy Shiki/TSX rendering, TOC, localized content, and RSS feeds (`0 KB` client JS).
+
+## Imports
+
+- `@kayjs/content`: `content`, `defineCollection`, `parseFrontmatter`, `renderMarkdown`, `renderRss`; types `Collection`, `CollectionOptions`, `CollectionOptionsWithSchema`, `CollectionOptionsWithoutSchema`, `CollectionRenderConfig`, `ContentEntry`, `ContentHeading`, `RenderedMarkdown`, `RenderMarkdownOptions`, `CodeHighlighter`, `MarkdownComponent`, `MarkdownImageResolver`, `MarkdownImageResult`, `RssFeedConfig`, `ContentFeed`.
+
+## Defining a Collection (`defineCollection(options)`)
+
+- `dir`: path to `.md`/`.markdown` files (relative to project root or absolute).
+- `schema`: optional Standard Schema v1 (`Zod`, `Valibot`, `ArkType`, custom) validating frontmatter synchronously into `entry.data`.
+- `localized`: `true` reads `<dir>/<locale>/<slug>.md`; `defaultLocale` defaults to `'en'`.
+- `render`: lazy async factory `async () => ({ highlight, components, headingLinks, resolveImage, trusted })` so index pages, config, and RSS never import Shiki or TSX components until `await entry.render()` runs.
+- Direct options (also accepted at top level): `highlight(code, lang)`, `components` (MDX-lite TSX components usable inside Markdown), `headingLinks` (`true` wraps `h2`–`h6` in `#id` anchor links), `resolveImage` (auto-wired with `@kayjs/images`; pass `false` to disable), `trusted` (default `false`; HTML is sanitized unless `true`), `includeDrafts` (`false`), `sort(a, b)` (default newest `date` first, then `slug`).
+
+## Collection & Entry API
+
+- `col.all(locale?)`: sorted `ContentEntry<TData>[]`.
+- `col.get(slug, locale?)`: O(1) lookup (`ContentEntry<TData> | undefined`).
+- `col.byTag(tag, locale?)`: entries whose `data.tags` includes `tag`.
+- `col.paths(prefix?, locale?)`: URL list for `export const prerender = true; export const paths = () => col.paths('/blog')`.
+- `col.clearCache()`: drops cached entries.
+- `ContentEntry<TData>`: `slug`, `locale`, `file`, `data`, `body`, `html`, `headings` (`{ level, id, text }[]`), `wordCount`, `readingMinutes`, and `await entry.render()` (memoized).
+
+## Plugin Setup (`content({ feeds?, collections? })`)
+
+- Register `content(...)` in `kay.config.ts` to auto-discover collections for `kay check` frontmatter validation and `kay dev` file watching.
+- `feeds`: array of `RssFeedConfig` (`{ path? ('/rss.xml'), title, description, site? (inherits KayConfig.site), collection, locale?, linkPrefix?, mapItem? }`). Emitted as static public files in `build()` and served with `ETag`/`304` on `GET <path>` in `server()`.
+
+## Snippets
+
+```ts
+// src/content.ts
+import { defineCollection } from '@kayjs/content'
+
+export const posts = defineCollection({
+  dir: 'src/content/posts',
+  headingLinks: true,
+  render: async () => ({ highlight: (await import('./highlight')).highlight }),
+})
+```
+
+```ts
+// kay.config.ts
+import { content } from '@kayjs/content'
+import { defineConfig } from '@kayjs/kay/config'
+import { posts } from './src/content'
+
+export default defineConfig({
+  site: 'https://example.com',
+  plugins: [content({ feeds: [{ collection: posts, title: 'Blog', description: 'Posts', linkPrefix: '/blog' }] })],
+})
+```

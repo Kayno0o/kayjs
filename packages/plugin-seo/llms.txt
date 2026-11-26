@@ -1,0 +1,48 @@
+# @kayjs/seo Reference
+
+> SEO `<head>` tags, `titleTemplate`, localized descriptions, canonical URLs, JSON-LD, `sitemap.xml` (i18n-aware), redirects, web manifest, favicons, and self-hosted fonts.
+
+## Imports
+
+- `@kayjs/seo`: `seo`, `jsonLd`; types `SeoPluginOptions`, `FontEntry`, `ManifestOptions`, `RedirectTarget`.
+
+## Plugin Setup (`seo(options?)`)
+
+- `site`: public origin (`https://example.com`, inherits `KayConfig.site`). Required for canonical links, absolute `og:image`, and `sitemap.xml`.
+- `name`: site name (`og:site_name` and fallback `<title>`).
+- `titleTemplate`: e.g. `'%s | My App'` (skips wrapping if `<title>` already contains `name`).
+- `description`: `string` or `Record<locale, string>` (localized fallback when a page doesn't emit `<meta name="description">`; reads `ctx.locals.locale` from `@kayjs/i18n`).
+- `image`, `imageAlt`: default `og:image`, `twitter:card` (`summary_large_image`), and `og:image:alt`.
+- `locale`: default `og:locale`.
+- `jsonLd`: array of Schema.org objects injected globally (`@context: 'https://schema.org'` auto-added).
+- `sitemap`: `boolean` (default `true`, emitted in `afterPrerender` as `/sitemap.xml` with `xhtml:link` alternates when `@kayjs/i18n` is active). `sitemapExclude`: `string[]`. `extraUrls`: `() => string[]`.
+- `redirects`: `Record<fromPath, string | { to: string, status?: 301 | 302 | 307 | 308 }>` (mounted as `GET` routes, default `301`).
+- `favicon`: `string | string[]` (relative path or package specifier; emits `favicon.{svg,png,ico}` and `<link rel="icon">`).
+- `manifest`: `{ name?, shortName?, description?, themeColor?, backgroundColor?, display?, startUrl? }` (emits `/manifest.webmanifest`).
+- `fonts`: `Array<{ family, src, weight?, style?, display?, preload? }>` (resolves local paths or `@fontsource/*` specifiers, emits content-hashed assets + `@font-face` stylesheet + `<link rel="preload">`).
+
+## Page-Specific JSON-LD
+
+- `jsonLd(schema)` returns a branded `Html` value for `<Head>`: `<Head>{jsonLd({ '@type': 'Article', headline: title })}</Head>`.
+
+## Snippet
+
+```ts
+// kay.config.ts
+import { defineConfig } from '@kayjs/kay/config'
+import { seo } from '@kayjs/seo'
+
+export default defineConfig({
+  site: 'https://example.com',
+  plugins: [
+    seo({
+      name: 'Acme',
+      titleTemplate: '%s | Acme',
+      description: 'Fast web apps with Kay v2.',
+      favicon: 'public/favicon.svg',
+      fonts: [{ family: 'Inter', src: '@fontsource/inter/files/inter-latin-400-normal.woff2', weight: 400 }],
+      redirects: { '/old': '/new' },
+    }),
+  ],
+})
+```
