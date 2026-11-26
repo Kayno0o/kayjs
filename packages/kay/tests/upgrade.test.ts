@@ -70,6 +70,16 @@ describe('kay upgrade moves an app onto @kayjs/kay (#3591)', () => {
     ].join('\n'))
   })
 
+  it('moves the icons plugin import to @kayjs/icons/plugin, leaving the component on @kayjs/icons (#3592)', () => {
+    const dir = appWith({
+      'kay.config.ts': 'import { icons } from \'@kayjs/icons\';\n',
+      'src/Nav.tsx': 'import { Icon, icons, type IconsPluginOptions } from "@kayjs/icons"\nimport { Icon as I } from \'@kayjs/icons\'\n',
+    })
+    expect(upgradeProject(dir)).toEqual({ changed: ['kay.config.ts', 'src/Nav.tsx'], manual: [] })
+    expect(read(dir, 'kay.config.ts')).toBe('import { icons } from \'@kayjs/icons/plugin\';\n')
+    expect(read(dir, 'src/Nav.tsx')).toBe('import { Icon } from "@kayjs/icons"\nimport { icons, type IconsPluginOptions } from "@kayjs/icons/plugin"\nimport { Icon as I } from \'@kayjs/icons\'\n')
+  })
+
   it('names each import that is no longer public, with its file and line, and leaves it as written', () => {
     const dir = appWith({
       'src/server.ts': 'import { signal } from \'kay\'\nimport { loadConfig, nodeEnv } from \'kay/server\'\nimport { mount } from \'kay/dom\'\n',

@@ -27,6 +27,8 @@ const SKIPPED_DIRS = new Set(['node_modules', 'dist'])
 const PUBLIC_ENTRIES = new Set(['', '/server', '/config', '/test', '/build', '/jsx-runtime', '/jsx-dev-runtime'])
 // kay v1 served `raw`, `esc` and `escAttr` from `kay/ssr`; v2 exports them from `/server`.
 const RENAMED_ENTRIES = new Map([['/ssr', '/server']])
+// Names a package moved to another of its entries, so that its root stays importable from an island.
+const MOVED_EXPORTS = new Map([['@kayjs/icons', { to: '@kayjs/icons/plugin', names: new Set(['icons', 'IconsPluginOptions']) }]])
 
 /** Rewrites the app at `root` in place; installing the renamed dependency is the caller's job. */
 export function upgradeProject(root: string): UpgradeResult {
@@ -144,6 +146,11 @@ function upgradeSource(file: string, code: string, manual: string[]): string {
   const scoped = (quote: string, entry: string): string => `${quote}@kayjs/kay${RENAMED_ENTRIES.get(entry) ?? entry}${quote}`
   for (const stmt of parseTsx(file, code).body) {
     const source = moduleSource(stmt)
+    const moves = stmt.type === 'ImportDeclaration' ? MOVED_EXPORTS.get(stmt.source.value) : undefined
+    if (moves !== undefined && stmt.type === 'ImportDeclaration') {
+      editor.replace(stmt.start, stmt.end, splitImport(code, stmt, code[stmt.source.start]!, moves.to, moves.names))
+      continue
+    }
     const match = source === undefined ? null : BARE_KAY_RE.exec(source.value)
     if (source === undefined || match === null)
       continue
@@ -194,12 +201,27 @@ function splitServerImport(file: string, code: string, stmt: ImportStatement, qu
     if (!server.has(name) && !config.has(name))
       manual.push(`${file}:${lineOf(code, stmt.start)}: ${name} is not exported by @kayjs/kay/server or @kayjs/kay/config: it is kay's internal API, outside semver.`)
   }
+  return importLines(code, stmt, quote, [keep, '@kayjs/kay/server'], [moved, '@kayjs/kay/config'])
+}
+
+// The named imports of `stmt` listed in `names` move to the module `to`; the others stay.
+function splitImport(code: string, stmt: ImportStatement, quote: string, to: string, names: ReadonlySet<string>): string {
+  if (stmt.specifiers.some(s => s.type !== 'ImportSpecifier'))
+    return code.slice(stmt.start, stmt.end)
+  const keep: string[] = []
+  const moved: string[] = []
+  for (const spec of stmt.specifiers) {
+    const named = spec.type === 'ImportSpecifier' ? (spec.imported.type === 'Identifier' ? spec.imported.name : String(spec.imported.value)) : undefined
+    ;(named !== undefined && names.has(named) ? moved : keep).push(code.slice(spec.start, spec.end))
+  }
+  if (moved.length === 0)
+    return code.slice(stmt.start, stmt.end)
+  return importLines(code, stmt, quote, [keep, stmt.source.value], [moved, to])
+}
+
+// One import statement per non-empty group, each keeping the kind, quote and semicolon of `stmt`.
+function importLines(code: string, stmt: ImportStatement, quote: string, ...groups: [string[], string][]): string {
   const head = stmt.importKind === 'type' ? 'import type' : 'import'
   const semi = code[stmt.end - 1] === ';' ? ';' : ''
-  const line = (names: string[], entry: string): string => `${head} { ${names.join(', ')} } from ${quote}@kayjs/kay${entry}${quote}${semi}`
-  if (moved.length === 0)
-    return line(keep, '/server')
-  if (keep.length === 0)
-    return line(moved, '/config')
-  return `${line(keep, '/server')}\n${line(moved, '/config')}`
+  return groups.filter(([names]) => names.length > 0).map(([names, from]) => `${head} { ${names.join(', ')} } from ${quote}${from}${quote}${semi}`).join('\n')
 }
