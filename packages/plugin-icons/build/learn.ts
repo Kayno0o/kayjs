@@ -124,7 +124,21 @@ export async function modelWords(): Promise<string[]> {
 }
 
 // Each key word to its nearest candidate words by meaning, scaled so `floor` similarity counts 0 and identical counts 1.
+// Cached on disk by its inputs, as comparing every key with every candidate takes minutes.
 export async function fromMeaning(keys: string[], candidates: string[], keep: number, floor: number): Promise<Related> {
+  const file = Bun.file(`${CACHE}/meaning-${Bun.hash(JSON.stringify([MODEL, keys, candidates, keep, floor])).toString(36)}.json`)
+
+  if (await file.exists())
+    return new Map(Object.entries(await file.json() as Record<string, [string, number][]>).map(([key, row]) => [key, new Map(row)]))
+
+  const related = await nearest(keys, candidates, keep, floor)
+
+  await Bun.write(file, JSON.stringify(Object.fromEntries([...related].map(([key, row]) => [key, [...row]]))))
+
+  return related
+}
+
+async function nearest(keys: string[], candidates: string[], keep: number, floor: number): Promise<Related> {
   const all = await vectors([...new Set([...keys, ...candidates])])
   // One flat matrix, as a loop over a single typed array is several times faster than one array per word.
   const matrix = new Float32Array(candidates.length * DIMENSIONS)
