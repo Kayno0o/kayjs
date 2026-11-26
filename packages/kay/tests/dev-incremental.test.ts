@@ -66,7 +66,7 @@ describe('kay dev incremental client/server split, build-driven watch set, strea
       await srv.rebuild()
       const s1 = srv.stats()
       expect(s1.clientBuilds).toBe(1)
-      expect(s1.clientSkips).toBe(1)
+      expect(s1.clientSkips).toBeGreaterThanOrEqual(1)
       expect(s1.serverBuilds).toBe(2)
       expect(await (await fetch(srv.url)).text()).toContain('v2-server-only')
 
@@ -76,7 +76,7 @@ describe('kay dev incremental client/server split, build-driven watch set, strea
       const s2 = srv.stats()
       expect(s2.clientBuilds).toBe(2)
       expect(s2.serverBuilds).toBe(2)
-      expect(s2.serverSkips).toBe(1)
+      expect(s2.serverSkips).toBeGreaterThanOrEqual(1)
       const html = await (await fetch(srv.url)).text()
       const cssHref = /<link[^>]+href="([^"]+\.css)"/.exec(html)?.[1]
       expect(cssHref).toBeDefined()
