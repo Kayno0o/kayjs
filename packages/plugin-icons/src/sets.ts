@@ -33,20 +33,14 @@ export function setFile(prefix: string, root: string): string | undefined {
   return undefined
 }
 
-/** Every set installed for the app at `root`, as prefix to JSON file, sorted by prefix. */
-export function installedSets(root: string): Map<string, string> {
-  const found = new Map<string, string>()
+/** The prefix of every set installed for the app at `root`. */
+export function installedPrefixes(root: string): string[] {
+  const found = new Set<string>()
   for (const dir of nodeModulesDirs(root)) {
-    for (const file of new Bun.Glob('@iconify-json/*/icons.json').scanSync({ cwd: dir, followSymlinks: true })) {
-      const prefix = basename(dirname(file))
-      if (isSetPrefix(prefix) && !found.has(prefix))
-        found.set(prefix, join(dir, file))
-    }
-    for (const file of new Bun.Glob('@iconify/json/json/*.json').scanSync({ cwd: dir, followSymlinks: true })) {
-      const prefix = basename(file, '.json')
-      if (isSetPrefix(prefix) && !found.has(prefix))
-        found.set(prefix, join(dir, file))
-    }
+    for (const file of new Bun.Glob('@iconify-json/*/icons.json').scanSync({ cwd: dir, followSymlinks: true }))
+      found.add(basename(dirname(file)))
+    for (const file of new Bun.Glob('@iconify/json/json/*.json').scanSync({ cwd: dir, followSymlinks: true }))
+      found.add(basename(file, '.json'))
   }
-  return new Map([...found].sort(([a], [b]) => a.localeCompare(b)))
+  return [...found].filter(isSetPrefix)
 }

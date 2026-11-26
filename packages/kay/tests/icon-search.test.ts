@@ -115,11 +115,11 @@ describe('kay icons-find', () => {
     return root
   }
 
-  async function run(root: string, args: string[]): Promise<string[]> {
+  async function run(root: string, args: string[], options: Parameters<typeof icons>[0] = {}): Promise<string[]> {
     const log = spyOn(console, 'log').mockImplementation(() => {})
 
     try {
-      await icons().commands!['icons-find']!(args, root)
+      await icons(options).commands!['icons-find']!(args, root)
 
       return log.mock.calls.map(call => String(call[0]))
     }
@@ -133,6 +133,42 @@ describe('kay icons-find', () => {
     const root = appWith({ tabler: ['trash', 'home'], lucide: ['trash-2'], mdi: ['trash-can'] })
 
     expect(await run(root, ['garbage'])).toEqual(['~icons/lucide/trash-2', '~icons/mdi/trash-can', '~icons/tabler/trash'])
+  })
+
+  it('finds a set hoisted to a parent folder, as a workspace installs it', async () => {
+    const root = appWith({ tabler: ['home'] })
+    mkdirSync(join(root, 'apps/site'), { recursive: true })
+
+    expect(await run(join(root, 'apps/site'), ['home'])).toEqual(['~icons/tabler/home'])
+  })
+
+  it('takes a set from the nearest node_modules when a parent has it too', async () => {
+    const root = appWith({ tabler: ['home-far'] })
+    mkdirSync(join(root, 'apps/site/node_modules/@iconify-json/tabler'), { recursive: true })
+    writeFileSync(join(root, 'apps/site/node_modules/@iconify-json/tabler/icons.json'), JSON.stringify({ prefix: 'tabler', icons: { 'home-near': { body: '' } } }))
+
+    expect(await run(join(root, 'apps/site'), ['home'])).toEqual(['~icons/tabler/home-near'])
+  })
+
+  it('finds the sets of @iconify/json, an installed @iconify-json package first', async () => {
+    const root = appWith({ mdi: ['home-outline'] })
+    mkdirSync(join(root, 'node_modules/@iconify/json/json'), { recursive: true })
+    writeFileSync(join(root, 'node_modules/@iconify/json/json/mdi.json'), JSON.stringify({ prefix: 'mdi', icons: { 'home-old': { body: '' } } }))
+    writeFileSync(join(root, 'node_modules/@iconify/json/json/lucide.json'), JSON.stringify({ prefix: 'lucide', icons: { home: { body: '' } } }))
+
+    expect(await run(root, ['home'])).toEqual(['~icons/lucide/home', '~icons/mdi/home-outline'])
+  })
+
+  it('searches the sets passed to icons() too', async () => {
+    const root = appWith({ tabler: ['home'] })
+
+    expect(await run(root, ['home'], { sets: { brand: { prefix: 'brand', icons: { 'home-logo': { body: '' } } } } })).toEqual(['~icons/brand/home-logo', '~icons/tabler/home'])
+  })
+
+  it('searches only the set --set names, as many as --limit says', async () => {
+    const root = appWith({ tabler: ['home', 'home-2', 'home-3'], lucide: ['home'] })
+
+    expect(await run(root, ['home', '--set', 'tabler', '--limit', '2'])).toEqual(['~icons/tabler/home', '~icons/tabler/home-2'])
   })
 
   it('prints at most 10 icons per set', async () => {

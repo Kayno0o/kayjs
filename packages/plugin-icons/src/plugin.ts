@@ -8,9 +8,9 @@ import { join, relative } from 'node:path'
 import { definePlugin } from '@kayjs/kay/config'
 import { iconData } from './icon-data'
 import { iconProblem } from './diagnose'
-import { installedSets, setFile } from './sets'
+import { iconsFind } from './find'
+import { installedPrefixes, setFile } from './sets'
 
-const FOUND_PER_SET = 10
 const ICON_SPEC_RE = /^~icons\/([^/]+)\/(.+)$/
 const SEARCH_ENTRY_RE = /^@kayjs\/icons\/search$/
 const ICON_IMPORT_RE = /\b(?:from|import)\s*\(?\s*(['"])(~icons\/[^/'"]+\/[^'"]+)\1/g
@@ -46,7 +46,7 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
       }
       return set
     },
-    prefixes: () => [...new Set([...Object.keys(options.sets ?? {}), ...installedSets(root).keys()])],
+    prefixes: () => [...new Set([...Object.keys(options.sets ?? {}), ...installedPrefixes(root)])],
   })
 
   return definePlugin({
@@ -96,28 +96,7 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
       },
     }],
     commands: {
-      // Prints the `~icons/<set>/<name>` specifiers of the installed sets matching the words, so an agent imports icons that exist.
-      'icons-find': async (args, root) => {
-        const query = args.join(' ')
-        if (query.trim() === '') {
-          console.error('Usage: kay icons-find <words>')
-          process.exit(1)
-        }
-
-        const files = [...installedSets(root).values()]
-        if (files.length === 0) {
-          console.error('No icon set installed. Install one, such as @iconify-json/tabler.')
-          process.exit(1)
-        }
-
-        // Imported here so the word table never reaches a bundle that only draws icons.
-        const { findIcons } = await import('./search')
-        for (const file of files) {
-          const set = await Bun.file(file).json() as IconSet
-          for (const name of findIcons(set, query, { limit: FOUND_PER_SET }))
-            console.log(`~icons/${set.prefix}/${name}`)
-        }
-      },
+      'icons-find': async (args, root) => await iconsFind(args, lookupIn(root)),
     },
   })
 }
