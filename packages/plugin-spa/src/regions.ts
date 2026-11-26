@@ -33,6 +33,8 @@ function stateOf(state: unknown): RegionState | undefined {
 const controllers = new Map<string, AbortController>()
 let idx = stateOf(typeof history === 'undefined' ? undefined : history.state)?.__kayIdx ?? 0
 let lastRegion = stateOf(typeof history === 'undefined' ? undefined : history.state)?.__kayRegion
+// The page and query the document shows: an entry that differs from it only in its hash needs no fetch.
+let shown = typeof location === 'undefined' ? '' : location.pathname + location.search
 let burstOpen = false
 let burstTimer: ReturnType<typeof setTimeout> | undefined
 let liveTimer: ReturnType<typeof setTimeout> | undefined
@@ -107,6 +109,7 @@ function record(url: URL, name: string, mode: 'push' | 'replace' | 'burst'): voi
     history.replaceState({ ...prev, __kayIdx: idx, __kayRegion: around }, '', next)
   }
   lastRegion = around
+  shown = url.pathname + url.search
 }
 
 function focusNode(el: Element | null | undefined): void {
@@ -278,15 +281,18 @@ if (typeof document !== 'undefined') {
   document.addEventListener('focusin', onIntent, { passive: true })
 
   // spa() skips these entries: they carry __kayIdx.
+  window.addEventListener('kay:navigate', () => { shown = location.pathname + location.search })
   window.addEventListener('popstate', (event) => {
     const state = stateOf(event.state)
+    const sameDocument = location.pathname + location.search === shown
+    shown = location.pathname + location.search
     if (state === undefined)
       return
     const name = state.__kayIdx < idx ? lastRegion : state.__kayRegion
     idx = state.__kayIdx
     lastRegion = state.__kayRegion
     burstOpen = false
-    if (name === undefined)
+    if (name === undefined || sameDocument)
       return
     void swapRegion({ url: new URL(location.href), region: name, history: 'none' })
   })

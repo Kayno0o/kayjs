@@ -294,6 +294,8 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointerover', onIntent, { passive: true })
   document.addEventListener('focusin', onIntent, { passive: true })
 
+  // A region swap moves the address too, so a later #hash entry of that address is no new page.
+  window.addEventListener('kay:region', () => { currentDocKey = `${location.pathname}${location.search}` })
   window.addEventListener('popstate', (event) => {
     const nextDocKey = `${location.pathname}${location.search}`
     if (nextDocKey === currentDocKey)

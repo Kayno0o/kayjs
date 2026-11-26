@@ -266,6 +266,34 @@ describe('regions() swaps one region of a page (#3597)', () => {
       expect(await marker(page)).toBe(true)
     }, 30_000)
 
+    it('keeps appended pages, fetching nothing, on back and forward across a #hash entry (#3623)', async () => {
+      const page = await open('/sets')
+      await page.click('#more')
+      await page.waitFor(() => document.querySelectorAll('#sets li').length === 4)
+      await page.evaluate('window.__fetches = 0; window.fetch = (f => (u, o) => { window.__fetches++; return f(u, o) })(window.fetch); location.hash = "top"')
+      await page.evaluate('history.back()')
+      await page.waitFor(() => location.hash === '')
+      await page.evaluate('history.forward()')
+      await page.waitFor(() => location.hash === '#top')
+      await page.evaluate('history.back()')
+      await page.waitFor(() => location.hash === '')
+      await Bun.sleep(300)
+      expect(await items(page)).toBe('apple,apricot,banana,blueberry')
+      expect(await page.evaluate('window.__fetches')).toBe(0)
+    }, 30_000)
+
+    it('restores a region entry on back from a page spa() navigated to (#3623)', async () => {
+      const page = await open('/sets')
+      await type(page, 'a')
+      await page.waitFor(() => document.getElementById('side')?.textContent === 'side a')
+      await page.evaluate('(() => { const a = document.createElement("a"); a.id = "home"; a.href = "/"; a.textContent = "Home"; document.body.append(a) })()')
+      await page.click('#home')
+      await page.waitFor(() => location.pathname === '/' && document.getElementById('side') === null)
+      await page.evaluate('history.back()')
+      await page.waitFor(() => document.getElementById('side')?.textContent === 'side a')
+      expect(await page.evaluate('location.search')).toBe('?q=a')
+    }, 30_000)
+
     it('drops an inner fetch that is still out when the outer region is swapped', async () => {
       const page = await open('/sets')
       await page.evaluate('window.fetch = (f => (u, o) => String(u).includes("page=2") ? new Promise(r => setTimeout(() => r(f(u, o)), 600)) : f(u, o))(window.fetch)')
