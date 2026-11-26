@@ -2,7 +2,6 @@
   "files": {},
   "functionLines": {
     "packages/kay/src/build/bundle.ts::buildClient": 201,
-    "packages/kay/src/build/bundle.ts::buildServer": 191,
     "packages/kay/src/build/index.ts::runBuild": 243,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys": 192,
     "packages/kay/src/compiler/dom.ts::compileDom": 454,

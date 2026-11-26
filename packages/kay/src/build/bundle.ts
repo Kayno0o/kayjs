@@ -1,6 +1,6 @@
 // The two Bun.build passes: the client (runtime + island chunks + standalone CSS) and the server (routes compiled for SSR).
 
-import type { BunPlugin } from 'bun'
+import type { BunPlugin, PluginBuilder } from 'bun'
 import type { IslandBinding } from '../compiler/index'
 import type { BuildPluginTarget, KayPlugin } from '../plugins/index'
 import type { ClientTransforms } from './client-plugin'
@@ -14,7 +14,7 @@ import { clientPlugin, KAY_SPECIFIER_FILTER, TS_FILTER } from './client-plugin'
 import { formatBunBuildLogs, isOutsideRoot, isTsFile, relPosix } from './files'
 import { stampFiles, stampsMatch } from './graph'
 import { clientLeakError, islandKey } from './islands'
-import { resolveKaySpecifier } from './resolve'
+import { KAY_SRC_ROOT, resolveKaySpecifier } from './resolve'
 
 export interface BundleEnv {
   root: string
@@ -404,6 +404,56 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   return result
 }
 
+// Where the server build takes each import from: `@kayjs/kay` from its source, packages that render components bundled for the SSR compiler, the rest external.
+// In dev kay's own source stays external too: Bun never unloads a module, so a bundled copy of kay's runtime was evaluated again and kept on every save.
+function resolveServerImports(b: PluginBuilder, isDev: boolean, root: string, reachesTsx: (file: string) => boolean, externalOutDir: boolean): void {
+  b.onResolve({ filter: KAY_SPECIFIER_FILTER }, (args) => {
+    const resolved = resolveKaySpecifier(args.path)
+    if (resolved === undefined)
+      return undefined
+    return EXTERNAL_KAY_SPECIFIERS.has(args.path) || isDev ? { path: resolved, external: true } : { path: resolved }
+  })
+  if (isDev)
+    b.onResolve({ filter: new RegExp(`^${RegExp.escape(`${KAY_SRC_ROOT}/`)}`) }, args => ({ path: args.path, external: true }))
+  b.onResolve({ filter: KAY_SCOPE_RE }, (args) => {
+    try {
+      return { path: Bun.resolveSync(args.path, args.resolveDir || root) }
+    }
+    catch {
+      return undefined
+    }
+  })
+  b.onResolve({ filter: /^[^./]/ }, (args) => {
+    if (args.path === 'bun' || args.path.startsWith('bun:') || args.path.startsWith('node:') || args.path.startsWith('~') || isAbsolute(args.path))
+      return undefined
+    let resolved: string | undefined
+    try {
+      resolved = Bun.resolveSync(args.path, args.resolveDir || root)
+    }
+    catch {
+      try {
+        resolved = Bun.resolveSync(args.path, root)
+      }
+      catch {
+        return undefined
+      }
+    }
+    if (resolved.endsWith('.tsx') || reachesTsx(resolved))
+      return { path: resolved }
+    if (isDev && isTsFile(resolved)) {
+      try {
+        const real = realpathSync(resolved)
+        if (!real.includes('/node_modules/') && !real.includes('\\node_modules\\'))
+          return { path: resolved }
+      }
+      catch {}
+    }
+    if (externalOutDir)
+      return { path: resolved, external: true }
+    return undefined
+  })
+}
+
 /** `entry` is the generated `_entry.js`, an in-memory file bundled beside `entries` so it shares their chunks. */
 export async function buildServer(env: BundleEnv, entries: string[], serverRoot: string, islandChunks: Map<string, string>, entry: { file: string, source: string }): Promise<void> {
   const { root, outDir, serverDir, graph, cache, islands } = env
@@ -470,49 +520,7 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
   const serverPlugin: BunPlugin = {
     name: 'kay-v2-server',
     setup(b) {
-      b.onResolve({ filter: KAY_SPECIFIER_FILTER }, (args) => {
-        const resolved = resolveKaySpecifier(args.path)
-        if (resolved === undefined)
-          return undefined
-        return EXTERNAL_KAY_SPECIFIERS.has(args.path) ? { path: resolved, external: true } : { path: resolved }
-      })
-      b.onResolve({ filter: KAY_SCOPE_RE }, (args) => {
-        try {
-          return { path: Bun.resolveSync(args.path, args.resolveDir || root) }
-        }
-        catch {
-          return undefined
-        }
-      })
-      b.onResolve({ filter: /^[^./]/ }, (args) => {
-        if (args.path === 'bun' || args.path.startsWith('bun:') || args.path.startsWith('node:') || args.path.startsWith('~') || isAbsolute(args.path))
-          return undefined
-        let resolved: string | undefined
-        try {
-          resolved = Bun.resolveSync(args.path, args.resolveDir || root)
-        }
-        catch {
-          try {
-            resolved = Bun.resolveSync(args.path, root)
-          }
-          catch {
-            return undefined
-          }
-        }
-        if (resolved.endsWith('.tsx') || reachesTsx(resolved))
-          return { path: resolved }
-        if (env.isDev && isTsFile(resolved)) {
-          try {
-            const real = realpathSync(resolved)
-            if (!real.includes('/node_modules/') && !real.includes('\\node_modules\\'))
-              return { path: resolved }
-          }
-          catch {}
-        }
-        if (externalOutDir)
-          return { path: resolved, external: true }
-        return undefined
-      })
+      resolveServerImports(b, env.isDev, root, reachesTsx, externalOutDir)
       b.onLoad({ filter: TS_FILTER }, (args) => {
         if (!args.path.endsWith('.tsx')) {
           if (!transforms.active || args.path.includes('/node_modules/'))

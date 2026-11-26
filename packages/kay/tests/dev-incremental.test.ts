@@ -213,8 +213,8 @@ describe('kay dev incremental client/server split, build-driven watch set, strea
       const heapAfter200 = process.memoryUsage().heapUsed
       const growthMb = (heapAfter200 - heapAfterWarmup) / (1024 * 1024)
 
-      // Heap growth over 180 additional saves should stay tightly bounded (flat, well under 40 MB)
-      expect(growthMb).toBeLessThan(40)
+      // About 3 MB over 180 saves; a copy of kay's runtime bundled into each save's server build kept about 44 MB.
+      expect(growthMb).toBeLessThan(12)
       expect(await (await fetch(srv.url)).text()).toContain('save-200')
 
       // Old build directories are pruned (at most 2 kept + `server/`)
