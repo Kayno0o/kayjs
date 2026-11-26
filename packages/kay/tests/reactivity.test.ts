@@ -536,6 +536,35 @@ describe('reactivity kernel', () => {
     stop()
   })
 
+  test.each([
+    ['push', (l: number[]) => l.push(5)],
+    ['pop', (l: number[]) => l.pop()],
+    ['shift', (l: number[]) => l.shift()],
+    ['unshift', (l: number[]) => l.unshift(0)],
+    ['splice', (l: number[]) => l.splice(1, 1, 9)],
+    ['sort', (l: number[]) => l.sort((a, b) => b - a)],
+    ['reverse', (l: number[]) => l.reverse()],
+    ['fill', (l: number[]) => l.fill(0, 1)],
+    ['copyWithin', (l: number[]) => l.copyWithin(0, 2)],
+  ])('a store array %s inside an effect does not subscribe it (#3648)', (_, mutate) => {
+    const list = store([1, 2, 3, 4])
+    let runs = 0
+    const stop = effect(() => {
+      runs++
+      mutate(list)
+    })
+    list[0] = 7
+    list.push(8)
+    expect(runs).toBe(1)
+    stop()
+  })
+
+  test('snapshot keeps an own __proto__ key as a plain key (#3648)', () => {
+    const copy = snapshot(store(JSON.parse('{"__proto__":{"x":1}}') as Record<string, unknown>))
+    expect(Object.keys(copy)).toEqual(['__proto__'])
+    expect(Object.getPrototypeOf(copy)).toBe(Object.prototype)
+  })
+
   test('a store assigned into another store comes back as the same proxy', () => {
     const inner = store({ n: 1 })
     const outer = store({ child: { n: 0 } })

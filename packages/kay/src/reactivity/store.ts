@@ -6,12 +6,12 @@ import { batch, isTracking, signal, untrack } from './index'
 const RAW = Symbol('kay.store.raw')
 const OWN_KEYS = Symbol('kay.store.keys')
 
-// An array method that moves several entries writes each one in turn; batched, its readers see only the finished array.
+// An array method that moves several entries writes each one in turn; batched, its readers see only the finished array, and untracked, an effect calling it does not subscribe to what it writes.
 const batchedMutators = new Map<PropertyKey, (this: unknown[], ...args: unknown[]) => unknown>(
   (['copyWithin', 'fill', 'pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'] as const).map((name) => {
     const method = Array.prototype[name] as (...args: unknown[]) => unknown
     return [name, function (this: unknown[], ...args: unknown[]) {
-      return batch(() => method.apply(this, args))
+      return batch(() => untrack(() => method.apply(this, args)))
     }]
   }),
 )
@@ -195,8 +195,13 @@ function cloneRaw<T>(value: T, seen: Map<object, unknown>): T {
   if (isPlain(raw)) {
     const copy: Record<string, unknown> = {}
     seen.set(raw, copy)
-    for (const [k, v] of Object.entries(raw))
-      copy[k] = cloneRaw(v, seen)
+    for (const [k, v] of Object.entries(raw)) {
+      // Assigning `__proto__` would set the copy's prototype; JSON.parse makes it an own key, so it stays one.
+      if (k === '__proto__')
+        Object.defineProperty(copy, k, { value: cloneRaw(v, seen), writable: true, enumerable: true, configurable: true })
+      else
+        copy[k] = cloneRaw(v, seen)
+    }
     return copy as T
   }
   return raw as T
