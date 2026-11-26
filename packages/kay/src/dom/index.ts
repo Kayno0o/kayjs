@@ -143,11 +143,21 @@ export function mount(container: Element, render: () => Node | DocumentFragment 
   return () => disposeOwner(owner)
 }
 
+function warnMismatch(node: Node, expectedTag: string, steppedOver: boolean): void {
+  const island = hydrateRoot?.getAttribute('c') ?? hydrateRoot?.tagName.toLowerCase() ?? 'unknown'
+  const found = node.nodeType === 1
+    ? `<${(node as Element).tagName.toLowerCase()}>`
+    : node.nodeType === 3
+      ? `#text(${JSON.stringify((node as Text).data.slice(0, 30))})`
+      : node.nodeType === 8
+        ? `<!--${(node as Comment).data}-->`
+        : `nodeType(${node.nodeType})`
+  console.warn(`kay: hydration mismatch in island "${island}": expected <${expectedTag}>, found ${found}; ${steppedOver ? `hydrating the next <${expectedTag}>` : 'falling back to fresh clone'}.`)
+}
+
 export function template(html: string, isSvg?: boolean): () => Node {
   let cached: Node | undefined
-  const expectedTag = process.env.NODE_ENV !== 'production'
-    ? /^<([A-Za-z][^\s/>]*)/.exec(html)?.[1]?.toLowerCase()
-    : undefined
+  const expectedTag = /^<([A-Za-z][^\s/>]*)/.exec(html)?.[1]?.toLowerCase()
 
   const clone = (): Node => {
     if (cached === undefined) {
@@ -160,25 +170,19 @@ export function template(html: string, isSvg?: boolean): () => Node {
 
   return (): Node => {
     if (hydrating && hydrateNode !== null) {
-      const node = hydrateNode
-      if (process.env.NODE_ENV !== 'production' && expectedTag !== undefined) {
-        const foundTag = node.nodeType === 1 ? (node as Element).tagName.toLowerCase() : undefined
-        if (foundTag !== expectedTag) {
-          const island = hydrateRoot?.getAttribute('c') ?? hydrateRoot?.tagName.toLowerCase() ?? 'unknown'
-          const foundDesc = foundTag !== undefined
-            ? `<${foundTag}>`
-            : node.nodeType === 3
-              ? `#text(${JSON.stringify((node as Text).data.slice(0, 30))})`
-              : node.nodeType === 8
-                ? `<!--${(node as Comment).data}-->`
-                : `nodeType(${node.nodeType})`
-          console.warn(`kay: hydration mismatch in island "${island}": expected <${expectedTag}>, found ${foundDesc}; falling back to fresh clone.`)
-          hydrating = false
-          hydrateNode = null
-          const fresh = clone()
-          node.parentNode?.replaceChild(fresh, node)
-          return fresh
-        }
+      const stale = hydrateNode
+      // A node injected before the markup (an extension, a password manager) is stepped over; no matching node at all means the server rendered something else.
+      let node: Node | null = stale
+      while (node !== null && expectedTag !== undefined && node.nodeName.toLowerCase() !== expectedTag)
+        node = node.nextSibling
+      if (process.env.NODE_ENV !== 'production' && node !== stale)
+        warnMismatch(stale, expectedTag!, node !== null)
+      if (node === null) {
+        hydrating = false
+        hydrateNode = null
+        const fresh = clone()
+        stale.parentNode?.replaceChild(fresh, stale)
+        return fresh
       }
       hydrateNode = node.nextSibling
       return node

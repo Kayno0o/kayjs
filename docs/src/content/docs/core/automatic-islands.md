@@ -75,6 +75,10 @@ Props passed from server code into an island are serialized into HTML and restor
 
 When you pass server-rendered JSX children into an island (`<Modal><ServerMarkdown /></Modal>`), Kay renders those children on the server inside `<kay-slot>`. Hydration preserves the slot untouched and ships **0 bytes** of client JS for its content. The children render before the island, in the page's scope: they read the page's contexts, and an island among them hydrates on its own.
 
+## When the page changed before hydration
+
+A browser extension or a password manager sometimes adds its own element inside an island before it hydrates. Hydration steps over that element and attaches to the markup kay rendered. If the server rendered something else entirely, the island draws that part again from scratch rather than wiring handlers to the wrong element. Both work in production; in dev, the console also names the island, the element expected and the one found.
+
 ## What an island cannot use
 
 The browser renders an island without the page around it, so kay refuses what would differ there:
