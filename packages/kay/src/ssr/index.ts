@@ -298,21 +298,13 @@ export function ssrSlot(html: string): TrackedSlot {
   return slot
 }
 
-export function ssrIslandStatic(
-  chunk: string,
-  openTag: string,
+function renderIslandBody(
+  ctx: ReturnType<typeof currentRenderContext>,
   render: (() => string) | undefined,
-  hydrate?: HydrateStrategy,
-  name?: string,
-  slot?: TrackedSlot,
-): string {
-  if (getIslandDepth() > 0)
-    return render !== undefined ? render() : ''
-
-  const ctx = currentRenderContext()
-  if (ctx !== undefined)
-    recordRenderedIsland(chunk, hydrate)
-
+  hydrate: HydrateStrategy | undefined,
+  name: string | undefined,
+  slot: TrackedSlot | undefined,
+): { idAttr: string, inner: string, hiddenSlot: string } {
   let idAttr = ''
   let inner = ''
   if (render !== undefined && hydrate !== 'client') {
@@ -340,6 +332,25 @@ export function ssrIslandStatic(
   const hiddenSlot = slot !== undefined && !slot.used && slot.html !== ''
     ? `<template data-kay-slot>${slot.html}</template>`
     : ''
+  return { idAttr, inner, hiddenSlot }
+}
+
+export function ssrIslandStatic(
+  chunk: string,
+  openTag: string,
+  render: (() => string) | undefined,
+  hydrate?: HydrateStrategy,
+  name?: string,
+  slot?: TrackedSlot,
+): string {
+  if (getIslandDepth() > 0)
+    return render !== undefined ? render() : ''
+
+  const ctx = currentRenderContext()
+  if (ctx !== undefined)
+    recordRenderedIsland(chunk, hydrate)
+
+  const { idAttr, inner, hiddenSlot } = renderIslandBody(ctx, render, hydrate, name, slot)
   const tag = idAttr === '' ? openTag : `${openTag.slice(0, -1)}${idAttr}>`
   return `${tag}${inner}${hiddenSlot}</kay-island>`
 }
@@ -377,33 +388,7 @@ export function ssrIsland(
     ? ` h="${escAttr(hydrate)}"`
     : ''
 
-  let idAttr = ''
-  let inner = ''
-  if (hydrate !== 'client') {
-    if (ctx !== undefined) {
-      const prevPrefix = ctx.idPrefix
-      const prevSeq = ctx.idSeq
-      const islandPrefix = `i${ctx.islandSeq++}-`
-      ctx.idPrefix = islandPrefix
-      ctx.idSeq = 0
-      try {
-        inner = ssrInIsland(render, undefined, undefined, name)
-        if (ctx.idSeq > 0)
-          idAttr = ` i="${islandPrefix}"`
-      }
-      finally {
-        ctx.idPrefix = prevPrefix
-        ctx.idSeq = prevSeq
-      }
-    }
-    else {
-      inner = ssrInIsland(render, undefined, undefined, name)
-    }
-  }
-
-  const hiddenSlot = slot !== undefined && !slot.used && slot.html !== ''
-    ? `<template data-kay-slot>${slot.html}</template>`
-    : ''
+  const { idAttr, inner, hiddenSlot } = renderIslandBody(ctx, render, hydrate, name, slot)
   return `<kay-island c="${escAttr(chunk)}"${propsAttr}${hydrateAttr}${idAttr}>${inner}${hiddenSlot}${propsScript}</kay-island>`
 }
 

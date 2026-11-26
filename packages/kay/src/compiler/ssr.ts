@@ -32,8 +32,8 @@ import {
   VOID_ELEMENTS,
 } from './shared'
 import {
-  containsDirectAwait,
   emitSsrElementAttrs,
+  precomputeSsrSubtreeFlags,
   serializeComponentProps,
   StringParts,
 } from './ssr-helpers'
@@ -77,6 +77,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   const emitMarkers = options.emitMarkers ?? options.isIsland ?? analysis.isInteractive
   const jsxNodes = analysis.jsxNodes
   const exprContext = createExprContext(program, jsxNodes)
+  const { directAwaitNodes, dynamicChildNodes } = precomputeSsrSubtreeFlags(program)
 
   function compileSubExpression(node: Node): string {
     if (!containsJsx(node, jsxNodes))
@@ -108,7 +109,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     if (stmts.length === 0)
       return parts.toExpr()
     flush()
-    const hasAwait = children.some(c => containsDirectAwait(c))
+    const hasAwait = children.some(c => directAwaitNodes.has(c))
     if (hasAwait)
       return `(await (async () => { let ${bufVar} = ""; ${stmts.join(' ')} return ${bufVar}; })())`
     return `(() => { let ${bufVar} = ""; ${stmts.join(' ')} return ${bufVar}; })()`
@@ -334,7 +335,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     if (islandInfo === undefined && islands !== undefined && hydrateExpr !== undefined)
       throw mistake(`$hydrate on <${tag}>`, filename, `${tag} is not an island, so it never hydrates; drop $hydrate, or give ${tag} state or handlers`)
 
-    const childrenHaveAwait = hasChildren && childNodes.some(c => containsDirectAwait(c))
+    const childrenHaveAwait = hasChildren && childNodes.some(c => directAwaitNodes.has(c))
     const childMarkers = islandInfo === undefined && emitMarkers
     const childExpr = hasChildren ? compileChildrenListToStringExpr(childNodes, childMarkers, childMarkers && meaningfulChildren.length > 1) : '""'
 
@@ -399,19 +400,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       return
     }
 
-    const childrenHaveDynamic = hasChildren && childNodes.some((c) => {
-      let dynamic = false
-      walk(c, (n) => {
-        if (dynamic)
-          return false
-        if (n.type === 'JSXExpressionContainer' && n.expression.type !== 'JSXEmptyExpression')
-          dynamic = true
-        else if (n.type === 'JSXElement' && isComponentTag(jsxTagName(n.openingElement.name)))
-          dynamic = true
-        return undefined
-      })
-      return dynamic
-    })
+    const childrenHaveDynamic = hasChildren && childNodes.some(c => dynamicChildNodes.has(c))
 
     // Lazy memoized getter for non-async dynamic/component children so Providers & context components run before their children!
     if (childrenHaveDynamic && !childrenHaveAwait) {
@@ -447,7 +436,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       return parts.toExpr()
 
     flush()
-    if (containsDirectAwait(node))
+    if (directAwaitNodes.has(node))
       return `(await (async () => { let ${bufVar} = ""; ${stmts.join(' ')} return ${bufVar}; })())`
     return `(() => { let ${bufVar} = ""; ${stmts.join(' ')} return ${bufVar}; })()`
   }

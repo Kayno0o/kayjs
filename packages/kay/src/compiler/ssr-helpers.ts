@@ -1,8 +1,9 @@
 // Helper utilities for the SSR compiler: string buffer builder, static attribute folding, component prop serialization, and `<select>`/`<option>` helpers.
 
-import type { JSXAttributeItem, JSXChild, JSXElement, Node } from 'oxc-parser'
+import type { JSXAttributeItem, JSXChild, JSXElement, Node, Program } from 'oxc-parser'
+import { visitorKeys } from 'oxc-parser'
 import { URL_ATTRS } from '../attrs'
-import { walk } from './ast'
+import { styleText } from '../style'
 import {
   cleanJsxText,
   decodeHtmlEntities,
@@ -10,31 +11,78 @@ import {
   EVENT_ATTR,
   filterMeaningfulChildren,
   isBlockedAttr,
+  isComponentTag,
   isStringBoolAttr,
   isUnsafeUrlAttr,
   jsxTagName,
   staticLiteral,
+  unwrapTsExpr,
 } from './shared'
 
-export function containsDirectAwait(root: Node): boolean {
-  let found = false
-  walk(root, (child) => {
-    if (found)
-      return false
-    if (child !== root && (
-      child.type === 'FunctionDeclaration'
-      || child.type === 'FunctionExpression'
-      || child.type === 'ArrowFunctionExpression'
-    )) {
-      return false
+export interface SsrSubtreeFlags {
+  directAwaitNodes: WeakSet<Node>
+  dynamicChildNodes: WeakSet<Node>
+}
+
+const AWAIT_BIT = 1
+const DYNAMIC_BIT = 2
+
+function isFunctionNode(type: string): boolean {
+  return type === 'FunctionDeclaration' || type === 'FunctionExpression' || type === 'ArrowFunctionExpression'
+}
+
+/** Precomputes direct-await and dynamic-JSX-child subtree membership in a single O(N) bottom-up pass. */
+export function precomputeSsrSubtreeFlags(program: Program): SsrSubtreeFlags {
+  const directAwaitNodes = new WeakSet<Node>()
+  const dynamicChildNodes = new WeakSet<Node>()
+
+  const visit = (node: unknown): number => {
+    if (node === null || typeof node !== 'object')
+      return 0
+    if (Array.isArray(node)) {
+      let mask = 0
+      for (let i = 0; i < node.length; i++)
+        mask |= visit(node[i])
+      return mask
     }
-    if (child.type === 'AwaitExpression') {
-      found = true
-      return false
+    const ast = node as Node
+    const type = ast.type
+    if (typeof type !== 'string')
+      return 0
+
+    let mask = 0
+    if (type === 'AwaitExpression') {
+      mask |= AWAIT_BIT
     }
-    return undefined
-  })
-  return found
+    else if (
+      (type === 'JSXExpressionContainer' && ast.expression.type !== 'JSXEmptyExpression')
+      || (type === 'JSXElement' && isComponentTag(jsxTagName(ast.openingElement.name)))
+    ) {
+      mask |= DYNAMIC_BIT
+    }
+
+    const keys = visitorKeys[type]
+    const rec = ast as unknown as Record<string, unknown>
+    if (keys !== undefined) {
+      for (let i = 0; i < keys.length; i++)
+        mask |= visit(rec[keys[i]!])
+    }
+    else {
+      for (const [k, v] of Object.entries(rec)) {
+        if (k !== 'start' && k !== 'end' && k !== 'type')
+          mask |= visit(v)
+      }
+    }
+
+    if ((mask & AWAIT_BIT) !== 0)
+      directAwaitNodes.add(ast)
+    if ((mask & DYNAMIC_BIT) !== 0)
+      dynamicChildNodes.add(ast)
+    return isFunctionNode(type) ? (mask & ~AWAIT_BIT) : mask
+  }
+
+  visit(program)
+  return { directAwaitNodes, dynamicChildNodes }
 }
 
 export class StringParts {
@@ -76,26 +124,81 @@ function isStaticNullish(node: Node): boolean {
     || (node.type === 'Literal' && node.value === null)
 }
 
+export function staticLiteralOrTemplate(node: Node): { ok: true, value: string | number | boolean | null } | { ok: false } {
+  const n = unwrapTsExpr(node)
+  if (n.type === 'TemplateLiteral' && n.expressions.length === 0 && n.quasis.length === 1) {
+    const cooked = n.quasis[0]?.value.cooked
+    if (typeof cooked === 'string')
+      return { ok: true, value: cooked }
+  }
+  return staticLiteral(n)
+}
+
+export function formatStaticAttrValue(name: string, value: string | number | boolean | null, tag?: string): string {
+  if (value === null || isBlockedAttr(name))
+    return ''
+  if (typeof value === 'boolean') {
+    if (isStringBoolAttr(name))
+      return ` ${name}="${value ? 'true' : 'false'}"`
+    return value ? ` ${name}` : ''
+  }
+  if (isUnsafeUrlAttr(name, value, tag)) {
+    if (process.env.NODE_ENV !== 'production')
+      console.warn(`kay: dropped unsafe URL on <${tag ?? 'element'} ${name}>.`)
+    return ''
+  }
+  return ` ${name}="${escapeStaticAttr(String(value))}"`
+}
+
+export function staticStyleObject(node: Node): Record<string, string | number | boolean | null> | undefined {
+  const n = unwrapTsExpr(node)
+  if (n.type !== 'ObjectExpression')
+    return undefined
+  const obj: Record<string, string | number | boolean | null> = {}
+  for (const prop of n.properties) {
+    if (prop.type !== 'Property' || prop.kind !== 'init' || prop.computed)
+      return undefined
+    let key: string
+    if (prop.key.type === 'Identifier')
+      key = prop.key.name
+    else if (prop.key.type === 'Literal' && (typeof prop.key.value === 'string' || typeof prop.key.value === 'number'))
+      key = String(prop.key.value)
+    else
+      return undefined
+    if (key === '__proto__')
+      return undefined
+    const lit = staticLiteralOrTemplate(prop.value)
+    if (!lit.ok)
+      return undefined
+    obj[key] = lit.value
+  }
+  return obj
+}
+
+export function formatStaticStyleExpr(expr: Node): string | undefined {
+  const unwrapped = unwrapTsExpr(expr)
+  const lit = staticLiteralOrTemplate(unwrapped)
+  if (lit.ok)
+    return typeof lit.value === 'string' ? ` style="${escapeStaticAttr(lit.value)}"` : ''
+  if (isStaticNullish(unwrapped))
+    return ''
+  const obj = staticStyleObject(unwrapped)
+  if (obj !== undefined) {
+    const css = styleText(obj)
+    return css === '' ? '' : ` style="${escapeStaticAttr(css)}"`
+  }
+  return undefined
+}
+
 export function formatStaticAttrBranch(attrName: string, node: Node, tag?: string): string | undefined {
   if (isBlockedAttr(attrName))
     return '""'
-  if (isStaticNullish(node))
+  const unwrapped = unwrapTsExpr(node)
+  if (isStaticNullish(unwrapped))
     return '""'
-  if (node.type === 'Literal') {
-    if (typeof node.value === 'boolean') {
-      if (isStringBoolAttr(attrName))
-        return JSON.stringify(` ${attrName}="${node.value ? 'true' : 'false'}"`)
-      return node.value ? JSON.stringify(` ${attrName}`) : '""'
-    }
-    if (typeof node.value === 'string' || typeof node.value === 'number') {
-      if (isUnsafeUrlAttr(attrName, node.value, tag)) {
-        if (process.env.NODE_ENV !== 'production')
-          console.warn(`kay: dropped unsafe URL on <${tag ?? 'element'} ${attrName}>.`)
-        return '""'
-      }
-      return JSON.stringify(` ${attrName}="${escapeStaticAttr(String(node.value))}"`)
-    }
-  }
+  const lit = staticLiteralOrTemplate(unwrapped)
+  if (lit.ok)
+    return JSON.stringify(formatStaticAttrValue(attrName, lit.value, tag))
   return undefined
 }
 
@@ -227,6 +330,64 @@ export interface SsrElementAttrsResult {
   nextSelectValue: SelectValueBinding | undefined
 }
 
+function emitSsrExprAttr(
+  ctx: SsrElementAttrsContext,
+  name: string,
+  expr: Node,
+  isOption: boolean,
+): { staticValue?: string | undefined, expr?: string | undefined } | undefined {
+  const { tag, parts, activeSelectValue, flushParts, pushStmt, nextId, use, compileSubExpression } = ctx
+
+  if (name === 'style') {
+    const staticStyle = formatStaticStyleExpr(expr)
+    if (staticStyle !== undefined)
+      parts.pushStatic(staticStyle)
+    else
+      parts.pushExpr(`${use('ssrStyle')}(${compileSubExpression(expr)})`)
+    return undefined
+  }
+
+  const unwrapped = unwrapTsExpr(expr)
+  const lit = staticLiteralOrTemplate(unwrapped)
+  if (lit.ok) {
+    parts.pushStatic(formatStaticAttrValue(name, lit.value, tag))
+    if (isOption && name === 'value' && (typeof lit.value === 'string' || typeof lit.value === 'number'))
+      return { staticValue: String(lit.value) }
+    return undefined
+  }
+  if (isStaticNullish(unwrapped))
+    return undefined
+
+  if (isOption && name === 'value' && activeSelectValue !== undefined) {
+    const exprCode = compileSubExpression(expr)
+    if (isSimpleValueExpr(expr)) {
+      parts.pushExpr(`${use('ssrAttr')}("value", ${exprCode})`)
+      return { expr: exprCode }
+    }
+    const ovVar = `_ov${nextId()}`
+    flushParts()
+    pushStmt(`const ${ovVar} = ${exprCode};`)
+    parts.pushExpr(`${use('ssrAttr')}("value", ${ovVar})`)
+    return { expr: ovVar }
+  }
+
+  if (expr.type === 'ConditionalExpression') {
+    const cons = formatStaticAttrBranch(name, expr.consequent, tag)
+    const alt = formatStaticAttrBranch(name, expr.alternate, tag)
+    if (cons !== undefined && alt !== undefined) {
+      parts.pushExpr(`${compileSubExpression(expr.test)} ? ${cons} : ${alt}`)
+      return undefined
+    }
+  }
+
+  const exprCode = compileSubExpression(expr)
+  if (URL_ATTRS.has(name.toLowerCase()))
+    parts.pushExpr(`${use('ssrAttr')}(${JSON.stringify(name)}, ${exprCode}, ${JSON.stringify(tag)})`)
+  else
+    parts.pushExpr(`${use('ssrAttr')}(${JSON.stringify(name)}, ${exprCode})`)
+  return undefined
+}
+
 /** Emits an HTML/SVG element's SSR opening attributes, handling spreads, `<textarea value>`, and `<select value>`/`<option>`. */
 export function emitSsrElementAttrs(ctx: SsrElementAttrsContext): SsrElementAttrsResult {
   const { node, tag, parts, activeSelectValue, flushParts, pushStmt, nextId, use, compileSubExpression } = ctx
@@ -252,10 +413,16 @@ export function emitSsrElementAttrs(ctx: SsrElementAttrsContext): SsrElementAttr
     if (rawName === 'key' || rawName === 'ref' || rawName === '$hydrate' || EVENT_ATTR.test(rawName))
       continue
     if (rawName === 'innerHTML') {
-      if (attr.value?.type === 'Literal')
+      if (attr.value?.type === 'Literal') {
         innerHtmlExpr = JSON.stringify(String(attr.value.value))
-      else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
-        innerHtmlExpr = `${use('ssrRaw')}(${compileSubExpression(attr.value.expression)})`
+      }
+      else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+        const lit = staticLiteralOrTemplate(attr.value.expression)
+        if (lit.ok)
+          innerHtmlExpr = lit.value === null || lit.value === false ? '""' : JSON.stringify(String(lit.value))
+        else
+          innerHtmlExpr = `${use('ssrRaw')}(${compileSubExpression(attr.value.expression)})`
+      }
       continue
     }
 
@@ -264,10 +431,16 @@ export function emitSsrElementAttrs(ctx: SsrElementAttrsContext): SsrElementAttr
       continue
 
     if (isTextarea && name === 'value') {
-      if (attr.value?.type === 'Literal')
+      if (attr.value?.type === 'Literal') {
         textareaValue = { staticText: String(attr.value.value) }
-      else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
-        textareaValue = { expr: compileSubExpression(attr.value.expression) }
+      }
+      else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+        const lit = staticLiteralOrTemplate(attr.value.expression)
+        if (lit.ok)
+          textareaValue = { staticText: lit.value === null || typeof lit.value === 'boolean' ? '' : String(lit.value) }
+        else
+          textareaValue = { expr: compileSubExpression(attr.value.expression) }
+      }
       continue
     }
 
@@ -276,10 +449,17 @@ export function emitSsrElementAttrs(ctx: SsrElementAttrsContext): SsrElementAttr
         nextSelectValue = { staticValue: String(attr.value.value), multiple: selectIsMultiple }
       }
       else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
-        const svVar = `_sv${nextId()}`
-        flushParts()
-        pushStmt(`const ${svVar} = ${compileSubExpression(attr.value.expression)};`)
-        nextSelectValue = { expr: svVar, multiple: selectIsMultiple }
+        const lit = staticLiteralOrTemplate(attr.value.expression)
+        if (lit.ok) {
+          if (lit.value !== null)
+            nextSelectValue = { staticValue: String(lit.value), multiple: selectIsMultiple }
+        }
+        else {
+          const svVar = `_sv${nextId()}`
+          flushParts()
+          pushStmt(`const ${svVar} = ${compileSubExpression(attr.value.expression)};`)
+          nextSelectValue = { expr: svVar, multiple: selectIsMultiple }
+        }
       }
       continue
     }
@@ -325,46 +505,12 @@ export function emitSsrElementAttrs(ctx: SsrElementAttrsContext): SsrElementAttr
     else if (attr.value.type === 'Literal') {
       if (isOption && name === 'value')
         optionValue = { staticValue: String(attr.value.value) }
-      if (!isUnsafeUrlAttr(name, attr.value.value, tag))
-        parts.pushStatic(` ${name}="${escapeStaticAttr(String(attr.value.value))}"`)
-      else if (process.env.NODE_ENV !== 'production')
-        console.warn(`kay: dropped unsafe URL on <${tag} ${name}>.`)
+      parts.pushStatic(formatStaticAttrValue(name, String(attr.value.value), tag))
     }
     else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
-      const expr = attr.value.expression
-
-      if (isOption && name === 'value' && activeSelectValue !== undefined) {
-        const exprCode = compileSubExpression(expr)
-        if (isSimpleValueExpr(expr)) {
-          optionValue = { expr: exprCode }
-          parts.pushExpr(`${use('ssrAttr')}("value", ${exprCode})`)
-        }
-        else {
-          const ovVar = `_ov${nextId()}`
-          flushParts()
-          pushStmt(`const ${ovVar} = ${exprCode};`)
-          optionValue = { expr: ovVar }
-          parts.pushExpr(`${use('ssrAttr')}("value", ${ovVar})`)
-        }
-        continue
-      }
-
-      if (name !== 'style' && expr.type === 'ConditionalExpression') {
-        const cons = formatStaticAttrBranch(name, expr.consequent, tag)
-        const alt = formatStaticAttrBranch(name, expr.alternate, tag)
-        if (cons !== undefined && alt !== undefined) {
-          parts.pushExpr(`${compileSubExpression(expr.test)} ? ${cons} : ${alt}`)
-          continue
-        }
-      }
-
-      const exprCode = compileSubExpression(expr)
-      if (name === 'style')
-        parts.pushExpr(`${use('ssrStyle')}(${exprCode})`)
-      else if (URL_ATTRS.has(name.toLowerCase()))
-        parts.pushExpr(`${use('ssrAttr')}(${JSON.stringify(name)}, ${exprCode}, ${JSON.stringify(tag)})`)
-      else
-        parts.pushExpr(`${use('ssrAttr')}(${JSON.stringify(name)}, ${exprCode})`)
+      const opt = emitSsrExprAttr(ctx, name, attr.value.expression, isOption)
+      if (opt !== undefined)
+        optionValue = opt
     }
   }
 

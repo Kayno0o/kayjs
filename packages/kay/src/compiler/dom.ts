@@ -16,7 +16,7 @@ import type { HydrationMarker, MapCallMatch } from './shared'
 
 import { analyzeModule, loadDeclarations, parseTsx } from './analyze'
 import { walk } from './ast'
-import { compileElementAttributes, compileRawTextChildren, resolveComponentCallee } from './dom-attrs'
+import { collectStaticStyleNames, compileElementAttributes, compileRawTextChildren, formatSetTextOp, resolveComponentCallee } from './dom-attrs'
 import { emitWalkStatements, moduleHeader, SVG_CHILD_TAGS } from './emit'
 import { SourceEditor } from './patch'
 import { createPropCompiler, isStaticPropExpr, withoutBindings } from './props'
@@ -56,6 +56,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   const loadNodes = new Set<Node>(loadDeclarations(program))
   const jsxNodes = analysis.jsxNodes
   const exprContext = createExprContext(program, jsxNodes)
+  const staticStyleNames = collectStaticStyleNames(program, exprContext.primitiveVars)
 
   const editor = new SourceEditor(code)
   const used = new Set<string>()
@@ -228,22 +229,20 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     const textSlotsByParent = new Map<string, Set<number>>()
     const rangeSlotsByParent = new Map<string, Set<number>>()
 
-    const addTextSlot = (parentVar: string, idx: number) => {
-      let s = textSlotsByParent.get(parentVar)
+    const addSlot = (map: Map<string, Set<number>>, parentVar: string, idx: number) => {
+      let s = map.get(parentVar)
       if (s === undefined) {
         s = new Set()
-        textSlotsByParent.set(parentVar, s)
+        map.set(parentVar, s)
       }
       s.add(idx)
     }
-
-    const addRangeSlot = (parentVar: string, idx: number) => {
-      let s = rangeSlotsByParent.get(parentVar)
-      if (s === undefined) {
-        s = new Set()
-        rangeSlotsByParent.set(parentVar, s)
+    const renameSlot = (map: Map<string, Set<number>>, from: string, to: string) => {
+      const slots = map.get(from)
+      if (slots !== undefined) {
+        map.delete(from)
+        map.set(to, slots)
       }
-      s.add(idx)
     }
 
     function requestChild(parentVar: string, index: number): string {
@@ -266,6 +265,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         tag,
         elVar,
         scopeRewrites,
+        staticStyleNames,
         ops,
         postChildOps,
         delegatedEvents,
@@ -293,7 +293,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           return 'null'
         const v = requestChild(elVar, domIndex)
         html += open + close
-        addRangeSlot(elVar, domIndex + 1)
+        addSlot(rangeSlotsByParent, elVar, domIndex + 1)
         domIndex += 2
         return v
       }
@@ -312,7 +312,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           const startVar = requestChild(elVar, domIndex)
           const endVar = requestChild(elVar, domIndex + 1)
           html += open + close
-          addRangeSlot(elVar, domIndex + 1)
+          addSlot(rangeSlotsByParent, elVar, domIndex + 1)
           domIndex += 2
           ops.push(`${use('insert')}(${elVar}, () => ${valueCode}, ${endVar}, ${startVar});`)
         }
@@ -351,16 +351,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
                 if (walkPlan[k]!.parentVar === placeholderVar)
                   walkPlan[k]!.parentVar = realVar
               }
-              const tSlots = textSlotsByParent.get(placeholderVar)
-              if (tSlots !== undefined) {
-                textSlotsByParent.delete(placeholderVar)
-                textSlotsByParent.set(realVar, tSlots)
-              }
-              const rSlots = rangeSlotsByParent.get(placeholderVar)
-              if (rSlots !== undefined) {
-                rangeSlotsByParent.delete(placeholderVar)
-                rangeSlotsByParent.set(realVar, rSlots)
-              }
+              renameSlot(textSlotsByParent, placeholderVar, realVar)
+              renameSlot(rangeSlotsByParent, placeholderVar, realVar)
             }
             html += subHtml
             domIndex++
@@ -420,7 +412,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               const markerVar = requestChild(elVar, domIndex)
               if (marker === 'text') {
                 html += `${open} ${close}`
-                addTextSlot(elVar, domIndex + 1)
+                addSlot(textSlotsByParent, elVar, domIndex + 1)
                 domIndex += 3
               }
               else {
@@ -429,7 +421,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               }
               ops.push(`const ${txtVar} = ${use('textAfter')}(${markerVar});`)
             }
-            ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
+            ops.push(formatSetTextOp(txtVar, exprCode, slot.expr, scopeRewrites, use))
           }
         }
       }
@@ -529,7 +521,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         if (marker === 'range')
           items.push(`${use('fragInsert')}(() => (${exprCode}))`)
         else
-          items.push(`(() => { const _t = ${use('fragText')}("", true); ${use('effect')}(() => ${use('setText')}(_t, (${exprCode}))); return _t; })()`)
+          items.push(`(() => { const _t = ${use('fragText')}("", true); ${formatSetTextOp('_t', `(${exprCode})`, slot.expr, scopeRewrites, use)} return _t; })()`)
       }
     }
     flushStatic()

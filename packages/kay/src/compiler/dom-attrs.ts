@@ -1,10 +1,12 @@
 // Element attribute, event, spread, ref, component callee, and raw-text compilation helpers for the DOM compiler.
 
-import type { JSXElement, Node } from 'oxc-parser'
+import type { JSXElement, Node, Program } from 'oxc-parser'
+import { walk } from './ast'
 import { DELEGATED_EVENTS } from './emit'
 import { isStaticPropExpr } from './props'
 import {
   cleanJsxText,
+  collectPatternNames,
   DOM_PROPS,
   escapeRawText,
   escapeStaticAttr,
@@ -14,11 +16,87 @@ import {
   isStringBoolAttr,
   isUnsafeUrlAttr,
   jsxTagName,
-  staticLiteral,
   unwrapTsExpr,
 } from './shared'
+import { formatStaticAttrValue, formatStaticStyleExpr, staticLiteralOrTemplate } from './ssr-helpers'
 
 const SIMPLE_CALLEE_RE = /^[A-Za-z_$][\w$.]*$/
+
+function isPlainInitObject(node: Node): boolean {
+  const cur = unwrapTsExpr(node)
+  if (cur.type !== 'ObjectExpression')
+    return false
+  for (const prop of cur.properties) {
+    if (prop.type !== 'Property' || prop.kind !== 'init')
+      return false
+  }
+  return true
+}
+
+/** Names provably never holding a reactive `store()` proxy (local plain-object `const`s or known primitives). */
+export function collectStaticStyleNames(program: Program, primitiveVars: ReadonlySet<string>): Set<string> {
+  const safe = new Set<string>(primitiveVars)
+  const unsafe = new Set<string>()
+  const mark = (pat: Node | null | undefined): void => {
+    if (pat != null)
+      collectPatternNames(pat, unsafe)
+  }
+  walk(program, (n) => {
+    if (n.type === 'VariableDeclaration') {
+      for (const d of n.declarations) {
+        if (n.kind === 'const' && d.id.type === 'Identifier' && d.init !== null && isPlainInitObject(d.init))
+          safe.add(d.id.name)
+        else if (n.kind !== 'const' || d.id.type !== 'Identifier' || !primitiveVars.has(d.id.name))
+          mark(d.id)
+      }
+      return
+    }
+    if (n.type === 'ImportSpecifier' || n.type === 'ImportDefaultSpecifier' || n.type === 'ImportNamespaceSpecifier')
+      mark(n.local)
+    else if (n.type === 'CatchClause')
+      mark(n.param)
+    else if (n.type === 'FunctionDeclaration' || n.type === 'ClassDeclaration')
+      mark(n.id)
+    if (n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' || n.type === 'ArrowFunctionExpression') {
+      for (const p of n.params)
+        mark(p)
+    }
+  })
+  for (const name of unsafe)
+    safe.delete(name)
+  return safe
+}
+
+/** True when a DOM expression cannot subscribe to any signal, prop getter, or reactive store, so `__effect()` can be omitted. */
+export function isStaticDomExpr(
+  rawNode: Node,
+  scopeRewrites: ReadonlyMap<string, string>,
+  isStyle = false,
+  staticStyleNames?: ReadonlySet<string>,
+): boolean {
+  if (!isStaticPropExpr(rawNode, scopeRewrites))
+    return false
+  if (!isStyle)
+    return true
+  const node = unwrapTsExpr(rawNode)
+  if (node.type === 'Identifier')
+    return staticStyleNames?.has(node.name) === true
+  return true
+}
+
+function wrapDomOp(stmt: string, isStatic: boolean, use: (name: string) => string): string {
+  return isStatic ? `${stmt};` : `${use('effect')}(() => ${stmt});`
+}
+
+export function formatSetTextOp(
+  targetVar: string,
+  exprCode: string,
+  expr: Node,
+  scopeRewrites: ReadonlyMap<string, string>,
+  use: (name: string) => string,
+): string {
+  return wrapDomOp(`${use('setText')}(${targetVar}, ${exprCode})`, isStaticDomExpr(expr, scopeRewrites), use)
+}
 
 /** Rewrites a JSX component tag's root identifier through `scopeRewrites` (`<Icon />` -> `__p.Icon`, `<ui.Icon />` -> `__p.ui.Icon`). */
 export function resolveComponentCallee(tag: string, scopeRewrites: ReadonlyMap<string, string>): string {
@@ -36,12 +114,54 @@ export interface ElementAttrCompileContext {
   tag: string
   elVar: string
   scopeRewrites: ReadonlyMap<string, string>
+  staticStyleNames?: ReadonlySet<string> | undefined
   ops: string[]
   postChildOps: string[]
   delegatedEvents: Set<string>
   use: (name: string) => string
   freshVar: (prefix?: string) => string
   compileExpression: (node: Node, rewrites: ReadonlyMap<string, string>) => string
+}
+
+function emitDomExprAttr(
+  ctx: ElementAttrCompileContext,
+  name: string,
+  expr: Node,
+  isSelect: boolean,
+): string {
+  const { tag, elVar, scopeRewrites, staticStyleNames, ops, postChildOps, use, compileExpression } = ctx
+
+  if (name === 'style') {
+    const staticStyle = formatStaticStyleExpr(expr)
+    if (staticStyle !== undefined)
+      return staticStyle
+    const exprCode = compileExpression(expr, scopeRewrites)
+    ops.push(wrapDomOp(`${use('setStyle')}(${elVar}, ${exprCode})`, isStaticDomExpr(expr, scopeRewrites, true, staticStyleNames), use))
+    return ''
+  }
+
+  if (!DOM_PROPS.has(name)) {
+    const unwrapped = unwrapTsExpr(expr)
+    const lit = staticLiteralOrTemplate(unwrapped)
+    if (lit.ok)
+      return formatStaticAttrValue(name, lit.value, tag)
+    if (unwrapped.type === 'Identifier' && unwrapped.name === 'undefined' && !scopeRewrites.has('undefined'))
+      return ''
+  }
+
+  const exprCode = compileExpression(expr, scopeRewrites)
+  const isStatic = isStaticDomExpr(expr, scopeRewrites)
+  if (name === 'class') {
+    ops.push(wrapDomOp(`${use('setClass')}(${elVar}, ${exprCode})`, isStatic, use))
+  }
+  else if (DOM_PROPS.has(name)) {
+    const targetOps = isSelect && name === 'value' ? postChildOps : ops
+    targetOps.push(wrapDomOp(`${use('setProp')}(${elVar}, ${JSON.stringify(name)}, ${exprCode})`, isStatic, use))
+  }
+  else {
+    ops.push(wrapDomOp(`${use('setAttr')}(${elVar}, ${JSON.stringify(name)}, ${exprCode})`, isStatic, use))
+  }
+  return ''
 }
 
 /** Compiles an HTML/SVG element's attributes, returning the static attribute HTML fragment and pushing DOM ops. */
@@ -71,10 +191,13 @@ export function compileElementAttributes(ctx: ElementAttrCompileContext): string
         continue
 
       if (rawName === 'innerHTML') {
-        if (attr.value?.type === 'Literal')
+        if (attr.value?.type === 'Literal') {
           ops.push(`${use('setInnerHtml')}(${elVar}, ${JSON.stringify(String(attr.value.value))});`)
-        else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
-          ops.push(`${use('effect')}(() => ${use('setInnerHtml')}(${elVar}, ${compileExpression(attr.value.expression, scopeRewrites)}));`)
+        }
+        else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+          const expr = attr.value.expression
+          ops.push(wrapDomOp(`${use('setInnerHtml')}(${elVar}, ${compileExpression(expr, scopeRewrites)})`, isStaticDomExpr(expr, scopeRewrites), use))
+        }
         continue
       }
 
@@ -123,10 +246,13 @@ export function compileElementAttributes(ctx: ElementAttrCompileContext): string
     }
 
     if (rawName === 'innerHTML') {
-      if (attr.value?.type === 'Literal')
+      if (attr.value?.type === 'Literal') {
         ops.push(`${use('setInnerHtml')}(${elVar}, ${JSON.stringify(String(attr.value.value))});`)
-      else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression')
-        ops.push(`${use('effect')}(() => ${use('setInnerHtml')}(${elVar}, ${compileExpression(attr.value.expression, scopeRewrites)}));`)
+      }
+      else if (attr.value?.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
+        const expr = attr.value.expression
+        ops.push(wrapDomOp(`${use('setInnerHtml')}(${elVar}, ${compileExpression(expr, scopeRewrites)})`, isStaticDomExpr(expr, scopeRewrites), use))
+      }
       continue
     }
 
@@ -176,37 +302,7 @@ export function compileElementAttributes(ctx: ElementAttrCompileContext): string
       }
     }
     else if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression.type !== 'JSXEmptyExpression') {
-      const expr = attr.value.expression
-      const lit = !DOM_PROPS.has(name) ? staticLiteral(expr) : { ok: false as const }
-      if (lit.ok) {
-        if (typeof lit.value === 'boolean') {
-          if (isStringBoolAttr(name))
-            html += ` ${name}="${lit.value ? 'true' : 'false'}"`
-          else if (lit.value === true)
-            html += ` ${name}`
-        }
-        else if (lit.value !== null && !isUnsafeUrlAttr(name, lit.value, tag)) {
-          html += ` ${name}="${escapeStaticAttr(String(lit.value))}"`
-        }
-        else if (lit.value !== null && process.env.NODE_ENV !== 'production') {
-          console.warn(`kay: dropped unsafe URL on <${tag} ${name}>.`)
-        }
-        continue
-      }
-      const exprCode = compileExpression(expr, scopeRewrites)
-      if (name === 'class') {
-        ops.push(`${use('effect')}(() => ${use('setClass')}(${elVar}, ${exprCode}));`)
-      }
-      else if (name === 'style') {
-        ops.push(`${use('effect')}(() => ${use('setStyle')}(${elVar}, ${exprCode}));`)
-      }
-      else if (DOM_PROPS.has(name)) {
-        const targetOps = isSelect && name === 'value' ? postChildOps : ops
-        targetOps.push(`${use('effect')}(() => ${use('setProp')}(${elVar}, ${JSON.stringify(name)}, ${exprCode}));`)
-      }
-      else {
-        ops.push(`${use('effect')}(() => ${use('setAttr')}(${elVar}, ${JSON.stringify(name)}, ${exprCode}));`)
-      }
+      html += emitDomExprAttr(ctx, name, attr.value.expression, isSelect)
     }
   }
   return html
@@ -231,6 +327,7 @@ export function compileRawTextChildren(
 
   const chunks: ({ static: true, text: string } | { static: false, expr: string })[] = []
   let hasDynamic = false
+  let allStaticExprs = true
 
   for (const child of meaningful) {
     if (child.type === 'JSXText') {
@@ -255,6 +352,8 @@ export function compileRawTextChildren(
         }
       }
       hasDynamic = true
+      if (!isStaticDomExpr(expr, scopeRewrites))
+        allStaticExprs = false
       chunks.push({ static: false, expr: compileExpression(expr, scopeRewrites) })
     }
   }
@@ -274,6 +373,7 @@ export function compileRawTextChildren(
     return `((_v) => _v == null || typeof _v === "boolean" ? "" : String(_v))(${c.expr})`
   })
   const combined = parts.length === 1 ? parts[0]! : parts.join(' + ')
-  ops.push(`${use('effect')}(() => { const _s = ${combined}; if (${elVar}.textContent !== _s) ${elVar}.textContent = _s; });`)
+  const updateBody = `{ const _s = ${combined}; if (${elVar}.textContent !== _s) ${elVar}.textContent = _s; }`
+  ops.push(allStaticExprs ? updateBody : `${use('effect')}(() => ${updateBody});`)
   return ''
 }
