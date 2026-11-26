@@ -421,11 +421,10 @@ export function show(
       }
     }
 
-    clear()
-    branch = nextBranch
-
     const fn = cond ? renderTrue : renderFalse
     if (fn === undefined) {
+      clear()
+      branch = nextBranch
       if (startMarker !== undefined && startMarker !== null) {
         let n = startMarker.nextSibling
         while (n !== null && n !== marker) {
@@ -437,8 +436,19 @@ export function show(
       return
     }
 
-    owner = createOwner(parentOwner)
-    const res = claimInsert(parent, marker, () => untrack(() => runWithOwner(owner, fn)), startMarker)
+    // The new branch renders before the old one goes: one that throws leaves the old branch shown, and the next run tries it again.
+    const nextOwner = createOwner(parentOwner)
+    let res: ReturnType<typeof claimInsert<unknown>>
+    try {
+      res = claimInsert(parent, marker, () => untrack(() => runWithOwner(nextOwner, fn)), startMarker)
+    }
+    catch (err) {
+      disposeOwner(nextOwner)
+      throw err
+    }
+    clear()
+    owner = nextOwner
+    branch = nextBranch
     marker = res.marker
     const rendered = res.result
     const clearStale = (keep?: Node) => {

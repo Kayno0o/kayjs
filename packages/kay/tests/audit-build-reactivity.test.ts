@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import { build } from '../src/build/index'
+import { show } from '../src/dom/extras'
+import { hydrate, template } from '../src/dom/index'
 import { loop } from '../src/dom/loop'
 import { computed, effect, onCleanup, root, signal, store } from '../src/index'
 import { createOwner, disposeOwner, getOwner } from '../src/reactivity/index'
@@ -466,6 +468,82 @@ describe('audit #3526 — Box 36: disposed row owners & computeds unlink from pa
 
       dispose()
       expect(rootOwner!.fs).toBeUndefined()
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+    }
+  })
+
+  // The server rendered 'a,b,c' (one marker-free list, one between range comments); the browser's data has fewer rows by the time it hydrates.
+  test.each([
+    ['fewer rows', ['a'], 'a'],
+    ['no rows', [], ''],
+  ])('hydrating a list with %s than the server rendered removes the extra server rows (#3664)', async (_name, items, shown) => {
+    GlobalRegistrator.register()
+    const warn = console.warn
+    const warnings: string[] = []
+    console.warn = (message: string) => warnings.push(message)
+    try {
+      for (const html of ['<ul><li>a</li><li>b</li><li>c</li></ul>', '<ul><!--k[--><li>a</li><li>b</li><li>c</li><!--k]--><li>end</li></ul>']) {
+        const host = document.createElement('div')
+        host.innerHTML = html
+        const list = signal(items)
+        const ul = template('<ul></ul>')
+        const li = template('<li></li>')
+        const ranged = html.includes('k[')
+        hydrate(host, () => {
+          const el = ul()
+          loop(el, ranged ? el.firstChild : null, () => list.value, x => x, (item) => {
+            const row = li()
+            row.textContent = item.peek()
+            return row
+          })
+          return el
+        })
+        const rows = (): string => [...host.querySelectorAll('li')].map(n => n.textContent).filter(t => t !== 'end').join(',')
+
+        expect(rows()).toBe(shown)
+        list.value = [...items, 'z']
+        expect(rows()).toBe([...items, 'z'].join(','))
+        expect(host.querySelectorAll('li').length).toBe(items.length + 1 + (ranged ? 1 : 0))
+      }
+      expect(warnings.length).toBe(2)
+      expect(warnings[0]).toContain(`removed ${3 - items.length} server node`)
+    }
+    finally {
+      console.warn = warn
+      await GlobalRegistrator.unregister()
+    }
+  })
+
+  test('a branch that throws keeps the one shown before and renders again on the next run of its condition (#3664)', async () => {
+    GlobalRegistrator.register()
+    try {
+      const host = document.createElement('div')
+      const items = signal<number[]>([])
+      let throws = true
+      let emptyCleanups = 0
+      let thrownCleanups = 0
+      root(() => {
+        show(host, null, () => items.value.length > 0, () => {
+          if (throws) {
+            throws = false
+            onCleanup(() => thrownCleanups++)
+            throw new Error('branch threw')
+          }
+          return document.createTextNode(`list ${items.peek().length}`)
+        }, () => {
+          onCleanup(() => emptyCleanups++)
+          return document.createTextNode('empty')
+        })
+      })
+
+      expect(() => {
+        items.value = [1]
+      }).toThrow('branch threw')
+      expect([host.textContent, emptyCleanups, thrownCleanups]).toEqual(['empty', 0, 1])
+      items.value = [1, 2]
+      expect([host.textContent, emptyCleanups]).toEqual(['list 2', 1])
     }
     finally {
       await GlobalRegistrator.unregister()

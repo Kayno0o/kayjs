@@ -1,26 +1,26 @@
 {
   "bench-app": {
-    "/": 3918,
+    "/": 3917,
     "/regions": 3926,
-    "/table": 7016
+    "/table": 7077
   },
   "bench-app (spa)": {
-    "/": 7707,
-    "/regions": 10541,
-    "/table": 10765
+    "/": 7709,
+    "/regions": 10540,
+    "/table": 10833
   },
   "examples/noticeboard": {
-    "/": 16085,
-    "/login": 9866,
-    "/notices/:id": 9866
+    "/": 16161,
+    "/login": 9944,
+    "/notices/:id": 9944
   },
   "examples/showcase": {
-    "/account": 10156,
-    "/": 19929
+    "/account": 10242,
+    "/": 20008
   },
   "docs": {
     "/docs/*slug": 3974,
-    "/grammars": 13921,
+    "/grammars": 14017,
     "/": 3974
   }
 }

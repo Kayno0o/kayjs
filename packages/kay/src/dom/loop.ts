@@ -107,6 +107,48 @@ function adoptRowNodes<T>(parent: Node, marker: Node | null, row: Row<T>, before
   }
 }
 
+// Server rows past the browser's last one: the data changed between the render and hydration, so they would stay in the DOM outside `rows`.
+function dropServerRows(from: Node | null, marker: Node | null): void {
+  if (process.env.NODE_ENV !== 'production' && from !== null && from !== marker) {
+    let removed = 0
+    for (let n: Node | null = from; n !== null && n !== marker; n = n.nextSibling)
+      removed++
+    console.warn(`kay: hydration removed ${removed} server node(s) past the list's last row: the island's data changed after the server rendered it.`)
+  }
+  while (from !== null && from !== marker) {
+    const next: Node | null = from.nextSibling
+    ;(from as ChildNode).remove()
+    from = next
+  }
+}
+
+// The first rows: claimed from the server's while hydrating, else rendered into a fragment inserted at once.
+function createRows<T>(parent: Node, marker: Node | null, items: readonly T[], newRow: (item: T, index: number) => Row<T>, skip: number, startMarker: Node | null | undefined): Row<T>[] {
+  const created = new Array<Row<T>>(items.length)
+  let end: Node | null = null
+  if (claimLoop(parent, () => {
+    for (let i = 0; i < items.length; i++) {
+      const before = hydrateCursor()
+      const row = newRow(items[i]!, i)
+      adoptRowNodes(parent, marker, row, before)
+      created[i] = row
+    }
+    end = hydrateCursor()
+  }, skip, startMarker)) {
+    dropServerRows(end, marker)
+    return created
+  }
+  if (items.length > 0) {
+    const frag = document.createDocumentFragment()
+    for (let i = 0; i < items.length; i++) {
+      created[i] = newRow(items[i]!, i)
+      insertRow(frag, created[i]!, null)
+    }
+    parent.insertBefore(frag, marker)
+  }
+  return created
+}
+
 export function loop<T>(
   parent: Node,
   marker: Node | null,
@@ -189,9 +231,7 @@ export function loop<T>(
 
     untrack(() => {
       // Fast path 1: Clear all rows
-      if (nextLen === 0) {
-        if (prevLen === 0)
-          return
+      if (nextLen === 0 && prevLen > 0) {
         for (let i = 0; i < prevLen; i++)
           disposeOwner(rows[i]!.owner)
         if (marker === null && skip === 0) {
@@ -207,29 +247,7 @@ export function loop<T>(
 
       // Fast path 2: Initial creation from empty
       if (prevLen === 0) {
-        const created = new Array<Row<T>>(nextLen)
-        if (claimLoop(parent, () => {
-          for (let i = 0; i < nextLen; i++) {
-            const item = next[i]!
-            const before = hydrateCursor()
-            const row = makeRow(item, i, keyFn(item, i))
-            adoptRowNodes(parent, marker, row, before)
-            created[i] = row
-          }
-        }, skip, startMarker)) {
-          rows = created
-          return
-        }
-
-        const frag = document.createDocumentFragment()
-        for (let i = 0; i < nextLen; i++) {
-          const item = next[i]!
-          const row = makeRow(item, i, keyFn(item, i))
-          created[i] = row
-          insertRow(frag, row, null)
-        }
-        parent.insertBefore(frag, marker)
-        rows = created
+        rows = createRows(parent, marker, next, (item, i) => makeRow(item, i, keyFn(item, i)), skip, startMarker)
         return
       }
 

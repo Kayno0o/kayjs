@@ -84,7 +84,7 @@ When you pass server-rendered JSX children into an island (`<Modal><ServerMarkdo
 
 ## When the page changed before hydration
 
-A browser extension or a password manager sometimes adds its own element inside an island before it hydrates. Hydration steps over that element and attaches to the markup kay rendered. If the server rendered something else entirely, the island draws that part again from scratch rather than wiring handlers to the wrong element. Both work in production; in dev, the console also names the island, the element expected and the one found.
+A browser extension or a password manager sometimes adds its own element inside an island before it hydrates. Hydration steps over that element and attaches to the markup kay rendered. If the server rendered something else entirely, the island draws that part again from scratch rather than wiring handlers to the wrong element. When a list has fewer items in the browser than the server rendered, hydration removes the extra rows. Both work in production; in dev, the console also names the island, the element expected and the one found.
 
 ## What an island cannot use
 
