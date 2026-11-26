@@ -21,6 +21,22 @@ export interface PublicFiles {
   register: (relPath: string) => string
 }
 
+/** A plugin hook's throw, renamed `kay build: plugin "<name>" <hook> failed: <message>` with the original as `cause`. */
+export function pluginHookError(plugin: Pick<KayPlugin, 'name'>, hook: string, error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error)
+  return new Error(`kay build: plugin "${plugin.name}" ${hook} failed: ${message}`, { cause: error })
+}
+
+/** Runs one plugin hook, so a throw names the plugin and the hook. */
+export async function runPluginHook<T>(plugin: Pick<KayPlugin, 'name'>, hook: string, run: () => T | Promise<T>): Promise<T> {
+  try {
+    return await run()
+  }
+  catch (error) {
+    throw pluginHookError(plugin, hook, error)
+  }
+}
+
 export function createPublicFiles(): PublicFiles {
   const files: string[] = []
   const seen = new Set<string>()
@@ -159,7 +175,7 @@ export function createPluginHost(options: PluginHostOptions) {
       for (const plugin of plugins) {
         if (plugin.build !== undefined) {
           const ctx: BuildPluginContext = { ...buildCtx, setData: setDataFor(plugin) }
-          await plugin.build(ctx)
+          await runPluginHook(plugin, 'build', () => plugin.build!(ctx))
         }
       }
     },
@@ -171,7 +187,7 @@ export function createPluginHost(options: PluginHostOptions) {
         if (plugin.afterPrerender !== undefined) {
           ran = true
           const ctx: FinalizeBuildContext = { ...shared, publicFiles: options.publicFiles.files, setData: setDataFor(plugin) }
-          await plugin.afterPrerender(ctx)
+          await runPluginHook(plugin, 'afterPrerender', () => plugin.afterPrerender!(ctx))
         }
       }
       return ran

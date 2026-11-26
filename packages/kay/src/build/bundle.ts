@@ -14,6 +14,7 @@ import { clientPlugin, KAY_SPECIFIER_FILTER, TS_FILTER } from './client-plugin'
 import { formatBunBuildLogs, isOutsideRoot, isTsFile, relPosix } from './files'
 import { stampFiles, stampsMatch } from './graph'
 import { clientLeakError, islandKey } from './islands'
+import { pluginHookError } from './plugin-host'
 import { KAY_SRC_ROOT, resolveKaySpecifier } from './resolve'
 
 export interface BundleEnv {
@@ -79,22 +80,49 @@ export function pluginBunPlugins(env: Pick<BundleEnv, 'plugins' | 'root' | 'asse
   })
 }
 
-/** Plugin `transform` hooks, applied in order to every module the bundles load. */
+/** Plugin `transform` hooks, applied in order to every module the bundles load. The first throw is kept in `failure`, since Bun turns it into a log line. */
 function pluginTransforms(plugins: KayPlugin[]): ClientTransforms {
   const list = plugins.filter(p => typeof p.transform === 'function')
-  return {
+  const transforms: ClientTransforms = {
     active: list.length > 0,
     key: list.map(p => p.name).join(','),
+    failure: undefined,
     apply(code, id, target) {
       let cur = code
       for (const plugin of list) {
-        const next = plugin.transform!(cur, id, target)
+        let next: string | void
+        try {
+          next = plugin.transform!(cur, id, target)
+        }
+        catch (error) {
+          transforms.failure ??= pluginHookError(plugin, 'transform', error)
+          throw transforms.failure
+        }
         if (typeof next === 'string')
           cur = next
       }
       return cur
     },
   }
+  return transforms
+}
+
+/** Runs Bun.build, failing first with what `ownFailure` throws (a leak, a plugin hook), then with Bun's own logs. */
+async function runBunBuild(side: 'client' | 'server', root: string, ownFailure: () => void, config: Parameters<typeof Bun.build>[0]): Promise<Awaited<ReturnType<typeof Bun.build>>> {
+  let result: Awaited<ReturnType<typeof Bun.build>>
+  try {
+    result = await Bun.build(config)
+  }
+  catch (err) {
+    ownFailure()
+    if (err instanceof AggregateError && err.errors.length > 0)
+      throw new Error(`kay build (${side}) failed:\n${formatBunBuildLogs(err.errors, root)}`)
+    throw err
+  }
+  ownFailure()
+  if (!result.success)
+    throw new Error(`kay build (${side}) failed:\n${formatBunBuildLogs(result.logs, root)}`)
+  return result
 }
 
 /** CSS files imported outside islands (plus the plugins' own), built as standalone stylesheets. */
@@ -273,41 +301,29 @@ export async function buildClient(env: BundleEnv, standaloneCss: string[]): Prom
   const inlinedEnvKey = (key: string): boolean => key === 'NODE_ENV' || `process.env.${key}` in envDefines
   const plugin = clientPlugin({ root, graph, cache, actionsByFile, transforms, leaks: clientLeaks })
 
-  let clientResult: Awaited<ReturnType<typeof Bun.build>>
-  try {
-    clientResult = await Bun.build({
-      entrypoints: entryPoints,
-      outdir: clientDir,
-      target: 'browser',
-      format: 'esm',
-      splitting: true,
-      minify: env.minify,
-      metafile: true,
-      naming: '[name]-[hash].[ext]',
-      define: {
-        KAY_DEFERRED: hasDeferredHydrate ? 'true' : 'false',
-        KAY_CLIENT_ONLY: hasClientOnlyHydrate ? 'true' : 'false',
-        KAY_BROWSER: 'true',
-        'process.env.NODE_ENV': JSON.stringify(env.nodeEnv ?? (env.isDev ? 'development' : 'production')),
-        ...envDefines,
-      },
-      plugins: [plugin, ...pluginBunPlugins(env, 'client')],
-    })
-  }
-  catch (err) {
+  const clientResult = await runBunBuild('client', env.root, () => {
     if (clientLeaks.size > 0)
       throw clientLeakError(clientLeaks)
-    if (err instanceof AggregateError && err.errors.length > 0)
-      throw new Error(`kay build (client) failed:\n${formatBunBuildLogs(err.errors, env.root)}`)
-    throw err
-  }
-
-  if (clientLeaks.size > 0)
-    throw clientLeakError(clientLeaks)
-  if (!clientResult.success) {
-    const msgs = formatBunBuildLogs(clientResult.logs, env.root)
-    throw new Error(`kay build (client) failed:\n${msgs}`)
-  }
+    if (transforms.failure !== undefined)
+      throw transforms.failure
+  }, {
+    entrypoints: entryPoints,
+    outdir: clientDir,
+    target: 'browser',
+    format: 'esm',
+    splitting: true,
+    minify: env.minify,
+    metafile: true,
+    naming: '[name]-[hash].[ext]',
+    define: {
+      KAY_DEFERRED: hasDeferredHydrate ? 'true' : 'false',
+      KAY_CLIENT_ONLY: hasClientOnlyHydrate ? 'true' : 'false',
+      KAY_BROWSER: 'true',
+      'process.env.NODE_ENV': JSON.stringify(env.nodeEnv ?? (env.isDev ? 'development' : 'production')),
+      ...envDefines,
+    },
+    plugins: [plugin, ...pluginBunPlugins(env, 'client')],
+  })
 
   const { metafile } = clientResult
   result.metafile = metafile
@@ -563,35 +579,25 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
     },
   }
 
-  let serverResult: Awaited<ReturnType<typeof Bun.build>>
-  try {
-    serverResult = await Bun.build({
-      entrypoints: [...entries, entry.file],
-      files: { [entry.file]: entry.source },
-      outdir: serverDir,
-      root: serverRoot,
-      target: 'bun',
-      format: 'esm',
-      splitting: true,
-      packages: 'external',
-      minify: false,
-      metafile: cache !== undefined,
-      define: {
-        'process.env.NODE_ENV': 'process.env.NODE_ENV',
-      },
-      plugins: [serverPlugin, ...pluginBunPlugins(env, 'server')],
-    })
-  }
-  catch (err) {
-    if (err instanceof AggregateError && err.errors.length > 0)
-      throw new Error(`kay build (server) failed:\n${formatBunBuildLogs(err.errors, env.root)}`)
-    throw err
-  }
-
-  if (!serverResult.success) {
-    const msgs = formatBunBuildLogs(serverResult.logs, env.root)
-    throw new Error(`kay build (server) failed:\n${msgs}`)
-  }
+  const serverResult = await runBunBuild('server', env.root, () => {
+    if (transforms.failure !== undefined)
+      throw transforms.failure
+  }, {
+    entrypoints: [...entries, entry.file],
+    files: { [entry.file]: entry.source },
+    outdir: serverDir,
+    root: serverRoot,
+    target: 'bun',
+    format: 'esm',
+    splitting: true,
+    packages: 'external',
+    minify: false,
+    metafile: cache !== undefined,
+    define: {
+      'process.env.NODE_ENV': 'process.env.NODE_ENV',
+    },
+    plugins: [serverPlugin, ...pluginBunPlugins(env, 'server')],
+  })
 
   if (cache !== undefined) {
     cache.stats.serverBuilds++

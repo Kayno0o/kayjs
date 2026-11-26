@@ -16,6 +16,8 @@ const TS_LANG_RE = /\.[cm]?ts$/i
 export interface ClientTransforms {
   active: boolean
   key: string
+  /** The first hook that threw, named, rethrown once the build is done. */
+  failure: Error | undefined
   apply: (code: string, id: string, target: 'server' | 'client') => string
 }
 

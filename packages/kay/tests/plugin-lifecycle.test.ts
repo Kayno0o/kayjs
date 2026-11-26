@@ -436,3 +436,19 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
     expect((await app.get('/_pages/own')).headers.get('content-security-policy')).toBe('default-src \'none\'')
   })
 })
+
+describe('a throwing plugin build hook (#3657)', () => {
+  const hooks = ['build', 'afterPrerender', 'transform', 'prerenderPaths'] as const
+  for (const hook of hooks) {
+    it(`fails the build naming the plugin and its ${hook} hook, keeping the cause`, async () => {
+      const dir = makeTemp(`kay-plugin-${hook}-`)
+      mkdirSync(join(dir, 'src', 'routes'), { recursive: true })
+      writeFileSync(join(dir, 'src', 'routes', 'index.tsx'), 'export const prerender = true\nexport default function Home() { return <main>ok</main> }')
+      const boom = new Error('boom')
+      const plugin = definePlugin({ name: 'breaker', [hook]: () => { throw boom } })
+      const err = await build({ root: dir, plugins: [plugin] }).then(() => undefined, (e: unknown) => e as Error)
+      expect(err?.message).toBe(`kay build: plugin "breaker" ${hook} failed: boom`)
+      expect(err?.cause).toBe(boom)
+    })
+  }
+})

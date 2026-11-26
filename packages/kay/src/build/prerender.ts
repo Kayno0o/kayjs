@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { inlineStyleHashes } from '../server/security'
 import { relPosix } from './files'
+import { runPluginHook } from './plugin-host'
 import { assertPathUrls } from './routes'
 
 const CONCURRENCY = 8
@@ -113,7 +114,7 @@ export async function prerender(options: PrerenderOptions) {
 
     for (const plugin of options.plugins) {
       if (plugin.prerenderPaths !== undefined && (urls.length > 0 || hasPathsFn))
-        urls = await plugin.prerenderPaths(urls, route)
+        urls = await runPluginHook(plugin, 'prerenderPaths', () => plugin.prerenderPaths!(urls, route))
     }
 
     urls = [...new Set(urls.map(normalizePrerenderUrl))]
