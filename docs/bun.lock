@@ -36,17 +36,17 @@
 
     "@joplin/turndown-plugin-gfm": ["@joplin/turndown-plugin-gfm@1.0.71", "", {}, "sha512-lzquxBhjG9ad6ykVsUYjs+lQc4Xmh3ob0n+oOUL5cvdQ2xUO0tsAAvIJ8Wm/+Pf59/4NNpmRa/zlbKeYP4XBrw=="],
 
-    "@kayjs/content": ["@kayjs/content@file:../packages/plugin-content", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.4" } }],
+    "@kayjs/content": ["@kayjs/content@file:../packages/plugin-content", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.5" } }],
 
-    "@kayjs/icons": ["@kayjs/icons@file:../packages/plugin-icons", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.4" } }],
+    "@kayjs/icons": ["@kayjs/icons@file:../packages/plugin-icons", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.5" } }],
 
-    "@kayjs/images": ["@kayjs/images@file:../packages/plugin-images", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.4" } }],
+    "@kayjs/images": ["@kayjs/images@file:../packages/plugin-images", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.5" } }],
 
     "@kayjs/kay": ["@kayjs/kay@file:../packages/kay", { "dependencies": { "@kaynooo/cli-kit": "^0.52.0", "oxc-parser": "^0.155.0" }, "peerDependencies": { "playwright-core": "^1.64.0" }, "optionalPeers": ["playwright-core"], "bin": { "kay": "./src/cli/index.ts" } }],
 
-    "@kayjs/seo": ["@kayjs/seo@file:../packages/plugin-seo", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.4" } }],
+    "@kayjs/seo": ["@kayjs/seo@file:../packages/plugin-seo", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.5" } }],
 
-    "@kayjs/ui": ["@kayjs/ui@file:../packages/ui", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.4" } }],
+    "@kayjs/ui": ["@kayjs/ui@file:../packages/ui", { "peerDependencies": { "@kayjs/kay": "^2.0.0-beta.5" } }],
 
     "@kaynooo/cli-kit": ["@kaynooo/cli-kit@0.52.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fcli-kit/-/0.52.0/cli-kit-0.52.0.tgz", { "dependencies": { "@kaynooo/utils": "3.1.0" }, "peerDependencies": { "@xterm/headless": ">=6.0.0" } }, "sha512-4/Uhsw6syMpjxNXSVI9hDlnRxrmdUcH+G8JqZqz+7IParJlDwI199Vujyzu+bW/ZjcjKRvRQ1KBCVmNFd8jiwg=="],
 
