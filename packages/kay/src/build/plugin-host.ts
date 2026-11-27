@@ -5,7 +5,7 @@ import type { BuildPluginContext, FinalizeBuildContext, KayPlugin } from '../plu
 import type { RouteManifestEntry } from './manifest'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { precompressFiles } from './files'
+import { precompressFiles } from './precompress'
 
 const LEADING_SLASHES_RE = /^\/+/
 const BACKSLASH_RE = /\\/g
@@ -214,7 +214,7 @@ export function createPluginHost(options: PluginHostOptions) {
         for (const rel of Object.values(route.prerendered ?? {}))
           once(join(outDir, rel))
       }
-      await precompressFiles(pending, 256)
+      await precompressFiles(pending, 256, options.root)
     },
   }
 }

@@ -16,7 +16,7 @@ PORT=3000 kay start
 
 Serves dynamic SSR routes, streaming `<Suspense>`, server actions, API routes, prerendered pages, and immutable `/_kay/*` client assets directly from `Bun.serve()`.
 
-`kay build` compresses the hashed assets, the `public/` files and the prerendered pages into `.br` and `.gz` files beside them, for files of 256 bytes or more, keeping each one only when it comes out smaller. The server sends those files as they are, so it compresses on the fly only the responses that have none, such as pages rendered per request. A page streamed past `<Suspense>` is compressed as it goes, flushed with each part. A `public/` file shipped with its own `.br` or `.gz` keeps it.
+`kay build` compresses the hashed assets, the `public/` files and the prerendered pages into `.br` and `.gz` files beside them, for files of 256 bytes or more, keeping each one only when it comes out smaller. Brotli runs at quality 11, the smallest it makes, and its output is kept in `.kay-cache/` by content, so the next build compresses only the files that changed; an entry no build used for 7 days is removed. The server sends those files as they are, so it compresses on the fly only the responses that have none, such as pages rendered per request. A page streamed past `<Suspense>` is compressed as it goes, flushed with each part. A `public/` file shipped with its own `.br` or `.gz` keeps it.
 
 ## 2. Single Standalone Executable (`kay build --compile`)
 

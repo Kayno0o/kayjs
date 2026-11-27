@@ -493,6 +493,7 @@ async function landBuild(run: BuildRun, built: BuiltOutput): Promise<void> {
 
     if (isStatic) {
       await exportStatic({
+        root: run.root,
         stageDir: prerenderDir,
         finalOutDir: run.finalOutDir,
         outDir,

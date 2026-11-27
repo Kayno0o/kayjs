@@ -1,11 +1,10 @@
 import type { FirstLoad, KayPlugin, Locate } from '@kayjs/kay/config'
-import { distLocator, firstLoadUrls, measureFirstLoad } from '@kayjs/kay/config'
+import { brotliSize, distLocator, firstLoadUrls, measureFirstLoad } from '@kayjs/kay/config'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { brotliCompress, constants as zlibConstants } from 'node:zlib'
 
-// The quality kay's build writes its .br sidecars at, so the footer shows what is served; the draft pass only places the line, so a fast quality does.
-const BROTLI_OPTS = { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 } }
+// The draft pass only places the line, so a fast quality does; the final one is measured as kay's build serves it, cached across builds.
 const DRAFT_OPTS = { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } }
 const SLOT_RE = /<span\b[^>]*\bdata-page-weight(?:="")?[^>]*><\/span>/
 const SCRIPT_RE = /<script\b([^>]*)>/g
@@ -14,9 +13,8 @@ const JS_TYPES = new Set(['module', 'text/javascript'])
 
 const runsJavaScript = (html: string): boolean => [...html.matchAll(SCRIPT_RE)].some(([, attrs]) => JS_TYPES.has(TYPE_RE.exec(attrs!)?.[1] ?? 'module'))
 
-// Off the main thread: at quality 11 a page takes tens of ms, and the pages prerender side by side.
 const brotliAsync = promisify(brotliCompress)
-const brotli = async (html: string, options = BROTLI_OPTS): Promise<number> => (await brotliAsync(html, options)).length
+const draftSize = async (html: string): Promise<number> => (await brotliAsync(html, DRAFT_OPTS)).length
 
 const kb = (bytes: number): string => `${(bytes / 1024).toFixed(1)} KB`
 
@@ -39,10 +37,10 @@ export function pageWeight(): KayPlugin {
       const javascript = runsJavaScript(html)
       const format = (load: FirstLoad) =>
         `<span class="docs-weight" data-page-weight>This page: ${kb(load.total)} (${kb(load.cached)} cached)${javascript ? '' : ', no JavaScript'}.</span>`
-      const measure = async (page: string, options?: typeof BROTLI_OPTS) => measureFirstLoad(urls, locate!, await brotli(page, options), cacheable)
+      const measure = (htmlBytes: number) => measureFirstLoad(urls, locate!, htmlBytes, cacheable)
       // The line adds a few bytes to the page it reports, so the page is measured again with a draft figure in place.
-      const first = format(await measure(html, DRAFT_OPTS))
-      const final = format(await measure(html.replace(SLOT_RE, () => first)))
+      const first = format(measure(await draftSize(html)))
+      const final = format(measure(await brotliSize(html.replace(SLOT_RE, () => first))))
       return html.replace(SLOT_RE, () => final)
     },
   }

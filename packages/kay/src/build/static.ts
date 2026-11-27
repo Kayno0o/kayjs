@@ -10,7 +10,8 @@ import { resolvePlugins } from '../plugins/index'
 import { createDocumentHooks, createHtmlHeaders } from '../server/document'
 import { createNavigation } from '../ssr/navigation'
 import { createFallbackPages } from '../server/errors'
-import { precompressFiles, walkAllFiles } from './files'
+import { walkAllFiles } from './files'
+import { precompressFiles } from './precompress'
 import { carryPreviousAssets } from './carry'
 import { swapStage } from './output'
 import { prerenderOrigin } from '../server/prerendered'
@@ -19,6 +20,8 @@ import { pageFailure } from './prerender'
 const LEADING_SLASH_RE = /^\//
 
 export interface StaticExportOptions {
+  /** The app's folder, whose `.kay-cache/` keeps the brotli of what was compressed before. */
+  root: string
   /** The folder the site is assembled in; it becomes `finalOutDir`. */
   stageDir: string
   finalOutDir: string
@@ -97,7 +100,7 @@ export async function exportStatic(options: StaticExportOptions): Promise<void> 
     publicFiles.register(relative(outPublicDir, abs))
   for (const rel of publicFiles.files)
     copyInto(stageDir, rel, join(outPublicDir, rel))
-  await precompressFiles(walkAllFiles(stageDir), 128)
+  await precompressFiles(walkAllFiles(stageDir), 128, options.root)
   if (!options.isDev)
     carryPreviousAssets(finalOutDir, stageDir, relative(stageDir, assetDir), options.assets)
 
