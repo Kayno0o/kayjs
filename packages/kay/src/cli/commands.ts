@@ -212,12 +212,14 @@ function devCommand(cwd: string): Commands[string] {
     run: async (args) => {
       const { values, positionals: [dir] } = parse(args, 'kay dev [options] [dir]: serves the app and rebuilds it when a file changes', { port: PORT, host: HOST, root: ROOT }, { positionals: ['[dir]'], exits: SERVE_EXITS })
       const root = rootOf(cwd, values.root, dir)
-      const { loadConfig } = await import('../plugins/index')
+      const { loadConfig, resolveServerConfig } = await import('../plugins/index')
       const config = await failing('dev', async () => loadConfig(root, { dev: true }))
       const port = parsePort(values.port ?? (process.env.PORT || config.port), 3000)
       const hostname = values.host ?? (process.env.HOST || '127.0.0.1')
-      const { devServer } = await import('../dev/index')
-      await failing('dev', async () => devServer({ root, port, hostname }))
+      const { devSupervisor } = await import('../dev/supervisor')
+      const dev = await failing('dev', async () => devSupervisor({ root, port, hostname, maxRequestBodySize: resolveServerConfig(config, {}).maxRequestBodySize }))
+      for (const signal of ['SIGINT', 'SIGTERM'] as const)
+        process.once(signal, () => void dev.stop().finally(() => process.exit(0)))
       return 0
     },
   }

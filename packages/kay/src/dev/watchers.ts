@@ -2,12 +2,12 @@
 
 import type { FSWatcher } from 'node:fs'
 import type { loadConfig } from '../plugins/index'
-import { existsSync, realpathSync, statSync, watch } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { existsSync, readFileSync, realpathSync, statSync, watch } from 'node:fs'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { isInNodeModules } from '../build/files'
 import { createAppContext, resolvePlugins, runWithAppContext } from '../plugins/index'
 
-export type ChangeKind = 'css' | 'code' | 'full' | 'config'
+export type ChangeKind = 'css' | 'code' | 'public' | 'full' | 'config'
 
 type KayConfig = Awaited<ReturnType<typeof loadConfig>>
 
@@ -18,6 +18,37 @@ export function srcChangeKind(name: string): ChangeKind {
   if (name.endsWith('.css') && !name.endsWith('.module.css'))
     return 'css'
   return CODE_FILE_RE.test(name) ? 'code' : 'full'
+}
+
+// The files outside node_modules that `entry` imports, transitively, `entry` left out.
+export function localImports(entry: string): string[] {
+  const transpiler = new Bun.Transpiler({ loader: 'tsx' })
+  const seen = new Set<string>([entry])
+  const queue = [entry]
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    let source: string
+    try {
+      source = readFileSync(file, 'utf8')
+    }
+    catch {
+      continue // deleted since it was resolved
+    }
+    for (const { path } of transpiler.scanImports(source)) {
+      let resolved: string
+      try {
+        resolved = Bun.resolveSync(path, dirname(file))
+      }
+      catch {
+        continue // a specifier that does not resolve from here, which the config load reports itself
+      }
+      if (!isAbsolute(resolved) || isInNodeModules(resolved) || seen.has(resolved))
+        continue
+      seen.add(resolved)
+      queue.push(resolved)
+    }
+  }
+  seen.delete(entry)
+  return [...seen]
 }
 
 const isInsideDir = (parent: string, target: string): boolean =>
@@ -38,6 +69,10 @@ export function createDevWatchers({ root, devRoot, srcDir, routesDir, schedule }
   const graphWatchers = new Map<string, FSWatcher>()
   let activeRoutesDir = resolve(root, routesDir ?? 'src/routes')
   let activePublicDir = resolve(root, 'public')
+  let builtPublic = new Set<string>()
+  // An edit to a file the last build listed changes no bundle; one added or removed changes the list.
+  const publicChangeKind = (name: string): ChangeKind =>
+    builtPublic.has(name) && existsSync(join(activePublicDir, name)) ? 'public' : 'full'
 
   function isCoveredByStaticWatchers(dir: string): boolean {
     if (dir === root)
@@ -58,7 +93,7 @@ export function createDevWatchers({ root, devRoot, srcDir, routesDir, schedule }
     if (!isInsideDir(srcDir, activeRoutesDir) && existsSync(activeRoutesDir))
       desired.set(activeRoutesDir, name => schedule(srcChangeKind(name)))
     if (existsSync(activePublicDir))
-      desired.set(activePublicDir, () => schedule('full'))
+      desired.set(activePublicDir, name => schedule(publicChangeKind(name)))
     for (const [dir, w] of dirWatchers) {
       if (!desired.has(dir)) {
         w.close()
@@ -100,7 +135,8 @@ export function createDevWatchers({ root, devRoot, srcDir, routesDir, schedule }
       }
     },
 
-    syncBuild(watchedFiles: ReadonlySet<string>): void {
+    syncBuild(watchedFiles: ReadonlySet<string>, publicFiles: readonly string[]): void {
+      builtPublic = new Set(publicFiles)
       const nextDirs = new Set<string>()
       let realRoot: string
       try {
@@ -145,8 +181,12 @@ export function createDevWatchers({ root, devRoot, srcDir, routesDir, schedule }
       }
     },
 
-    // The root, non-recursively: kay.config.ts, and a public, routes or src folder created after startup.
-    watchRoot(currentConfig: () => KayConfig): void {
+    // The root, non-recursively: kay.config.ts, and a public, routes or src folder created after startup; with `configImports`, the local files kay.config.ts imports too.
+    watchRoot(currentConfig: () => KayConfig, configImports: boolean): void {
+      if (configImports) {
+        for (const file of localImports(join(root, 'kay.config.ts')))
+          rootWatchers.push(watch(file, () => schedule('config')))
+      }
       rootWatchers.push(watch(root, (_ev, filename) => {
         if (filename === 'kay.config.ts') {
           schedule('config')

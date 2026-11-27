@@ -214,11 +214,10 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
   })
 
   it('re-imports every server module when a file no bundle holds changes', async () => {
-    const dir = makeTemp('kay-dev-public-')
+    const dir = makeTemp('kay-dev-data-')
     linkKay(dir)
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
-    mkdirSync(join(dir, 'public'), { recursive: true })
-    const dataPath = join(dir, 'public/data.txt')
+    const dataPath = join(dir, 'src/data.txt')
     writeFileSync(dataPath, 'data v1')
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
       import { readFileSync } from 'node:fs'
@@ -239,6 +238,49 @@ describe('Incremental BuildCache & kay dev (#3520)', () => {
     finally {
       ac.abort()
       srv.stop()
+    }
+  })
+
+  it('serves an edited public/ file fresh with no rebuild, and rebuilds when one is added', async () => {
+    const dir = makeTemp('kay-dev-public-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'public'), { recursive: true })
+    writeFileSync(join(dir, 'public/robots.txt'), 'v1')
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      const bootId = Math.random().toString(36).slice(2)
+      export default function Home() { return <p>{bootId}</p> }
+    `)
+
+    const logs: string[] = []
+    const log = spyOn(console, 'log').mockImplementation((...args: unknown[]) => { logs.push(args.join(' ')) })
+    const srv = await devServer({ root: dir, port: 0 })
+    const ac = new AbortController()
+    try {
+      const boot = await (await fetch(srv.url)).text()
+      const first = await fetch(`${srv.url}/robots.txt`)
+      expect(await first.text()).toBe('v1')
+      const reader = (await fetch(`${srv.url}/_kay/dev-events`, { signal: ac.signal })).body!.getReader()
+      await Bun.sleep(60)
+      const builds = logs.filter(l => l.includes('rebuilt in')).length
+
+      writeFileSync(join(dir, 'public/robots.txt'), 'v2 is longer')
+      expect(await readNextSseData(reader)).toBe('reload')
+      const second = await fetch(`${srv.url}/robots.txt`, { headers: { 'if-none-match': first.headers.get('etag')! } })
+      expect(second.status).toBe(200)
+      expect(await second.text()).toBe('v2 is longer')
+      expect(await (await fetch(srv.url)).text()).toBe(boot)
+      expect(logs.filter(l => l.includes('rebuilt in')).length).toBe(builds)
+
+      writeFileSync(join(dir, 'public/added.txt'), 'new')
+      expect(await readNextSseData(reader)).toBe('reload')
+      expect(await (await fetch(`${srv.url}/added.txt`)).text()).toBe('new')
+      expect(logs.filter(l => l.includes('rebuilt in')).length).toBe(builds + 1)
+    }
+    finally {
+      ac.abort()
+      log.mockRestore()
+      await srv.stop()
     }
   })
 

@@ -1,7 +1,7 @@
 // What kay dev adds to the app's answers: the reload script and its event stream, the build-error overlay, and the script's injection into streamed HTML.
 
 import { wantsJson } from '../server/http'
-import { withCspHashes } from '../server/index'
+import { withCspHashes } from '../server/security'
 import { REGION_HEADER } from '../server/region'
 
 export function makeDevReloadAssets(assetPrefix: string): { script: string, hash: string, eventsPath: string } {
@@ -77,7 +77,7 @@ export function injectReloadStream(body: ReadableStream<Uint8Array>, reloadScrip
 }
 
 /** The reload script's event stream: `controller` joins `clients` until the browser goes away. */
-export function reloadEvents(request: Request, clients: Set<ReadableStreamDefaultController<Uint8Array>>): Response {
+function reloadEvents(request: Request, clients: Set<ReadableStreamDefaultController<Uint8Array>>): Response {
   let ctrl: ReadableStreamDefaultController<Uint8Array> | undefined
   let open = true
   const stream = new ReadableStream<Uint8Array>({
@@ -130,4 +130,27 @@ export function withReloadScript(request: Request, res: Response, assets: { scri
   if (existingCsp !== null)
     headers.set('content-security-policy', withCspHashes(existingCsp, { scriptHashes: [assets.hash] }))
   return new Response(injectReloadStream(res.body!, assets.script), { status: res.status, headers })
+}
+
+/** The browsers' reload streams: `broadcast` reaches each, and a ping every 15 s keeps idle ones open. */
+export function createReloadHub() {
+  const clients = new Set<ReadableStreamDefaultController<Uint8Array>>()
+  const encoder = new TextEncoder()
+  const push = (chunk: Uint8Array): void => {
+    for (const c of clients) {
+      try {
+        c.enqueue(chunk)
+      }
+      catch {
+        clients.delete(c)
+      }
+    }
+  }
+  const ping = encoder.encode(': ping\n\n')
+  const pinger = setInterval(() => push(ping), 15_000)
+  return {
+    events: (request: Request): Response => reloadEvents(request, clients),
+    broadcast: (payload: string): void => push(encoder.encode(`data: ${payload}\n\n`)),
+    close: (): void => clearInterval(pinger),
+  }
 }

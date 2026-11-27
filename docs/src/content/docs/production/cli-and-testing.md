@@ -22,6 +22,16 @@ order: 4
 | `kay mcp-footprint` | Print `@kayjs/mcp` tool sizes in bytes and estimated tokens |
 | `kay i18n-check` | List missing translation keys across `@kayjs/i18n` locales |
 
+### How `kay dev` reloads
+
+`kay dev` keeps the port and the browser's reload stream in its own process, and runs the build and the app in a child process behind it. A save rebuilds what changed inside that child, keeping its build cache and the in-memory state of plugins, such as sessions.
+
+An edit to `kay.config.ts`, or to a local file it imports such as a plugin of your own, starts a new child that loads both fresh. So does a child that passes 2 GB of memory after a rebuild. Requests made during the swap wait for the new child, and open tabs reload once it has built.
+
+A child that crashes shows its exit and the end of its error output in the page, as JSON or plain text when the request asks for it. The next save starts it again.
+
+An edit to a file in `public/` reloads the browser without a rebuild. Adding or removing one rebuilds, since the list of served files changes.
+
 Plugins can register additional commands via `KayPlugin.commands`. They are read from `kay.config.ts` only when the first word is not a built-in command, and they take `--root <dir>` to name the app folder and `--help`. A `kay.config.ts` that fails to load leaves `kay --help` and the built-in commands working; a plugin command typed then prints the error and exits 1.
 
 ## Help, completion and exit codes
