@@ -14,7 +14,7 @@
     "packages/kay/src/compiler/server-only.ts::findPrivateEnv": 158,
     "packages/kay/src/compiler/ssr-helpers.ts::emitSsrElementAttrs": 154,
     "packages/kay/src/compiler/ssr.ts::compileSsr": 330,
-    "packages/kay/src/dev/index.ts::devServer": 390,
+    "packages/kay/src/dev/index.ts::devServer": 229,
     "packages/kay/src/dom/island.ts::defineIslandElement": 162,
     "packages/kay/src/dom/loop.ts::loop": 223,
     "packages/kay/src/dom/loop.ts::loop.effect()": 163,

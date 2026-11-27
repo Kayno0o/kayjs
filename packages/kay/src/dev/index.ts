@@ -1,18 +1,19 @@
 // kay dev: incremental cached rebuilds, serialized rebuild queue, CSS hot-swap, streaming reload injection,
 // SSE error push, and live config reload.
 
-import type { FSWatcher } from 'node:fs'
 import type { BuildCacheStats } from '../build/graph'
 import type { KayApp } from '../server/index'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
-import { isInNodeModules } from '../build/files'
+import type { ChangeKind } from './watchers'
+import { rmSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { clearBuildCache } from '../build/graph'
 import { build, createBuildCache } from '../build/index'
-import { createAppContext, loadConfig, resolvePlugins, resolveServerConfig, runWithAppContext } from '../plugins/index'
-import { DEFAULT_MAX_REQUEST_BODY_SIZE, wantsJson } from '../server/http'
-import { createServer, withCspHashes } from '../server/index'
-import { REGION_HEADER } from '../server/region'
+import { loadConfig, resolveServerConfig } from '../plugins/index'
+import { DEFAULT_MAX_REQUEST_BODY_SIZE } from '../server/http'
+import { createServer } from '../server/index'
+import { createModuleStore } from './modules'
+import { buildErrorResponse, makeDevReloadAssets, reloadEvents, withReloadScript } from './reload'
+import { createDevWatchers } from './watchers'
 
 export interface DevServerOptions {
   root: string
@@ -22,152 +23,6 @@ export interface DevServerOptions {
   maxRequestBodySize?: number | undefined
 }
 
-function makeDevReloadAssets(assetPrefix: string): { script: string, hash: string, eventsPath: string } {
-  const prefix = assetPrefix.replace(/\/$/, '')
-  const eventsPath = `${prefix}/dev-events`
-  const js = `(()=>{const stem=u=>u.replace(/-[a-z0-9]+\\.css$/i,'');const s=new EventSource(${JSON.stringify(eventsPath)});s.onmessage=(e)=>{if(e.data.startsWith('css:')){const urls=JSON.parse(e.data.slice(4));const byStem=new Map(urls.map(u=>[stem(u),u]));const old=[...document.querySelectorAll('link[rel="stylesheet"][href^=${JSON.stringify(`${prefix}/`)}]')];if(old.length===0){location.reload();return;}const next=[];for(const o of old){const m=byStem.get(stem(o.getAttribute('href')||''));if(m)next.push(m);}if(next.length===0){location.reload();return;}let left=next.length;for(const u of next){const l=document.createElement('link');l.rel='stylesheet';l.href=u;const done=()=>{if(--left===0)for(const o of old)o.remove();};l.onload=done;l.onerror=done;document.head.appendChild(l);}}else{location.reload();}};})();`
-  const hash = `'sha256-${new Bun.CryptoHasher('sha256').update(js).digest('base64')}'`
-  return { script: `<script>${js}</script>`, hash, eventsPath }
-}
-
-function renderErrorOverlay(errText: string, reloadScript: string): string {
-  const escaped = errText
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Kay Dev Error</title><style>body{margin:0;min-height:100vh;background:#0d1117;color:#e6edf3;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;display:grid;place-items:center;padding:2rem}main{max-width:56rem;width:100%;background:#161b22;border:1px solid #f85149;border-radius:10px;padding:1.5rem 2rem;box-shadow:0 16px 48px rgba(0,0,0,.45)}h1{margin:0 0 1rem;color:#ff7b72;font-size:1.15rem}pre{margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.5;font-size:.9rem;color:#ffa198}p{margin:1rem 0 0;font-size:.8rem;color:#8b949e}</style></head><body><main><h1>Kay Dev Build Error</h1><pre>${escaped}</pre><p>Save a fix to auto-reload.</p></main>${reloadScript}</body></html>`
-}
-
-type ChangeKind = 'css' | 'code' | 'full' | 'config'
-
-// A source edit changes the bundled bytes; any other file (content, data, public/) may be read when a module loads.
-const CODE_FILE_RE = /\.(?:[cm]?[jt]sx?|css)$/
-
-function srcChangeKind(name: string): ChangeKind {
-  if (name.endsWith('.css') && !name.endsWith('.module.css'))
-    return 'css'
-  return CODE_FILE_RE.test(name) ? 'code' : 'full'
-}
-
-function shouldInjectReload(request: Request, res: Response, ct: string): boolean {
-  return ct.includes('text/html')
-    && request.method !== 'HEAD'
-    && res.body !== null
-    && !res.headers.has('content-encoding')
-    && !request.headers.has(REGION_HEADER)
-    && !res.headers.has(REGION_HEADER)
-}
-
-// Injects the dev reload script into an HTML response while preserving streaming (<Suspense>).
-function injectReloadStream(body: ReadableStream<Uint8Array>, reloadScript: string): ReadableStream<Uint8Array> {
-  const decoder = new TextDecoder()
-  const encoder = new TextEncoder()
-  let injected = false
-  let tail = ''
-  const KEEP = 16 // enough to span a split `</body>` tag across chunk boundaries
-
-  return body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      if (injected) {
-        controller.enqueue(chunk)
-        return
-      }
-      const text = tail + decoder.decode(chunk, { stream: true })
-      const idx = text.indexOf('</body>')
-      if (idx !== -1) {
-        injected = true
-        tail = ''
-        controller.enqueue(encoder.encode(`${text.slice(0, idx)}${reloadScript}${text.slice(idx)}`))
-        return
-      }
-      if (text.length > KEEP) {
-        const split = text.length - KEEP
-        controller.enqueue(encoder.encode(text.slice(0, split)))
-        tail = text.slice(split)
-      }
-      else {
-        tail = text
-      }
-    },
-    flush(controller) {
-      const rest = tail + decoder.decode()
-      if (injected) {
-        if (rest.length > 0)
-          controller.enqueue(encoder.encode(rest))
-        return
-      }
-      const idx = rest.indexOf('</body>')
-      if (idx !== -1)
-        controller.enqueue(encoder.encode(`${rest.slice(0, idx)}${reloadScript}${rest.slice(idx)}`))
-      else
-        controller.enqueue(encoder.encode(rest + reloadScript))
-    },
-  }))
-}
-
-// Bun never unloads a module, so each build's server files are copied into a generation store.
-// Only `_entry.js` is imported, with its hash: the code lives in content-named chunks, so an unchanged chunk keeps its loaded instance across saves.
-// A failed import starts a new generation, since Bun keeps a module that failed to evaluate.
-function createModuleStore(storeRoot: string) {
-  const hashes = new Map<string, string>()
-  let generation = 0
-  let stale = false
-  const generationDir = (g: number): string => join(storeRoot, `g${g}`)
-  return {
-    reloadAll(): void {
-      stale = true
-    },
-    sync(serverDir: string): void {
-      const nextFiles = new Map<string, { bytes: Buffer, hash: string }>()
-      for (const entry of readdirSync(serverDir, { recursive: true, withFileTypes: true })) {
-        if (!entry.isFile())
-          continue
-        const from = join(entry.parentPath, entry.name)
-        const rel = relative(serverDir, from).replaceAll('\\', '/')
-        const bytes = readFileSync(from)
-        const hash = Bun.hash(bytes).toString(36)
-        nextFiles.set(rel, { bytes, hash })
-      }
-
-      if (stale) {
-        stale = false
-        hashes.clear()
-        generation++
-        // The previous generation stays for requests the old app is still serving.
-        rmSync(generationDir(generation - 2), { recursive: true, force: true })
-      }
-      const storeDir = generationDir(generation)
-      for (const [rel, { bytes, hash }] of nextFiles) {
-        if (hashes.get(rel) === hash)
-          continue
-        const to = join(storeDir, rel)
-        mkdirSync(dirname(to), { recursive: true })
-        writeFileSync(to, bytes)
-        hashes.set(rel, hash)
-      }
-      // Prune removed chunk files from current generation to avoid unbounded disk/map growth.
-      for (const rel of [...hashes.keys()]) {
-        if (!nextFiles.has(rel)) {
-          hashes.delete(rel)
-          rmSync(join(storeDir, rel), { force: true })
-        }
-      }
-    },
-    importFrom(serverDir: string) {
-      const storeDir = generationDir(generation)
-      return async (path: string): Promise<Record<string, unknown>> => {
-        const rel = relative(serverDir, path).replaceAll('\\', '/')
-        try {
-          return await import(`${join(storeDir, rel)}?v=${hashes.get(rel)}`)
-        }
-        catch (err) {
-          stale = true
-          throw err
-        }
-      }
-    },
-  }
-}
 
 export async function devServer(options: DevServerOptions): Promise<{
   url: string
@@ -184,116 +39,12 @@ export async function devServer(options: DevServerOptions): Promise<{
   const assetPrefix = (initialCfg.assetPrefix ?? '/_kay').replace(/\/$/, '')
   let reloadAssets = makeDevReloadAssets(assetPrefix)
   const srcDir = resolve(root, 'src')
-  let activeRoutesDir = resolve(root, options.routesDir ?? initialCfg.routesDir ?? 'src/routes')
-  let activePublicDir = resolve(root, initialCfg.publicDir ?? 'public')
   const port = options.port ?? initialCfg.port ?? 3000
   const hostname = options.hostname ?? '127.0.0.1'
   const buildCache = createBuildCache()
   const modules = createModuleStore(join(devRoot, 'server'))
-  const watchers: FSWatcher[] = []
-  const dirWatchers = new Map<string, FSWatcher>()
-  const pluginWatchers: FSWatcher[] = []
-  const graphWatchers = new Map<string, FSWatcher>()
+  const watchers = createDevWatchers({ root, devRoot, srcDir, routesDir: options.routesDir, schedule: kind => scheduleRebuild(kind) })
   let activeAssetPrefix = assetPrefix
-
-  const isInsideDir = (parent: string, target: string): boolean =>
-    target === parent || target.startsWith(`${parent}/`) || target.startsWith(`${parent}\\`)
-
-  function isCoveredByStaticWatchers(dir: string): boolean {
-    if (dir === root)
-      return false
-    for (const base of dirWatchers.keys()) {
-      if (isInsideDir(base, dir))
-        return true
-    }
-    return false
-  }
-
-  function syncBuildWatchers(watchedFiles: ReadonlySet<string>): void {
-    const nextDirs = new Set<string>()
-    let realRoot = root
-    try {
-      realRoot = realpathSync(root)
-    }
-    catch {}
-    for (const file of watchedFiles) {
-      if (isInNodeModules(file))
-        continue
-      if (isInsideDir(devRoot, file) || isInsideDir(join(root, '.kay-cache'), file))
-        continue
-      const dir = dirname(file)
-      // Root is already watched non-recursively for `kay.config.ts`; skip if it's only kay.config.ts itself.
-      if (dir === root || dir === realRoot) {
-        if (file === join(root, 'kay.config.ts') || file === join(realRoot, 'kay.config.ts'))
-          continue
-      }
-      if (isCoveredByStaticWatchers(dir))
-        continue
-      nextDirs.add(dir)
-    }
-    for (const [dir, watcher] of graphWatchers) {
-      if (!nextDirs.has(dir)) {
-        watcher.close()
-        graphWatchers.delete(dir)
-      }
-    }
-    for (const dir of nextDirs) {
-      if (graphWatchers.has(dir) || !existsSync(dir))
-        continue
-      try {
-        graphWatchers.set(dir, watch(dir, (_ev, filename) => {
-          const name = typeof filename === 'string' ? filename : ''
-          scheduleRebuild(srcChangeKind(name))
-        }))
-      }
-      catch {}
-    }
-  }
-
-  function refreshPluginWatchers(cfg: Awaited<ReturnType<typeof loadConfig>>): void {
-    for (const w of pluginWatchers)
-      w.close()
-    pluginWatchers.length = 0
-    const seen = new Set<string>(dirWatchers.keys())
-    const watchCtx = createAppContext({ root, outDir: devRoot, publicDir: activePublicDir, assetPrefix: activeAssetPrefix, site: cfg.site, dev: true })
-    for (const plugin of resolvePlugins(cfg.plugins)) {
-      const paths = runWithAppContext(watchCtx, () =>
-        typeof plugin.watchPaths === 'function' ? plugin.watchPaths(root) : (plugin.watchPaths ?? []))
-      for (const p of paths) {
-        const abs = resolve(root, p)
-        if (seen.has(abs) || !existsSync(abs))
-          continue
-        seen.add(abs)
-        const isDir = statSync(abs).isDirectory()
-        pluginWatchers.push(watch(abs, isDir ? { recursive: true } : {}, () => scheduleRebuild('full')))
-      }
-    }
-  }
-
-  function syncStaticWatchers(cfg: Awaited<ReturnType<typeof loadConfig>>): void {
-    activeRoutesDir = resolve(root, options.routesDir ?? cfg.routesDir ?? 'src/routes')
-    activePublicDir = resolve(root, cfg.publicDir ?? 'public')
-    const desired = new Map<string, (filename: string) => void>()
-    if (existsSync(srcDir))
-      desired.set(srcDir, name => scheduleRebuild(srcChangeKind(name)))
-    if (!isInsideDir(srcDir, activeRoutesDir) && existsSync(activeRoutesDir))
-      desired.set(activeRoutesDir, name => scheduleRebuild(srcChangeKind(name)))
-    if (existsSync(activePublicDir))
-      desired.set(activePublicDir, () => scheduleRebuild('full'))
-    for (const [dir, w] of dirWatchers) {
-      if (!desired.has(dir)) {
-        w.close()
-        dirWatchers.delete(dir)
-      }
-    }
-    for (const [dir, handler] of desired) {
-      if (dirWatchers.has(dir))
-        continue
-      dirWatchers.set(dir, watch(dir, { recursive: true }, (_ev, filename) => {
-        handler(typeof filename === 'string' ? filename : '')
-      }))
-    }
-  }
 
   let buildNum = 0
   let currentApp: KayApp | undefined
@@ -339,8 +90,8 @@ export async function devServer(options: DevServerOptions): Promise<{
         activeCfg = freshCfg
         activeAssetPrefix = (freshCfg.assetPrefix ?? '/_kay').replace(/\/$/, '')
         reloadAssets = makeDevReloadAssets(activeAssetPrefix)
-        syncStaticWatchers(freshCfg)
-        refreshPluginWatchers(freshCfg)
+        watchers.syncStatic(freshCfg)
+        watchers.refreshPlugins(freshCfg, activeAssetPrefix)
       }
       if (reloadAll)
         modules.reloadAll()
@@ -377,7 +128,7 @@ export async function devServer(options: DevServerOptions): Promise<{
       currentApp = nextApp
       await prevApp?.dispose?.()
       lastError = undefined
-      syncBuildWatchers(buildCache.watchedFiles)
+      watchers.syncBuild(buildCache.watchedFiles)
       if (n > 2)
         rmSync(join(devRoot, `b${n - 2}`), { recursive: true, force: true })
       console.log(`[kay dev] rebuilt in ${(performance.now() - t0).toFixed(1)} ms`)
@@ -447,27 +198,11 @@ export async function devServer(options: DevServerOptions): Promise<{
     }, 40)
   }
 
-  syncStaticWatchers(initialCfg)
-
-  // Watch root (non-recursive) for kay.config.ts and newly created publicDir/routesDir/srcDir.
-  watchers.push(watch(root, (_ev, filename) => {
-    if (filename === 'kay.config.ts') {
-      scheduleRebuild('config')
-      return
-    }
-    const changed = typeof filename === 'string' && filename !== '' ? resolve(root, filename) : undefined
-    for (const dir of [activePublicDir, activeRoutesDir, srcDir]) {
-      if (!dirWatchers.has(dir) && existsSync(dir) && (changed === undefined || isInsideDir(changed, dir))) {
-        syncStaticWatchers(activeCfg)
-        scheduleRebuild(dir === activePublicDir ? 'full' : 'code')
-        break
-      }
-    }
-  }))
-
-  // Watch plugin-declared extra paths (e.g. content/ or messages/ directories); refreshed on kay.config.ts edits.
+  watchers.syncStatic(initialCfg)
+  watchers.watchRoot(() => activeCfg)
+  // Plugin-declared extra paths (e.g. content/ or messages/ directories); refreshed on kay.config.ts edits.
   try {
-    refreshPluginWatchers(initialCfg)
+    watchers.refreshPlugins(initialCfg, activeAssetPrefix)
   }
   catch (err) {
     console.warn(`[kay dev] could not attach plugin watchers: ${err instanceof Error ? err.message : String(err)}`)
@@ -489,44 +224,10 @@ export async function devServer(options: DevServerOptions): Promise<{
 
       if (url.pathname === reloadAssets.eventsPath) {
         srv.timeout(request, 0)
-        let ctrl: ReadableStreamDefaultController<Uint8Array> | undefined
-        const stream = new ReadableStream<Uint8Array>({
-          start(controller) {
-            ctrl = controller
-            clients.add(controller)
-            controller.enqueue(encoder.encode(': connected\n\n'))
-            request.signal.addEventListener('abort', () => {
-              clients.delete(controller)
-              try {
-                controller.close()
-              }
-              catch {}
-            }, { once: true })
-          },
-          cancel() {
-            if (ctrl !== undefined)
-              clients.delete(ctrl)
-          },
-        })
-        return new Response(stream, {
-          headers: {
-            'content-type': 'text/event-stream; charset=utf-8',
-            'cache-control': 'no-cache, no-transform',
-            'x-accel-buffering': 'no',
-          },
-        })
+        return reloadEvents(request, clients)
       }
-
-      if (lastError !== undefined) {
-        if (wantsJson(request))
-          return Response.json({ ok: false, status: 500, error: lastError }, { status: 500 })
-        if ((request.headers.get('accept') ?? '').startsWith('text/plain'))
-          return new Response(lastError, { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
-        return new Response(renderErrorOverlay(lastError, reloadAssets.script), {
-          status: 500,
-          headers: { 'content-type': 'text/html; charset=utf-8' },
-        })
-      }
+      if (lastError !== undefined)
+        return buildErrorResponse(request, lastError, reloadAssets.script)
 
       const remoteIp = srv.requestIP(request)?.address
       const res = await currentApp!.handle(request, remoteIp)
@@ -534,15 +235,7 @@ export async function devServer(options: DevServerOptions): Promise<{
       const isStreamedHtml = ct.includes('text/html') && request.method !== 'HEAD' && res.body !== null && !res.headers.has('content-length')
       if (ct.includes('text/event-stream') || isStreamedHtml)
         srv.timeout(request, 0)
-      if (shouldInjectReload(request, res, ct)) {
-        const headers = new Headers(res.headers)
-        headers.delete('content-length')
-        const existingCsp = headers.get('content-security-policy')
-        if (existingCsp !== null)
-          headers.set('content-security-policy', withCspHashes(existingCsp, { scriptHashes: [reloadAssets.hash] }))
-        return new Response(injectReloadStream(res.body!, reloadAssets.script), { status: res.status, headers })
-      }
-      return res
+      return withReloadScript(request, res, reloadAssets)
     },
   })
 
@@ -566,16 +259,7 @@ export async function devServer(options: DevServerOptions): Promise<{
       stopped = true
       clearTimeout(timer)
       clearInterval(pingInterval)
-      for (const w of watchers)
-        w.close()
-      for (const w of dirWatchers.values())
-        w.close()
-      dirWatchers.clear()
-      for (const w of pluginWatchers)
-        w.close()
-      for (const w of graphWatchers.values())
-        w.close()
-      graphWatchers.clear()
+      watchers.close()
       server.stop(true)
       stopPromise = (async () => {
         try {
