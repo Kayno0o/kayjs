@@ -624,6 +624,54 @@ describe('Issue #3635 Part 1 — Cross-plugin audit fixes', () => {
       expect(registeredCollections.size).toBeLessThanOrEqual(sizeBefore + 1)
     })
 
+    // An app whose route defines a collection over one bad file and renders a JSX component of its own.
+    function collectionApp(prefix: string): string {
+      const dir = makeTemp(prefix)
+      mkdirSync(join(dir, 'src/routes/blog'), { recursive: true })
+      mkdirSync(join(dir, 'src/components'), { recursive: true })
+      mkdirSync(join(dir, 'content/posts'), { recursive: true })
+      mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
+      symlinkSync(join(import.meta.dir, '..'), join(dir, 'node_modules/@kayjs/kay'), 'dir')
+      writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: { jsx: 'react-jsx', jsxImportSource: '@kayjs/kay' } }))
+      writeFileSync(join(dir, 'content/posts/bad.md'), '---\ntitle: ""\n---\nHi\n')
+      writeFileSync(join(dir, 'src/components/Title.tsx'), 'export function Title({ n }: { n: number }) { return <h1>{n}</h1> }\n')
+      writeFileSync(join(dir, 'src/routes/blog/index.tsx'), `
+        import { defineCollection } from ${JSON.stringify(CONTENT_PKG)}
+        import { Title } from '../../components/Title'
+        const schema = {
+          '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            validate(raw: unknown) {
+              const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+              return typeof o.title === 'string' && o.title.trim() ? { value: { title: o.title } } : { issues: [{ message: 'title required', path: ['title'] }] }
+            },
+          },
+        }
+        export const blog = defineCollection({ dir: 'content/posts', schema })
+        export default function Blog() { return <Title n={blog.all().length} /> }
+      `)
+      writeFileSync(join(dir, 'kay.config.ts'), `import { content } from ${JSON.stringify(CONTENT_PKG)}\nexport default { plugins: [content()] }\n`)
+      return dir
+    }
+
+    it('kay check validates a .tsx route\'s collection run from a folder whose tsconfig names React (#3670)', async () => {
+      const app = collectionApp('kay-col-cwd-')
+      const elsewhere = makeTemp('kay-col-react-')
+      writeFileSync(join(elsewhere, 'tsconfig.json'), JSON.stringify({ compilerOptions: { jsx: 'react-jsx', jsxImportSource: 'react' } }))
+      const proc = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli/index.ts'), 'check', app, '--no-typecheck'], { cwd: elsewhere, stdout: 'pipe', stderr: 'pipe' })
+      const out = await new Response(proc.stdout).text() + await new Response(proc.stderr).text()
+      expect(await proc.exited).toBe(1)
+      expect(out).toContain('content/posts/bad.md:2:1: error: @kayjs/content: title: title required')
+    })
+
+    it('checkProject validates the .tsx collections of two apps in one process (#3670)', async () => {
+      for (const app of [collectionApp('kay-col-one-'), collectionApp('kay-col-two-')]) {
+        const checked = await checkProject(app, { skipTypecheck: true })
+        expect(checked.errors.some(e => e.includes('content/posts/bad.md') && e.includes('title required'))).toBe(true)
+      }
+    })
+
     it('avoids Bun.spawnSync in @kayjs/images, blocks shareCard symlink escapes, and serves runtime images without dist/public writes', async () => {
       // 1. Zero Bun.spawnSync in plugin-images/src/
       const imgSrcDir = join(REPO_ROOT, 'packages/plugin-images/src')

@@ -236,12 +236,31 @@ export function walkCollectionDefFiles(dir: string, out: string[] = []): string[
 }
 
 export const DEFINE_COLLECTION_RE = /\bdefineCollection\s*(?:<[^>]*>)?\s*\(/
+const REGEXP_SPECIAL_RE = /[.*+?^${}()|[\]\\]/g
+
+const kayJsxRoots = new Set<string>()
+
+// Bun gives a runtime import the JSX source of the working directory's tsconfig, not the app's, so `kay check <dir>` run elsewhere would import its routes as React.
+function importAppTsxWithKayJsx(root: string): void {
+  if (kayJsxRoots.has(root))
+    return
+  kayJsxRoots.add(root)
+  const filter = new RegExp(`^${`${root}/`.replace(REGEXP_SPECIAL_RE, '\\$&')}.*\\.tsx$`)
+  Bun.plugin({
+    name: `@kayjs/content: kay JSX under ${root}`,
+    setup(build) {
+      // The pragma goes last, where it moves no line of a stack trace.
+      build.onLoad({ filter }, async ({ path }) => ({ contents: `${await Bun.file(path).text()}\n/** @jsxImportSource @kayjs/kay */\n`, loader: 'tsx' }))
+    },
+  })
+}
 
 export async function discoverAppCollections(root: string): Promise<void> {
   const absRoot = resolve(root)
   const prevDiscoverRoot = discoverRoot
   discoverRoot = absRoot
   try {
+    importAppTsxWithKayJsx(absRoot)
     const srcDir = resolve(absRoot, 'src')
     for (const file of walkCollectionDefFiles(srcDir)) {
       let text: string
