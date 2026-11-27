@@ -5,6 +5,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFil
 import { tmpdir } from 'node:os'
 import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
+import { isInside } from './is-inside'
 
 const TEST_FILE_RE = /\.(?:test|spec)\.(?:tsx|ts)$/
 const BACKSLASH_RE = /\\/g
@@ -74,14 +75,6 @@ export function walkAllFiles(dir: string): string[] {
   return walkFiles(dir, { keep: entry => entry.isFile() })
 }
 
-/** Whether `target` lies under `dir`, or is `dir` itself with `orSame`. Paths are compared as written: realpath both first to follow symlinks. */
-export function isInside(dir: string, target: string, options: { orSame?: boolean } = {}): boolean {
-  const rel = relative(dir, target)
-  if (rel === '')
-    return options.orSame === true
-  // `..x` is a name inside `dir`; only `..` itself, as a whole segment, leaves it.
-  return rel !== '..' && !rel.startsWith('../') && !rel.startsWith('..\\') && !isAbsolute(rel)
-}
 
 export function assertSafeOutDir(root: string, outDir: string, routesDir: string, publicDir: string): void {
   // Refuse filesystem root, home dir, tmpdir root, or root/ancestors of root

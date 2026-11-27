@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import type { KayPlugin } from '../src/plugins/types'
 import type { Middleware } from '../src/server/http'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
 import { i18n } from '../../plugin-i18n/src/index'
@@ -551,6 +551,34 @@ describe('prerendered pages stay on the native route table with i18n and auth (#
     const home = await app.get('/')
     expect(home.status).toBe(302)
     expect(home.headers.get('location')).toBe('/en')
+  })
+})
+
+describe('what kay start loads', () => {
+  // A static walk of the value imports from the loader, so a helper moved into a heavy module shows up here and not in RSS.
+  it('never reaches node:zlib or node:crypto, which cost 3 and 2 MB of RSS', () => {
+    const transpilers = { ts: new Bun.Transpiler({ loader: 'ts' }), tsx: new Bun.Transpiler({ loader: 'tsx' }) }
+    const from = new Map<string, string>([[join(KAY_PKG_DIR, 'src/server/loader.ts'), '']])
+    const chains: string[] = []
+    const chain = (file: string): string => {
+      const parent = from.get(file)!
+      return `${parent === '' ? '' : `${chain(parent)} -> `}${file.slice(KAY_PKG_DIR.length + 1)}`
+    }
+    const queue = [...from.keys()]
+    for (const file of queue) {
+      for (const { kind, path } of transpilers[file.endsWith('.tsx') ? 'tsx' : 'ts'].scanImports(readFileSync(file, 'utf8'))) {
+        if (kind !== 'import-statement')
+          continue
+        if (['node:zlib', 'zlib', 'node:crypto', 'crypto'].includes(path))
+          chains.push(`${chain(file)}: ${path}`)
+        const local = path.startsWith('.') ? Bun.resolveSync(path, dirname(file)) : undefined
+        if (local !== undefined && !from.has(local)) {
+          from.set(local, file)
+          queue.push(local)
+        }
+      }
+    }
+    expect(chains).toEqual([])
   })
 })
 

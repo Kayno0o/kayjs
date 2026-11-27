@@ -85,6 +85,12 @@ describe('safeEqual: a constant-time compare of two secrets (#3672)', () => {
     expect(safeEqual('', 'x')).toBe(false)
     expect(safeEqual('clé', 'cle')).toBe(false)
   })
+
+  test('every byte of the two digests counts', () => {
+    // Their SHA-256 digests share the first byte with that of 's3cret-token', then the last one.
+    expect(safeEqual('s3cret-token', 's3cret-token-618')).toBe(false)
+    expect(safeEqual('s3cret-token', 's3cret-token-16')).toBe(false)
+  })
 })
 
 describe('escJson: JSON text made safe inside a <script> element (#3672)', () => {

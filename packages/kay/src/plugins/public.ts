@@ -1,6 +1,6 @@
 // `@kayjs/kay/config`: what `kay.config.ts` and plugin packages use.
 
-export { isInside } from '../build/files'
+export { isInside } from '../build/is-inside'
 export { distLocator, firstLoadUrls, measureFirstLoad } from '../build/first-load'
 export type { FirstLoad, Locate } from '../build/first-load'
 export { defineConfig, definePlugin } from './config'

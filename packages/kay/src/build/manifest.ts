@@ -3,7 +3,7 @@
 import type { ModuleGraph } from './graph'
 import type { IslandPlan } from './islands'
 import { join } from 'node:path'
-import { isInside } from './files'
+import { isInside } from './is-inside'
 import { islandKey } from './islands'
 import { ancestorFiles, fileToRoutePath, MIDDLEWARE_NAMES } from './routes'
 
