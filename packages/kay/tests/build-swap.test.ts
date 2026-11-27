@@ -271,14 +271,14 @@ describe('testApp() leaves the app\'s dist/ alone (#3658)', () => {
     expect(snapshot(join(dir, 'dist'))).toEqual(before)
   })
 
-  it('removes its folder when the test process exits', async () => {
+  it('removes its folder when the test process exits, leaving only the brotli cache builds share (#3684)', async () => {
     const dir = appWith({})
     write(dir, 'run.ts', `import { testApp } from '@kayjs/kay/test'\nconst t = await testApp({ root: import.meta.dir })\nif ((await t.get('/')).status !== 200) process.exit(3)\n`)
 
     const proc = Bun.spawnSync(['bun', 'run.ts'], { cwd: dir, stderr: 'pipe' })
 
     expect(proc.exitCode).toBe(0)
-    expect(existsSync(join(dir, '.kay-cache'))).toBe(false)
+    expect(readdirSync(join(dir, '.kay-cache'))).toEqual(['brotli-11'])
     expect(existsSync(join(dir, 'dist'))).toBe(false)
   })
 
