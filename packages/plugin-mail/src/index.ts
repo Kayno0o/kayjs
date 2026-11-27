@@ -84,33 +84,48 @@ function isDevOrTest(devFlag: boolean): boolean {
   return devFlag || env === 'development' || env === 'test'
 }
 
-/** Zero-dependency Resend HTTP transport using native fetch(). */
-export function resend(options: { apiKey?: string | undefined, endpoint?: string | undefined, timeoutMs?: number | undefined } = {}): MailTransport {
+/** The wait before retry `attempt` (0-based): the answer's `retry-after` when it gives one, else 0.5 s doubling, never past 5 s. */
+function resendRetryDelay(res: Response, attempt: number): number {
+  const seconds = Number(res.headers.get('retry-after'))
+  return Math.min(Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 500 * 2 ** attempt, 5_000)
+}
+
+/** Zero-dependency Resend HTTP transport using native fetch(); a 429 or 5xx answer is retried `retries` times (default 2) under the mail's id as idempotency key, so a retry never sends twice. */
+export function resend(options: { apiKey?: string | undefined, endpoint?: string | undefined, timeoutMs?: number | undefined, retries?: number | undefined } = {}): MailTransport {
   const endpoint = options.endpoint ?? 'https://api.resend.com/emails'
   const timeoutMs = options.timeoutMs ?? DEFAULT_RESEND_TIMEOUT_MS
+  const retries = options.retries ?? 2
   return {
     async send(mail) {
       const apiKey = options.apiKey ?? process.env.RESEND_API_KEY
       if (!apiKey)
         throw new MailNotConfiguredError('RESEND_API_KEY is not set')
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'authorization': `Bearer ${apiKey}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: mail.from,
-          to: mail.to,
-          reply_to: mail.replyTo,
-          subject: mail.subject,
-          text: mail.text,
-          html: mail.html,
-        }),
-        ...(timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
+      const body = JSON.stringify({
+        from: mail.from,
+        to: mail.to,
+        reply_to: mail.replyTo,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
       })
-      if (!res.ok)
-        throw new Error(`@kayjs/mail (resend): HTTP ${res.status}: ${await res.text()}`)
+      for (let attempt = 0; ; attempt++) {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'authorization': `Bearer ${apiKey}`,
+            'content-type': 'application/json',
+            'idempotency-key': mail.id,
+          },
+          body,
+          ...(timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
+        })
+        if (res.ok)
+          return
+        const text = await res.text()
+        if ((res.status !== 429 && res.status < 500) || attempt >= retries)
+          throw new Error(`@kayjs/mail (resend): HTTP ${res.status}: ${text}`)
+        await Bun.sleep(resendRetryDelay(res, attempt))
+      }
     },
   }
 }

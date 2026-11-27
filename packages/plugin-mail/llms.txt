@@ -26,7 +26,7 @@
 
 - `await mail.send({ from?, to?, replyTo?, subject, text?, html? })` → `SentMail` (`{ id, from, to, replyTo?, subject, text?, html?, sentAt }`).
 - `mail.isConfigured()`: `boolean`. `mail.outbox`: `SentMail[]`. `mail.clearOutbox()`.
-- `resend({ apiKey?, endpoint? })`: built-in Resend HTTP transport using `fetch()`.
+- `resend({ apiKey?, endpoint?, timeoutMs?, retries? })`: built-in Resend HTTP transport using `fetch()`. Each request times out after `timeoutMs` (10 000). A `429` or `5xx` answer is retried `retries` times (2), after its `retry-after` or 0.5 s doubling, capped at 5 s, under the mail's id as `Idempotency-Key`, so a retry never sends twice.
 - Works directly as `createAuth({ mailer: mail })` with `@kayjs/auth`.
 
 ## Snippet

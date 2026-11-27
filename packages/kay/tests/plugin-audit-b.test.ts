@@ -401,6 +401,46 @@ describe('Cross-plugin audit part 2 (#3635): @kayjs/live, @kayjs/mail, @kayjs/mc
       }
     })
 
+    async function resendAgainst(answers: Array<{ status: number, retryAfter?: string }>): Promise<{ keys: Array<string | null>, sent: Promise<void> }> {
+      const keys: Array<string | null> = []
+      const server = Bun.serve({
+        port: 0,
+        fetch(req) {
+          keys.push(req.headers.get('idempotency-key'))
+          const answer = answers[keys.length - 1] ?? { status: 200 }
+          return new Response(`answer ${keys.length}`, { status: answer.status, headers: answer.retryAfter === undefined ? {} : { 'retry-after': answer.retryAfter } })
+        },
+      })
+      const transport = resend({ apiKey: 're_test_123', endpoint: `http://127.0.0.1:${server.port}/emails` })
+      const sent = transport.send({ id: 'mail-1', from: 'a@b.test', to: ['c@d.test'], subject: 'Retry test', sentAt: new Date().toISOString() })
+      return { keys, sent: sent.finally(() => server.stop(true)) }
+    }
+
+    it('retries a resend() 429 or 5xx under the same idempotency key, waiting its retry-after', async () => {
+      const t0 = performance.now()
+      const { keys, sent } = await resendAgainst([{ status: 429, retryAfter: '0.01' }, { status: 503, retryAfter: '0.01' }])
+      await sent
+      expect(keys).toEqual(['mail-1', 'mail-1', 'mail-1'])
+      expect(performance.now() - t0).toBeLessThan(450)
+    })
+
+    it('waits half a second before retrying a resend() answer with no retry-after', async () => {
+      const t0 = performance.now()
+      const { keys, sent } = await resendAgainst([{ status: 502 }])
+      await sent
+      expect(keys).toHaveLength(2)
+      expect(performance.now() - t0).toBeGreaterThanOrEqual(480)
+    })
+
+    it('gives up on resend() after two retries, and never retries a 4xx other than 429', async () => {
+      const unavailable = await resendAgainst([{ status: 500, retryAfter: '0.05' }, { status: 500, retryAfter: '0.05' }, { status: 500, retryAfter: '0.05' }])
+      await expect(unavailable.sent).rejects.toThrow('@kayjs/mail (resend): HTTP 500: answer 3')
+      expect(unavailable.keys).toHaveLength(3)
+      const refused = await resendAgainst([{ status: 422 }])
+      await expect(refused.sent).rejects.toThrow('@kayjs/mail (resend): HTTP 422: answer 1')
+      expect(refused.keys).toHaveLength(1)
+    })
+
     it('does not silently drop mail when NODE_ENV is unset outside dev', async () => {
       const prevEnv = process.env.NODE_ENV
       const prevDev = process.env.KAY_DEV

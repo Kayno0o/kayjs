@@ -50,6 +50,8 @@ export const mail = createMailer({
 
 Register `mail` in `kay.config.ts`. In development and tests, sent messages are recorded in `mail.outbox` and rendered at `/_kay/mail`. In `NODE_ENV=production`, the preview routes are never mounted and no outbox copy is kept in memory.
 
+`resend()` retries a `429` or `5xx` answer twice, after the wait Resend asks for. It sends the mail's id as idempotency key, so Resend never delivers a retried mail twice. Pass `retries: 0` to turn this off.
+
 ## `@kayjs/icons`
 
 Zero-runtime inline SVGs from any `@iconify-json/*` icon pack. Register `icons()` from `@kayjs/icons/plugin` in `kay.config.ts`, then import icons anywhere, islands included:
