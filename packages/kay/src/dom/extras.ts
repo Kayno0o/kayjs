@@ -1,6 +1,7 @@
 // Optional DOM helpers (spread, omit, insert, show, setInnerHtml) split into a separate module
 // so Bun.build({ splitting: true }) keeps them out of minimal islands that don't use them.
 
+import type { CatchProps } from '../context'
 import type { Owned } from '../reactivity/graph'
 import type { Owner } from '../reactivity/index'
 import { DOM_PROPS } from '../attrs'
@@ -11,7 +12,8 @@ import { setAttr, setClass, setProp, setStyle } from './attrs'
 import { claimInsert } from './claim'
 import { claimRange, delegate, hydrateCursor, isHydrating, moveCursor, skipRange } from './index'
 
-const DELEGATED_EVENTS = new Set('beforeinput,click,dblclick,focusin,focusout,input,keydown,keyup,mousedown,mouseup,pointerdown,pointerup,touchstart,touchend'.split(','))
+// A literal rather than a split string, so the bundler drops it from an island that imports this module for its chunk alone (#3683).
+const DELEGATED_EVENTS = new Set(['beforeinput', 'click', 'dblclick', 'focusin', 'focusout', 'input', 'keydown', 'keyup', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend'])
 
 const RAW_HTML = Symbol.for('kay.html')
 
@@ -393,8 +395,8 @@ function catchInOwners(node: Owned, err: unknown): boolean {
   return false
 }
 
-// `<Catch>` in the browser: an error of `children`, while they render or in a later effect, swaps in `fallback` until `retry()`.
-export function catchBoundary(children: () => unknown, fallback: (error: unknown, retry: () => void) => unknown): Node | null {
+// `<Catch>` in the browser, which the compiler calls in place of `Catch`: an error of `children`, while they render or in a later effect, swaps in `fallback` until `retry()`.
+export function catchBoundary(props: CatchProps): Node | null {
   onEffectError(catchInOwners)
   const tries = signal(0)
   let failed: { error: unknown } | undefined
@@ -413,7 +415,7 @@ export function catchBoundary(children: () => unknown, fallback: (error: unknown
       owner.eh = fail
       const from = isHydrating() ? hydrateCursor() : undefined
       try {
-        return runOwned(owner, children)
+        return runOwned(owner, () => props.children)
       }
       catch (error) {
         disposeOwner(owner)
@@ -424,7 +426,8 @@ export function catchBoundary(children: () => unknown, fallback: (error: unknown
       }
     }
     const { error } = failed
-    return untrack(() => fallback(error, retry))
+    const fallback = props.fallback
+    return untrack(() => typeof fallback === 'function' ? fallback(error, retry) : fallback)
   })
 }
 

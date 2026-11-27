@@ -74,7 +74,7 @@ export default function Product({ product }) {
 ```
 
 - **On the server**: A child that throws, or an awaited child that rejects, renders the fallback, and `onError` in `kay.config.ts` is notified. Unlike `<Suspense>`, nothing streams: the page waits for the children. Wrap an async component in `<Suspense error={...}>` instead.
-- **In an island**: `<Catch>` works there too, and also catches an effect of its children that throws later, after a click for instance. A fallback written as a function gets the error and `retry`, which renders the children again:
+- **In an island**: `<Catch>` works there too, and also catches an effect of its children that throws later, after a click for instance. Write it as a tag there: calling `Catch()` as a function throws. A fallback written as a function gets the error and `retry`, which renders the children again:
 
 ```tsx
 <Catch fallback={(error, retry) => <button onClick={retry}>Reload the chart</button>}>

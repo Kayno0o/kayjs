@@ -61,6 +61,17 @@ describe('guardrails-check: browser-pure module boundaries', () => {
     expect(contextAnalysis.violations).toEqual([])
   })
 
+  test('rejects a runtime import of the DOM runtime in context.ts, which every @kayjs/kay import reaches (#3683)', () => {
+    const analysis = analyzeFile('packages/kay/src/context.ts', `
+      import type { Owned } from './dom/extras'
+      import { catchBoundary } from './dom/extras'
+      export { catchBoundary }
+      export type { Owned }
+    `)
+    expect(analysis.violations.map(v => [v.kind, v.line])).toEqual([['browser-pure-import', 3]])
+    expect(analyzeFile('packages/kay/src/dom/extras.ts', `import { claimInsert } from './claim'\nexport { claimInsert }`).violations).toEqual([])
+  })
+
   test('rejects runtime imports from server/, build/, cli/, dev/, node:*, bun:* in dom/, reactivity/, and context.ts', () => {
     const domViolations = analyzeFile('packages/kay/src/dom/bad.ts', `
       import { run } from '../server/action'

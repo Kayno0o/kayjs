@@ -22,7 +22,7 @@ export const DELEGATED_EVENTS = new Set([
 // Helpers kept out of the dom core, which every island loads: a page pays for them only when one of its islands binds them.
 const ATTR_HELPERS = ['setAttr', 'setClass', 'setProp', 'setStyle']
 const CLAIM_HELPERS = ['eachStatic']
-const EXTRA_HELPERS = ['fragInsert', 'insert', 'mergeProps', 'omit', 'propDefault', 'setInnerHtml', 'show', 'spread']
+const EXTRA_HELPERS = ['catchBoundary', 'fragInsert', 'insert', 'mergeProps', 'omit', 'propDefault', 'setInnerHtml', 'show', 'spread']
 
 function takeHelpers(used: Set<string>, names: readonly string[]): string[] {
   return names.filter(name => used.delete(name))
@@ -45,6 +45,9 @@ export function moduleHeader(used: Set<string>, templates: readonly { name: stri
       if (names.length > 0)
         header += `import { ${names.map(name => `${name} as __${name}`).join(', ')} } from '@kayjs/kay/internal/${module}';\n`
     }
+    // Bun groups modules by the islands reaching them: an island binding attributes or claims reaches the extras too, so the extras other islands use share that chunk instead of costing the page a request of their own (#3683).
+    if (usedExtras.length === 0 && usedAttrs.length + usedClaims.length > 0)
+      header += `import '@kayjs/kay/internal/dom-extras';\n`
     if (hasLoop)
       header += `import { loop as __loop } from '@kayjs/kay/internal/dom-loop';\n`
   }

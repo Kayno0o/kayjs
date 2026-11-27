@@ -3,7 +3,6 @@
 
 import type { KayChild } from './jsx-runtime'
 import type { IdScope, Owner } from './reactivity/index'
-import { catchBoundary } from './dom/extras'
 import { createOwner, getOwner, runWithOwner } from './reactivity/index'
 
 export interface RegionProps {
@@ -69,10 +68,7 @@ export function Catch(props: CatchProps): KayChild | Promise<KayChild> {
   const bridge = getOwner() === undefined ? getServerBridge() : undefined
   if (bridge !== undefined)
     return bridge.catch(props)
-  return catchBoundary(() => props.children, (error, retry) => {
-    const fallback = props.fallback
-    return typeof fallback === 'function' ? fallback(error, retry) : fallback
-  }) as KayChild
+  throw new Error('kay: Catch was called as a function in the browser: write it as <Catch fallback={...}>...</Catch>, which the compiler turns into the browser boundary.')
 }
 
 /** A part of the page that a link or form with `data-kay-target` swaps alone: a request for it renders only its children. Server-only, like `Head`. */

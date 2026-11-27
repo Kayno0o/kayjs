@@ -449,6 +449,39 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     }
   })
 
+  test('the extras an island uses share the chunk of the attribute bindings, and an app using none ships none of their code (#3683)', async () => {
+    const buildApp = async (files: Record<string, string>): Promise<string[]> => {
+      const dir = mkdtempSync(join(tmpdir(), 'kay-extras-chunk-'))
+      tempDirs.push(dir)
+      mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
+      symlinkSync(resolve(import.meta.dir, '..'), join(dir, 'node_modules/@kayjs/kay'))
+      for (const [file, text] of Object.entries(files)) {
+        mkdirSync(join(dir, file, '..'), { recursive: true })
+        writeFileSync(join(dir, file), text)
+      }
+      await build({ root: dir, minify: true, prerender: false })
+      const clientDir = join(dir, 'dist/client')
+      return [...new Bun.Glob('*.js').scanSync(clientDir)].map(file => readFileSync(join(clientDir, file), 'utf8'))
+    }
+    const toggle = `import { signal } from '@kayjs/kay'\nexport function Toggle() { const on = signal(false); return <button class={on.value ? 'on' : 'off'} onClick={() => { on.value = !on.value }}>t</button> }`
+    const raw = `import { signal } from '@kayjs/kay'\nexport function Raw() { const html = signal('<b>x</b>'); return <div innerHTML={html.value} onClick={() => { html.value = '' }} /> }`
+    const route = (name: string) => `import { ${name} } from '../components/${name}'\nexport default function P() { return <main><${name} /></main> }`
+
+    const both = await buildApp({
+      'src/components/Toggle.tsx': toggle,
+      'src/components/Raw.tsx': raw,
+      'src/routes/index.tsx': route('Toggle'),
+      'src/routes/raw.tsx': route('Raw'),
+    })
+    const bindings = both.filter(js => js.includes('removeAttribute("class")'))
+    expect(bindings.map(js => js.includes('innerHTML takes the HTML string'))).toEqual([true])
+
+    const togglesOnly = (await buildApp({ 'src/components/Toggle.tsx': toggle, 'src/routes/index.tsx': route('Toggle') })).join('\n')
+    expect(togglesOnly).toContain('removeAttribute("class")')
+    for (const marker of ['kay.html', 'beforeinput'])
+      expect([marker, togglesOnly.includes(marker)]).toEqual([marker, false])
+  })
+
   test('a streamed page preloads its eager islands only, as a buffered page does (#3662)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kay-stream-preload-'))
     tempDirs.push(dir)

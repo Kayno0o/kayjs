@@ -10,7 +10,7 @@ import { Catch } from '../src/context'
 import * as domExtras from '../src/dom/extras'
 import * as domCore from '../src/dom/index'
 import * as domLoop from '../src/dom/loop'
-import { effect, signal } from '../src/reactivity/index'
+import { createOwner, effect, runWithOwner, signal } from '../src/reactivity/index'
 import { createRenderContext, runWithRenderContext } from '../src/ssr/context'
 import * as ssrRt from '../src/ssr/index'
 import { testApp } from '../src/test/index'
@@ -137,6 +137,18 @@ const CART = `
     )
   }
 `
+
+describe('#3683 Catch called as a function in the browser', () => {
+  test('throws naming the JSX form, which the compiler turns into the browser boundary', () => {
+    // Under an owner, as island code runs, Catch does not take the server path.
+    expect(() => runWithOwner(createOwner(undefined), () => Catch({ fallback: 'x' }))).toThrow('kay: Catch was called as a function in the browser: write it as <Catch fallback={...}>...</Catch>')
+  })
+
+  test('an island compiles <Catch> to catchBoundary, not to the server-side Catch', () => {
+    const { code } = compileDom('Isle.tsx', `import { Catch } from '@kayjs/kay'\nexport default function Isle() { return <Catch fallback="no"><p>yes</p></Catch> }`)
+    expect(code).toContain('__catchBoundary({ fallback: "no", get children()')
+  })
+})
 
 describe('#3664 <Catch> in an island', () => {
   let warnings: string[]

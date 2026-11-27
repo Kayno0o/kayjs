@@ -234,6 +234,17 @@ function checkBrowserPureImport(
     }
   }
 
+  // Every client build that imports `@kayjs/kay` parses context.ts: reaching the DOM runtime from it cost bench-app's client build 4 ms (#3683).
+  if (file === 'packages/kay/src/context.ts' && topDir === 'dom' && !typeOnly) {
+    return {
+      kind: 'browser-pure-import',
+      file,
+      line,
+      detail: `context.ts imports "${specifier}", so every client build importing @kayjs/kay parses the DOM runtime`,
+      fix: 'have the DOM compiler call the dom/ helper in place of the component, as it does for <Catch> with catchBoundary',
+    }
+  }
+
   return undefined
 }
 

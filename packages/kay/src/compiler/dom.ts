@@ -33,6 +33,7 @@ import {
   jsxTagName,
   planChildSlots,
   RAW_TEXT_ELEMENTS,
+  resolveKayTag,
   VOID_ELEMENTS,
 } from './shared'
 
@@ -105,7 +106,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   function compileComponentCall(node: JSXElement, scopeRewrites: ReadonlyMap<string, string>): string {
     const tag = jsxTagName(node.openingElement.name)
-    const callee = resolveComponentCallee(tag, scopeRewrites)
+    // `Catch` itself stays server-side, so the `@kayjs/kay` an island imports does not pull the DOM runtime into every client build.
+    const callee = resolveKayTag(tag, analysis.imports) === 'Catch' ? use('catchBoundary') : resolveComponentCallee(tag, scopeRewrites)
     const attrs = node.openingElement.attributes
     const hasSpread = attrs.some(a => a.type === 'JSXSpreadAttribute')
     const segments: string[] = []
