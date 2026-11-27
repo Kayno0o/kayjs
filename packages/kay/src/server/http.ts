@@ -101,6 +101,8 @@ export interface ServerOptions extends ServerRuntimeConfig {
   importModule?: ((path: string) => Promise<Record<string, unknown>>) | undefined
   /** @internal Hears every unhandled route, action and plugin error; `testApp().errors` fills from it. */
   errorSink?: ((info: ServerErrorInfo) => void) | undefined
+  /** @internal The build's prerender server, which runs before the production environment exists, so plugin `requires` are not checked. */
+  prerender?: boolean | undefined
 }
 
 export interface RequestContext<Params = Record<string, string>> {
@@ -155,6 +157,7 @@ export interface EmbeddedServerConfig extends ServerRuntimeConfig {
   dev?: boolean | undefined
   nodeEnv?: string | undefined
   errorSink?: ((info: ServerErrorInfo) => void) | undefined
+  prerender?: boolean | undefined
 }
 
 export const MIME: Record<string, string> = {

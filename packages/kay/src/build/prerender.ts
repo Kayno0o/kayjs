@@ -79,7 +79,7 @@ export async function prerender(options: PrerenderOptions) {
     if (!pageErrors.has(request.url))
       pageErrors.set(request.url, error)
   }
-  const { app, entry } = await startBuiltApp({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, site: options.site, plugins: options.pluginOverride, dev: options.isDev, nodeEnv: options.nodeEnv, errorSink })
+  const { app, entry } = await startBuiltApp({ root, outDir: relPosix(root, outDir), assetPrefix: options.assetPrefix, site: options.site, plugins: options.pluginOverride, dev: options.isDev, nodeEnv: options.nodeEnv, errorSink, prerender: true })
   const origin = prerenderOrigin(options.site)
   mkdirSync(prerenderDir, { recursive: true })
 

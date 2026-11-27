@@ -74,6 +74,12 @@ export interface CheckPluginContext {
   warn(message: string): void
 }
 
+export interface RequiresPluginContext {
+  readonly root: string
+  /** `KayConfig.site`, when the app sets it. */
+  readonly site: string | undefined
+}
+
 export interface PluginRouteOptions {
   /** Enable CSRF Origin/Sec-Fetch-Site verification on unsafe methods (default: true). Set `false` to opt out (e.g. webhooks, bearer-token APIs). */
   csrf?: boolean | undefined
@@ -177,6 +183,11 @@ export interface KayPlugin {
   clientEntry?: string | undefined
   /** Client module bundled on its own and loaded only on routes whose tree renders a `<Region>`; every other page stays free of it. */
   regionClientEntry?: string | undefined
+  /**
+   * What the plugin needs to run in production, read from its options, the app's config and the environment: one message per unmet setting, naming it and its fix.
+   * A production start refuses while any is unmet, listing them all; `kay dev`, tests and `kay check` warn.
+   */
+  requires?: (ctx: RequiresPluginContext) => readonly string[] | Promise<readonly string[]>
   /** Validate plugin-specific invariants during `kay check` (e.g. missing i18n keys, content frontmatter). */
   check?: (ctx: CheckPluginContext) => void | Promise<void>
   /** Extra directories or files (relative to app root or absolute) for `kay dev` to watch. */

@@ -5,7 +5,7 @@ import type { AuthSession, AuthStore, AuthUser, OAuthAccount, TokenKind, UserExp
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { normalizeEmail, toPublicUser } from './store'
+import { keptInMemory, normalizeEmail, toPublicUser } from './store'
 
 interface UserRow {
   id: string
@@ -177,7 +177,7 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
     return qListUserSessions.all(userId, now).map(row => rowToSession(row)!)
   }
 
-  return {
+  return keptInMemory(db.filename === ':memory:', {
     db,
     close() {
       if (closed)
@@ -309,5 +309,5 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
         expiresAt: row.expires_at,
       }
     },
-  }
+  })
 }

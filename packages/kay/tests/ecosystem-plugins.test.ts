@@ -249,25 +249,26 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
     delete process.env.KAY_DEV
     try {
       const strict = createMailer({ optional: false })
-      await expect(strict.send({ subject: 'Fail' })).rejects.toBeInstanceOf(MailNotConfiguredError)
+      await expect(strict.send({ subject: 'Fail', to: 'c@d.test' })).rejects.toBeInstanceOf(MailNotConfiguredError)
 
       // The mailer's preview is never mounted in production
       const dir = makeTemp('kay-mail-prod-')
       mkdirSync(join(dir, 'src/routes'), { recursive: true })
       writeFileSync(join(dir, 'src/routes/index.tsx'), `export default async function Home() { return <h1>Prod</h1> }`)
-      const prodApp = await testApp({ root: dir, plugins: [strict] })
+      const configured = { from: 'a@b.test', transport: { async send() {} } }
+      const prodApp = await testApp({ root: dir, plugins: [createMailer(configured)] })
       expect((await prodApp.get('/_kay/mail')).status).toBe(404)
       expect((await prodApp.get('/_kay/mail.json')).status).toBe(404)
 
       // An untyped config passing preview: true still mounts nothing in production
-      const forced = createMailer({ optional: false, preview: true } as unknown as MailerOptions)
+      const forced = createMailer({ ...configured, preview: true } as unknown as MailerOptions)
       const forcedApp = await testApp({ root: dir, plugins: [forced] })
       expect((await forcedApp.get('/_kay/mail')).status).toBe(404)
       expect((await forcedApp.get('/_kay/mail.json')).status).toBe(404)
 
       // Mail a transport delivered in production is not kept in memory
       const delivering = createMailer({ transport: { async send() {} } })
-      await delivering.send({ subject: 'Sign-in link', text: 'https://example.test/auth/magic?token=secret' })
+      await delivering.send({ subject: 'Sign-in link', to: 'c@d.test', text: 'https://example.test/auth/magic?token=secret' })
       expect(delivering.outbox).toEqual([])
     }
     finally {

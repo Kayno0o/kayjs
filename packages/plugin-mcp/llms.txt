@@ -11,7 +11,7 @@
 - `name` (`'kay-mcp'`), `version` (`'1.0.0'`), `instructions` (returned in `initialize`).
 - `path`: HTTP endpoint (default `'/mcp/tools'`).
 - `rateLimit`: `{ max, windowMs, key? } | false` (default 120 calls a minute per address, each method counted apart; past it `429` with `Retry-After`).
-- `token`: `string | { env: string } | { file: string } | (() => string | undefined | Promise<string | undefined>)`. Unconfigured token returns `404`; missing/invalid `Authorization: Bearer <token>` returns `401`.
+- `token`: `string | { env: string } | { file: string } | (() => string | undefined | Promise<string | undefined>)`. Unconfigured token returns `404`, and a production start refuses until it is set; missing/invalid `Authorization: Bearer <token>` returns `401`.
 - `tools`: `Record<string, McpTool>` — each entry either wraps an existing Kay `action` (`{ action, description, ... }`) or defines `{ schema?, handler(input, ctx), description, ... }`. Wrap with `mcpTool(...)` for strict `format`/`handler` inference.
   - Per-tool options: `inputSchema`, `schemaRef` (references `options.schemas` to emit a compact stub in `tools/list` while keeping full server validation), `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), `format(output, input)`, `maxOutputChars`, `pruneEmpty`.
 - `schemas`: shared schemas exposed on demand via auto-added `describe_schema` tool and `kay://schemas/<name>` resources.

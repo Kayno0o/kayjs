@@ -408,6 +408,12 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
     after: ['@kayjs/i18n'],
     readsLocals: ['locale'],
 
+    requires(ctx) {
+      return resolveSite(ctx.site) === undefined
+        ? ['no `site`, so pages go out with no canonical link, no absolute `og:image` and no sitemap: set `site` in `kay.config.ts` (or pass it to `seo()`).']
+        : []
+    },
+
     onError({ request }) {
       errorRequests.add(request)
     },

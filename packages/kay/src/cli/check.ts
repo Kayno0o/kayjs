@@ -16,6 +16,7 @@ import { collectProjectComplianceWarnings, shouldEmitWarning } from '../compiler
 import { collectMistakes, KayMistake, serverOnlyTagError } from '../compiler/mistakes'
 import { DIAGNOSTIC_PREFIX_RE, formatDiagnostic, formatLoc } from '../compiler/shared'
 import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from '../plugins/index'
+import { collectRequirements } from '../plugins/requires'
 
 /** Whether `kay check` typechecked the app, with which tool, or why it did not. */
 export type TypecheckRun = { ran: true, tool: string } | { ran: false, reason: string }
@@ -173,8 +174,8 @@ function formatIslandIssue(issue: IslandIssue, root: string, sources: Map<string
 }
 
 // Each plugin's check(ctx) runs inside a real AppRuntimeContext; what it reports without a place lands on kay.config.ts.
-async function runPluginChecks(plugins: readonly KayPlugin[], paths: { root: string, routesDir: string, outDir: string, assetPrefix: string }, errors: string[], warnings: string[]): Promise<void> {
-  const { root, routesDir, outDir, assetPrefix } = paths
+async function runPluginChecks(plugins: readonly KayPlugin[], paths: { root: string, routesDir: string, outDir: string, assetPrefix: string, site: string | undefined }, errors: string[], warnings: string[]): Promise<void> {
+  const { root, routesDir, outDir, assetPrefix, site } = paths
   const appCtx = createAppContext({ root, outDir, publicDir: join(outDir, 'public'), assetPrefix, dev: false })
   const placed = (message: string, severity: 'error' | 'warning'): string =>
     DIAGNOSTIC_PREFIX_RE.test(message) ? message : formatDiagnostic('kay.config.ts:1:1', message, severity)
@@ -194,6 +195,11 @@ async function runPluginChecks(plugins: readonly KayPlugin[], paths: { root: str
       errors.push(placed(`${plugin.name}: ${err instanceof Error ? err.message : String(err)}`, 'error'))
     }
   }
+  const { unmet, failed } = await runWithAppContext(appCtx, () => collectRequirements(plugins, { root, site }))
+  for (const line of unmet)
+    warnings.push(placed(`${line} (a production start refuses until it is set)`, 'warning'))
+  for (const line of failed)
+    errors.push(placed(line, 'error'))
 }
 
 
@@ -314,7 +320,7 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
   warnings.push(...collectProjectComplianceWarnings({ root, srcDir, routesDir, routeFiles, analyses, compliance, site }))
 
   // 3d. Plugin check(ctx) hooks
-  await runPluginChecks(plugins, { root, routesDir, outDir, assetPrefix }, errors, warnings)
+  await runPluginChecks(plugins, { root, routesDir, outDir, assetPrefix, site }, errors, warnings)
 
   const typecheck = options.skipTypecheck === true ? { ran: false as const, reason: "skipped by --no-typecheck" } : runTypecheck(root, errors)
 

@@ -8,7 +8,7 @@
 
 ## Plugin Setup (`seo(options?)`)
 
-- `site`: public origin (`https://example.com`, inherits `KayConfig.site`). Required for canonical links, absolute `og:image`, and `sitemap.xml`.
+- `site`: public origin (`https://example.com`, inherits `KayConfig.site`). Required for canonical links, absolute `og:image`, and `sitemap.xml`; a production start refuses without it.
 - `name`: site name (`og:site_name` and fallback `<title>`).
 - `titleTemplate`: e.g. `'%s | My App'` (skips wrapping if `<title>` already contains `name`).
 - `description`: `string` or `Record<locale, string>` (localized fallback when a page doesn't emit `<meta name="description">`; reads `ctx.locals.locale` from `@kayjs/i18n`).

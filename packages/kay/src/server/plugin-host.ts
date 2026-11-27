@@ -7,6 +7,7 @@ import type { EmbeddedServerConfig, Middleware, RequestContext } from './http'
 
 import type { TrustProxy } from './security'
 import { runWithAppContext } from '../plugins/context'
+import { enforceRequirements } from '../plugins/requires'
 import { normalizeConsentConfig, registerConsentRoute } from './consent'
 import { assertRateLimit, createRateLimitStore, hitFor, tooManyRequests } from './rate-limit'
 import { Router } from './router'
@@ -147,6 +148,10 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
   } = config as EmbeddedServerConfig & Record<string, unknown>
   const readonlyRuntimeConfig: Readonly<Record<string, unknown>> = Object.freeze({ ...forwardedConfig })
 
+  if (config.prerender !== true) {
+    const production = !options.dev && (appCtx.nodeEnv ?? process.env.NODE_ENV) === 'production'
+    await runWithAppContext(appCtx, () => enforceRequirements(plugins, { root: options.root, site: options.site }, production))
+  }
   for (const plugin of plugins) {
     if (plugin.server !== undefined) {
       const pluginApi: ServerPluginAPI = {

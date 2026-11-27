@@ -91,6 +91,20 @@ interface MemoryState<TUser extends AuthUser = AuthUser> {
   tokens: Map<string, VerificationToken>
 }
 
+const inMemoryStores = new WeakSet<object>()
+
+/** Marks `store` as one whose data lives in the process alone when `inMemory`, for `requires` to refuse it in production. */
+export function keptInMemory<T extends object>(inMemory: boolean, store: T): T {
+  if (inMemory)
+    inMemoryStores.add(store)
+  return store
+}
+
+/** Whether the store loses every account and session when the process stops: `memoryAuthStore()`, or `sqliteAuthStore()` on `:memory:`. */
+export function isKeptInMemory(store: object): boolean {
+  return inMemoryStores.has(store)
+}
+
 export function memoryAuthStore<TUser extends AuthUser = AuthUser>(): AuthStore<TUser> {
   const state: MemoryState<TUser> = {
     users: new Map(),
@@ -100,7 +114,7 @@ export function memoryAuthStore<TUser extends AuthUser = AuthUser>(): AuthStore<
     tokens: new Map(),
   }
 
-  return {
+  return keptInMemory(true, {
     getUserById(userId) {
       return state.users.get(userId)
     },
@@ -249,5 +263,5 @@ export function memoryAuthStore<TUser extends AuthUser = AuthUser>(): AuthStore<
           state.tokens.delete(k)
       }
     },
-  }
+  })
 }

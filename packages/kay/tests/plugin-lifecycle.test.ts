@@ -452,3 +452,141 @@ describe('a throwing plugin build hook (#3657)', () => {
     })
   }
 })
+
+describe('KayPlugin.requires: what a plugin needs to run in production (#3674)', () => {
+  const needs = (name: string, unmet: string[]) => definePlugin({ name, requires: () => unmet })
+  const broken = definePlugin({
+    name: 'broken',
+    requires() {
+      throw new Error('boom')
+    },
+  })
+  const ctx = { root: '/app', site: undefined }
+
+  function appDir(): string {
+    const dir = makeTemp('kay-requires-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export const prerender = true\nexport default function Home() { return <h1>Home</h1> }\n')
+    return dir
+  }
+
+  it('a production start with every requirement met boots', async () => {
+    const app = await testApp({ root: appDir(), plugins: [needs('a', [])], nodeEnv: 'production' })
+    expect((await app.get('/')).status).toBe(200)
+    await app.app.dispose?.()
+  })
+
+  it('a production start refuses while two plugins lack something, listing both with their plugin and fix, after a build that went through', async () => {
+    const root = appDir()
+    const plugins = [needs('a', ['set A']), needs('b', ['set B'])]
+    const built = await build({ root, outDir: 'dist-requires', plugins, nodeEnv: 'production' })
+    expect(built.routes.find(r => r.path === '/')?.prerendered).toEqual({ '/': 'prerendered/index.html' })
+    await expect(createServer({ root, outDir: 'dist-requires', plugins, nodeEnv: 'production' })).rejects.toThrow('kay: the app cannot start in production until its plugins get what they need:\n  - a: set A\n  - b: set B')
+  })
+
+  it('kay dev boots with NODE_ENV=production and only warns', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const app = await testApp({ root: appDir(), plugins: [needs('in-dev', ['set E'])], dev: true, nodeEnv: 'production' })
+      expect((await app.get('/')).status).toBe(200)
+      expect(warn.mock.calls.filter(c => String(c[0]).includes('in-dev: set E'))).toHaveLength(1)
+      await app.app.dispose?.()
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('a requires that throws is that plugin\'s error, the other plugins still listed', async () => {
+    await expect(testApp({ root: appDir(), plugins: [needs('a', ['set A']), broken], nodeEnv: 'production' })).rejects.toThrow('  - a: set A\n  - broken: requires() threw: boom')
+  })
+
+  it('outside production the app boots and warns once per requirement, however many servers start', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const root = appDir()
+      const first = await testApp({ root, plugins: [needs('dev-only', ['set D'])] })
+      const second = await testApp({ root, prebuilt: true, plugins: [needs('dev-only', ['set D'])] })
+      expect((await second.get('/')).status).toBe(200)
+      expect(warn.mock.calls.filter(c => String(c[0]).includes('dev-only: set D'))).toEqual([['kay: in production this would refuse to start: dev-only: set D']])
+      await first.app.dispose?.()
+      await second.app.dispose?.()
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('kay check warns about each unmet requirement and reports a throwing requires as an error', async () => {
+    const { checkProject } = await import('../src/cli/check')
+    const root = appDir()
+    writeFileSync(join(root, 'kay.config.ts'), `export default {
+      compliance: { legalNotice: false },
+      plugins: [
+        { name: 'a', requires: () => ['set A'] },
+        { name: 'broken', requires: () => { throw new Error('boom') } },
+      ],
+    }\n`)
+    const res = await checkProject(root, { skipTypecheck: true })
+    expect(res.warnings.filter(w => w.includes('a: set A'))).toEqual(['kay.config.ts:1:1: warning: a: set A (a production start refuses until it is set)'])
+    expect(res.errors.filter(e => e.includes('broken'))).toEqual(['kay.config.ts:1:1: error: broken: requires() threw: boom'])
+  })
+
+  it('@kayjs/auth requires a store that outlives the process', async () => {
+    const { sqliteAuthStore } = await import('../../plugin-auth/src/sqlite')
+    const secret = 'test-secret-012345678901234567890123'
+    const message = '`store` keeps accounts and sessions in memory, so a restart signs everyone out and loses every account: pass `store: sqliteAuthStore(\'data/auth.db\')` from `@kayjs/auth/sqlite`, or your own `AuthStore`.'
+    expect(await createAuth({ secret }).requires!(ctx)).toEqual([message])
+    expect(await createAuth({ secret, store: memoryAuthStore() }).requires!(ctx)).toEqual([message])
+    expect(await createAuth({ secret, store: sqliteAuthStore() }).requires!(ctx)).toEqual([message])
+    expect(await createAuth({ secret, store: sqliteAuthStore(join(makeTemp('kay-auth-db-'), 'auth.db')) }).requires!(ctx)).toEqual([])
+  })
+
+  it('@kayjs/mail requires a transport and a sender, a transport only when mail is not optional', async () => {
+    const transport = { async send() {} }
+    expect(await createMailer().requires!(ctx)).toEqual([
+      'no transport, so every send() throws: set `RESEND_API_KEY`, or pass `transport` to `createMailer()` (`optional: true` drops mail instead).',
+      'no sender, so mail goes out from noreply@localhost: set `MAIL_FROM`, or pass `from` to `createMailer()`.',
+    ])
+    expect(await createMailer({ optional: true, from: 'a@b.test' }).requires!(ctx)).toEqual([])
+    expect(await createMailer({ transport, from: 'a@b.test' }).requires!(ctx)).toEqual([])
+    const prev = process.env.MAIL_FROM
+    process.env.MAIL_FROM = 'env@b.test'
+    try {
+      expect(await createMailer({ transport }).requires!(ctx)).toEqual([])
+    }
+    finally {
+      if (prev === undefined)
+        delete process.env.MAIL_FROM
+      else
+        process.env.MAIL_FROM = prev
+    }
+  })
+
+  it('@kayjs/mail refuses a mail with no recipient, naming the call, in development and in production', async () => {
+    const mailer = createMailer({ from: 'a@b.test', transport: { async send() {} } })
+    const refusal = '@kayjs/mail: send({ subject: "Hi" }) has no recipient: give it `to`, pass `to` to `createMailer()`, or set `MAIL_TO`.'
+    await expect(mailer.send({ subject: 'Hi' })).rejects.toThrow(refusal)
+    const prev = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      await expect(mailer.send({ subject: 'Hi' })).rejects.toThrow(refusal)
+    }
+    finally {
+      if (prev === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = prev
+    }
+  })
+
+  it('@kayjs/mcp requires a token that resolves, @kayjs/seo a site', async () => {
+    const noToken = ['no `token`, so the endpoint answers 404 to every call: pass `token: { env: \'MCP_TOKEN\' }` and set `MCP_TOKEN`, or `token: { file }`.']
+    expect(await mcp({ tools: {} }).requires!(ctx)).toEqual(noToken)
+    expect(await mcp({ tools: {}, token: { env: 'KAY_TEST_UNSET_MCP_TOKEN' } }).requires!(ctx)).toEqual(noToken)
+    expect(await mcp({ tools: {}, token: 'secret-token' }).requires!(ctx)).toEqual([])
+    expect(await seo().requires!(ctx)).toEqual(['no `site`, so pages go out with no canonical link, no absolute `og:image` and no sitemap: set `site` in `kay.config.ts` (or pass it to `seo()`).'])
+    expect(await seo().requires!({ ...ctx, site: 'https://example.test' })).toEqual([])
+    expect(await seo({ site: 'https://example.test' }).requires!(ctx)).toEqual([])
+  })
+})

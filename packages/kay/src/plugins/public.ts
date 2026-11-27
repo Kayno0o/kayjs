@@ -8,4 +8,4 @@ export { CONTENT_IMAGE_RESOLVER_SERVICE, I18N_CONFIG_SERVICE, serviceKey } from 
 export type { ActiveI18nConfig, ContentImageResolver, ContentImageResult, ServiceKey } from './services'
 export type { ComplianceConfig, ComplianceRule } from '../compiler/compliance'
 export type { ConsentConfig } from '../server/consent'
-export type { BuildPluginContext, BuildPluginTarget, CheckPluginContext, DocumentHeadContext, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerErrorInfo, ServerPluginAPI, ServerRuntimeConfig } from './types'
+export type { BuildPluginContext, BuildPluginTarget, CheckPluginContext, DocumentHeadContext, FinalizeBuildContext, KayConfig, KayPlugin, MiddlewareOptions, PluginRouteOptions, RequiresPluginContext, ServerErrorInfo, ServerPluginAPI, ServerRuntimeConfig } from './types'

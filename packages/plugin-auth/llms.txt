@@ -12,7 +12,7 @@
 
 `createAuth()` returns a single object that is both the `KayPlugin` (register in `kay.config.ts`) and the app handle (import in routes/middleware):
 
-- `store`: `AuthStore` (default `memoryAuthStore()`; use `sqliteAuthStore('./data/auth.sqlite')` in production).
+- `store`: `AuthStore` (default `memoryAuthStore()`; a production start refuses it and `sqliteAuthStore()` on `:memory:`: use `sqliteAuthStore('./data/auth.sqlite')`).
 - `secret`: string (defaults to `process.env.AUTH_SECRET`; required and ≥32 UTF-8 bytes in `NODE_ENV=production`).
 - `site`: public origin (`https://example.com`, inherits `KayConfig.site`; required off localhost for mailed links & OAuth callbacks).
 - `basePath`: route prefix (default `'/auth'`).

@@ -16,7 +16,7 @@ import { registerOAuthRoutes } from './oauth-routes'
 
 import { registerAuthRoutes } from './routes'
 import { createSessionManager } from './session'
-import { memoryAuthStore, normalizeEmail, toPublicUser } from './store'
+import { isKeptInMemory, memoryAuthStore, normalizeEmail, toPublicUser } from './store'
 
 declare module '@kayjs/kay/server' {
   interface KayLocals {
@@ -192,6 +192,8 @@ export interface Auth<TUser extends AuthUser = AuthUser> extends KayPlugin {
   pruneExpired(): Promise<void>
   dispose(): void
 }
+
+const STORE_IN_MEMORY = '`store` keeps accounts and sessions in memory, so a restart signs everyone out and loses every account: pass `store: sqliteAuthStore(\'data/auth.db\')` from `@kayjs/auth/sqlite`, or your own `AuthStore`.'
 
 function resolveSecret(optionSecret: string | undefined): string {
   if (optionSecret !== undefined && optionSecret.trim().length === 0)
@@ -436,6 +438,7 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     name: '@kayjs/auth',
     enforce: 'pre',
     providesLocals: ['user', 'session'],
+    requires: () => isKeptInMemory(store) ? [STORE_IN_MEMORY] : [],
     server(api) {
       if (options.trustProxy === undefined)
         trustProxy = api.trustProxy

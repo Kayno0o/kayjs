@@ -151,6 +151,14 @@ export function createMailer(options: MailerOptions = {}): Mailer {
     isConfigured() {
       return getTransport() !== undefined
     },
+    requires() {
+      const unmet: string[] = []
+      if (getTransport() === undefined && !options.optional)
+        unmet.push('no transport, so every send() throws: set `RESEND_API_KEY`, or pass `transport` to `createMailer()` (`optional: true` drops mail instead).')
+      if ((options.from ?? process.env.MAIL_FROM) === undefined)
+        unmet.push('no sender, so mail goes out from noreply@localhost: set `MAIL_FROM`, or pass `from` to `createMailer()`.')
+      return unmet
+    },
     clearOutbox() {
       outbox.length = 0
     },
@@ -158,10 +166,12 @@ export function createMailer(options: MailerOptions = {}): Mailer {
       assertNoHeaderInjection(message.subject, 'subject')
       const from = message.from ?? options.from ?? process.env.MAIL_FROM ?? 'noreply@localhost'
       const toList = normalizeList(message.to ?? options.to ?? process.env.MAIL_TO, 'to')
+      if (toList.length === 0)
+        throw new Error(`@kayjs/mail: send({ subject: ${JSON.stringify(message.subject)} }) has no recipient: give it \`to\`, pass \`to\` to \`createMailer()\`, or set \`MAIL_TO\`.`)
       const record: SentMail = {
         id: crypto.randomUUID(),
         from: formatAddress(from, 'from'),
-        to: toList.length > 0 ? toList : ['dev@localhost'],
+        to: toList,
         ...(message.replyTo !== undefined ? { replyTo: formatAddress(message.replyTo, 'replyTo') } : {}),
         subject: message.subject,
         ...(message.text !== undefined ? { text: message.text } : {}),

@@ -483,6 +483,12 @@ export function mcp(options: McpOptions): KayPlugin {
   return definePlugin({
     name: '@kayjs/mcp',
 
+    async requires() {
+      return await resolveToken(options.token, readTokenFile) === undefined
+        ? ['no `token`, so the endpoint answers 404 to every call: pass `token: { env: \'MCP_TOKEN\' }` and set `MCP_TOKEN`, or `token: { file }`.']
+        : []
+    },
+
     server(api) {
       if (api.dev || nodeEnv() !== 'production') {
         for (const msg of collectBudgetViolations(footprint, options.budget))

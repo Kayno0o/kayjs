@@ -73,6 +73,7 @@ export async function startBuiltApp(options: ServerOptions): Promise<{ app: KayA
     dev: options.dev ?? (process.env.KAY_DEV === '1'),
     nodeEnv: options.nodeEnv,
     errorSink: options.errorSink,
+    prerender: options.prerender,
   })
   return { app, outDir, entry }
 }
