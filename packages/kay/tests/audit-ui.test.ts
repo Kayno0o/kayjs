@@ -108,7 +108,7 @@ beforeAll(async () => {
   writeFileSync(join(builtDir, 'src/components/SigHost.tsx'), `
     import { signal } from '@kayjs/kay'
     import { mount } from '@kayjs/kay/internal/dom'
-    import { Field, Select, toast } from ${JSON.stringify(UI_ENTRY)}
+    import { ControlledDialog, ControlledDrawer, Field, Select, toast } from ${JSON.stringify(UI_ENTRY)}
     export function FieldIsland(props: { err: ReturnType<typeof signal<string | undefined>> }) {
       return (
         <Field id="isl-email" label="Email" hint="Work email" error={props.err.value} required>
@@ -123,7 +123,7 @@ beforeAll(async () => {
         </Field>
       )
     }
-    ;(globalThis as Record<string, unknown>).__kayAuditTest = { mount, signal, toast, FieldIsland, FieldSelectIsland }
+    ;(globalThis as Record<string, unknown>).__kayAuditTest = { mount, signal, toast, FieldIsland, FieldSelectIsland, ControlledDialog, ControlledDrawer }
     export function SigHost() {
       const s = signal(0)
       return <span>{s.value}</span>
@@ -205,14 +205,18 @@ beforeAll(async () => {
     toast: typeof toastApi
     FieldIsland: (...args: any[]) => any
     FieldSelectIsland: (...args: any[]) => any
+    ControlledDialog: (...args: any[]) => any
+    ControlledDrawer: (...args: any[]) => any
   }
   mountFn = helpers.mount
   signal = helpers.signal
   toastApi = helpers.toast
   uiMods.FieldIsland = helpers.FieldIsland
   uiMods.FieldSelectIsland = helpers.FieldSelectIsland
+  uiMods.ControlledDialog = helpers.ControlledDialog
+  uiMods.ControlledDrawer = helpers.ControlledDrawer
 
-  for (const name of ['Menu', 'Select', 'CommandPalette', 'Dialog', 'Drawer', 'DataTable', 'Toaster']) {
+  for (const name of ['Menu', 'Select', 'CommandPalette', 'DataTable', 'Toaster']) {
     const mod = await loadIsland(name)
     uiMods[name] = mod[name] ?? mod.default
   }
@@ -616,8 +620,8 @@ describe('Box 21 — Dialog, Drawer, Field, DataTable search & CommandPalette la
     // Configurable labels via props (for i18n / RGAA in non-English apps)
     const TableComp = uiMods.DataTable!
     const CommandComp = uiMods.CommandPalette!
-    const DialogComp = uiMods.Dialog!
-    const DrawerComp = uiMods.Drawer!
+    const DialogComp = uiMods.ControlledDialog!
+    const DrawerComp = uiMods.ControlledDrawer!
     const ToasterComp = uiMods.Toaster!
     const t = mountInBody(() => TableComp({
       rows: [{ id: '1', name: 'A' }, { id: '2', name: 'B' }],
@@ -649,10 +653,12 @@ describe('Box 21 — Dialog, Drawer, Field, DataTable search & CommandPalette la
     const dlg = mountInBody(() => DialogComp({
       title: 'Paramètres',
       closeLabel: 'Fermer',
+      open: signal(false),
     }))
     const drw = mountInBody(() => DrawerComp({
       title: 'Navigation',
       closeLabel: 'Fermer le panneau',
+      open: signal(false),
     }))
     toastApi.show('Enregistré', undefined, 0)
     const tst = mountInBody(() => ToasterComp({ dismissLabel: 'Ignorer' }))
@@ -883,9 +889,10 @@ describe('Box 24 — WCAG Contrast >= 4.5:1 across all grammars, Orbit focus ind
   })
 })
 
-describe('Box 40 — Dialog, Drawer, CommandPalette: open={signal(true)} on mount & padding click does not close', () => {
-  it('Dialog opens immediately when mounted with open={signal(true)}, ignores clicks on inner padding panel, and closes on backdrop click', () => {
-    const DialogComp = uiMods.Dialog!
+describe('Box 40 — ControlledDialog, ControlledDrawer, CommandPalette: open={signal(true)} on mount & padding click does not close', () => {
+  // The browser closes a ControlledDialog or ControlledDrawer on a backdrop click (`closedby="any"`), which happy-dom lacks: ui.test.ts checks it in Chromium.
+  it('ControlledDialog opens immediately when mounted with open={signal(true)} and ignores clicks on inner padding panel', () => {
+    const DialogComp = uiMods.ControlledDialog!
     const openSig = signal(true)
     const mounted = mountInBody(() => DialogComp({
       title: 'Confirm',
@@ -901,19 +908,14 @@ describe('Box 40 — Dialog, Drawer, CommandPalette: open={signal(true)} on moun
       panel.click()
       expect(openSig.value).toBe(true)
       expect(dialog.open).toBe(true)
-
-      // Click on backdrop (dialog element itself) closes the dialog
-      dialog.click()
-      expect(openSig.value).toBe(false)
-      expect(dialog.open).toBe(false)
     }
     finally {
       mounted.dispose()
     }
   })
 
-  it('Drawer opens immediately when mounted with open={signal(true)}, ignores clicks on inner padding panel, and closes on backdrop click', () => {
-    const DrawerComp = uiMods.Drawer!
+  it('ControlledDrawer opens immediately when mounted with open={signal(true)} and ignores clicks on inner padding panel', () => {
+    const DrawerComp = uiMods.ControlledDrawer!
     const openSig = signal(true)
     const mounted = mountInBody(() => DrawerComp({
       title: 'Side panel',
@@ -928,10 +930,6 @@ describe('Box 40 — Dialog, Drawer, CommandPalette: open={signal(true)} on moun
       panel.click()
       expect(openSig.value).toBe(true)
       expect(dialog.open).toBe(true)
-
-      dialog.click()
-      expect(openSig.value).toBe(false)
-      expect(dialog.open).toBe(false)
     }
     finally {
       mounted.dispose()
