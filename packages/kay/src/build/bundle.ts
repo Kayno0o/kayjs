@@ -11,7 +11,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { compileSsr } from '../compiler/index'
 import { readsPrivateEnv } from '../compiler/server-only'
 import { clientPlugin, KAY_SPECIFIER_FILTER, localIslandExports, TS_FILTER } from './client-plugin'
-import { formatBunBuildLogs, isInNodeModules, isOutsideRoot, isTsFile, relPosix } from './files'
+import { formatBunBuildLogs, isInNodeModules, isInside, isTsFile, relPosix } from './files'
 import { stampFiles, stampsMatch } from './graph'
 import { entryStaticImports, hydrateStrategies, writeClientEntries } from './client-entries'
 import { clientLeakError, islandKey } from './islands'
@@ -462,7 +462,7 @@ function resolveServerImports(b: PluginBuilder, isDev: boolean, root: string, re
 export async function buildServer(env: BundleEnv, entries: string[], serverRoot: string, islandChunks: Map<string, string>, entry: { file: string, source: string }): Promise<void> {
   const { root, outDir, serverDir, graph, cache, islands } = env
   const transforms = pluginTransforms(env.plugins)
-  const externalOutDir = isOutsideRoot(root, outDir)
+  const externalOutDir = !isInside(root, outDir, { orSame: true })
 
   const serverSignature = cache !== undefined
     ? JSON.stringify({

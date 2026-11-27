@@ -3,8 +3,8 @@
 // (cached by content hash in `.kay-cache/images/` at build time, or served from memory at runtime for --compile).
 
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve } from 'node:path'
-import { serviceKey } from '@kayjs/kay/config'
+import { join, resolve } from 'node:path'
+import { isInside, serviceKey } from '@kayjs/kay/config'
 import { getAppContext } from '@kayjs/kay/internal/server'
 import { escAttr } from '@kayjs/kay/server'
 import {
@@ -68,10 +68,6 @@ function getCardConfig(): ShareCardDefaults {
   return standaloneCardConfig ?? {}
 }
 
-function isStrictlyInside(parent: string, target: string): boolean {
-  const rel = relative(parent, target)
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
-}
 
 function wrapLines(text: string, maxChars: number, maxLines: number): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean)
@@ -99,12 +95,12 @@ function readConfinedSvgImage(imageSpec: string): string {
     return imageSpec
   const rootDir = resolve(getAppContext()?.root ?? process.cwd())
   const absImg = resolve(rootDir, imageSpec)
-  if (!isStrictlyInside(rootDir, absImg) || !existsSync(absImg))
+  if (!isInside(rootDir, absImg) || !existsSync(absImg))
     return ''
   try {
     const realRoot = realpathSync(rootDir)
     const realImg = realpathSync(absImg)
-    if (!isStrictlyInside(realRoot, realImg))
+    if (!isInside(realRoot, realImg))
       return ''
     return readFileSync(realImg, 'utf8')
   }

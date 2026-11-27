@@ -18,7 +18,7 @@ import { createAppContext, loadConfig, resolvePlugins, runWithAppContext } from 
 import { actionHash } from '../server/action'
 import { buildClient, buildServer, linkOrCopyFile, pluginBunPlugins, standaloneCssFiles } from './bundle'
 import { compileExecutable } from './compile'
-import { assertSafeOutDir, fileSize, isInNodeModules, isStrictDescendant, relPosix, walkAllFiles, walkRoutes } from './files'
+import { assertSafeOutDir, fileSize, isInNodeModules, isInside, relPosix, walkAllFiles, walkRoutes } from './files'
 import { ModuleGraph } from './graph'
 import { renderProblems } from './render-rules'
 import { planIslands } from './islands'
@@ -522,7 +522,7 @@ function compileOutfile(compile: string | true, root: string, stageDir: string, 
   if (compile === true)
     return join(stageDir, 'server-bin')
   const outfile = resolve(root, compile)
-  return isStrictDescendant(finalOutDir, outfile) ? join(stageDir, relative(finalOutDir, outfile)) : outfile
+  return isInside(finalOutDir, outfile) ? join(stageDir, relative(finalOutDir, outfile)) : outfile
 }
 
 /** Points the cache's reusable folders at where the swap moved them, so the next build links from there. */

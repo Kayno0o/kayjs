@@ -3,7 +3,7 @@
 import type { ImageAsset } from './helpers'
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
-import { basename, extname, isAbsolute, join, relative } from 'node:path'
+import { basename, extname, join } from 'node:path'
 
 export const ALLOWED_IMAGE_EXTS = new Set([
   '.png',
@@ -102,10 +102,6 @@ export interface VariantPipelineConfig {
   cachePrefix: string
 }
 
-export function isStrictlyInside(dir: string, target: string): boolean {
-  const rel = relative(dir, target)
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
-}
 
 function parseMagickDimensions(stdout: string): { width: number, height: number } | undefined {
   const parts = stdout.trim().split(/\s+/)

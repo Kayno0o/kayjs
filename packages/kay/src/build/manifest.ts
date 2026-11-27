@@ -2,7 +2,8 @@
 
 import type { ModuleGraph } from './graph'
 import type { IslandPlan } from './islands'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
+import { isInside } from './files'
 import { islandKey } from './islands'
 import { ancestorFiles, fileToRoutePath, MIDDLEWARE_NAMES } from './routes'
 
@@ -252,7 +253,7 @@ export function buildRouteEntries(options: {
 export function buildActionEntries(actionsByFile: Map<string, { exportName: string, url: string }[]>, routesDir: string, toOutRel: (srcFile: string) => string): ActionManifestEntry[] {
   const entries: ActionManifestEntry[] = []
   for (const [srcFile, list] of actionsByFile) {
-    const inRoutes = !relative(routesDir, srcFile).startsWith('..')
+    const inRoutes = isInside(routesDir, srcFile, { orSame: true })
     const middlewares = inRoutes ? ancestorFiles(routesDir, srcFile, MIDDLEWARE_NAMES).map(toOutRel) : []
     for (const a of list)
       entries.push({ url: a.url, file: toOutRel(srcFile), exportName: a.exportName, middlewares })

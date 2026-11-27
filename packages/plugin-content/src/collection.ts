@@ -1,6 +1,7 @@
 // Typed file-backed Markdown collections with caching, schema validation, localization, and lazy renderers.
 
 import type { ContentImageResolver, ContentImageResult } from '@kayjs/kay/config'
+import { isInside } from '@kayjs/kay/config'
 import type { StandardSchemaV1 } from '@kayjs/kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
@@ -142,10 +143,6 @@ export interface CollectionOptionsWithoutSchema extends Omit<CollectionOptions<R
   schema?: undefined
 }
 
-export function isInsideOrSame(dir: string, target: string): boolean {
-  const rel = relative(dir, target)
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
-}
 
 function resolveCollectionDir(dir: string, explicitRoot?: string): string {
   if (isAbsolute(dir))
@@ -434,7 +431,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     if (targetLocale === undefined)
       return absDir
     const scanDir = resolve(absDir, targetLocale)
-    return isInsideOrSame(absDir, scanDir) && scanDir !== absDir ? scanDir : undefined
+    return isInside(absDir, scanDir) ? scanDir : undefined
   }
 
   function all(locale?: string): ContentEntry<TData>[] {
@@ -481,7 +478,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       const clean = slug.replace(/^\/+|\/+$/g, '')
       const targetLocale = localized ? (locale ?? getDefaultLocale()) : undefined
       const scanDir = localeDir(absDir, targetLocale)
-      if (scanDir === undefined || !isInsideOrSame(scanDir, resolve(scanDir, clean)))
+      if (scanDir === undefined || !isInside(scanDir, resolve(scanDir, clean), { orSame: true }))
         return undefined
       const dev = isDevMode()
       if (!dev) {

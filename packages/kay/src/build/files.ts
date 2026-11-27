@@ -74,18 +74,13 @@ export function walkAllFiles(dir: string): string[] {
   return walkFiles(dir, { keep: entry => entry.isFile() })
 }
 
-function isOutside(base: string, target: string): boolean {
-  const rel = relative(base, target)
-  return rel === '..' || rel.startsWith('../') || rel.startsWith('..\\') || isAbsolute(rel)
-}
-
-export function isStrictDescendant(base: string, target: string): boolean {
-  return relative(base, target) !== '' && !isOutside(base, target)
-}
-
-export function isOutsideRoot(root: string, outDir: string): boolean {
-  const rel = relative(root, outDir)
-  return rel !== '' && (rel.startsWith('..') || isAbsolute(rel))
+/** Whether `target` lies under `dir`, or is `dir` itself with `orSame`. Paths are compared as written: realpath both first to follow symlinks. */
+export function isInside(dir: string, target: string, options: { orSame?: boolean } = {}): boolean {
+  const rel = relative(dir, target)
+  if (rel === '')
+    return options.orSame === true
+  // `..x` is a name inside `dir`; only `..` itself, as a whole segment, leaves it.
+  return rel !== '..' && !rel.startsWith('../') && !rel.startsWith('..\\') && !isAbsolute(rel)
 }
 
 export function assertSafeOutDir(root: string, outDir: string, routesDir: string, publicDir: string): void {
@@ -93,14 +88,14 @@ export function assertSafeOutDir(root: string, outDir: string, routesDir: string
   if (dirname(outDir) === outDir || outDir === tmpdir() || outDir === resolve(process.env.HOME ?? '\0')) {
     throw new Error(`kay build: refusing unsafe outDir "${outDir}" — cannot wipe a root or shared system directory.`)
   }
-  if (!isOutside(outDir, root)) {
+  if (isInside(outDir, root, { orSame: true })) {
     throw new Error(`kay build: refusing unsafe outDir "${outDir}" — outDir cannot be or contain project root "${root}".`)
   }
   if (existsSync(outDir)) {
     try {
       const realRoot = realpathSync(root)
       const realOut = realpathSync(outDir)
-      if (dirname(realOut) === realOut || !isOutside(realOut, realRoot)) {
+      if (dirname(realOut) === realOut || isInside(realOut, realRoot, { orSame: true })) {
         throw new Error(`kay build: refusing unsafe outDir "${outDir}" — resolved target "${realOut}" is or contains project root "${realRoot}".`)
       }
     }
@@ -117,12 +112,12 @@ export function assertSafeOutDir(root: string, outDir: string, routesDir: string
     ['package.json', resolve(root, 'package.json')],
   ]
   for (const [label, target] of protectedTargets) {
-    if (!isOutside(outDir, target)) {
+    if (isInside(outDir, target, { orSame: true })) {
       throw new Error(`kay build: refusing unsafe outDir "${outDir}" — it equals or contains protected path ${label} ("${target}").`)
     }
   }
   // If outDir is outside root (e.g. an external temp build dir), refuse it if it looks like another project directory.
-  if (!isStrictDescendant(root, outDir) && existsSync(outDir)) {
+  if (!isInside(root, outDir) && existsSync(outDir)) {
     for (const marker of ['package.json', 'kay.config.ts', 'src']) {
       if (existsSync(join(outDir, marker))) {
         throw new Error(`kay build: refusing unsafe external outDir "${outDir}" — it contains "${marker}".`)

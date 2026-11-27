@@ -4,7 +4,7 @@ import type { FSWatcher } from 'node:fs'
 import type { loadConfig } from '../plugins/index'
 import { existsSync, readFileSync, realpathSync, statSync, watch } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
-import { isInNodeModules } from '../build/files'
+import { isInNodeModules, isInside } from '../build/files'
 import { createAppContext, resolvePlugins, runWithAppContext } from '../plugins/index'
 
 export type ChangeKind = 'css' | 'code' | 'public' | 'full' | 'config'
@@ -51,8 +51,7 @@ export function localImports(entry: string): string[] {
   return [...seen]
 }
 
-const isInsideDir = (parent: string, target: string): boolean =>
-  target === parent || target.startsWith(`${parent}/`) || target.startsWith(`${parent}\\`)
+const isInsideDir = (parent: string, target: string): boolean => isInside(parent, target, { orSame: true })
 
 export interface DevWatcherOptions {
   root: string

@@ -6,6 +6,7 @@ import type { SecurityHeadersOptions, TrustProxy } from './security'
 import type { FileSource, ServedFile } from './served-file'
 import { readdirSync, readFileSync, realpathSync, statSync, watch } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
+import { isInside } from '../build/files'
 import { CompressionCache, isCompressibleType } from './compress'
 import { applyHstsHeader, MIME } from './http'
 import { decodeRequestPath } from './request-path'
@@ -14,8 +15,6 @@ import { createFileServer, servedFile } from './served-file'
 
 const isRead = (request: Request): boolean => request.method === 'GET' || request.method === 'HEAD'
 
-const isContained = (target: string, root: string): boolean =>
-  target === root || target.startsWith(`${root}/`) || target.startsWith(`${root}\\`)
 
 /** The files under `absRoot` by their path from it, `/`-separated; a symlink counts only when it lands on a file inside `realRoot`. */
 function listFiles(absRoot: string, realRoot: string): Map<string, string> {
@@ -32,7 +31,7 @@ function listFiles(absRoot: string, realRoot: string): Map<string, string> {
     const abs = join(absRoot, rel)
     try {
       const real = realpathSync(abs)
-      if (isContained(real, realRoot) && statSync(real).isFile())
+      if (isInside(realRoot, real, { orSame: true }) && statSync(real).isFile())
         files.set(rel.replaceAll('\\', '/'), real)
     }
     catch {

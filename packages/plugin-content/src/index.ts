@@ -6,7 +6,7 @@ import type { Collection, InternalCollection } from './collection'
 import type { ContentFeed, RssFeedConfig } from './rss'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { definePlugin } from '@kayjs/kay/config'
+import { definePlugin, isInside } from '@kayjs/kay/config'
 import { currentApp } from './app'
 import {
   COLLECTION_DIR_FOR_ROOT_KEY,
@@ -15,7 +15,7 @@ import {
   COLLECTION_VERSION_KEY,
   DEFINE_COLLECTION_RE,
   discoverAppCollections,
-  isInsideOrSame,
+
   registeredCollections,
   walkCollectionDefFiles,
 } from './collection'
@@ -62,7 +62,7 @@ function discoverStaticCollectionDirs(root: string): string[] {
     let m: RegExpExecArray | null
     while ((m = STATIC_COLLECTION_DIR_RE.exec(text)) !== null) {
       const dir = resolve(absRoot, m[2]!)
-      if (existsSync(dir) && isInsideOrSame(absRoot, dir))
+      if (existsSync(dir) && isInside(absRoot, dir, { orSame: true }))
         found.push(dir)
     }
   }
@@ -95,7 +95,7 @@ export function content(options: { feeds?: readonly ContentFeed[] | undefined, c
       const dir = dirOf(c, absRoot)
       if (!existsSync(dir))
         continue
-      if (absRoot === undefined || isInsideOrSame(absRoot, dir))
+      if (absRoot === undefined || isInside(absRoot, dir, { orSame: true }))
         out.add(c)
     }
     return [...out]

@@ -9,7 +9,7 @@ import type { CachedImageMeta, VariantPipelineConfig } from './pipeline'
 import type { RuntimeImageStore } from './runtime'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, extname, join, resolve } from 'node:path'
-import { CONTENT_IMAGE_RESOLVER_SERVICE, definePlugin } from '@kayjs/kay/config'
+import { CONTENT_IMAGE_RESOLVER_SERVICE, definePlugin, isInside } from '@kayjs/kay/config'
 import { getAppContext } from '@kayjs/kay/internal/server'
 import { SHARE_CARD_CONFIG_SERVICE } from './card'
 import {
@@ -18,7 +18,7 @@ import {
   computeImageKey,
   encodeVariantAsync,
   identifyImageAsync,
-  isStrictlyInside,
+
   mapConcurrent,
   MAX_ENCODE_CONCURRENCY,
   planVariantJobs,
@@ -481,13 +481,13 @@ export function createMarkdownImageResolver(options: MarkdownImageResolverOption
     }
     else {
       const kayRoot = getAppContext()?.root
-      boundary = (typeof kayRoot === 'string' && kayRoot !== '' && isStrictlyInside(resolve(kayRoot), absFile))
+      boundary = (typeof kayRoot === 'string' && kayRoot !== '' && isInside(resolve(kayRoot), absFile))
         ? resolve(kayRoot)
         : dirname(absFile)
     }
 
     const abs = resolve(dirname(absFile), src)
-    if (!isStrictlyInside(boundary, abs))
+    if (!isInside(boundary, abs))
       return undefined
     if (!ALLOWED_IMAGE_EXTS.has(extname(abs).toLowerCase()))
       return undefined
@@ -503,7 +503,7 @@ export function createMarkdownImageResolver(options: MarkdownImageResolverOption
     catch {
       return undefined
     }
-    if (!isStrictlyInside(realBoundary, realTarget))
+    if (!isInside(realBoundary, realTarget))
       return undefined
     if (!ALLOWED_IMAGE_EXTS.has(extname(realTarget).toLowerCase()))
       return undefined
