@@ -1,5 +1,7 @@
 // What the platform does for plain page changes with no kay JS: cross-document view transitions, Speculation Rules and a marked panel's scroll offset kept across page loads.
 
+import { escJson } from './index'
+
 export const KEEP_SCROLL_ATTR = 'data-kay-keep-scroll'
 export const NO_PREFETCH_ATTR = 'data-kay-no-prefetch'
 
@@ -69,7 +71,7 @@ export function createNavigation(config: NavigationConfig | undefined): Navigati
       rules.prefetch = [{ source: 'document', where, eagerness: prefetch }]
     if (prerender !== undefined)
       rules.prerender = [{ source: 'document', where, eagerness: prerender }]
-    const json = JSON.stringify(rules).replaceAll('<', '\\u003c')
+    const json = escJson(JSON.stringify(rules))
     html += `<script type="speculationrules">${json}</script>`
     scriptHashes.push(sha256(json))
   }

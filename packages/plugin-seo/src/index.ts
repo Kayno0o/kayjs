@@ -7,7 +7,7 @@ import type { RequestContext } from '@kayjs/kay/server'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { definePlugin, I18N_CONFIG_SERVICE } from '@kayjs/kay/config'
-import { escAttr, raw } from '@kayjs/kay/server'
+import { escAttr, escJson, raw } from '@kayjs/kay/server'
 
 export interface FontEntry {
   family: string
@@ -54,11 +54,7 @@ const CANONICAL_LINK_RE = /<link rel="canonical" href="[^"]*">/
 
 function serializeJsonLd(schema: Record<string, unknown>): string {
   const payload = '@context' in schema ? schema : { '@context': 'https://schema.org', ...schema }
-  const safe = JSON.stringify(payload)
-    .replace(/</g, '\\u003c')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029')
-  return `<script type="application/ld+json">${safe}</script>`
+  return `<script type="application/ld+json">${escJson(JSON.stringify(payload))}</script>`
 }
 
 /** Render a page-specific JSON-LD script inside `<Head>{jsonLd({ ... })}</Head>`. */

@@ -95,4 +95,5 @@ The first-party plugins use these instead of keeping their own copies, and a thi
 - **`readStringFields(request)`** from `@kayjs/kay/server`: the string fields of a JSON object, urlencoded or multipart body, the last of a repeated name winning. Files, numbers and arrays are dropped. The record has no prototype, so a `__proto__` field is an ordinary field. A malformed body throws: answer 400.
 - **`wantsJson(request)`** from `@kayjs/kay/server`: whether the client sent or asked for JSON, to answer an error as JSON rather than as a redirect or a page.
 - **`safeRedirect(target, fallback)`** from `@kayjs/kay/server`: `target` when it is a path on this site, otherwise `fallback`.
+- **`escJson(json)`** from `@kayjs/kay/server`: JSON text made safe inside a `<script>` element, such as JSON-LD or a JSON data block. It escapes `<` and the two Unicode line separators, and the result still parses to the same value.
 - **`safeEqual(a, b)`** from `@kayjs/kay/server`: compares two secrets, such as a bearer token or an OAuth state, in constant time. Both are hashed first, so the time taken does not reveal their length either.

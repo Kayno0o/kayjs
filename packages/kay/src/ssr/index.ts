@@ -96,6 +96,14 @@ export function escAttr(value: unknown): string {
     .replaceAll('>', '&gt;')
 }
 
+// `<`, then the two line separators, built from their code points so the source shows no invisible character.
+const SCRIPT_JSON_RE = new RegExp(`[<${String.fromCharCode(0x2028, 0x2029)}]`, 'g')
+
+/** JSON text made safe inside a `<script>` element: `<` can no longer close it or open a comment, and U+2028 and U+2029 cannot end a line of script. */
+export function escJson(json: string): string {
+  return json.replace(SCRIPT_JSON_RE, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)
+}
+
 export function raw(html: string): Html {
   return { __html: html, [RAW_HTML]: true } as unknown as Html
 }
@@ -356,9 +364,6 @@ export function ssrIslandStatic(
   return `${tag}${inner}${hiddenSlot}</kay-island>`
 }
 
-function safeJsonScript(json: string): string {
-  return json.replace(/</g, '\\u003c')
-}
 
 export function ssrIsland(
   chunk: string,
@@ -383,7 +388,7 @@ export function ssrIsland(
     if (ctx !== undefined && json.includes('"__k":'))
       ctx.revives = true
     if (scriptProps)
-      propsScript = `<script type="application/json" data-kay-props>${safeJsonScript(json)}</script>`
+      propsScript = `<script type="application/json" data-kay-props>${escJson(json)}</script>`
     else
       propsAttr = ` p="${escAttr(json)}"`
   }

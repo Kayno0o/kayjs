@@ -14,4 +14,4 @@ export { getClientIp, isHttpsRequest, isTrustedOrigin, safeEqual, safeRedirect, 
 export type { SecurityHeadersOptions, TrustProxy } from './security'
 export { formatIssuePath, formatSchemaIssues, validateSchema, validateSchemaSync } from './standard-schema'
 export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult, ValidationSuccess } from './standard-schema'
-export { esc, escAttr, raw } from '../ssr/index'
+export { esc, escAttr, escJson, raw } from '../ssr/index'

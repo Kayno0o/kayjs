@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { isInside } from '../src/plugins/public'
-import { readStringFields, safeEqual } from '../src/server/public'
+import { escJson, readStringFields, safeEqual } from '../src/server/public'
 
 function post(body: BodyInit, contentType?: string): Request {
   return new Request('http://app.test/x', { method: 'POST', body, headers: contentType === undefined ? {} : { 'content-type': contentType } })
@@ -84,5 +84,17 @@ describe('safeEqual: a constant-time compare of two secrets (#3672)', () => {
     expect(safeEqual('s3cret-token', 's3cret-token2')).toBe(false)
     expect(safeEqual('', 'x')).toBe(false)
     expect(safeEqual('clé', 'cle')).toBe(false)
+  })
+})
+
+describe('escJson: JSON text made safe inside a <script> element (#3672)', () => {
+  test('a closing tag, a comment opener and the two line separators are escaped', () => {
+    const json = JSON.stringify({ a: '</script><script>x()</script>', b: '<!--', c: 'l\u2028m\u2029n' })
+    expect(escJson(json)).toBe('{"a":"\\u003c/script>\\u003cscript>x()\\u003c/script>","b":"\\u003c!--","c":"l\\u2028m\\u2029n"}')
+  })
+
+  test('the escaped text parses back to the same value, an already-escaped string unchanged', () => {
+    const value = { a: '</script>', b: 'l\u2028m\u2029n', c: '\\u003c stays', d: 3 }
+    expect(JSON.parse(escJson(JSON.stringify(value)))).toEqual(value)
   })
 })
