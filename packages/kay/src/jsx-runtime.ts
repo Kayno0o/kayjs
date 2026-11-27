@@ -298,6 +298,9 @@ interface HtmlElementOverrides {
   button: {
     form?: string | undefined
     type?: 'button' | 'submit' | 'reset' | undefined
+    /** The id of the dialog or popover `command` acts on, with no script. */
+    commandfor?: string | undefined
+    command?: 'show-modal' | 'close' | 'request-close' | 'show-popover' | 'hide-popover' | 'toggle-popover' | `--${string}` | undefined
     popovertarget?: string | undefined
     popoverTarget?: string | undefined
     popovertargetaction?: 'hide' | 'show' | 'toggle' | undefined

@@ -47,6 +47,10 @@ test('JSX types refuse unknown tags, unknown attrs, React/Solid spellings, and t
     <button onClik={() => {}} />,
     // @ts-expect-error href is not valid on <div>
     <div href="/nope" />,
+    <button type="button" commandfor="d" command="show-modal" />,
+    <button type="button" commandfor="d" command="--app-refresh" />,
+    // @ts-expect-error not a command a button carries: show-modal, close, request-close, show-popover, hide-popover, toggle-popover or --custom
+    <button type="button" commandfor="d" command="open" />,
     // @ts-expect-error form is only valid on form-associated controls
     <div form="filters" />,
     // @ts-expect-error React camelCase SVG attribute
