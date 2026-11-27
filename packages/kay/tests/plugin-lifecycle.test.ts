@@ -437,6 +437,28 @@ describe('KayPlugin lifecycle, build-to-server handoff & HTTP/CSRF precedence (#
   })
 })
 
+describe('KayPlugin.inlineScripts (#3686)', () => {
+  it('allows the inline scripts a plugin declares by hash in the CSP of every page, prerendered or not', async () => {
+    const dir = makeTemp('kay-3686-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export const prerender = true\nexport default function Home() { return <p>ok</p> }')
+    writeFileSync(join(dir, 'src/routes/live.tsx'), `export default function Live() { return <p>live</p> }`)
+    const script = 'document.documentElement.dataset.ok=1'
+    const plugin = definePlugin({
+      name: 'scripted',
+      inlineScripts: [script],
+      transformHtml: html => html.replace('</head>', `<script>${script}</script></head>`),
+    })
+    const app = await testApp({ root: dir, plugins: [plugin] })
+
+    for (const path of ['/', '/live']) {
+      const res = await app.get(path)
+      expect(await res.text()).toContain(`<script>${script}</script>`)
+      expect(res.headers.get('content-security-policy')!.split(';').find(part => part.trim().startsWith('script-src'))).toContain('\'sha256-u3twIN/hbuTtF4dczntgihzKrZIoj3rwsCNTla9zyIA=\'')
+    }
+  })
+})
+
 describe('a throwing plugin build hook (#3657)', () => {
   const hooks = ['build', 'afterPrerender', 'transform', 'prerenderPaths'] as const
   for (const hook of hooks) {

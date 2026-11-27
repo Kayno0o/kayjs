@@ -60,7 +60,7 @@ async function renderStaticNotFound(options: StaticExportOptions): Promise<strin
     }
     const document = createDocumentHooks({ plugins, lang, trustProxy, notifyError })
     const navigation = createNavigation(options.entry.kayConfig.navigation)
-    const htmlHeaders = createHtmlHeaders(options.entry.kayConfig.security, {}, navigation)
+    const htmlHeaders = createHtmlHeaders(options.entry.kayConfig.security, {}, navigation, plugins)
     const { buildNotFoundResponse } = createFallbackPages({
       manifest: options.manifest,
       modules: options.entry.modules,

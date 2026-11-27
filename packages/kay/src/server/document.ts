@@ -5,6 +5,7 @@ import type { RenderContext } from '../ssr/context'
 import type { Navigation } from '../ssr/navigation'
 import type { RequestContext } from './http'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
+import { cspSha256 } from '../ssr/navigation'
 import { readBufferedOrPassThrough } from './compress'
 import { extractRenderedIslands, makeRequestContext } from './http'
 import { inlineStyleHashes, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, resolveCspPolicy, withCspHashes } from './security'
@@ -17,10 +18,10 @@ export type HtmlHeaders = (hasIslands: boolean, hasSuspense: boolean, isDynamic:
 const STYLED_HEADER_CACHE_SIZE = 256
 
 // HTML headers, one set per (dynamic, islands, suspense) combination: the CSP only gains the hashes a page needs.
-export function createHtmlHeaders(security: SecurityHeadersOptions | false | undefined, securityRecord: Record<string, string>, navigation?: Navigation): HtmlHeaders {
+export function createHtmlHeaders(security: SecurityHeadersOptions | false | undefined, securityRecord: Record<string, string>, navigation?: Navigation, plugins: readonly KayPlugin[] = []): HtmlHeaders {
   const baseCsp = resolveCspPolicy(security)
   const navStyles = navigation?.styleHashes ?? []
-  const navScripts = navigation?.scriptHashes ?? []
+  const navScripts = [...navigation?.scriptHashes ?? [], ...plugins.flatMap(plugin => plugin.inlineScripts ?? []).map(cspSha256)]
   const htmlHeaderSets: Record<string, string>[] = []
   const kayStyleHashes: string[][] = []
   const kayScriptHashes: string[][] = []

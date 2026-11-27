@@ -181,6 +181,8 @@ export interface KayPlugin {
   prerenderPaths?: (paths: string[], route: RouteManifestEntry) => string[] | Promise<string[]>
   /** Client bootstrap module path — bundled ONLY when this plugin is active. */
   clientEntry?: string | undefined
+  /** Inline scripts the plugin writes into pages (from `head`, `transformHtml` or `addHead`), each as it stands between its tags: the CSP of every page allows them by hash. */
+  inlineScripts?: readonly string[] | undefined
   /** Client module bundled on its own and loaded only on routes whose tree renders a `<Region>`; every other page stays free of it. */
   regionClientEntry?: string | undefined
   /**

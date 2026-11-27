@@ -52,6 +52,9 @@ export function myPlugin() {
       return html
     },
 
+    // Inline scripts the plugin writes into pages, as they stand between their tags: every page's CSP allows them by hash
+    inlineScripts: [],
+
     // Native Bun.build plugins per target ('client' | 'server' | 'compile')
     bunPlugins: ({ root, assetPrefix, minify, target }) => [],
 

@@ -227,7 +227,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const serverError = makeServerError(securityRecord)
   const fileGone = makeFileGone(securityRecord)
   const navigation = createNavigation(config.navigation)
-  const htmlHeaders = createHtmlHeaders(security, securityRecord, navigation)
+  const htmlHeaders = createHtmlHeaders(security, securityRecord, navigation, plugins)
   const streams = createStreamTracker()
 
   const compressEnabled = config.compress ?? !isDev
