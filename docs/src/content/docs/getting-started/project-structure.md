@@ -9,6 +9,7 @@ A typical Kay v2 project stays flat and predictable:
 
 ```text
 my-app/
+├── .gitignore              # node_modules/, dist/ and .kay-cache/, written by kay new
 ├── kay.config.ts           # Plugins, security headers, lang, trustedOrigins
 ├── public/                 # Served at / (ETag/304 in prod, zero-copy in dev)
 ├── src/

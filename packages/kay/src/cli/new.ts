@@ -15,6 +15,9 @@ export interface ScaffoldOptions {
 
 const TEMPLATES_DIR = join(import.meta.dir, '../../templates')
 
+// npm leaves any file named `.gitignore` out of a package, so the template stores it under another name.
+const RENAMED: Record<string, string> = { gitignore: '.gitignore' }
+
 export function scaffoldProject(targetDir: string, options: ScaffoldOptions = {}): { root: string, files: string[] } {
   const root = resolve(targetDir)
   const name = basename(root).toLowerCase().replace(/[^a-z0-9-_]/g, '-') || 'kay-app'
@@ -27,7 +30,7 @@ export function scaffoldProject(targetDir: string, options: ScaffoldOptions = {}
   const written: string[] = []
   for (const dir of [join(TEMPLATES_DIR, '_shared'), join(TEMPLATES_DIR, template)]) {
     for (const abs of walkFiles(dir, { skipDir: isNotSourceDir, keep: entry => entry.isFile() })) {
-      const rel = relPosix(dir, abs)
+      const rel = RENAMED[relPosix(dir, abs)] ?? relPosix(dir, abs)
       const text = readFileSync(abs, 'utf8').replaceAll('__APP_NAME__', name).replaceAll('__KAY_VERSION__', kayVersion)
       mkdirSync(dirname(join(root, rel)), { recursive: true })
       writeFileSync(join(root, rel), text)

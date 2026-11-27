@@ -345,6 +345,15 @@ describe('Milestone 4: kay new scaffolder & kay check validator', () => {
     }
   })
 
+  it('scaffolds a .gitignore keeping dependencies, the build and kay\'s cache out of git (#3685)', () => {
+    const dir = join(makeTemp('kay-3685-'), 'my-app')
+    const { files } = scaffoldProject(dir, { template: 'minimal' })
+
+    expect(files).toContain('.gitignore')
+    expect(files).not.toContain('gitignore')
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('node_modules/\ndist/\n.kay-cache/\n')
+  })
+
   // Their types are checked by the repo's tsconfig, which includes packages/kay/templates.
   for (const template of ['minimal', 'fullstack', 'blog', 'app'] as const) {
     it(`scaffolds the ${template} template on kay's version and the repo's TypeScript, passing kay check and kay build (#3586)`, async () => {
