@@ -451,7 +451,7 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
           }
         }
         return next()
-      })
+      }, { scope: 'rendered' })
 
       registerAuthRoutes({
         api,

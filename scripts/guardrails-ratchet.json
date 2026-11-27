@@ -3,7 +3,6 @@
     "packages/kay/src/build/bundle.ts": 1,
     "packages/kay/src/build/graph.ts": 1,
     "packages/kay/src/build/index.ts": 1,
-    "packages/kay/src/build/prerender.ts": 1,
     "packages/kay/src/cli/inspect.ts": 2,
     "packages/kay/src/dom/action.ts": 1,
     "packages/kay/src/server/action-registry.ts": 2,

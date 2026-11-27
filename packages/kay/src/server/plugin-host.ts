@@ -19,8 +19,13 @@ export interface PluginRouteDef {
 
 interface ScopedMiddleware {
   mw: Middleware
-  scope: 'all' | 'dynamic' | string
+  scope: 'all' | 'rendered' | 'dynamic' | string
 }
+
+/** What a request reaches, as middleware scopes see it: a page built ahead of time, a page with no `load` that renders the same for everyone, or anything else answered per request. */
+export type RequestKind = 'prerendered' | 'static' | 'dynamic'
+
+const isKindScope = (scope: string): boolean => scope === 'all' || scope === 'rendered' || scope === 'dynamic'
 
 export interface ServerPluginHostOptions {
   plugins: readonly KayPlugin[]
@@ -37,11 +42,13 @@ export interface ServerPluginHostOptions {
   trustedOrigins: Set<string> | undefined
 }
 
-function middlewareAppliesToPath(scope: ScopedMiddleware['scope'], path: string, isStaticFast: boolean): boolean {
+function middlewareAppliesToPath(scope: ScopedMiddleware['scope'], path: string, kind: RequestKind): boolean {
   if (scope === 'all')
     return true
+  if (scope === 'rendered')
+    return kind !== 'prerendered'
   if (scope === 'dynamic')
-    return !isStaticFast
+    return kind === 'dynamic'
   const normScope = scope.length > 1 && scope.endsWith('/') ? scope.slice(0, -1) : scope
   const normPath = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
   if (normScope === '/')
@@ -158,24 +165,23 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
   }
 
   const allMiddlewares: readonly Middleware[] = scopedMiddlewares.map(m => m.mw)
-  const staticFastMiddlewares: readonly Middleware[] = scopedMiddlewares
-    .filter(m => m.scope === 'all')
-    .map(m => m.mw)
-  const hasPathScopedMiddlewares = scopedMiddlewares.some(m => m.scope !== 'all' && m.scope !== 'dynamic')
-  const middlewaresFor = (path: string, isStaticFast = false): readonly Middleware[] => {
-    if (scopedMiddlewares.length === 0)
-      return allMiddlewares
-    if (!hasPathScopedMiddlewares)
-      return isStaticFast ? staticFastMiddlewares : allMiddlewares
-    return scopedMiddlewares.filter(m => middlewareAppliesToPath(m.scope, path, isStaticFast)).map(m => m.mw)
+  const hasPathScopedMiddlewares = scopedMiddlewares.some(m => !isKindScope(m.scope))
+  // With no path-scoped middleware the list depends on the kind alone, so it is worked out once per kind.
+  const byKind: Record<RequestKind, readonly Middleware[]> = {
+    prerendered: scopedMiddlewares.filter(m => middlewareAppliesToPath(m.scope, '/', 'prerendered')).map(m => m.mw),
+    static: scopedMiddlewares.filter(m => middlewareAppliesToPath(m.scope, '/', 'static')).map(m => m.mw),
+    dynamic: allMiddlewares,
   }
-  const middlewaresForPaths = (paths: readonly string[], isStaticFast = false): readonly Middleware[] => {
-    if (scopedMiddlewares.length === 0)
-      return allMiddlewares
+  const middlewaresFor = (path: string, kind: RequestKind = 'dynamic'): readonly Middleware[] => {
     if (!hasPathScopedMiddlewares)
-      return isStaticFast ? staticFastMiddlewares : allMiddlewares
+      return byKind[kind]
+    return scopedMiddlewares.filter(m => middlewareAppliesToPath(m.scope, path, kind)).map(m => m.mw)
+  }
+  const middlewaresForPaths = (paths: readonly string[], kind: RequestKind = 'dynamic'): readonly Middleware[] => {
+    if (!hasPathScopedMiddlewares)
+      return byKind[kind]
     return scopedMiddlewares
-      .filter(m => paths.some(path => middlewareAppliesToPath(m.scope, path, isStaticFast)))
+      .filter(m => paths.some(path => middlewareAppliesToPath(m.scope, path, kind)))
       .map(m => m.mw)
   }
 

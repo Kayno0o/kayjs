@@ -4,6 +4,7 @@ import type { BuildManifest, RouteManifestEntry } from '../build/index'
 import type { DocumentOptions } from '../ssr/index'
 import type { Middleware } from './http'
 import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } from './page'
+import type { RequestKind } from './plugin-host'
 import type { FastHandler, FastStaticPageOptions } from './routing'
 import { headTagStyleHashes } from './document'
 import { mergedHeadTags } from './page'
@@ -46,7 +47,7 @@ export interface RouteTableOptions {
   lang: string
   alwaysLoadRuntime: boolean
   navigation: DocumentOptions['navigation']
-  middlewaresFor: (path: string, staticOnly?: boolean) => readonly Middleware[]
+  middlewaresFor: (path: string, kind?: RequestKind) => readonly Middleware[]
   /** Whether a plugin rewrite, head hook, HTML transform or route may change what `path` answers. */
   pluginIntercepts: (path: string) => boolean
   fast: SharedFastOptions
@@ -65,7 +66,7 @@ export function compileRouteTable(options: RouteTableOptions): { router: Router<
     const doc = routeDocument(manifest, entry, lang, alwaysLoadRuntime, navigation)
 
     // Zero-overhead path for a static route with no middleware, no <Head>/<Suspense>, and no intercepting plugin hook
-    const canFastPath = middlewaresFor(entry.path, !hasLoad).length === 0
+    const canFastPath = middlewaresFor(entry.path, hasLoad ? 'dynamic' : 'static').length === 0
       && !pluginIntercepts(entry.path) && !dynamic
       && dirMiddlewares.length === 0 && !entry.usesRenderContext
       && typeof mod.default === 'function' && mod.GET === undefined

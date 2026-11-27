@@ -4,6 +4,7 @@ import type { KayPlugin } from '../plugins/index'
 import type { RouteManifestEntry } from './manifest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
+import { prerenderOrigin } from '../server/prerendered'
 import { inlineStyleHashes } from '../server/security'
 import { relPosix } from './files'
 import { runPluginHook } from './plugin-host'
@@ -13,17 +14,6 @@ const CONCURRENCY = 8
 const SLASH_EDGES_RE = /^\/|\/$/g
 const TRAILING_SLASHES_RE = /\/+$/
 
-export function prerenderOrigin(site: string | undefined): string {
-  if (site !== undefined && site !== '') {
-    try {
-      const parsed = new URL(site)
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-        return parsed.origin
-    }
-    catch {}
-  }
-  return 'http://localhost'
-}
 
 function normalizePrerenderUrl(urlStr: string): string {
   const pathname = new URL(urlStr, 'http://localhost').pathname

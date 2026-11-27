@@ -12,7 +12,8 @@ import { createNavigation } from '../ssr/navigation'
 import { createFallbackPages } from '../server/errors'
 import { precompressFile, walkAllFiles } from './files'
 import { swapStage } from './output'
-import { pageFailure, prerenderOrigin } from './prerender'
+import { prerenderOrigin } from '../server/prerendered'
+import { pageFailure } from './prerender'
 
 const LEADING_SLASH_RE = /^\//
 

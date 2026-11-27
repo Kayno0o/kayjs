@@ -34,7 +34,7 @@
 - `GET /auth/verify-email?token=...` and `GET /auth/magic-link/verify?token=...` (the mailed links) show a no-JS page whose button POSTs the token to the same URL; only that `POST` (form or JSON `{ token }`) consumes it, so mail scanners don't burn links
 - `POST /auth/magic-link` mails the sign-in link; the first claim of an unverified account drops prior password, sessions, and OAuth links
 - `GET /auth/oauth/:provider`, `GET /auth/oauth/:provider/callback`
-- `ctx.locals.user` (`PublicUser | undefined`) and `ctx.locals.session` (`AuthSession | undefined`) — lazily resolved on first read.
+- `ctx.locals.user` (`PublicUser | undefined`) and `ctx.locals.session` (`AuthSession | undefined`) — lazily resolved on first read. The session middleware has `scope: 'rendered'`: a prerendered page, built before any visitor, never resolves or renews a session, and stays on Bun's route table.
 
 ## Handle Methods (`auth`)
 

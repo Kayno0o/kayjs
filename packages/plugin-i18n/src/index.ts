@@ -160,6 +160,7 @@ export function i18n(options: I18nOptions): KayPlugin {
       })
 
       if (prefixDefault) {
+        // Every prerendered path carries a locale prefix (`prerenderPaths`), so prerendered pages skip this redirect.
         api.use((ctx, next) => {
           const method = ctx.request.method
           if (method !== 'GET' && method !== 'HEAD')
@@ -179,7 +180,7 @@ export function i18n(options: I18nOptions): KayPlugin {
             return next()
           const target = localizePath(rawPath, defaultLocale, defaultLocale, locales, true)
           return ctx.redirect(`${target}${ctx.url.search}`, 302)
-        })
+        }, { scope: 'rendered' })
       }
 
       api.route('GET', '/_i18n/locales', ctx =>

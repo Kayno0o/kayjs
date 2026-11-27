@@ -1,9 +1,15 @@
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import type { KayPlugin } from '../src/plugins/types'
+import type { Middleware } from '../src/server/http'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
+import { i18n } from '../../plugin-i18n/src/index'
+import { seo } from '../../plugin-seo/src/index'
 import { build } from '../src/build/index'
 import { CompressionCache, createServer, isCompressibleType, pickEncoding } from '../src/server/index'
+import { nativePrerenderedCheck } from '../src/server/prerendered'
 import { Router } from '../src/server/router'
 import { verifyOrigin } from '../src/server/security'
 import { testApp } from '../src/test/index'
@@ -394,6 +400,155 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
       proc.kill()
       await proc.exited
     }
+  })
+})
+
+describe('prerendered pages stay on the native route table with i18n and auth (#3675)', () => {
+  // An app with prerendered pages, a load-less page reading the user, and a plugin whose rewrite logs each path it sees and sends /alias to its own route.
+  async function pluginApp(prefixDefault: boolean) {
+    const dir = makeTemp('kay-native-prerender-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    for (const [name, text] of [['index', 'Home'], ['about', 'About'], ['alias', 'Alias page'], ['gated', 'Gated page'], ['kept', 'Kept page']]) {
+      writeFileSync(join(dir, `src/routes/${name}.tsx`), `
+        export const prerender = true
+        export default function Page({ locals }: { locals: { t: (k: string) => string } }) {
+          return <h1>${text} {locals.t('hi')}</h1>
+        }
+      `)
+    }
+    writeFileSync(join(dir, 'src/routes/target.tsx'), 'export default function Target() { return <p>target</p> }\n')
+    writeFileSync(join(dir, 'src/routes/hook.tsx'), 'export default function Hook() { return <p>hook page</p> }\n')
+    mkdirSync(join(dir, 'src/routes/members'))
+    writeFileSync(join(dir, 'src/routes/members/index.tsx'), 'export const prerender = true\nexport default function Members() { return <p>members</p> }\n')
+    writeFileSync(join(dir, 'src/routes/members/_middleware.ts'), `
+      import type { Middleware } from '@kayjs/kay/server'
+      const deny: Middleware = (ctx, next) => ctx.request.headers.get('x-deny') === '1' ? ctx.text('Forbidden', { status: 403 }) : next()
+      export default deny
+    `)
+    writeFileSync(join(dir, 'src/routes/me.tsx'), `
+      export default function Me({ locals }: { locals: { user?: { email: string } } }) {
+        return <p>user: {locals.user?.email ?? 'none'}</p>
+      }
+    `)
+    const rewrites: string[] = []
+    const reads = { sessions: 0 }
+    const base = memoryAuthStore()
+    const store = { ...base, async getSession(hash: string) {
+      reads.sessions++
+      return base.getSession(hash)
+    } }
+    const logRewrites: KayPlugin = {
+      name: 'log-rewrites',
+      server(api) {
+        api.rewrite((path) => {
+          rewrites.push(path)
+          return path.endsWith('/alias') ? '/hook' : path.endsWith('/gated') ? '/target' : undefined
+        })
+        api.route('GET', '/hook', ctx => ctx.text('from the plugin route'))
+        const markScoped: Middleware = async (_ctx, next) => {
+          const res = await next()
+          res.headers.set('x-scoped', 'yes')
+          return res
+        }
+        api.use(markScoped, { scope: '/target' })
+        api.use(markScoped, { scope: '/kept' })
+      },
+    }
+    const app = await testApp({
+      root: dir,
+      plugins: [
+        i18n({ locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault, messages: { en: { hi: 'Hello' }, fr: { hi: 'Bonjour' } } }),
+        createAuth({ secret: 'native-prerender-secret-32-bytes-min!', store, requireEmailVerification: false }),
+        seo({ name: 'Demo', redirects: { '/fr/ancien': '/fr/about' } }),
+        logRewrites,
+      ],
+    })
+    return { app, rewrites, reads }
+  }
+
+  it('serves each prerendered page with no rewrite, middleware or session read, a signed-in visitor included', async () => {
+    const { app, rewrites, reads } = await pluginApp(false)
+    expect((await app.post('/auth/signup', { email: 'ada@example.com', password: 'password1234' })).status).toBeLessThan(300)
+    expect(app.cookies.has('kay_session')).toBe(true)
+    rewrites.length = 0
+    reads.sessions = 0
+
+    for (const [path, text] of [['/', 'Home Hello'], ['/fr', 'Home Bonjour'], ['/about', 'About Hello'], ['/fr/about', 'About Bonjour']] as const) {
+      const res = await app.get(path)
+      expect(res.status).toBe(200)
+      expect(await res.text()).toContain(text)
+    }
+    expect(rewrites).toEqual([])
+    expect(reads.sessions).toBe(0)
+  })
+
+  it('still runs the pipeline where a rewrite leads to a plugin route, and auth on a load-less page', async () => {
+    const { app, rewrites, reads } = await pluginApp(false)
+    await app.post('/auth/signup', { email: 'ada@example.com', password: 'password1234' })
+    rewrites.length = 0
+    reads.sessions = 0
+
+    expect(await (await app.get('/alias')).text()).toBe('from the plugin route')
+    expect(await (await app.get('/fr/alias')).text()).toBe('from the plugin route')
+    expect(await (await app.get('/me')).text()).toContain('user: ada@example.com')
+    const gated = await app.get('/gated')
+    expect(gated.headers.get('x-scoped')).toBe('yes')
+    expect(await gated.text()).toContain('<p>target</p>')
+    expect((await app.fetch(new Request('http://localhost/members', { headers: { 'x-deny': '1' } }))).status).toBe(403)
+    const moved = await app.get('/fr/ancien')
+    expect(moved.status).toBe(301)
+    expect(moved.headers.get('location')).toBe('/fr/about')
+    const kept = await app.get('/kept')
+    expect(kept.headers.get('x-scoped')).toBe('yes')
+    expect(await kept.text()).toContain('Kept page Hello')
+    expect(rewrites).toEqual(['/alias', '/alias', '/me', '/gated', '/members', '/ancien', '/kept'])
+    expect(reads.sessions).toBe(7)
+  })
+
+  it('runs auth on a load-less page in an app with no rewrite', async () => {
+    const dir = makeTemp('kay-native-auth-only-')
+    linkKay(dir)
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/me.tsx'), `
+      export default function Me({ locals }: { locals: { user?: { email: string } } }) {
+        return <p>user: {locals.user?.email ?? 'none'}</p>
+      }
+    `)
+    const app = await testApp({ root: dir, plugins: [createAuth({ secret: 'native-prerender-secret-32-bytes-min!', requireEmailVerification: false })] })
+    await app.post('/auth/signup', { email: 'ada@example.com', password: 'password1234' })
+    expect(await (await app.get('/me')).text()).toContain('user: ada@example.com')
+  })
+
+  it('leaves a page off the table when a rewrite throws on the start-up request', () => {
+    const isFast = nativePrerenderedCheck({
+      site: undefined,
+      rewrites: [(path) => {
+        if (path === '/boom')
+          throw new Error('boom')
+        return undefined
+      }],
+      pluginRouter: { match: () => undefined },
+      router: { match: () => undefined },
+      actions: { byUrl: () => undefined },
+      middlewaresForPaths: () => [],
+      trustProxy: false,
+      consent: undefined,
+    })
+    const route = { middlewares: [] } as unknown as Parameters<typeof isFast>[1]
+    expect(isFast('/boom', route)).toBe(false)
+    expect(isFast('/calm', route)).toBe(true)
+  })
+
+  it('with prefixDefault, serves /en and /fr natively and still redirects /', async () => {
+    const { app, rewrites } = await pluginApp(true)
+    rewrites.length = 0
+    expect(await (await app.get('/en/about')).text()).toContain('About Hello')
+    expect(await (await app.get('/fr/about')).text()).toContain('About Bonjour')
+    expect(rewrites).toEqual([])
+    const home = await app.get('/')
+    expect(home.status).toBe(302)
+    expect(home.headers.get('location')).toBe('/en')
   })
 })
 

@@ -33,6 +33,7 @@ import { allowedMethodsHeader, pickPageIslandProps, stripHeadBody } from './page
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
 import { hasRegionHeader, invalidRegionResponse, requestedRegion, respondRegion, withRegionVary } from './region'
 import { decodeRequestPath, literalPath } from './request-path'
+import { nativePrerenderedCheck } from './prerendered'
 import { compileRouteTable } from './route-table'
 import { actionRoutePrefix, createAncestorMiddlewareLookup, inferRoutesServerPrefix, methodNotAllowed } from './routing'
 import { hasActionErrorCookie, isPlainRead, isRead, serveHandlers } from './serve-handlers'
@@ -163,7 +164,7 @@ interface ManifestActions {
   actions: ReturnType<typeof createActionRegistry>
   routesPrefix: ReturnType<typeof inferRoutesServerPrefix>
   routePathByFile: Map<string, string>
-  middlewaresFor: (path: string, staticOnly?: boolean) => readonly Middleware[]
+  middlewaresFor: (path: string) => readonly Middleware[]
   middlewaresForPaths: (paths: string[]) => readonly Middleware[]
 }
 
@@ -263,14 +264,6 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
   registerManifestActions({ manifest, modules, actions, routesPrefix, routePathByFile, middlewaresFor, middlewaresForPaths })
 
-  const { all: prerenderedMap, fast: fastPrerenderedMap } = files.collectPrerendered(manifest.routes, {
-    prerendered,
-    prerenderedFiles,
-    prerenderedEtags,
-    // The route's region script is what sends `x-kay-region`, so a page without one never varies on it.
-    htmlHeaders: (route, urlPath) => withRegionVary(htmlHeaders(route.islandChunks.length > 0, false, false, route.prerenderedStyleHashes?.[urlPath]), route.usesRegion === true),
-    isFast: (urlPath, route) => route.middlewares.length === 0 && middlewaresFor(urlPath, true).length === 0 && !hasPluginRewrites && pluginRouter.match(literalPath(urlPath)) === undefined,
-  })
 
   const { buildNotFoundResponse, renderError } = createFallbackPages({ manifest, modules, lang, alwaysLoadRuntime, navigation: navigation.html, dev: isDev, document, htmlHeaders, notifyError, finish })
 
@@ -316,6 +309,14 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     manifest, modules, lang, alwaysLoadRuntime, navigation: navigation.html, middlewaresFor,
     pluginIntercepts: path => hasPluginRewrites || hasHeadHooks || hasHtmlTransformers || pluginRouter.match(literalPath(path)) !== undefined,
     fast: { trustProxy, consent, htmlHeaders, compressCache, actions, buildNotFoundResponse, renderError, notifyError, finish, withHsts },
+  })
+  const { all: prerenderedMap, fast: fastPrerenderedMap } = files.collectPrerendered(manifest.routes, {
+    prerendered,
+    prerenderedFiles,
+    prerenderedEtags,
+    // The route's region script is what sends `x-kay-region`, so a page without one never varies on it.
+    htmlHeaders: (route, urlPath) => withRegionVary(htmlHeaders(route.islandChunks.length > 0, false, false, route.prerenderedStyleHashes?.[urlPath]), route.usesRegion === true),
+    isFast: nativePrerenderedCheck({ site, rewrites: pluginHost.rewrites, pluginRouter, router, actions, middlewaresForPaths, trustProxy, consent }),
   })
 
   async function renderCompiledRoute(

@@ -310,12 +310,16 @@ function registerRedirects(
   redirects: Record<string, RedirectTarget>,
   i18nCfg: ActiveI18nConfig | undefined,
 ): void {
-  const exactLocaleRules = new Map<string, { to: string, status: 301 | 302 | 307 | 308 }>()
   for (const [from, target] of Object.entries(redirects)) {
     const to = typeof target === 'string' ? target : target.to
     const status = typeof target === 'string' ? 301 : (target.status ?? 301)
+    // A source with a locale prefix is matched before i18n strips it, so on the raw path, by a middleware scoped to it that leaves every other page alone.
     if (i18nCfg !== undefined && stripLocaleFromPath(from, i18nCfg).hasPrefix) {
-      exactLocaleRules.set(normalizePathname(from), { to, status })
+      const source = normalizePathname(from)
+      api.use((ctx, next) => {
+        const read = ctx.request.method === 'GET' || ctx.request.method === 'HEAD'
+        return read && normalizePathname(ctx.url.pathname) === source ? ctx.redirect(to, status) : next()
+      }, { scope: source })
       continue
     }
     api.route('GET', from, (ctx) => {
@@ -325,16 +329,6 @@ function registerRedirects(
         ? ctx.locals.locale
         : i18nCfg.defaultLocale
       return ctx.redirect(localizeRedirectTarget(to, locale, i18nCfg), status)
-    })
-  }
-  if (exactLocaleRules.size > 0) {
-    api.use((ctx, next) => {
-      if (ctx.request.method === 'GET' || ctx.request.method === 'HEAD') {
-        const hit = exactLocaleRules.get(normalizePathname(ctx.url.pathname))
-        if (hit !== undefined)
-          return ctx.redirect(hit.to, hit.status)
-      }
-      return next()
     })
   }
 }

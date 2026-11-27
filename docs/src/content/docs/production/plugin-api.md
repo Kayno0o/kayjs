@@ -86,6 +86,8 @@ export function myPlugin() {
 - **Per-route assets**: Use `ctx.addRouteStyle(routePath, href)` and `ctx.addRouteHead(routePath, html)` when an asset belongs on one route rather than every page.
 - **Route headers**: an `api.route()` response gets the app's security headers. An HTML response without its own `content-security-policy` gets the app's CSP, with a hash for each of its `<style>` blocks.
 - **Route CSRF**: `api.route()` enforces `Origin` / `Sec-Fetch-Site` on unsafe methods by default. Pass `{ csrf: false }` for webhooks or bearer-token endpoints (such as `@kayjs/mcp`).
+- **Middleware scope**: `api.use(mw, { scope })` takes `'all'` (the default), `'rendered'`, `'dynamic'` or a path prefix. `'all'` runs on prerendered pages too. `'rendered'` skips them: they were rendered at build time and never read `ctx.locals`, so a middleware that only feeds rendering, such as `@kayjs/auth`'s session, belongs there. `'dynamic'` also skips pages with no `load`. A prerendered page that no middleware, plugin route or route `_middleware.ts` applies to is answered by Bun's route table, without running any kay code.
+- **Rewrites and prerendered pages**: the server runs the `api.rewrite()` chain once per prerendered page when it starts, on an anonymous GET as the build did, to find where it sends the page. Keep a rewrite free of side effects. A page it sends onto a plugin route, a path-scoped middleware or a route with a `_middleware.ts` goes through the full pipeline, as before.
 
 ## Helpers for plugin code
 

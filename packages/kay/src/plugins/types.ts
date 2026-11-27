@@ -83,8 +83,13 @@ export interface PluginRouteOptions {
 }
 
 export interface MiddlewareOptions {
-  /** `'all'` (default) runs on every route; `'dynamic'` skips static/prerendered fast paths; a string prefix scopes to matching pathnames. */
-  scope?: 'all' | 'dynamic' | string | undefined
+  /**
+   * `'all'` (default) runs on every request, prerendered pages included.
+   * `'rendered'` skips prerendered pages, which were rendered at build time and never read `ctx.locals`: for middleware that only feeds rendering, such as a session.
+   * `'dynamic'` also skips pages with no `load`, which render the same for everyone.
+   * A path prefix runs on the pathnames under it.
+   */
+  scope?: 'all' | 'rendered' | 'dynamic' | string | undefined
 }
 
 export interface ServerPluginAPI {
