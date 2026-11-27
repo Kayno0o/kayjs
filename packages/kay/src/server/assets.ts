@@ -36,6 +36,14 @@ export interface PrerenderedSources {
 
 const embedded = (body: EmbeddedBody): FileSource => typeof body === 'string' ? { path: body } : { bytes: body }
 
+
+/** The `.br` and `.gz` sidecars the build wrote next to `rel`; a file that has one is never compressed at runtime. */
+function sidecarsOf(files: Readonly<Record<string, EmbeddedBody>>, rel: string): { br: FileSource | undefined, gz: FileSource | undefined } {
+  const br = files[`${rel}.br`]
+  const gz = files[`${rel}.gz`]
+  return { br: br === undefined ? undefined : embedded(br), gz: gz === undefined ? undefined : embedded(gz) }
+}
+
 export function createAssets(options: AssetsOptions) {
   const { assets, assetPrefix, isDev, compressEnabled, compressCache, nosniffHeader, securityRecord, withHsts } = options
   const serveFile = createFileServer({ compressEnabled, compressCache, withHsts })
@@ -44,7 +52,7 @@ export function createAssets(options: AssetsOptions) {
   const publicMap = new Map<string, ServedFile>()
   const publicCacheControl = isDev ? 'no-cache' : 'public, max-age=3600'
 
-  const registerPublic = (rel: string, body: EmbeddedBody, etag?: string): void => {
+  const registerPublic = (rel: string, body: EmbeddedBody, etag?: string, sidecars: ReturnType<typeof sidecarsOf> = { br: undefined, gz: undefined }): void => {
     const cleanRel = rel.replace(/^\/+/, '')
     const type = MIME[extname(cleanRel).toLowerCase()] ?? 'application/octet-stream'
     publicMap.set(`/${cleanRel}`, servedFile({
@@ -52,8 +60,15 @@ export function createAssets(options: AssetsOptions) {
       source: embedded(body),
       etag,
       headers: { 'content-type': type, 'cache-control': publicCacheControl, ...securityRecord },
-      compressible: compressible(type),
+      compressible: sidecars.br === undefined && sidecars.gz === undefined && compressible(type),
+      ...sidecars,
     }))
+  }
+
+  // The public files the build listed, each with the sidecars it was compressed into; a sidecar stays reachable at its own URL, as on a static host.
+  const registerPublicFiles = (files: Readonly<Record<string, EmbeddedBody>>, etags: Readonly<Record<string, string>>): void => {
+    for (const [rel, body] of Object.entries(files))
+      registerPublic(rel, body, etags[rel], sidecarsOf(files, rel))
   }
 
   // A file a plugin writes into the public dir at runtime, served once it exists on disk.
@@ -100,12 +115,14 @@ export function createAssets(options: AssetsOptions) {
         const source: FileSource | undefined = filePath !== undefined ? { path: filePath } : html !== undefined ? { text: html } : undefined
         if (source === undefined)
           continue
+        const sidecars = sidecarsOf(sources.prerenderedFiles, relHtml)
         const entry = servedFile({
           key: `pre:${urlPath}`,
           source,
           etag: sources.prerenderedEtags[relHtml],
           headers: sources.htmlHeaders(route, urlPath),
-          compressible: compressCache !== undefined,
+          compressible: sidecars.br === undefined && sidecars.gz === undefined && compressCache !== undefined,
+          ...sidecars,
         })
         all.set(urlPath, entry)
         if (sources.isFast(urlPath, route))
@@ -115,5 +132,5 @@ export function createAssets(options: AssetsOptions) {
     return { all, fast }
   }
 
-  return { assetMap, publicMap, registerPublic, registerPublicFromDisk, collectPrerendered, serveFile }
+  return { assetMap, publicMap, registerPublicFiles, registerPublicFromDisk, collectPrerendered, serveFile }
 }

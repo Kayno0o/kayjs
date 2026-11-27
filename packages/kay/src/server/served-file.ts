@@ -13,6 +13,8 @@ export type FileSource = { path: string } | { bytes: Uint8Array<ArrayBuffer> } |
 interface Variant {
   body: BodyInit
   headers: Record<string, string>
+  /** The file's path and size, for a variant on disk the compression cache may keep in memory. */
+  disk: { path: string, size: () => number } | undefined
 }
 
 export interface ServedFile {
@@ -66,8 +68,12 @@ export function servedFile(init: ServedFileInit): ServedFile {
   const varies = init.compressible || init.br !== undefined || init.gz !== undefined
   const headers: Record<string, string> = { ...init.headers, etag, ...(varies ? { vary: mergeVaryValue(init.headers.vary, 'Accept-Encoding') } : {}) }
   const { 'content-type': _type, ...notModifiedHeaders } = headers
+  const onDisk = (path: string): Variant['disk'] => {
+    let bytes: number | undefined
+    return { path, size: () => bytes ??= Bun.file(path).size }
+  }
   const encoded = (source: FileSource | undefined, encoding: string): Variant | undefined =>
-    source === undefined ? undefined : { body: bodyOf(source), headers: { ...headers, 'content-encoding': encoding, 'etag': toWeakEtag(etag) } }
+    source === undefined ? undefined : { body: bodyOf(source), headers: { ...headers, 'content-encoding': encoding, 'etag': toWeakEtag(etag) }, disk: 'path' in source ? onDisk(source.path) : undefined }
   let size: number | undefined
   return {
     key: `${init.key}:${etag}`,
@@ -102,7 +108,11 @@ export function createFileServer(options: {
       const pre = pickPrecompressedEncoding(accept, { br: file.br !== undefined, gz: file.gz !== undefined })
       if (pre !== undefined) {
         const variant = pre === 'br' ? file.br! : file.gz!
-        return done(new Response(variant.body, { status, headers: variant.headers }), request)
+        const { disk } = variant
+        const kept = disk !== undefined && compressCache?.keeps(disk.size()) === true
+          ? await compressCache.sidecar(`${file.key}:${pre}`, async () => new Uint8Array(await Bun.file(disk.path).arrayBuffer()))
+          : undefined
+        return done(new Response(kept ?? variant.body, { status, headers: variant.headers }), request)
       }
     }
     if (file.compressedHeaders !== undefined && compressCache !== undefined) {

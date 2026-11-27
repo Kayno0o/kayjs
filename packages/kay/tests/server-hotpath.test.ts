@@ -75,7 +75,7 @@ describe('#3637 item 3 — avoid double compression and unhandled pendingRead re
         securityRecord: {},
         withHsts: res => res,
       })
-      files.registerPublic('noise.txt', noise)
+      files.registerPublicFiles({ 'noise.txt': noise }, {})
       const pub = files.publicMap.get('/noise.txt')!
       const served = await files.serveFile(req, pub)
       const callsAfterServe = spy.mock.calls.length

@@ -269,8 +269,21 @@ export class CompressionCache {
   }
 
   /** The compressed variant of a build file, read and compressed on its first request only (deduped + bounded LRU); `undefined` when it does not shrink. */
-  async file(key: string, encoding: CompressionEncoding, read: () => Uint8Array<ArrayBuffer> | Promise<Uint8Array<ArrayBuffer>>): Promise<Uint8Array<ArrayBuffer> | undefined> {
-    const variantKey = `${encoding}:${key}`
+  file(key: string, encoding: CompressionEncoding, read: () => Uint8Array<ArrayBuffer> | Promise<Uint8Array<ArrayBuffer>>): Promise<Uint8Array<ArrayBuffer> | undefined> {
+    return this.#kept(`${encoding}:${key}`, async () => shrink(await read(), encoding, GZIP_KEPT))
+  }
+
+  /** Whether a file of `bytes` fits in the build-file LRU, so a request for it is answered from memory once read. */
+  keeps(bytes: number): boolean {
+    return bytes <= this.#maxFileEntryBytes
+  }
+
+  /** A `.br` or `.gz` file the build wrote, read on its first request only and kept in the same LRU, so a hot one is not opened per request. */
+  sidecar(key: string, read: () => Promise<Uint8Array<ArrayBuffer>>): Promise<Uint8Array<ArrayBuffer> | undefined> {
+    return this.#kept(`sidecar:${key}`, read)
+  }
+
+  async #kept(variantKey: string, produce: () => Promise<Uint8Array<ArrayBuffer> | undefined>): Promise<Uint8Array<ArrayBuffer> | undefined> {
     if (this.#files.has(variantKey)) {
       const hit = this.#files.get(variantKey)!
       // Refresh LRU recency
@@ -283,8 +296,7 @@ export class CompressionCache {
       return inflight
 
     const task = (async () => {
-      const bytes = await read()
-      const variant = shrink(bytes, encoding, GZIP_KEPT) ?? null
+      const variant = (await produce()) ?? null
       if (variant === null) {
         this.#files.set(variantKey, null)
         return undefined

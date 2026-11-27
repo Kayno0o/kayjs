@@ -29,22 +29,24 @@ export async function startBuiltApp(options: ServerOptions): Promise<{ app: KayA
   const srcPublicDir = resolve(root, entry.kayConfig.publicDir ?? 'public')
 
   // File paths only: Bun.file() serves them zero-copy, and nothing is read at startup.
+  const withSidecars = (files: Record<string, EmbeddedBody>, rel: string, abs: string): void => {
+    files[rel] = abs
+    for (const ext of ['.br', '.gz']) {
+      if (existsSync(`${abs}${ext}`))
+        files[`${rel}${ext}`] = `${abs}${ext}`
+    }
+  }
   for (const rel of manifest.assets) {
     const abs = join(clientDir, rel)
-    if (existsSync(abs)) {
-      assets[rel] = abs
-      if (existsSync(`${abs}.br`))
-        assets[`${rel}.br`] = `${abs}.br`
-      if (existsSync(`${abs}.gz`))
-        assets[`${rel}.gz`] = `${abs}.gz`
-    }
+    if (existsSync(abs))
+      withSidecars(assets, rel, abs)
   }
 
   for (const rel of manifest.publicFiles ?? []) {
     const outAbs = join(outDir, 'public', rel)
     const abs = existsSync(outAbs) ? outAbs : join(srcPublicDir, rel)
     if (existsSync(abs)) {
-      publicAssets[rel] = abs
+      withSidecars(publicAssets, rel, abs)
       const st = statSync(abs)
       publicEtags[rel] = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`
     }
@@ -54,7 +56,7 @@ export async function startBuiltApp(options: ServerOptions): Promise<{ app: KayA
     for (const relHtml of Object.values(r.prerendered ?? {})) {
       const abs = join(outDir, relHtml)
       if (existsSync(abs))
-        prerenderedFiles[relHtml] = abs
+        withSidecars(prerenderedFiles, relHtml, abs)
     }
   }
 

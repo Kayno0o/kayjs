@@ -3,7 +3,7 @@
 import type { AppRuntimeContext } from '../plugins/context'
 import type { BuildPluginContext, FinalizeBuildContext, KayPlugin } from '../plugins/index'
 import type { RouteManifestEntry } from './manifest'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { precompressFile } from './files'
 
@@ -188,15 +188,30 @@ export function createPluginHost(options: PluginHostOptions) {
       return ran
     },
 
-    /** Writes `.br`/`.gz` sidecars for client assets not compressed yet (production server builds only: `--static` compresses its own output). */
-    precompressAssets(): void {
+    /**
+     * Writes `.br`/`.gz` sidecars for the client assets, public files and prerendered pages not compressed yet, so the server never compresses them itself.
+     * Production server builds only: `--static` compresses its own output. A public file the app ships with its own sidecar keeps it.
+     */
+    precompressOutput(): void {
       if (options.isDev || options.isStatic)
         return
-      for (const rel of assets) {
-        if (!precompressed.has(rel)) {
-          precompressed.add(rel)
-          precompressFile(join(clientDir, rel), 256)
+      const once = (abs: string): void => {
+        if (!precompressed.has(abs)) {
+          precompressed.add(abs)
+          precompressFile(abs, 256)
         }
+      }
+      for (const rel of assets)
+        once(join(clientDir, rel))
+      const listed = new Set(options.publicFiles.files)
+      for (const rel of listed) {
+        const abs = join(outPublicDir, rel)
+        if (!listed.has(`${rel}.br`) && !listed.has(`${rel}.gz`) && existsSync(abs))
+          once(abs)
+      }
+      for (const route of routes) {
+        for (const rel of Object.values(route.prerendered ?? {}))
+          once(join(outDir, rel))
       }
     },
   }

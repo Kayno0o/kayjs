@@ -4,12 +4,14 @@ import type { Middleware } from '../src/server/http'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { brotliDecompressSync } from 'node:zlib'
 import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
 import { i18n } from '../../plugin-i18n/src/index'
 import { seo } from '../../plugin-seo/src/index'
 import { build } from '../src/build/index'
 import { CompressionCache, createServer, isCompressibleType, pickEncoding } from '../src/server/index'
 import { nativePrerenderedCheck } from '../src/server/prerendered'
+import { createFileServer, type ServedFile, servedFile } from '../src/server/served-file'
 import { Router } from '../src/server/router'
 import { verifyOrigin } from '../src/server/security'
 import { testApp } from '../src/test/index'
@@ -309,11 +311,11 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     const countAfterBuild = Number(await Bun.file(counterFile).text())
     expect(countAfterBuild).toBe(2) // en + fr prerendered during build
 
-    // Subsequent requests for / and /fr must hit prerendered fast path (0 re-renders!) and compress cleanly
-    const enRes = await app.fetch(new Request('http://localhost/', { headers: { 'accept-encoding': 'zstd' } }))
+    // Subsequent requests for / and /fr must hit prerendered fast path (0 re-renders!) and get the build's sidecars
+    const enRes = await app.fetch(new Request('http://localhost/', { headers: { 'accept-encoding': 'br' } }))
     expect(enRes.status).toBe(200)
-    expect(enRes.headers.get('content-encoding')).toBe('zstd')
-    const enHtml = new TextDecoder().decode(Bun.zstdDecompressSync(new Uint8Array(await enRes.arrayBuffer())))
+    expect(enRes.headers.get('content-encoding')).toBe('br')
+    const enHtml = brotliDecompressSync(new Uint8Array(await enRes.arrayBuffer())).toString()
     expect(enHtml).toContain('<title>Home | Demo</title>')
     expect(enHtml).toContain('<html lang="en">')
     expect(enHtml).toContain('<link rel="canonical" href="https://example.test/">')
@@ -380,18 +382,18 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
       const port = Number(/listening on http:\/\/[^:]+:(\d+)/.exec(buf)![1])
 
       // Use raw TCP/Bun.fetch with decompress: false to verify Content-Encoding on the wire!
-      const zstdRes = await fetch(`http://127.0.0.1:${port}/`, {
-        headers: { 'accept-encoding': 'zstd' },
+      const brRes = await fetch(`http://127.0.0.1:${port}/`, {
+        headers: { 'accept-encoding': 'br' },
         decompress: false,
       })
-      expect(zstdRes.status).toBe(200)
-      expect(zstdRes.headers.get('content-encoding')).toBe('zstd')
-      expect(zstdRes.headers.get('vary')).toContain('Accept-Encoding')
-      const body = new TextDecoder().decode(Bun.zstdDecompressSync(new Uint8Array(await zstdRes.arrayBuffer())))
+      expect(brRes.status).toBe(200)
+      expect(brRes.headers.get('content-encoding')).toBe('br')
+      expect(brRes.headers.get('vary')).toContain('Accept-Encoding')
+      const body = brotliDecompressSync(new Uint8Array(await brRes.arrayBuffer())).toString()
       expect(body).toContain('Compiled Prerender')
 
       // The build hashed the embedded page, so the binary answers a 304 to its ETag.
-      const etag = zstdRes.headers.get('etag')!
+      const etag = brRes.headers.get('etag')!
       expect(etag).toMatch(/^W\/"/)
       const notModified = await fetch(`http://127.0.0.1:${port}/`, { headers: { 'if-none-match': etag } })
       expect(notModified.status).toBe(304)
@@ -552,6 +554,130 @@ describe('prerendered pages stay on the native route table with i18n and auth (#
   })
 })
 
+describe('compression done by the build (#3668)', () => {
+  const prose = 'A paragraph long enough to compress well. '.repeat(40)
+
+  async function builtApp() {
+    const dir = makeTemp('kay-build-compress-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'public'), { recursive: true })
+    writeFileSync(join(dir, 'public/site.css'), `body { margin: 0 } /* ${prose} */\n`)
+    writeFileSync(join(dir, 'public/notes.txt'), 'twelve bytes')
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      export const prerender = true
+      export default function Home() { return <main><p>${prose}</p></main> }
+    `)
+    await build({ root: dir })
+    return dir
+  }
+
+  const get = (app: { handle: (r: Request) => Promise<Response> }, path: string, encoding: string) =>
+    app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': encoding } }))
+
+  it('writes .br and .gz next to prerendered pages and public files, and serves those bytes', async () => {
+    const dir = await builtApp()
+    for (const file of ['dist/prerendered/index.html', 'dist/public/site.css']) {
+      expect(existsSync(join(dir, `${file}.br`))).toBe(true)
+      expect(existsSync(join(dir, `${file}.gz`))).toBe(true)
+    }
+    expect(existsSync(join(dir, 'dist/public/notes.txt.br'))).toBe(false)
+
+    const app = await createServer({ root: dir })
+    const page = await get(app, '/', 'br')
+    expect(page.headers.get('content-encoding')).toBe('br')
+    expect(new Uint8Array(await page.arrayBuffer())).toEqual(new Uint8Array(await Bun.file(join(dir, 'dist/prerendered/index.html.br')).arrayBuffer()))
+    const css = await get(app, '/site.css', 'gzip')
+    expect(css.headers.get('content-encoding')).toBe('gzip')
+    expect(new Uint8Array(await css.arrayBuffer())).toEqual(new Uint8Array(await Bun.file(join(dir, 'dist/public/site.css.gz')).arrayBuffer()))
+    expect(page.headers.get('vary')).toContain('Accept-Encoding')
+  })
+
+  it('compresses nothing at runtime for a file the build compressed', async () => {
+    const dir = await builtApp()
+    const app = await createServer({ root: dir })
+    for (const path of ['/', '/site.css']) {
+      const res = await get(app, path, 'zstd')
+      expect(res.headers.get('content-encoding')).toBe(null)
+      expect(await res.text()).toContain('A paragraph long enough')
+    }
+  })
+
+  it('reads a requested sidecar once and answers it from memory, unless it is too big for the cache', async () => {
+    const dir = makeTemp('kay-sidecar-kept-')
+    const file = (name: string, body: string) => {
+      writeFileSync(join(dir, name), body)
+      return join(dir, name)
+    }
+    // An entry may take a quarter of the file budget: 64 bytes here.
+    const serveFile = createFileServer({ compressEnabled: true, compressCache: new CompressionCache(undefined, 256), withHsts: res => res })
+    const served = (name: string, br: string) => servedFile({ key: name, source: { path: file(name, 'identity') }, headers: { 'content-type': 'text/css' }, compressible: false, br: { path: file(`${name}.br`, br) } })
+    const small = served('small.css', 'brotli v1')
+    const big = served('big.css', `brotli v1 ${'x'.repeat(64)}`)
+    const read = async (entry: ServedFile) => (await serveFile(new Request('http://localhost/', { headers: { 'accept-encoding': 'br' } }), entry)).text()
+
+    expect(await read(small)).toBe('brotli v1')
+    expect(await read(big)).toStartWith('brotli v1 ')
+    file('small.css.br', 'brotli v2')
+    file('big.css.br', `brotli v2 ${'x'.repeat(64)}`)
+    expect(await read(small)).toBe('brotli v1')
+    expect(await read(big)).toStartWith('brotli v2 ')
+    // The big one is streamed from the file opened at startup, never read into memory per request.
+    const opened = spyOn(Bun, 'file')
+    try {
+      await read(big)
+      expect(opened).not.toHaveBeenCalled()
+    }
+    finally {
+      opened.mockRestore()
+    }
+  })
+
+  it('keeps a sidecar the app ships in public/ and serves it as that file\'s encoding', async () => {
+    const dir = makeTemp('kay-build-compress-own-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'public'), { recursive: true })
+    writeFileSync(join(dir, 'public/site.css'), `body { margin: 0 } /* ${prose} */\n`)
+    writeFileSync(join(dir, 'public/site.css.br'), 'the app\'s own brotli')
+    writeFileSync(join(dir, 'src/routes/index.tsx'), 'export default function Home() { return <p>hi</p> }\n')
+    await build({ root: dir })
+    expect(await Bun.file(join(dir, 'dist/public/site.css.br')).text()).toBe('the app\'s own brotli')
+    expect(existsSync(join(dir, 'dist/public/site.css.gz'))).toBe(false)
+
+    const app = await createServer({ root: dir })
+    const res = await get(app, '/site.css', 'br')
+    expect(res.headers.get('content-encoding')).toBe('br')
+    expect(await res.text()).toBe('the app\'s own brotli')
+  })
+
+  it('serves the sidecars from a compiled binary', async () => {
+    const dir = await builtApp()
+    const binPath = join(dir, 'server-bin')
+    await build({ root: dir, compile: binPath })
+    const proc = Bun.spawn([binPath], { cwd: dir, env: { ...process.env, PORT: '0' }, stdout: 'pipe', stderr: 'pipe' })
+    try {
+      const reader = proc.stdout.getReader()
+      let out = ''
+      while (!/http:\/\/\S+/.test(out)) {
+        const { value, done } = await reader.read()
+        if (done)
+          break
+        out += new TextDecoder().decode(value)
+      }
+      reader.releaseLock()
+      const origin = /http:\/\/\S+/.exec(out)![0]
+      for (const [path, file] of [['/', 'dist/prerendered/index.html.br'], ['/site.css', 'dist/public/site.css.br']] as const) {
+        const res = await fetch(`${origin}${path}`, { headers: { 'accept-encoding': 'br' }, decompress: false })
+        expect(res.headers.get('content-encoding')).toBe('br')
+        expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array(await Bun.file(join(dir, file)).arrayBuffer()))
+      }
+    }
+    finally {
+      proc.kill()
+      await proc.exited
+    }
+  })
+})
+
 describe('files served as they are (#3667)', () => {
   it('answers a prerendered page, an asset and a public file with an ETag, a 304 to it, and their length to HEAD', async () => {
     const dir = makeTemp('kay-served-file-')
@@ -606,7 +732,8 @@ describe('compression work per request', () => {
     writeFileSync(join(dir, 'src/routes/api/me.ts'), `
       export function GET(ctx) { return ctx.json({ name: 'Ada '.repeat(200) }) }
     `)
-    await build({ root: dir })
+    // Served from public/ itself, with no sidecar the build compressed, so the runtime compresses the files.
+    await build({ root: dir, copyPublic: false })
     const app = await createServer({ root: dir, compress: true })
     const get = async (path: string) => {
       const res = await app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': 'zstd' } }))

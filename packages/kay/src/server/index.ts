@@ -221,8 +221,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
   const files = createAssets({ assets, assetPrefix, isDev, compressEnabled, compressCache, nosniffHeader, securityRecord, withHsts })
   const { assetMap, publicMap, serveFile } = files
-  for (const [rel, body] of Object.entries(publicAssets))
-    files.registerPublic(rel, body, publicEtags[rel])
+  files.registerPublicFiles(publicAssets, publicEtags)
 
   const serverAppCtx = createAppContext({
     root: serverRoot,

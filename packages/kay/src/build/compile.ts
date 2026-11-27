@@ -30,50 +30,41 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   const lifecycle = join(import.meta.dir, '../server/lifecycle.ts')
   const imports: string[] = [`import ${JSON.stringify(prodEnvPath)};`, `import { createApp, kayConfig } from ${JSON.stringify(entryJs)};`, `import { handleSignals } from ${JSON.stringify(lifecycle)};`]
 
-  // Embed client assets and public files natively via `with { type: "file" }` (0 base64, 0 startup decode!)
-  const embeddedAssets: string[] = []
-  let assetIdx = 0
-  for (const rel of manifest.assets) {
-    const abs = join(clientDir, rel)
-    if (!existsSync(abs))
-      continue
-    const v = `_a${assetIdx++}`
-    imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
-    embeddedAssets.push(`${JSON.stringify(rel)}: ${v}`)
-    for (const ext of ['.br', '.gz'] as const) {
-      const sidecarAbs = `${abs}${ext}`
-      if (existsSync(sidecarAbs)) {
-        const sv = `_a${assetIdx++}`
-        imports.push(`import ${sv} from ${JSON.stringify(sidecarAbs)} with { type: "file" };`)
-        embeddedAssets.push(`${JSON.stringify(`${rel}${ext}`)}: ${sv}`)
+  // Embed client assets, public files and prerendered pages natively via `with { type: "file" }` (0 base64, 0 startup decode!), each with the sidecars the build compressed it into.
+  let fileIdx = 0
+  const embed = (entries: string[], rel: string, abs: string): void => {
+    for (const ext of ['', '.br', '.gz']) {
+      if (ext === '' || existsSync(`${abs}${ext}`)) {
+        const v = `_f${fileIdx++}`
+        imports.push(`import ${v} from ${JSON.stringify(`${abs}${ext}`)} with { type: "file" };`)
+        entries.push(`${JSON.stringify(`${rel}${ext}`)}: ${v}`)
       }
     }
   }
+  const embeddedAssets: string[] = []
+  for (const rel of manifest.assets) {
+    const abs = join(clientDir, rel)
+    if (existsSync(abs))
+      embed(embeddedAssets, rel, abs)
+  }
   const embeddedPublic: string[] = []
   const embeddedPublicEtags: string[] = []
-  let pubIdx = 0
   for (const rel of manifest.publicFiles) {
     const abs = join(outDir, 'public', rel)
     if (!existsSync(abs))
       continue
-    const v = `_p${pubIdx++}`
-    const etag = `W/"${Bun.hash(readFileSync(abs)).toString(36)}"`
-    imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
-    embeddedPublic.push(`${JSON.stringify(rel)}: ${v}`)
-    embeddedPublicEtags.push(`${JSON.stringify(rel)}: ${JSON.stringify(etag)}`)
+    embed(embeddedPublic, rel, abs)
+    embeddedPublicEtags.push(`${JSON.stringify(rel)}: ${JSON.stringify(`W/"${Bun.hash(readFileSync(abs)).toString(36)}"`)}`)
   }
   const embeddedPrerenderedFiles: string[] = []
   const embeddedPrerenderedEtags: string[] = []
-  let preIdx = 0
   for (const r of manifest.routes) {
     if (r.prerendered) {
       for (const [, relHtml] of Object.entries(r.prerendered)) {
         const abs = join(outDir, relHtml)
         if (!existsSync(abs))
           continue
-        const v = `_r${preIdx++}`
-        imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
-        embeddedPrerenderedFiles.push(`${JSON.stringify(relHtml)}: ${v}`)
+        embed(embeddedPrerenderedFiles, relHtml, abs)
         // An embedded file has no mtime to version it by.
         embeddedPrerenderedEtags.push(`${JSON.stringify(relHtml)}: ${JSON.stringify(`W/"${Bun.hash(readFileSync(abs)).toString(36)}"`)}`)
       }

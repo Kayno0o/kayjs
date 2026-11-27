@@ -16,6 +16,8 @@ PORT=3000 kay start
 
 Serves dynamic SSR routes, streaming `<Suspense>`, server actions, API routes, prerendered pages, and immutable `/_kay/*` client assets directly from `Bun.serve()`.
 
+`kay build` compresses the hashed assets, the `public/` files and the prerendered pages into `.br` and `.gz` files beside them, for files of 256 bytes or more, keeping each one only when it comes out smaller. The server sends those files as they are, so it compresses on the fly only the responses that have none, such as pages rendered per request. A `public/` file shipped with its own `.br` or `.gz` keeps it.
+
 ## 2. Single Standalone Executable (`kay build --compile`)
 
 Compile your entire server, routes, `kay.config.ts` plugins, client bundles, and `public/` assets (`with { type: "file" }`) into **one self-contained binary**:

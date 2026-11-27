@@ -424,7 +424,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   })
   await host.runBuild()
   restoreCachedPluginAssets(options.cache, clientDir, assets, anyPassSkipped)
-  host.precompressAssets()
+  host.precompressOutput()
 
   const manifest: BuildManifest = {
     runtimeScript: client.runtimeScript, regionScript: client.regionScript, reviveScript: client.reviveScript, chunkImports: client.chunkImports, runtimeOnEveryPage: plugins.some(p => Boolean(p.clientEntry)),
@@ -464,7 +464,7 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
   try {
     const ranAfterPrerender = await host.runAfterPrerender()
     recordCachedPluginAssets(options.cache, clientDir, assets, builtClientAssets)
-    host.precompressAssets()
+    host.precompressOutput()
     if (Object.keys(host.pluginData).length > 0)
       manifest.pluginData = host.pluginData
 
