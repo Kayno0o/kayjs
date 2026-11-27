@@ -53,13 +53,13 @@ async function nextEvent(reader: ReadableStreamDefaultReader<Uint8Array>): Promi
   throw new Error(`no reload event after ${JSON.stringify(buf)}`)
 }
 
-// Waits until `/` is answered by an app process other than `pid`.
+// Waits until `/` is answered by an app process other than `pid`; until one is up, `/` may still answer the crash page.
 async function nextProcess(url: string, pid: string): Promise<{ site: string, pid: string }> {
   const deadline = Date.now() + 15_000
   while (Date.now() < deadline) {
-    const now = await home(url)
-    if (now.pid !== pid)
-      return now
+    const now = /<p>(\w+) (\d+)<\/p>/.exec(await (await fetch(url)).text())
+    if (now !== null && now[2] !== pid)
+      return { site: now[1]!, pid: now[2]! }
     await Bun.sleep(50)
   }
   throw new Error('the app process was not replaced')
