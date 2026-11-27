@@ -146,6 +146,81 @@ describe('Dialog and Drawer on the platform (#3686)', () => {
       server.stop(true)
     }
   })
+
+  it('places Menu and Popover against their trigger where the browser has no anchor positioning, flipping above with no room below', async () => {
+    const dir = makeTemp('kay-3686-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { Menu, Popover } from ${JSON.stringify(UI_ENTRY)}
+      export default function Home() {
+        return (
+          <main>
+            <div style="block-size: 10rem" />
+            <Menu label="Actions" items={[{ id: 'edit', label: 'Edit item' }, { id: 'del', label: 'Delete item' }]} />
+            <Popover id="tip" triggerLabel="Tip"><p>A tip</p></Popover>
+            <div style="block-size: 200vh" />
+          </main>
+        )
+      }
+    `)
+    const app = await testApp({ root: dir, plugins: [ui()] })
+    const chromePath = findChrome()
+    if (chromePath === undefined)
+      return
+    const server = app.app.serve(0)
+    const browser = await chromium.launch({ headless: true, executablePath: chromePath })
+    const below = (popup: string, trigger: string) => (page: Page) => page.evaluate(([p, t]) => {
+      const box = document.querySelector(p!)!.getBoundingClientRect()
+      const anchor = document.querySelector(t!)!.getBoundingClientRect()
+      return { gap: Math.round(box.top - anchor.bottom), left: Math.round(box.left - anchor.left) }
+    }, [popup, trigger])
+    try {
+      const page = await browser.newPage()
+      const fetched: string[] = []
+      page.on('request', req => fetched.push(new URL(req.url()).pathname))
+      // What Firefox before 147 does: no position-area, so CSS alone leaves the popup where the top layer puts it.
+      await page.addInitScript(() => {
+        const supports = CSS.supports.bind(CSS)
+        CSS.supports = (...args: [string, string?]) => !args.join(':').includes('position-area') && supports(...(args as [string]))
+      })
+      await page.goto(`http://localhost:${server.port}/`)
+
+      await page.click('[data-ui="menu"] [data-part="trigger"]')
+      await page.waitForFunction(() => document.querySelector<HTMLElement>('[role="menu"]')?.style.inset !== '', undefined, { timeout: 2000 })
+      expect(await below('[role="menu"]', '[data-ui="menu"] [data-part="trigger"]')(page)).toEqual({ gap: 4, left: 0 })
+      await page.keyboard.press('Escape')
+
+      await page.click('[popovertarget="tip"]')
+      await page.waitForFunction(() => document.getElementById('tip')!.style.inset !== '', undefined, { timeout: 2000 })
+      expect(await below('#tip', '[popovertarget="tip"]')(page)).toEqual({ gap: 4, left: 0 })
+      // Scrolling moves the trigger, and the popover follows it.
+      await page.evaluate(() => scrollBy(0, 60))
+      await page.waitForFunction(() => Math.round(document.getElementById('tip')!.getBoundingClientRect().top - document.querySelector('[popovertarget="tip"]')!.getBoundingClientRect().bottom) === 4, undefined, { timeout: 2000 })
+      await page.evaluate(() => scrollTo(0, 0))
+      await page.keyboard.press('Escape')
+
+      const triggerBottom = await page.locator('[data-ui="menu"] [data-part="trigger"]').evaluate(el => el.getBoundingClientRect().bottom)
+      await page.setViewportSize({ width: 800, height: Math.ceil(triggerBottom) + 20 })
+      await page.click('[data-ui="menu"] [data-part="trigger"]')
+      await page.waitForFunction(() => document.querySelector<HTMLElement>('[role="menu"]')?.style.inset !== '', undefined, { timeout: 2000 })
+      const flipped = await page.locator('[role="menu"]').evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('[data-ui="menu"] [data-part="trigger"]')!.getBoundingClientRect().top)
+      expect(flipped).toBe(true)
+      await page.keyboard.press('Escape')
+
+      // With no room above either, it stays below.
+      await page.evaluate(() => document.querySelector('main > div:first-child')!.remove())
+      const topTriggerBottom = await page.locator('[data-ui="menu"] [data-part="trigger"]').evaluate(el => el.getBoundingClientRect().bottom)
+      await page.setViewportSize({ width: 800, height: Math.ceil(topTriggerBottom) + 20 })
+      await page.click('[data-ui="menu"] [data-part="trigger"]')
+      await page.waitForFunction(() => document.querySelector<HTMLElement>('[role="menu"]')?.style.inset !== '', undefined, { timeout: 2000 })
+      expect(await below('[role="menu"]', '[data-ui="menu"] [data-part="trigger"]')(page)).toEqual({ gap: 4, left: 0 })
+      expect(fetched.some(path => path.includes('kui-fallback-'))).toBe(true)
+    }
+    finally {
+      await browser.close()
+      server.stop(true)
+    }
+  })
 })
 
 describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars', () => {
@@ -199,8 +274,9 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
 
     const app = await testApp({ root: dir, plugins, prebuilt: true })
     const html = await (await app.get('/')).text()
-    // The speculation rules are data, not JS.
-    expect(html.replace(/<script type="speculationrules">[\s\S]*?<\/script>/, '')).not.toContain('<script')
+    // No script file: the speculation rules are data, and the Popover's inline guard imports the platform fallback only where anchor positioning is missing.
+    expect(html.match(/<script\b[^>]*\bsrc=/g)).toBeNull()
+    expect(html.replace(/<script type="speculationrules">[\s\S]*?<\/script>/, '').match(/<script\b/g)).toEqual(['<script'])
     // Zero inline style="..." attributes — 100% compatible with strict zero-'unsafe-inline' CSP
     expect(html).not.toContain(' style=')
     expect(html).toContain('data-ui="button"')
@@ -334,13 +410,15 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
                 { id: 'two', label: 'Settings', content: 'Panel Two' },
               ]}
             />
-            <Menu
-              label="Actions"
-              items={[
-                { id: 'edit', label: 'Edit item' },
-                { id: 'del', label: 'Delete item' },
-              ]}
-            />
+            <div id="clipper" style="overflow: hidden; block-size: 3rem">
+              <Menu
+                label="Actions"
+                items={[
+                  { id: 'edit', label: 'Edit item' },
+                  { id: 'del', label: 'Delete item' },
+                ]}
+              />
+            </div>
             <Field id="plan-field" label="Plan">
               <Select
                 name="plan"
@@ -413,21 +491,49 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
       expect(await page.locator('[id$="-panel-two"]').isVisible()).toBe(true)
       expect(await page.locator('[id$="-tab-two"]').getAttribute('data-state')).toBe('active')
 
-      // 3. Menu open + floats absolutely with opaque surface background + click item closes menu
+      // 3. Menu opens below its trigger with an opaque surface, out of the overflow box around it, and an item click closes it
       await page.click('[data-ui="menu"] [data-part="trigger"]')
       expect(await page.locator('[data-ui="menu"] [role="menu"]').isVisible()).toBe(true)
-      const menuStyle = await page.locator('[data-ui="menu"] [role="menu"]').evaluate((el) => {
-        const s = getComputedStyle(el)
-        return { bg: s.backgroundColor, position: s.position }
+      const menuBox = await page.locator('[data-ui="menu"] [role="menu"]').evaluate((el) => {
+        const menu = el.getBoundingClientRect()
+        const trigger = el.parentElement!.querySelector('[data-part="trigger"]')!.getBoundingClientRect()
+        const clipper = document.getElementById('clipper')!.getBoundingClientRect()
+        const lastItem = el.querySelector('[role="menuitem"]:last-child')!.getBoundingClientRect()
+        const hit = document.elementFromPoint(lastItem.left + lastItem.width / 2, lastItem.top + lastItem.height / 2)
+        return {
+          bg: getComputedStyle(el).backgroundColor,
+          gap: menu.top - trigger.bottom,
+          left: menu.left - trigger.left,
+          pastClipper: lastItem.top > clipper.bottom,
+          lastItemHit: hit?.closest('[role="menu"]') === el,
+        }
       })
-      expect(menuStyle.bg).not.toBe('rgba(0, 0, 0, 0)')
-      expect(menuStyle.position).toBe('absolute')
+      expect(menuBox).toEqual({ bg: expect.not.stringMatching(/^rgba\(0, 0, 0, 0\)$/), gap: 4, left: 0, pastClipper: true, lastItemHit: true })
       await page.click('[data-ui="menu"] [role="menuitem"]:first-child')
+      expect(await page.locator('[data-ui="menu"] [role="menu"]').count()).toBe(0)
+
+      // 3a. With no room below its trigger, the menu flips above it
+      const viewport = page.viewportSize()!
+      const triggerBottom = await page.locator('[data-ui="menu"] [data-part="trigger"]').evaluate(el => el.getBoundingClientRect().bottom)
+      await page.setViewportSize({ width: viewport.width, height: Math.ceil(triggerBottom) + 20 })
+      await page.click('[data-ui="menu"] [data-part="trigger"]')
+      const flipped = await page.locator('[data-ui="menu"] [role="menu"]').evaluate(el => el.getBoundingClientRect().bottom <= el.parentElement!.querySelector('[data-part="trigger"]')!.getBoundingClientRect().top)
+      expect(flipped).toBe(true)
+      await page.keyboard.press('Escape')
+      await page.setViewportSize(viewport)
+
+      // 3b. An outside click closes the menu, and a second click on its trigger closes it too
+      await page.click('[data-ui="menu"] [data-part="trigger"]')
+      await page.mouse.click(1, 1)
+      await page.waitForFunction(() => document.querySelector('[data-ui="menu"] [role="menu"]') === null, undefined, { timeout: 2000 })
+      await page.click('[data-ui="menu"] [data-part="trigger"]')
+      await page.click('[data-ui="menu"] [data-part="trigger"]')
       expect(await page.locator('[data-ui="menu"] [role="menu"]').count()).toBe(0)
 
       // 4. Select inside <Field> keeps label-for id after hydration + open + pick option updates trigger & hidden form input
       expect(await page.locator('[data-ui="select"] [data-part="trigger"]').getAttribute('id')).toBe('plan-field')
       await page.click('[data-ui="select"] [data-part="trigger"]')
+      expect(await page.locator('[data-ui="select"] [role="listbox"]').evaluate(el => el.matches(':popover-open'))).toBe(true)
       await page.click('[data-ui="select"] [role="option"]:nth-child(2)')
       expect(await page.locator('[data-ui="select"] [data-part="value"]').textContent()).toBe('Pro')
       expect(await page.locator('input[name="plan"]').inputValue()).toBe('pro')

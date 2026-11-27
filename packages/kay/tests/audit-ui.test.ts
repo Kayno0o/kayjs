@@ -189,6 +189,8 @@ beforeAll(async () => {
   ssrHtml = await (await app.get('/')).text()
 
   GlobalRegistrator.register()
+  // happy-dom has no Popover API; Menu and Select show their popup through it, which ui.test.ts checks in Chromium.
+  HTMLElement.prototype.showPopover ??= function showPopover() {}
 
   const loadIsland = async (exportName: string) => {
     const entry = Object.entries(manifest.islands).find(([k]) => k.endsWith(`#${exportName}`))
@@ -286,7 +288,8 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
       if (labelledBy)
         expect(trig1.id).toBe(labelledBy)
 
-      // Open menu 2 briefly to confirm unique menu IDs
+      // Open menu 2 briefly to confirm unique menu IDs; the browser would close menu 1 on that outside click (ui.test.ts checks it in Chromium), happy-dom does not
+      trig1.click()
       trig2.click()
       const ctrl2 = trig2.getAttribute('aria-controls')
       expect(ctrl2).toBeTruthy()
@@ -389,7 +392,8 @@ describe('Box 20 — Menu, Select, CommandPalette keyboard & active-descendant a
       expect(ctrl1).toBe(listbox.id)
       expect(Boolean(listbox.getAttribute('aria-label') || listbox.getAttribute('aria-labelledby'))).toBe(true)
 
-      // Open s2 to verify unique listbox IDs
+      // Open s2 to verify unique listbox IDs, s1 closed first as the browser would on that outside click
+      trig1.click()
       trig2.click()
       const ctrl2 = trig2.getAttribute('aria-controls')
       expect(ctrl2).toBeTruthy()

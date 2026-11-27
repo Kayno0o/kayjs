@@ -30,7 +30,11 @@ Available grammars: `'orbit'` · `'editorial'` · `'workshop'` · `'console'` ·
 - **0 KB JS static & layout primitives**: `Stack`, `Cluster`, `Grid`, `Sidebar`, `Split`, `Button`, `Card` (`CardHeader`/`CardBody`/`CardFooter`), `Badge`, `Notice`, `Field`, `Switch`, `Checkbox`, `RadioGroup`, `Accordion` (`AccordionItem`), `Popover`, `Dialog`, `Drawer`.
 - **Auto-hydrated interactive islands**: `ControlledDialog` and `ControlledDrawer` (a `Dialog` or `Drawer` your code opens and closes through an `open` signal), `Tabs`, `Menu`, `Select`, `CommandPalette` (`⌘K`), `DataTable` (sort, filter, select, paginate), `Toaster` + `toast()`.
 
-`Dialog` and `Drawer` ship no JavaScript. Their trigger opens them with the browser's invoker commands (`commandfor` and `command="show-modal"`), and the browser closes them on Esc, on the close button and on a click on the backdrop (`closedby="any"`). A browser that lacks one of these, such as Safari before 26.2, loads a fallback of about 400 bytes that does their work; other browsers fetch nothing. The `ui()` plugin adds that check to pages with a `commandfor` button, so your own buttons get it too.
+`Dialog` and `Drawer` ship no JavaScript. Their trigger opens them with the browser's invoker commands (`commandfor` and `command="show-modal"`), and the browser closes them on Esc, on the close button and on a click on the backdrop (`closedby="any"`).
+
+`Menu`, `Select` and `Popover` open in the browser's top layer, so a parent with `overflow: hidden` never clips them. CSS anchor positioning places each one below its trigger, and above it or on its other side when the viewport has no room there. An outside click closes them.
+
+A browser that lacks one of these features, such as Safari before 26.2 or Firefox before 147, loads a fallback of about 700 bytes that does their work; other browsers fetch nothing. The `ui()` plugin adds that check to pages with a `commandfor` button, a `Menu`, a `Select` or a `Popover`, so your own `commandfor` buttons get it too.
 
 ```tsx
 import { Button, Card, CardBody, CardHeader, Switch } from '@kayjs/ui'

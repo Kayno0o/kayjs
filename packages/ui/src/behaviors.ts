@@ -111,9 +111,17 @@ export interface ListPopupState {
   onTriggerKeyDown(e: KeyboardEvent): void
   focusActive(): void
   activeDescendantId(): string | undefined
+  /** The popup's `ref`: shows it in the top layer, anchored to the trigger. */
+  mountPopup(el: HTMLElement | undefined): void
 }
 
-/** Shared popup open/close, outside-click dismiss, and keyboard list navigation for Menu and Select. */
+// In the top layer no overflow ancestor clips the popup, and the trigger as its `source` is the anchor CSS places it against and a click the browser does not count as outside.
+function showAnchored(el: HTMLElement, trigger: HTMLElement): void {
+  if (el.isConnected && !el.matches(':popover-open'))
+    el.showPopover({ source: trigger })
+}
+
+/** Shared popup open/close and keyboard list navigation for Menu and Select; the browser dismisses the popup on an outside click. */
 export function createListPopup<T>(opts: ListPopupOptions<T>): ListPopupState {
   const open = signal(false)
   const highlighted = signal(findFirstEnabledIndex(opts.items(), opts.isDisabled))
@@ -155,10 +163,6 @@ export function createListPopup<T>(opts: ListPopupOptions<T>): ListPopupState {
   effect(() => {
     if (!open.value)
       return
-    const onDocClick = (e: MouseEvent) => {
-      if (rootEl && !rootEl.contains(e.target as Node))
-        close()
-    }
     const onKey = (e: KeyboardEvent) => {
       if (e === lastOpenEvent)
         return
@@ -174,12 +178,8 @@ export function createListPopup<T>(opts: ListPopupOptions<T>): ListPopupState {
       if (open.peek() && highlighted.peek() !== prev)
         focusActive()
     }
-    document.addEventListener('click', onDocClick)
     document.addEventListener('keydown', onKey)
-    onCleanup(() => {
-      document.removeEventListener('click', onDocClick)
-      document.removeEventListener('keydown', onKey)
-    })
+    onCleanup(() => document.removeEventListener('keydown', onKey))
   })
 
   return {
@@ -204,6 +204,15 @@ export function createListPopup<T>(opts: ListPopupOptions<T>): ListPopupState {
     },
     focusActive,
     activeDescendantId,
+    mountPopup(el) {
+      if (el === undefined)
+        return
+      el.addEventListener('toggle', e => (e as ToggleEvent).newState === 'closed' && close())
+      queueMicrotask(() => {
+        showAnchored(el, rootEl!.querySelector<HTMLElement>('[data-part="trigger"]')!)
+        focusActive()
+      })
+    },
   }
 }
 

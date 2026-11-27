@@ -10,17 +10,17 @@
     "/table": 10846
   },
   "examples/noticeboard": {
-    "/": 16167,
-    "/login": 9957,
-    "/notices/:id": 9957
+    "/": 16161,
+    "/login": 9955,
+    "/notices/:id": 9955
   },
   "examples/showcase": {
-    "/account": 10248,
-    "/": 18942
+    "/account": 10253,
+    "/": 19052
   },
   "docs": {
-    "/docs/*slug": 3992,
-    "/grammars": 13752,
-    "/": 3992
+    "/docs/*slug": 3990,
+    "/grammars": 13835,
+    "/": 3990
   }
 }

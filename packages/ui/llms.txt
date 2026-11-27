@@ -6,7 +6,7 @@
 
 - `@kayjs/ui`:
   - Static layout primitives (`0 KB` JS): `Stack`, `Cluster`, `Grid`, `Sidebar`, `Split`
-  - Static & native-platform primitives (`0 KB` JS): `Button`, `Card`, `CardHeader`, `CardBody`, `CardFooter`, `Badge`, `Notice`, `Field`, `FieldContext`, `useFieldContext`, `Checkbox`, `Switch`, `RadioGroup`, `Accordion`, `AccordionItem`, `Popover`, `Dialog`, `Drawer` (opened by `commandfor`/`command` buttons and closed by Esc or a backdrop click, with no JS; `ui()` adds a fallback that only a browser without invoker commands or `closedby` loads)
+  - Static & native-platform primitives (`0 KB` JS): `Button`, `Card`, `CardHeader`, `CardBody`, `CardFooter`, `Badge`, `Notice`, `Field`, `FieldContext`, `useFieldContext`, `Checkbox`, `Switch`, `RadioGroup`, `Accordion`, `AccordionItem`, `Popover`, `Dialog`, `Drawer` (opened by `commandfor`/`command` buttons and closed by Esc or a backdrop click, with no JS; `ui()` adds a fallback that only a browser without invoker commands, `closedby` or anchor positioning loads)
   - Interactive island primitives: `ControlledDialog`, `ControlledDrawer`, `Tabs`, `Menu`, `Select`, `CommandPalette`, `DataTable`, `Toaster`
   - Headless signal behaviors & helpers: `createDialog`, `createTabs`, `createDataTable`, `toast`, `handleListKeyDown`, `findFirstEnabledIndex`, `findLastEnabledIndex`, `findNextEnabledIndex`, `isDialogBackdropClick`, `syncDialogOpen`, `nextUiId`
 - `@kayjs/ui/plugin`: `ui(options?)`, `GRAMMAR_NAMES`, `grammarCssPath`, `renderGrammarCss`, `ejectGrammar`
@@ -35,7 +35,7 @@ export default defineConfig({
 - `Field`: `{ id, label, hint?, error?, required?, class?, children? }` — auto-wires `for`, `id`, `aria-describedby`, `aria-invalid`, `required` onto its child control (and provides `FieldContext`).
 - `Checkbox` / `Switch`: `{ id?, name?, value?, label, checked?, disabled? }`; `RadioGroup`: `{ name, legend?, options: RadioOption[], defaultValue? }`.
 - `Accordion` + `AccordionItem`: `{ title, group?, open?, children? }` (native `<details name={group}>`).
-- `Popover`: `{ id, triggerLabel, triggerVariant?, children? }` (native Popover API).
+- `Popover`: `{ id, triggerLabel, triggerVariant?, children? }` (native Popover API). `Popover`, `Menu` and `Select` open in the top layer (never clipped by an `overflow` parent), anchored below their trigger and flipped when the viewport has no room.
 - `Dialog` / `Drawer`: `{ id?, title?, ariaLabel?, description?, triggerLabel?, triggerVariant?, closeLabel?, side?: 'right' | 'left' | 'bottom', children? }`; another button opens one with `commandfor={id} command="show-modal"`. `ControlledDialog` / `ControlledDrawer` take the same props plus `open: Signal<boolean>`, which the browser closing it sets back to `false`.
 - `Tabs`: `{ id?, items: Array<{ id, label, content }>, defaultValue?, label? }`.
 - `Menu`: `{ id?, label, items: Array<{ id, label, href?, disabled?, onSelect? }>, variant?, onSelect? }`.

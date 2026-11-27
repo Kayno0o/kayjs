@@ -85,6 +85,8 @@ export function Select(props: SelectProps) {
           role="listbox"
           aria-label={ariaLabel}
           aria-labelledby={ariaLabel ? undefined : triggerId}
+          popover="auto"
+          ref={popup.mountPopup}
         >
           {props.options.map((opt, idx) => (
             <button

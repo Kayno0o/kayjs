@@ -260,16 +260,15 @@
 
   [data-ui="menu"],
   [data-ui="select"] {
-    position: relative;
     display: inline-block;
   }
   [data-ui="menu"] [data-part="content"],
   [data-ui="select"] [data-part="listbox"] {
-    position: absolute;
-    inset-block-start: calc(100% + 4px);
-    inset-inline-start: 0;
-    min-inline-size: 100%;
-    z-index: 40;
+    inset: auto;
+    margin: 4px 0;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block, flip-inline;
+    min-inline-size: anchor-size(inline);
   }
 
   [data-ui="toaster"] {

@@ -72,7 +72,8 @@ export function Menu(props: MenuProps) {
           data-part="content"
           role="menu"
           aria-labelledby={triggerId}
-          ref={() => { popup.focusActive() }}
+          popover="auto"
+          ref={popup.mountPopup}
         >
           {props.items.map((item, idx) => (
             item.href !== undefined && !item.disabled
