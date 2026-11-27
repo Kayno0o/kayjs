@@ -647,6 +647,72 @@ describe('Audit #3526 Batch 1 — Server, Security, Compression, CLI & Dev', () 
       expect(r.match('/files/a.b/..c')?.params).toEqual({ rest: 'a.b/..c' })
     })
 
+    it('decodes a request path once, so a folder middleware of a 404 gets %2525 as %25 (#3669)', async () => {
+      const dir = makeTemp('kay-decode-once-')
+      mkdirSync(join(dir, 'src/routes/files/[name]'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/files/[name]/index.tsx'), `export default function File({ params }: { params: { name: string } }) { return <p>file {params.name}</p> }\n`)
+      writeFileSync(join(dir, 'src/routes/files/[name]/_middleware.ts'), `import type { Middleware } from '@kayjs/kay/server'\nconst mw: Middleware = ctx => new Response(\`name=\${ctx.params.name}\`)\nexport default mw\n`)
+      await build({ root: dir })
+      const app = await createServer({ root: dir })
+
+      expect(await (await app.handle(new Request('http://localhost/files/%2525/missing'))).text()).toBe('name=%25')
+      expect(await (await app.handle(new Request('http://localhost/files/caf%C3%A9/missing'))).text()).toBe('name=café')
+    })
+
+    it('gives a param %252f as the text %2f, and matches a static and a dynamic route with a trailing slash (#3669)', () => {
+      const r = new Router<string>()
+      r.add('/about', 'about')
+      r.add('/posts/:slug', 'post')
+      r.add('/files/*rest', 'files')
+      expect(r.match('/posts/a%252fb')?.params).toEqual({ slug: 'a%2fb' })
+      expect(r.match('/files/a%252fb/c%20d')?.params).toEqual({ rest: 'a%2fb/c d' })
+      expect(r.match('/about/')?.data).toBe('about')
+      expect(r.match('/posts/caf%C3%A9/')?.params).toEqual({ slug: 'café' })
+    })
+
+    it('reaches a file, page or middleware folder named with a literal %2f by %252f, never by %2f (#3669)', async () => {
+      const dir = makeTemp('kay-decode-literal-')
+      mkdirSync(join(dir, 'src/routes/a%2fb'), { recursive: true })
+      mkdirSync(join(dir, 'src/routes/m%2fw'), { recursive: true })
+      mkdirSync(join(dir, 'public'), { recursive: true })
+      writeFileSync(join(dir, 'public/p%2fq.txt'), 'literal file')
+      writeFileSync(join(dir, 'src/routes/a%2fb/[id].tsx'), `export default function Item({ params }: { params: { id: string } }) { return <p>item {params.id}</p> }\n`)
+      writeFileSync(join(dir, 'src/routes/m%2fw/index.tsx'), `export default function Index() { return <p>index</p> }\n`)
+      writeFileSync(join(dir, 'src/routes/m%2fw/_middleware.ts'), `import type { Middleware } from '@kayjs/kay/server'\nconst mw: Middleware = () => new Response('folder middleware')\nexport default mw\n`)
+      await build({ root: dir })
+      const app = await createServer({ root: dir })
+      const get = async (path: string): Promise<string> => {
+        const res = await app.handle(new Request(`http://localhost${path}`))
+        return `${res.status} ${(await res.text()).includes('literal file') ? 'file' : ''}`.trim()
+      }
+
+      expect(await get('/p%252fq.txt')).toBe('200 file')
+      expect(await get('/p%2fq.txt')).toBe('404')
+      expect(await (await app.handle(new Request('http://localhost/a%252fb/1'))).text()).toContain('item 1')
+      expect((await app.handle(new Request('http://localhost/a%2fb/1'))).status).toBe(404)
+      expect(await (await app.handle(new Request('http://localhost/m%252fw/missing'))).text()).toBe('folder middleware')
+      expect(await (await app.handle(new Request('http://localhost/m%2fw/missing'))).text()).not.toBe('folder middleware')
+    })
+
+    it('decodes a path a plugin rewrote, refusing an encoded separator after the prefix (#3669)', async () => {
+      const dir = makeTemp('kay-decode-rewrite-')
+      mkdirSync(join(dir, 'src/routes/posts'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/posts/[slug].tsx'), `export default function Post({ params }: { params: { slug: string } }) { return <p>post {params.slug}</p> }\n`)
+      await build({ root: dir })
+      const stripFr = definePlugin({
+        name: 'strip-fr',
+        server(api) {
+          api.rewrite(pathname => pathname === '/fr/bad' ? '/posts/%E0%A4%A' : pathname.startsWith('/fr/') ? pathname.slice(3) : undefined)
+        },
+      })
+      const app = await createServer({ root: dir, plugins: [stripFr] })
+
+      expect(await (await app.handle(new Request('http://localhost/fr/posts/caf%C3%A9'))).text()).toContain('post café')
+      expect((await app.handle(new Request('http://localhost/fr/posts/a%2fb'))).status).toBe(404)
+      expect((await app.handle(new Request('http://localhost/fr/posts/%E0%A4%A'))).status).toBe(400)
+      expect((await app.handle(new Request('http://localhost/fr/bad'))).status).toBe(400)
+    })
+
     it('returns 404 for unlisted params on prerendered dynamic routes instead of SSR fallback', async () => {
       const dir = makeTemp('kay-audit-box10-')
       mkdirSync(join(dir, 'src/routes/posts'), { recursive: true })

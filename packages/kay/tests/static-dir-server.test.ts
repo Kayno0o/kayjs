@@ -204,6 +204,8 @@ describe('createStaticDirServer boundary tests & ServerRuntimeConfig / rootLayou
     const assetHead = await app.handle(new Request('http://localhost/_kay/app-abc.js', { method: 'HEAD' }))
     expect(assetHead.headers.get('content-length')).toBe('19')
 
+    // An encoded separator names no file here, as on a server build (#3669).
+    expect((await app.handle(new Request('http://localhost/_kay%2fapp-abc.js'))).status).toBe(404)
     expect((await app.handle(new Request('http://localhost/later'))).status).toBe(404)
     writeFileSync(join(outDir, 'later.html'), '<!DOCTYPE html><main>Later</main>')
     const later = await answerOnceChanged(app, new Request('http://localhost/later'), null)

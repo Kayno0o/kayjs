@@ -479,7 +479,7 @@ describe('compression work per request', () => {
 })
 
 describe('Server hot-path allocations (#3557)', () => {
-  it('Router sorts lazily on first match and skips param decoding on non-matching dynamic routes', () => {
+  it('Router sorts lazily on first match and decodes each encoded segment once, a plain one never (#3669)', () => {
     const sortSpy = spyOn(Array.prototype, 'sort')
     const decodeSpy = spyOn(globalThis, 'decodeURIComponent')
     try {
@@ -492,12 +492,11 @@ describe('Server hot-path allocations (#3557)', () => {
       // Adding dynamic routes must not re-sort on every add()
       expect(sortSpy).not.toHaveBeenCalled()
 
-      // First match sorts once; non-matching candidate (:org/:repo/issues/:id) must NOT decode params
+      // First match sorts once; the one encoded segment is decoded once, whatever the routes tried
       const m = router.match('/acme/kay%20v2/settings')
       expect(sortSpy).toHaveBeenCalledTimes(1)
       expect(m).toEqual({ data: 'settings', params: { org: 'acme', repo: 'kay v2' } })
-      // Only the winning route's two params were decoded (not any rejected candidate's params)
-      expect(decodeSpy).toHaveBeenCalledTimes(2)
+      expect(decodeSpy).toHaveBeenCalledTimes(1)
 
       // Subsequent match does not re-sort
       sortSpy.mockClear()
@@ -505,12 +504,11 @@ describe('Server hot-path allocations (#3557)', () => {
       const m2 = router.match('/acme/kay/issues/42')
       expect(sortSpy).not.toHaveBeenCalled()
       expect(m2).toEqual({ data: 'issue', params: { org: 'acme', repo: 'kay', id: '42' } })
-      expect(decodeSpy).toHaveBeenCalledTimes(3)
-
-      // Encoded slash rejected without decoding
-      decodeSpy.mockClear()
-      expect(router.match('/acme/bad%2Frepo/settings')).toBeUndefined()
       expect(decodeSpy).not.toHaveBeenCalled()
+
+      // Encoded slash: decoded once to refuse a malformed escape, then kept out of every param
+      expect(router.match('/acme/bad%2Frepo/settings')).toBeUndefined()
+      expect(decodeSpy).toHaveBeenCalledTimes(1)
     }
     finally {
       sortSpy.mockRestore()

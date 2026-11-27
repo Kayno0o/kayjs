@@ -13,6 +13,7 @@ import type { NotifyError } from './errors'
 import type { Middleware, RequestContext } from './http'
 import type { KayLocals } from './index'
 import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } from './page'
+import type { RequestPath } from './request-path'
 import type { TrustProxy } from './security'
 import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
@@ -22,51 +23,16 @@ import { headTagStyleHashes, mergeStyleHashes } from './document'
 import { isNotFound, makeRequestContext } from './http'
 import { pickPageIslandProps } from './page'
 import { withRegionVary } from './region'
+import { pathPrefix } from './request-path'
 import { Router } from './router'
 import { styleHashesOf } from './security'
 
-const UNSAFE_ENCODED_SEGMENT_RE = /%(?:2f|5c|00)/i
 const MIDDLEWARE_BASENAME_RE = /(?:^|\/)_middleware\.js$/
 const CATCH_ALL_BRACKET_RE = /\[\.\.\.([^\]]+)\]/g
 const PARAM_BRACKET_RE = /\[([^\]]+)\]/g
 
 export type FastHandler = (req: Request, remoteIp?: string, url?: URL) => Response | Promise<Response>
 
-export type DecodedPathname =
-  | { ok: true, staticPath: string | undefined, scopedPath: string }
-  | { ok: false }
-
-/**
- * Safely percent-decodes a request pathname segment-by-segment.
- * - Malformed `%` escapes return `{ ok: false }` (caller responds 400).
- * - Encoded slashes (`%2F`), backslashes (`%5C`), and NUL (`%00`) are never turned into separators:
- *   `staticPath` becomes `undefined` (rejecting static/public/prerendered lookups) while `scopedPath`
- *   decodes all other segments so path-scoped middleware cannot be bypassed via `/%61dmin/...`.
- */
-export function decodeRequestPathname(rawPathname: string): DecodedPathname {
-  if (!rawPathname.includes('%'))
-    return { ok: true, staticPath: rawPathname, scopedPath: rawPathname }
-  const parts = rawPathname.split('/')
-  let hasUnsafe = false
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i]!
-    if (!part.includes('%'))
-      continue
-    let decoded: string
-    try {
-      decoded = decodeURIComponent(part)
-    }
-    catch {
-      return { ok: false }
-    }
-    if (UNSAFE_ENCODED_SEGMENT_RE.test(part))
-      hasUnsafe = true
-    else
-      parts[i] = decoded
-  }
-  const scopedPath = parts.join('/')
-  return { ok: true, staticPath: hasUnsafe ? undefined : scopedPath, scopedPath }
-}
 
 export function methodNotAllowed(allow: string): Response {
   return new Response('Method Not Allowed', allow ? { status: 405, headers: { allow } } : { status: 405 })
@@ -141,7 +107,7 @@ export function createAncestorMiddlewareLookup(
   manifest: BuildManifest,
   modules: Record<string, unknown>,
   routesPrefix: string,
-): (pathname: string) => AncestorMiddlewareMatch | undefined {
+): (path: RequestPath) => AncestorMiddlewareMatch | undefined {
   const byPattern = new Map<string, Middleware[]>()
   const seenModules = new Set<string>()
 
@@ -185,18 +151,12 @@ export function createAncestorMiddlewareLookup(
   for (const [pattern, list] of byPattern)
     dirRouter.add(pattern, list)
 
-  return (pathname: string): AncestorMiddlewareMatch | undefined => {
-    const norm = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
-    const segments = norm === '/' ? [] : norm.slice(1).split('/')
+  return (path: RequestPath): AncestorMiddlewareMatch | undefined => {
     const middlewares: Middleware[] = []
     const params: Record<string, string> = {}
 
-    let prefix = ''
-    for (let i = 0; i <= segments.length; i++) {
-      const candidate = i === 0 ? '/' : `${prefix}/${segments[i - 1]!}`
-      if (i > 0)
-        prefix = candidate
-      const matched = dirRouter.match(candidate)
+    for (let i = 0; i <= path.segments.length; i++) {
+      const matched = dirRouter.match(pathPrefix(path, i))
       if (matched !== undefined) {
         for (const mw of matched.data)
           middlewares.push(mw)

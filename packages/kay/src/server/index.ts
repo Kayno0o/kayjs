@@ -12,6 +12,7 @@ import type { CookieStore } from './cookies'
 import type { NotifyError } from './errors'
 import type { EmbeddedServerConfig, KayApp, KayServer, Middleware, RequestContext } from './http'
 import type { LoadedMiddlewareModule } from './page'
+import type { RequestPath } from './request-path'
 import type { CompiledRoute } from './route-table'
 import type { FastHandler } from './routing'
 import type { TrustProxy } from './security'
@@ -31,8 +32,9 @@ import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit
 import { allowedMethodsHeader, pickPageIslandProps, stripHeadBody } from './page'
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
 import { hasRegionHeader, invalidRegionResponse, requestedRegion, respondRegion, withRegionVary } from './region'
+import { decodeRequestPath, literalPath } from './request-path'
 import { compileRouteTable } from './route-table'
-import { actionRoutePrefix, createAncestorMiddlewareLookup, decodeRequestPathname, inferRoutesServerPrefix, methodNotAllowed } from './routing'
+import { actionRoutePrefix, createAncestorMiddlewareLookup, inferRoutesServerPrefix, methodNotAllowed } from './routing'
 import { hasActionErrorCookie, isPlainRead, isRead, serveHandlers } from './serve-handlers'
 import { buildSecurityHeaderEntries, resolveHstsValue, styleHashesOf, verifyOrigin } from './security'
 import { createStreamTracker, STREAM_TAIL_MARK, streamDocument } from './stream'
@@ -67,6 +69,7 @@ const DEFAULT_STREAM_TIMEOUT = 30_000
 const isEventStream = (res: Response): boolean => (res.headers.get('content-type') ?? '').toLowerCase().includes('text/event-stream')
 const makeServerError = (securityRecord: Record<string, string>) => (): Response => new Response('Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8', ...securityRecord } })
 // A file body Bun could not open: a build swapped in since this app loaded, or a file deleted by hand. Never cached.
+const badRequest = (): Response => new Response('Bad Request', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } })
 const makeFileGone = (securityRecord: Record<string, string>) => (): Response => new Response('Not Found', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', ...securityRecord } })
 
 function lookupPrerendered<T>(map: ReadonlyMap<string, T>, staticPath: string | undefined): T | undefined {
@@ -266,7 +269,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     prerenderedEtags,
     // The route's region script is what sends `x-kay-region`, so a page without one never varies on it.
     htmlHeaders: (route, urlPath) => withRegionVary(htmlHeaders(route.islandChunks.length > 0, false, false, route.prerenderedStyleHashes?.[urlPath]), route.usesRegion === true),
-    isFast: (urlPath, route) => route.middlewares.length === 0 && middlewaresFor(urlPath, true).length === 0 && !hasPluginRewrites && pluginRouter.match(urlPath) === undefined,
+    isFast: (urlPath, route) => route.middlewares.length === 0 && middlewaresFor(urlPath, true).length === 0 && !hasPluginRewrites && pluginRouter.match(literalPath(urlPath)) === undefined,
   })
 
   const { buildNotFoundResponse, renderError } = createFallbackPages({ manifest, modules, lang, alwaysLoadRuntime, navigation: navigation.html, dev: isDev, document, htmlHeaders, notifyError, finish })
@@ -276,11 +279,11 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     url: URL,
     request: Request,
     ctx: RequestContext,
-    effectiveScopedPath: string,
+    effective: RequestPath,
     rawScopedPath: string,
   ): Promise<Response> {
-    const pluginMws = pluginMiddlewaresFor(effectiveScopedPath, rawScopedPath)
-    const ancestor = ancestorMiddlewaresFor(effectiveScopedPath)
+    const pluginMws = pluginMiddlewaresFor(effective.scopedPath, rawScopedPath)
+    const ancestor = ancestorMiddlewaresFor(effective)
     if (ancestor !== undefined)
       ctx.params = ancestor.params
     const chain = ancestor === undefined ? pluginMws : [...pluginMws, ...ancestor.middlewares]
@@ -311,7 +314,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
   const { router, fastStaticPages } = compileRouteTable({
     manifest, modules, lang, alwaysLoadRuntime, navigation: navigation.html, middlewaresFor,
-    pluginIntercepts: path => hasPluginRewrites || hasHeadHooks || hasHtmlTransformers || pluginRouter.match(path) !== undefined,
+    pluginIntercepts: path => hasPluginRewrites || hasHeadHooks || hasHtmlTransformers || pluginRouter.match(literalPath(path)) !== undefined,
     fast: { trustProxy, consent, htmlHeaders, compressCache, actions, buildNotFoundResponse, renderError, notifyError, finish, withHsts },
   })
 
@@ -424,10 +427,10 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     try {
       const url = new URL(request.url)
       const rawPathname = url.pathname
-      const decoded = decodeRequestPathname(rawPathname)
-      if (!decoded.ok)
-        return finish(new Response('Bad Request', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } }), request)
-      const { staticPath, scopedPath } = decoded
+      const requestPath = decodeRequestPath(rawPathname)
+      if (requestPath === undefined)
+        return finish(badRequest(), request)
+      const { staticPath, scopedPath } = requestPath
       const read = isRead(request)
 
       // 1. Static client assets, then public/ files (explicit plugin routes take precedence over public/ files)
@@ -437,7 +440,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           return serveFile(request, asset)
         const pub = publicMap.get(staticPath)
         if (pub !== undefined) {
-          const matchedPlugin = pluginRouter.match(rawPathname)
+          const matchedPlugin = pluginRouter.match(requestPath)
           const reqMethod = request.method.toUpperCase()
           const shadowedByPlugin = matchedPlugin !== undefined
             && (matchedPlugin.data.has(reqMethod) || (reqMethod === 'HEAD' && matchedPlugin.data.has('GET')) || matchedPlugin.data.has('ALL'))
@@ -472,22 +475,21 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         if (nextPath !== undefined)
           effectivePath = nextPath
       }
-      let effectiveScopedPath = scopedPath
-      let effectiveStaticPath = staticPath
+      let effective = requestPath
       if (effectivePath !== rawPathname) {
-        const reDecoded = decodeRequestPathname(effectivePath)
-        if (!reDecoded.ok)
-          return finish(new Response('Bad Request', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } }), request, cookieStore)
-        effectiveScopedPath = reDecoded.scopedPath
-        effectiveStaticPath = reDecoded.staticPath
-        const rewrittenAction = effectiveStaticPath !== undefined ? actions.byUrl(effectiveStaticPath) : undefined
+        const rewritten = decodeRequestPath(effectivePath)
+        if (rewritten === undefined)
+          return finish(badRequest(), request, cookieStore)
+        effective = rewritten
+        const rewrittenAction = rewritten.staticPath !== undefined ? actions.byUrl(rewritten.staticPath) : undefined
         if (rewrittenAction !== undefined)
           return dispatchAction(rewrittenAction, request, url, effectivePath, remoteIp, bodyLimited, { ctx, cookieStore })
       }
+      const { scopedPath: effectiveScopedPath, staticPath: effectiveStaticPath } = effective
 
       // Custom plugin routes run behind path-matched plugin middlewares so ctx.locals is available without cross-scope leaks.
       const method = request.method.toUpperCase()
-      const pluginMatch = pluginRouter.match(effectivePath)
+      const pluginMatch = pluginRouter.match(effective)
       const directPluginDef = pluginMatch?.data.get(method) ?? pluginMatch?.data.get('ALL')
       const headFallbackPluginDef = directPluginDef === undefined && method === 'HEAD' ? pluginMatch?.data.get('GET') : undefined
       const routeDef = directPluginDef ?? headFallbackPluginDef
@@ -524,7 +526,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           return serveFile(request, pub)
       }
 
-      const matched = router.match(effectivePath)
+      const matched = router.match(effective)
       if (matched === undefined) {
         if (pluginMatch !== undefined) {
           ctx.params = pluginMatch.params
@@ -539,7 +541,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
             return renderError(error, cookieStore, ctx.url, request, ctx)
           }
         }
-        return renderNotFound(cookieStore, ctx.url, request, ctx, effectiveScopedPath, scopedPath)
+        return renderNotFound(cookieStore, ctx.url, request, ctx, effective, scopedPath)
       }
 
       ctx.params = matched.params

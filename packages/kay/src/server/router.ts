@@ -1,8 +1,7 @@
 // File-based route matcher: static > [param] > [...catchall] priority sorting + param extraction.
 
-
-const UNSAFE_ENCODED_RE = /%(?:2f|5c|00)/i
-const ENCODED_DOT_SEGMENT_RE = /^(?:\.|%2e){1,2}$/i
+import type { RequestPath } from './request-path'
+import { decodeRequestPath } from './request-path'
 
 const enum SegmentKind {
   Static = 0,
@@ -87,7 +86,6 @@ function compileRoutePattern<T>(path: string, data: T): RoutePattern<T> {
 
 export class Router<T> {
   readonly #staticRoutes = new Map<string, T>()
-  readonly #staticSegmentCounts = new Set<number>()
   readonly #dynamicRoutes: RoutePattern<T>[] = []
   #sorted = true
 
@@ -95,7 +93,6 @@ export class Router<T> {
     const compiled = compileRoutePattern(path, data)
     if (compiled.isStatic) {
       this.#staticRoutes.set(compiled.path, data)
-      this.#staticSegmentCounts.add(compiled.segments.length)
     }
     else {
       const existing = this.#dynamicRoutes.findIndex(r => r.path === compiled.path)
@@ -107,24 +104,16 @@ export class Router<T> {
     }
   }
 
-  match(pathname: string): RouteMatch<T> | undefined {
-    const norm = normalizePath(pathname)
+  /** Matches a decoded request path; a string is a URL pathname, decoded first. */
+  match(input: string | RequestPath): RouteMatch<T> | undefined {
+    const path = typeof input === 'string' ? decodeRequestPath(input) : input
+    if (path === undefined)
+      return undefined
 
-    const exact = this.#staticRoutes.get(norm)
-    if (exact !== undefined)
-      return { data: exact, params: {} }
-
-    let parts: string[] | undefined
-    if (this.#staticRoutes.size > 0 && norm.includes('%') && !UNSAFE_ENCODED_RE.test(norm)) {
-      parts = norm === '/' ? [] : norm.slice(1).split('/')
-      if (this.#staticSegmentCounts.has(parts.length)) {
-        const decoded = tryDecodeStatic(norm)
-        if (decoded !== undefined) {
-          const decodedExact = this.#staticRoutes.get(decoded)
-          if (decodedExact !== undefined)
-            return { data: decodedExact, params: {} }
-        }
-      }
+    if (path.staticPath !== undefined) {
+      const exact = this.#staticRoutes.get(normalizePath(path.staticPath))
+      if (exact !== undefined)
+        return { data: exact, params: {} }
     }
 
     const dynLen = this.#dynamicRoutes.length
@@ -136,7 +125,9 @@ export class Router<T> {
       this.#sorted = true
     }
 
-    parts ??= norm === '/' ? [] : norm.slice(1).split('/')
+    const parts = path.segments
+    // A param never receives a separator, a NUL or a dot segment, encoded or not: joined into a path, it would walk out of the folder it names.
+    const refused = (k: number): boolean => path.encoded?.has(k) === true || parts[k] === '.' || parts[k] === '..'
 
     for (let i = 0; i < dynLen; i++) {
       const route = this.#dynamicRoutes[i]!
@@ -152,66 +143,34 @@ export class Router<T> {
         const seg = segs[j]!
         if (seg.kind === SegmentKind.CatchAll) {
           for (let k = j; k < parts.length; k++) {
-            if (isUnsafeParam(parts[k]!))
+            if (refused(k))
               matched = false
           }
           break
         }
-        if (seg.kind === SegmentKind.Param) {
-          if (isUnsafeParam(parts[j]!)) {
-            matched = false
-            break
-          }
-        }
-        else if (seg.value !== parts[j]) {
-          const part = parts[j]!
-          if (!part.includes('%') || UNSAFE_ENCODED_RE.test(part) || tryDecodeStatic(part) !== seg.value) {
-            matched = false
-            break
-          }
+        if (seg.kind === SegmentKind.Param ? refused(j) : seg.value !== parts[j] || path.encoded?.has(j) === true) {
+          matched = false
+          break
         }
       }
 
       if (!matched)
         continue
 
-      // Allocate and decode params only for the winning route.
+      // Allocate params only for the winning route.
       const params: Record<string, string> = {}
       for (let j = 0; j < segs.length; j++) {
         const seg = segs[j]!
         if (seg.kind === SegmentKind.CatchAll) {
-          params[seg.value] = parts.slice(j).map(decodeSegment).join('/')
+          params[seg.value] = parts.slice(j).join('/')
           break
         }
         if (seg.kind === SegmentKind.Param)
-          params[seg.value] = decodeSegment(parts[j]!)
+          params[seg.value] = parts[j]!
       }
       return { data: route.data, params }
     }
 
     return undefined
-  }
-}
-
-// A param never receives a separator, a NUL or a dot segment, whether it came encoded or not: joined into a path, it would walk out of the folder it names.
-function isUnsafeParam(part: string): boolean {
-  return part.includes('%') ? UNSAFE_ENCODED_RE.test(part) || ENCODED_DOT_SEGMENT_RE.test(part) : part === '.' || part === '..'
-}
-
-function tryDecodeStatic(str: string): string | undefined {
-  try {
-    return decodeURIComponent(str)
-  }
-  catch {
-    return undefined
-  }
-}
-
-function decodeSegment(str: string): string {
-  try {
-    return decodeURIComponent(str)
-  }
-  catch {
-    return str
   }
 }

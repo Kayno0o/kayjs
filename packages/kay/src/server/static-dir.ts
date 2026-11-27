@@ -5,9 +5,10 @@ import type { KayApp, KayServer } from './http'
 import type { SecurityHeadersOptions, TrustProxy } from './security'
 import type { FileSource, ServedFile } from './served-file'
 import { readdirSync, readFileSync, realpathSync, statSync, watch } from 'node:fs'
-import { extname, join, posix, resolve } from 'node:path'
+import { extname, join, resolve } from 'node:path'
 import { CompressionCache, isCompressibleType } from './compress'
 import { applyHstsHeader, MIME } from './http'
+import { decodeRequestPath } from './request-path'
 import { buildSecurityHeaderEntries, inlineStyleHashes, KAY_ISLAND_STYLE_HASH, resolveCspPolicy, resolveHstsValue, withCspHashes } from './security'
 import { createFileServer, servedFile } from './served-file'
 
@@ -41,18 +42,9 @@ function listFiles(absRoot: string, realRoot: string): Map<string, string> {
   return files
 }
 
-/** The request path a URL answers to: decoded, dot segments resolved, no leading or trailing slash; undefined when it cannot name a file. */
+/** The listed path a URL names: decoded like every request path, no leading or trailing slash; undefined when it cannot name a file. */
 function requestedRel(pathname: string): string | undefined {
-  let decoded: string
-  try {
-    decoded = decodeURIComponent(pathname)
-  }
-  catch {
-    return undefined
-  }
-  if (decoded.includes('\0'))
-    return undefined
-  return posix.normalize(`/${decoded}`).replace(/^\/+/, '').replace(/\/+$/, '')
+  return decodeRequestPath(pathname)?.staticPath?.replace(/^\/+/, '').replace(/\/+$/, '')
 }
 
 export function createStaticDirServer(

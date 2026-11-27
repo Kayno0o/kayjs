@@ -3,16 +3,18 @@
 import type { createAssets, ServedFile } from './assets'
 import type { NotifyError } from './errors'
 import type { KayServer } from './http'
+import type { RequestPath } from './request-path'
 import type { FastHandler } from './routing'
 import { ACTION_ERROR_COOKIE } from './action'
 import { hasRegionHeader } from './region'
+import { literalPath } from './request-path'
 import { toBunRouteKey } from './routing'
 
 export interface ServeHandlerSources {
   files: ReturnType<typeof createAssets>
   fastPrerenderedMap: ReadonlyMap<string, ServedFile>
   fastStaticPages: ReadonlyMap<string, FastHandler>
-  pluginRouter: { match: (path: string) => unknown }
+  pluginRouter: { match: (path: RequestPath) => unknown }
   /** Answers through the app's whole pipeline, with the request's timeout turned off by `disableTimeout` for a long-lived stream. */
   runRequest: (req: Request, remoteIp: string | undefined, disableTimeout: () => void) => Promise<Response>
   runFast: (handler: FastHandler, req: Request, remoteIp: string | undefined) => Response | Promise<Response>
@@ -44,7 +46,7 @@ export function serveHandlers(server: () => KayServer | undefined, sources: Serv
     registerServeRoute(path, req => isRead(req) ? files.serveFile(req, asset) : fetchReq(req))
 
   for (const [path, pub] of files.publicMap) {
-    if (pluginRouter.match(path) === undefined)
+    if (pluginRouter.match(literalPath(path)) === undefined)
       registerServeRoute(path, req => isRead(req) ? files.serveFile(req, pub) : fetchReq(req))
   }
 

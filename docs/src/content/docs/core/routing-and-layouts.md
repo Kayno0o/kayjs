@@ -21,7 +21,7 @@ Every file in `src/routes/` maps directly to a URL path on `Bun.serve()`.
 | `src/routes/_404.tsx` | Unmatched routes | 404 page (also `404.html` in `--static`) |
 | `src/routes/_error.tsx` | Uncaught route errors | Error page (receives `{ error }`) |
 
-Params arrive percent-decoded, so `/posts/caf%C3%A9` gives `params.slug === "café"`. A dynamic route never matches a segment holding an encoded `/`, `\` or NUL, or a `.` or `..` segment: the request gets a 404, so you can join a param into a file path without checking it for traversal.
+Params arrive percent-decoded, so `/posts/caf%C3%A9` gives `params.slug === "café"`. A dynamic route never matches a segment holding an encoded `/`, `\` or NUL, or a `.` or `..` segment: the request gets a 404, so you can join a param into a file path without checking it for traversal. The same rule holds for static pages, `public/` files and a `kay start --static` export: `/a%2fb.txt` never serves `a/b.txt`, and a file whose name holds a literal `%2f` is reached through `%252f`.
 
 `_404.tsx` and `_error.tsx` automatically render inside your root `_layout.tsx` with global styles.
 
