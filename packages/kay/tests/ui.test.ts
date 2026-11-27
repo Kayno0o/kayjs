@@ -177,7 +177,10 @@ describe('Dialog and Drawer on the platform (#3686)', () => {
     try {
       const page = await browser.newPage()
       const fetched: string[] = []
+      const problems: string[] = []
       page.on('request', req => fetched.push(new URL(req.url()).pathname))
+      page.on('pageerror', err => problems.push(err.message))
+      page.on('console', msg => msg.type() === 'error' && !msg.text().includes('status of 404') && problems.push(msg.text()))
       // What Firefox before 147 does: no position-area, so CSS alone leaves the popup where the top layer puts it.
       await page.addInitScript(() => {
         const supports = CSS.supports.bind(CSS)
@@ -215,6 +218,7 @@ describe('Dialog and Drawer on the platform (#3686)', () => {
       await page.waitForFunction(() => document.querySelector<HTMLElement>('[role="menu"]')?.style.inset !== '', undefined, { timeout: 2000 })
       expect(await below('[role="menu"]', '[data-ui="menu"] [data-part="trigger"]')(page)).toEqual({ gap: 4, left: 0 })
       expect(fetched.some(path => path.includes('kui-fallback-'))).toBe(true)
+      expect(problems).toEqual([])
     }
     finally {
       await browser.close()
