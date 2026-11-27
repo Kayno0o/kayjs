@@ -3,7 +3,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { brotliDecompressSync } from 'node:zlib'
+import { brotliCompressSync, brotliDecompressSync, constants as zlibConstants } from 'node:zlib'
 import { build } from '../src/build/index'
 import { show } from '../src/dom/extras'
 import { hydrate, template } from '../src/dom/index'
@@ -698,6 +698,9 @@ describe('audit #3526 — Box 41: build-time precompression of hashed client ass
       expect(Buffer.compare(brotliDecompressSync(br), raw)).toBe(0)
       expect(Buffer.compare(Buffer.from(Bun.gunzipSync(gz)), raw)).toBe(0)
     }
+    // Sidecars are written once and downloaded by every visitor, so at the top quality: the largest asset's beats brotli 9
+    const largest = compressibleAssets.map(rel => join(clientDir, rel)).sort((a, b) => readFileSync(b).byteLength - readFileSync(a).byteLength)[0]!
+    expect(readFileSync(`${largest}.br`).byteLength).toBeLessThan(brotliCompressSync(readFileSync(largest), { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 9 } }).byteLength)
 
     // Dev build skips precompression for speed
     const devManifest = await build({ root: dir, outDir: 'dist-dev', minify: false, prerender: false, dev: true })

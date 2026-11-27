@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, posix } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
+import { BROTLI_QUALITY } from './files'
 
 // A static `import ... from "./x.js"` or `import "./x.js"` of an emitted chunk; `import("./x.js")` stays lazy and is left out.
 export const STATIC_CHUNK_IMPORT_RE = /\b(?:import|export)\s*(?:[^"'();]*?\bfrom\s*)?["'](\.\.?\/[^"']+\.js)["']/g
@@ -98,7 +99,7 @@ function servedSize(file: string): number {
   const key = `${file}:${raw.byteLength}`
   let packed = brotliCache.get(key)
   if (packed === undefined) {
-    packed = brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } }).byteLength
+    packed = brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY } }).byteLength
     brotliCache.set(key, packed)
   }
   return Math.min(packed, raw.byteLength)

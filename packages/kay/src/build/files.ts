@@ -2,9 +2,10 @@
 
 import type { Dirent } from 'node:fs'
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { availableParallelism, tmpdir } from 'node:os'
 import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
-import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
+import { promisify } from 'node:util'
+import { brotliCompress, constants as zlibConstants } from 'node:zlib'
 import { isInside } from './is-inside'
 
 const TEST_FILE_RE = /\.(?:test|spec)\.(?:tsx|ts)$/
@@ -119,19 +120,33 @@ export function assertSafeOutDir(root: string, outDir: string, routesDir: string
   }
 }
 
-/** Writes `.br` and `.gz` sidecars next to a compressible file of at least `minBytes`, when they come out smaller. */
-export function precompressFile(abs: string, minBytes: number): void {
+/** Brotli quality of the sidecars: written once per build, downloaded by every visitor, so the smallest the encoder makes. */
+export const BROTLI_QUALITY = 11
+
+const brotli = promisify(brotliCompress)
+
+async function precompressFile(abs: string, minBytes: number): Promise<void> {
   if (!COMPRESSIBLE_EXTS.has(extname(abs).toLowerCase()))
     return
   const raw = readFileSync(abs)
   if (raw.byteLength < minBytes)
     return
-  const br = brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } })
+  const br = await brotli(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [zlibConstants.BROTLI_PARAM_SIZE_HINT]: raw.byteLength } })
   if (br.byteLength < raw.byteLength)
     writeFileSync(`${abs}.br`, br)
   const gz = Bun.gzipSync(raw, { level: 9 })
   if (gz.byteLength < raw.byteLength)
     writeFileSync(`${abs}.gz`, gz)
+}
+
+/** Writes `.br` and `.gz` sidecars next to each compressible file of at least `minBytes`, when they come out smaller, one file per core at a time off the main thread. */
+export async function precompressFiles(files: Iterable<string>, minBytes: number): Promise<void> {
+  const queue = [...files]
+  const next = async (): Promise<void> => {
+    for (let abs = queue.pop(); abs !== undefined; abs = queue.pop())
+      await precompressFile(abs, minBytes)
+  }
+  await Promise.all(Array.from({ length: Math.min(availableParallelism(), queue.length) }, next))
 }
 
 export interface BunBuildLogLike {

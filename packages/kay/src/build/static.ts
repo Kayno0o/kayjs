@@ -10,7 +10,7 @@ import { resolvePlugins } from '../plugins/index'
 import { createDocumentHooks, createHtmlHeaders } from '../server/document'
 import { createNavigation } from '../ssr/navigation'
 import { createFallbackPages } from '../server/errors'
-import { precompressFile, walkAllFiles } from './files'
+import { precompressFiles, walkAllFiles } from './files'
 import { carryPreviousAssets } from './carry'
 import { swapStage } from './output'
 import { prerenderOrigin } from '../server/prerendered'
@@ -97,8 +97,7 @@ export async function exportStatic(options: StaticExportOptions): Promise<void> 
     publicFiles.register(relative(outPublicDir, abs))
   for (const rel of publicFiles.files)
     copyInto(stageDir, rel, join(outPublicDir, rel))
-  for (const abs of walkAllFiles(stageDir))
-    precompressFile(abs, 128)
+  await precompressFiles(walkAllFiles(stageDir), 128)
   if (!options.isDev)
     carryPreviousAssets(finalOutDir, stageDir, relative(stageDir, assetDir), options.assets)
 

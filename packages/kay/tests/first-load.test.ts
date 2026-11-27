@@ -20,7 +20,7 @@ afterAll(() => {
     rmSync(d, { recursive: true, force: true })
 })
 
-const brotli = (text: string): number => brotliCompressSync(Buffer.from(text), { params: { [constants.BROTLI_PARAM_QUALITY]: 6 } }).length
+const brotli = (text: string): number => brotliCompressSync(Buffer.from(text), { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }).length
 const bytes = (n: number, fill = 7): Uint8Array => new Uint8Array(n).fill(fill)
 
 describe('first-load weight (#3644)', () => {

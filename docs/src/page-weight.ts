@@ -3,7 +3,8 @@ import { distLocator, firstLoadUrls, measureFirstLoad } from '@kayjs/kay/config'
 import { join } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 
-const BROTLI_OPTS = { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } }
+// The quality kay's build writes its .br sidecars at, so the footer shows what is served.
+const BROTLI_OPTS = { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 } }
 const SLOT_RE = /<span\b[^>]*\bdata-page-weight(?:="")?[^>]*><\/span>/
 const SCRIPT_RE = /<script\b([^>]*)>/g
 const TYPE_RE = /\btype="([^"]+)"/

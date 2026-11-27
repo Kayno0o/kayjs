@@ -5,7 +5,7 @@ import type { BuildPluginContext, FinalizeBuildContext, KayPlugin } from '../plu
 import type { RouteManifestEntry } from './manifest'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { precompressFile } from './files'
+import { precompressFiles } from './files'
 
 const LEADING_SLASHES_RE = /^\/+/
 const BACKSLASH_RE = /\\/g
@@ -192,13 +192,14 @@ export function createPluginHost(options: PluginHostOptions) {
      * Writes `.br`/`.gz` sidecars for the client assets, public files and prerendered pages not compressed yet, so the server never compresses them itself.
      * Production server builds only: `--static` compresses its own output. A public file the app ships with its own sidecar keeps it.
      */
-    precompressOutput(): void {
+    async precompressOutput(): Promise<void> {
       if (options.isDev || options.isStatic)
         return
+      const pending: string[] = []
       const once = (abs: string): void => {
         if (!precompressed.has(abs)) {
           precompressed.add(abs)
-          precompressFile(abs, 256)
+          pending.push(abs)
         }
       }
       for (const rel of assets)
@@ -213,6 +214,7 @@ export function createPluginHost(options: PluginHostOptions) {
         for (const rel of Object.values(route.prerendered ?? {}))
           once(join(outDir, rel))
       }
+      await precompressFiles(pending, 256)
     },
   }
 }
