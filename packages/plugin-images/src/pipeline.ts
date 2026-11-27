@@ -19,7 +19,6 @@ export const ALLOWED_IMAGE_EXTS = new Set([
   '.tif',
 ])
 
-export const MAX_ENCODE_CONCURRENCY = 4
 
 // Bun runs every image's onLoad at once, so a limit per image multiplies: every magick call takes one of these slots, half the cores and at most 8 for the whole build.
 export const ENCODE_SLOTS = Math.max(1, Math.min(8, Math.floor(availableParallelism() / 2)))
@@ -123,18 +122,6 @@ export async function identifyImageAsync(filePath: string): Promise<{ width: num
   return parseMagickDimensions(new TextDecoder().decode(result.stdout))
 }
 
-export async function mapConcurrent<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length)
-  let next = 0
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const idx = next++
-      results[idx] = await fn(items[idx]!)
-    }
-  })
-  await Promise.all(workers)
-  return results
-}
 
 export function writeFileAtomic(dstPath: string, data: string | Uint8Array): void {
   const tmpPath = `${dstPath}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}`
@@ -153,22 +140,60 @@ function variantTmpPath(dstPath: string): string {
   return `${stem}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}${ext}`
 }
 
-export async function encodeVariantAsync(srcPath: string, dstPath: string, width: number, quality: number): Promise<boolean> {
-  const tmpPath = variantTmpPath(dstPath)
-  const result = await runMagick([`${srcPath}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', String(quality), tmpPath])
-  if (!result.ok)
-    console.warn(`@kayjs/images: magick could not encode ${srcPath} at ${width}w (${extname(dstPath).slice(1)}), so that variant is left out: ${result.error || 'no output'}`)
-  if (result.ok && existsSync(tmpPath)) {
-    try {
-      renameSync(tmpPath, dstPath)
-    }
-    catch {
-      rmSync(tmpPath, { force: true })
-    }
-    return existsSync(dstPath)
+/**
+ * Writes one format's variants of an image in a single `magick` run: the source is decoded and oriented once, kept as `mpr:src`, and each width resized from it.
+ * A run that fails part way keeps the variants it wrote before failing, and warns with the widths it left out.
+ */
+async function encodeFormatAsync(srcPath: string, jobs: readonly VariantEncodeJob[]): Promise<void> {
+  const tmpPaths = jobs.map(job => variantTmpPath(job.cachedFile))
+  const result = await runMagick([
+    `${srcPath}[0]`,
+    '-auto-orient',
+    '-strip',
+    '-write',
+    'mpr:src',
+    '+delete',
+    ...jobs.flatMap((job, i) => ['(', 'mpr:src', '-resize', `${job.width}x>`, '-quality', String(job.quality), '-write', tmpPaths[i]!, '+delete', ')']),
+    'null:',
+  ])
+  // magick writes the variants in order, so after a failed run only the last file it wrote can be cut short.
+  if (!result.ok) {
+    const last = tmpPaths.findLastIndex(tmpPath => existsSync(tmpPath))
+    if (last !== -1)
+      rmSync(tmpPaths[last]!, { force: true })
   }
-  rmSync(tmpPath, { force: true })
-  return false
+  const missing: number[] = []
+  for (const [i, job] of jobs.entries()) {
+    const tmpPath = tmpPaths[i]!
+    if (existsSync(tmpPath)) {
+      try {
+        renameSync(tmpPath, job.cachedFile)
+      }
+      catch {
+        rmSync(tmpPath, { force: true })
+      }
+    }
+    if (!existsSync(job.cachedFile))
+      missing.push(job.width)
+  }
+  if (missing.length > 0)
+    console.warn(`@kayjs/images: magick could not encode ${srcPath} at ${missing.map(w => `${w}w`).join(', ')} (${jobs[0]!.format}), so those variants are left out: ${result.error || 'no output'}`)
+}
+
+/** Encodes the jobs not in the cache yet, one `magick` run per format, and returns every job whose file is now in the cache, in plan order. */
+export async function encodeVariants(srcPath: string, jobs: readonly VariantEncodeJob[]): Promise<VariantEncodeJob[]> {
+  const byFormat = new Map<VariantEncodeJob['format'], VariantEncodeJob[]>()
+  for (const job of jobs) {
+    if (existsSync(job.cachedFile))
+      continue
+    const group = byFormat.get(job.format)
+    if (group === undefined)
+      byFormat.set(job.format, [job])
+    else
+      group.push(job)
+  }
+  await Promise.all([...byFormat.values()].map(group => encodeFormatAsync(srcPath, group)))
+  return jobs.filter(job => existsSync(job.cachedFile))
 }
 
 // Bumped when the same source and options give other variants or sizes, so a cache from before is not reused: 2 sizes photos after their EXIF orientation (#3676).

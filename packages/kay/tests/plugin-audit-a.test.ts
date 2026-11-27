@@ -790,8 +790,7 @@ sleep 0.05
 rmdir "${runs}/run.$$"
 case "$*" in *identify*) printf '64 48'; exit 0;; esac
 case "$*" in *bad*) echo "fake magick: bad input" >&2; exit 1;; esac
-for last; do :; done
-printf 'x' > "$last"
+prev=; for arg; do [ "$prev" = -write ] && [ "\${arg#mpr:}" = "$arg" ] && printf 'x' > "$arg"; prev=$arg; done
 `)
     chmodSync(join(bin, 'magick'), 0o755)
     mkdirSync(join(dir, 'src/routes'), { recursive: true })
@@ -799,7 +798,7 @@ printf 'x' > "$last"
     const names = [...Array.from({ length: 19 }, (_, i) => `i${i}`), 'bad']
     for (const name of names)
       writeFileSync(join(dir, `src/assets/${name}.png`), makePng(64, 48))
-    writeFileSync(join(dir, 'kay.config.ts'), `import { images } from '${IMAGES_PKG}'\nexport default { plugins: [images()], compliance: { legalNotice: false } }\n`)
+    writeFileSync(join(dir, 'kay.config.ts'), `import { images } from '${IMAGES_PKG}'\nexport default { plugins: [images({ widths: [16, 32] })], compliance: { legalNotice: false } }\n`)
     writeFileSync(join(dir, 'src/routes/index.tsx'), [
       ...names.map(name => `import ${name} from '../assets/${name}.png'`),
       `export default function Home() { return <main>{[${names.join(', ')}].map(img => <img src={img.src} alt="" />)}</main> }`,
@@ -819,10 +818,96 @@ printf 'x' > "$last"
     }
 
     const counts = readFileSync(join(runs, 'counts'), 'utf8').trim().split('\n').map(Number)
-    expect(counts.length).toBeGreaterThanOrEqual(40)
     expect(Math.max(...counts)).toBeLessThanOrEqual(ENCODE_SLOTS)
-    for (const line of readFileSync(join(runs, 'args'), 'utf8').trim().split('\n'))
+    const args = readFileSync(join(runs, 'args'), 'utf8').trim().split('\n')
+    for (const line of args)
       expect(line).toContain('-limit thread 1 -limit memory 512MiB -limit map 1GiB')
+    // One decode per image and format (#3677): 20 images in avif and webp, and no identify, the PNG header giving the size.
+    expect(args.length).toBe(40)
+    expect(args.filter(line => line.includes('identify'))).toEqual([])
+    expect(args.filter(line => line.includes('/i0.png[0]') && line.endsWith('null:')).length).toBe(2)
     expect(warned.some(message => message.includes('src/assets/bad.png') && message.includes('fake magick: bad input'))).toBe(true)
+  })
+})
+
+describe('@kayjs/images decodes each image once per format (#3677)', () => {
+  function app(dir: string, name: string, config: string) {
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'kay.config.ts'), `import { images } from '${IMAGES_PKG}'\nexport default { plugins: [images(${config})], compliance: { legalNotice: false } }\n`)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `import { image } from '${IMAGES_PKG}'\nimport photo from '../assets/${name}'\nexport default function Home() { return <img {...image(photo, { sizes: '100vw' })} alt="" /> }\n`)
+  }
+
+  it('writes the same bytes as one magick run per variant', async () => {
+    const dir = makeTemp('kay-image-decode-once-')
+    mkdirSync(join(dir, 'src/assets'), { recursive: true })
+    const src = join(dir, 'src/assets/photo.png')
+    expect(Bun.spawnSync(['magick', '-size', '400x300', '-seed', '7', 'plasma:', src]).exitCode).toBe(0)
+    app(dir, 'photo.png', `{ widths: [160, 320], formats: ['avif', 'webp'], quality: 80, avifQuality: 55, cacheDir: '.cache' }`)
+    await build({ root: dir })
+
+    const cached = readdirSync(join(dir, '.cache')).filter(file => /-\d+w\.(?:avif|webp)$/.test(file)).sort()
+    expect(cached.map(file => file.replace(/^photo-[^-]+-/, ''))).toEqual(['160w.avif', '160w.webp', '320w.avif', '320w.webp', '400w.avif', '400w.webp'])
+    for (const file of cached) {
+      const [, width, format] = /-(\d+)w\.(avif|webp)$/.exec(file)!
+      const alone = join(dir, `alone.${format}`)
+      const run = Bun.spawnSync(['magick', '-limit', 'thread', '1', `${src}[0]`, '-auto-orient', '-strip', '-resize', `${width}x>`, '-quality', format === 'avif' ? '55' : '80', alone])
+      expect(run.exitCode).toBe(0)
+      expect(Bun.hash(readFileSync(join(dir, '.cache', file)))).toBe(Bun.hash(readFileSync(alone)))
+    }
+  })
+
+  it('keeps the variants a failed run finished, drops the one it was writing, and names the widths left out', async () => {
+    const dir = makeTemp('kay-image-part-')
+    const bin = join(dir, 'bin')
+    mkdirSync(bin)
+    // Writes the first two webp targets, the second one cut short, then fails.
+    writeFileSync(join(bin, 'magick'), `#!/bin/sh
+n=0; prev=; for arg; do
+  if [ "$prev" = -write ] && [ "\${arg#mpr:}" = "$arg" ]; then
+    case "$arg" in *.webp) n=$((n+1)); printf 'x' > "$arg"; [ $n = 2 ] && { echo "fake magick: disk full" >&2; exit 1; };; *) printf 'x' > "$arg";; esac
+  fi
+  prev=$arg
+done
+`)
+    chmodSync(join(bin, 'magick'), 0o755)
+    mkdirSync(join(dir, 'src/assets'), { recursive: true })
+    writeFileSync(join(dir, 'src/assets/part.png'), makePng(64, 48))
+    app(dir, 'part.png', `{ widths: [16, 32], formats: ['avif', 'webp'] }`)
+
+    const prevPath = process.env.PATH
+    process.env.PATH = `${bin}:${prevPath}`
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+    let warned: string[] = []
+    try {
+      await build({ root: dir })
+      warned = warn.mock.calls.map(call => String(call[0]))
+    }
+    finally {
+      process.env.PATH = prevPath
+      warn.mockRestore()
+    }
+    const app2 = await createServer({ root: dir })
+    const html = await (await app2.handle(new Request('http://localhost/'))).text()
+    const webp = /srcset="([^"]*\.webp[^"]*)"/.exec(html)?.[1] ?? ''
+    expect(webp.split(', ').map(entry => entry.split(' ')[1])).toEqual(['16w'])
+    const cached = readdirSync(join(dir, '.kay-cache/images')).filter(file => /w\.(?:avif|webp)$/.test(file)).map(file => file.replace(/^part-[^-]+-/, '')).sort()
+    expect(cached).toEqual(['16w.avif', '16w.webp', '32w.avif', '64w.avif'])
+    expect(warned.some(message => message.includes('part.png at 32w, 64w (webp)') && message.includes('fake magick: disk full'))).toBe(true)
+
+    // The next build, with a working magick, encodes only the two webp widths left out.
+    writeFileSync(join(bin, 'magick'), `#!/bin/sh
+echo "$*" >> "${dir}/args"
+prev=; for arg; do [ "$prev" = -write ] && [ "\${arg#mpr:}" = "$arg" ] && printf 'x' > "$arg"; prev=$arg; done
+`)
+    process.env.PATH = `${bin}:${prevPath}`
+    try {
+      await build({ root: dir })
+    }
+    finally {
+      process.env.PATH = prevPath
+    }
+    const rerun = readFileSync(join(dir, 'args'), 'utf8').trim().split('\n')
+    expect(rerun.length).toBe(1)
+    expect(rerun[0]!.match(/-\d+w\.[a-z]+/g)?.map(target => target.replace(/\.tmp.*$/, ''))).toEqual(['-32w', '-64w'])
   })
 })

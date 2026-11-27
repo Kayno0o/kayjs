@@ -17,11 +17,10 @@ import {
   ALLOWED_IMAGE_EXTS,
   assembleImageAsset,
   computeImageKey,
-  encodeVariantAsync,
+  encodeVariants,
   identifyImageAsync,
 
-  mapConcurrent,
-  MAX_ENCODE_CONCURRENCY,
+
   planVariantJobs,
   readCachedMeta,
   writeFileAtomic,
@@ -141,16 +140,15 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
                 throw new Error(`@kayjs/images: could not determine dimensions for "${args.path}"`)
 
               const jobs = planVariantJobs(dims, stem, hash, cacheRoot, pipelineCfg)
-              const encoded = await mapConcurrent(jobs, MAX_ENCODE_CONCURRENCY, async (job) => {
-                const ok = existsSync(job.cachedFile) || await encodeVariantAsync(args.path, job.cachedFile, job.width, job.quality)
-                return ok ? { rel: `img/${job.fileName}`, width: job.width, format: job.format } : undefined
-              })
-              const files: CachedImageMeta['files'] = encoded.filter((entry): entry is NonNullable<typeof entry> => entry !== undefined)
+              const encoded = await encodeVariants(args.path, jobs)
+              const files: CachedImageMeta['files'] = encoded.map(job => ({ rel: `img/${job.fileName}`, width: job.width, format: job.format }))
               if (files.length === 0)
                 return emitRaw(dims.width, dims.height)
 
               meta = { width: dims.width, height: dims.height, files }
-              writeFileAtomic(metaPath, JSON.stringify(meta))
+              // Kept only once every variant is in: a variant left out by a failed run is tried again by the next build.
+              if (files.length === jobs.length)
+                writeFileAtomic(metaPath, JSON.stringify(meta))
             }
 
             const asset = assembleImageAsset(meta, cacheRoot, '', prefix, (rel, fileName, cachedFile) => {
@@ -358,14 +356,10 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
   queueBuildTask(appCtx.outDir, (async () => {
     mkdirSync(cacheRoot, { recursive: true })
     mkdirSync(imgOutDir, { recursive: true })
-    const encoded = await mapConcurrent(jobs, MAX_ENCODE_CONCURRENCY, async (job) => {
-      const ok = existsSync(job.cachedFile) || await encodeVariantAsync(absPath, job.cachedFile, job.width, job.quality)
-      if (!ok)
-        return undefined
+    const encoded = await encodeVariants(absPath, jobs)
+    for (const job of encoded)
       writeFileSync(join(imgOutDir, job.fileName), readFileSync(job.cachedFile))
-      return { rel: `img/${job.fileName}`, width: job.width, format: job.format }
-    })
-    const files = encoded.filter((entry): entry is NonNullable<typeof entry> => entry !== undefined)
+    const files = encoded.map(job => ({ rel: `img/${job.fileName}`, width: job.width, format: job.format }))
     if (files.length === jobs.length)
       writeFileAtomic(metaPath, JSON.stringify({ width: dims.width, height: dims.height, files }))
   })())

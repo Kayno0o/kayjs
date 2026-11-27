@@ -28,7 +28,7 @@ export default defineConfig({
 })
 ```
 
-The variants come from ImageMagick (`magick` on `PATH`). However many images a build has, at most half the cores (and never more than 8) encode at once, each on one thread with 512 MiB of memory and two minutes to finish, so a large site stays within a shared CI host. An encode that fails prints the file and the error `magick` gave, and that variant is left out; an image none of whose variants encode is served as its original.
+The variants come from ImageMagick (`magick` on `PATH`). However many images a build has, at most half the cores (and never more than 8) encode at once, each on one thread with 512 MiB of memory and two minutes to finish, so a large site stays within a shared CI host. Each image is decoded once per format, its widths resized from that one copy. An encode that fails prints the file, the widths and the error `magick` gave, and those variants are left out until the next build tries them again; an image none of whose variants encode is served as its original.
 
 An image reports the size it is displayed at. A phone photo stored sideways, with an EXIF orientation that turns it, has its width and height swapped, as its variants do.
 
