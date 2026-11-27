@@ -1,36 +1,7 @@
 // Request parsing and client-address helpers shared by the auth routes.
 
 import type { RequestContext, TrustProxy } from '@kayjs/kay/server'
-import { getClientIp } from '@kayjs/kay/server'
-
-export function wantsJson(req: Request): boolean {
-  const accept = req.headers.get('accept') ?? ''
-  const ct = req.headers.get('content-type') ?? ''
-  return accept.includes('application/json') || ct.includes('application/json')
-}
-
-async function readBody(req: Request): Promise<Record<string, string>> {
-  const ct = req.headers.get('content-type') ?? ''
-  if (ct.includes('application/json')) {
-    const raw = await req.json() as Record<string, unknown>
-    const out: Record<string, string> = {}
-    for (const [k, v] of Object.entries(raw ?? {})) {
-      if (typeof v === 'string')
-        out[k] = v
-    }
-    return out
-  }
-  if (ct.includes('application/x-www-form-urlencoded') || ct.includes('multipart/form-data')) {
-    const fd = await req.formData()
-    const out: Record<string, string> = {}
-    for (const [k, v] of fd.entries()) {
-      if (typeof v === 'string')
-        out[k] = v
-    }
-    return out
-  }
-  return {}
-}
+import { getClientIp, readStringFields, wantsJson } from '@kayjs/kay/server'
 
 export function fail(ctx: RequestContext, status: number, error: string): Response {
   return ctx.json({ ok: false, error }, { status })
@@ -71,7 +42,7 @@ export function withNoStore(res: Response): Response {
 
 export async function parseBody(ctx: RequestContext): Promise<Record<string, string> | Response> {
   try {
-    return await readBody(ctx.request)
+    return await readStringFields(ctx.request)
   }
   catch {
     return fail(ctx, 400, 'Invalid request body')

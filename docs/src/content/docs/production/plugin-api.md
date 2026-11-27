@@ -86,3 +86,12 @@ export function myPlugin() {
 - **Per-route assets**: Use `ctx.addRouteStyle(routePath, href)` and `ctx.addRouteHead(routePath, html)` when an asset belongs on one route rather than every page.
 - **Route headers**: an `api.route()` response gets the app's security headers. An HTML response without its own `content-security-policy` gets the app's CSP, with a hash for each of its `<style>` blocks.
 - **Route CSRF**: `api.route()` enforces `Origin` / `Sec-Fetch-Site` on unsafe methods by default. Pass `{ csrf: false }` for webhooks or bearer-token endpoints (such as `@kayjs/mcp`).
+
+## Helpers for plugin code
+
+The first-party plugins use these instead of keeping their own copies, and a third-party plugin can do the same.
+
+- **`isInside(dir, target, { orSame })`** from `@kayjs/kay/config`: whether `target` lies under `dir`. The folder itself counts only with `orSame: true`. Paths are compared as written, so call `realpathSync` on both first when a symlink must not lead out.
+- **`readStringFields(request)`** from `@kayjs/kay/server`: the string fields of a JSON object, urlencoded or multipart body, the last of a repeated name winning. Files, numbers and arrays are dropped. The record has no prototype, so a `__proto__` field is an ordinary field. A malformed body throws: answer 400.
+- **`wantsJson(request)`** from `@kayjs/kay/server`: whether the client sent or asked for JSON, to answer an error as JSON rather than as a redirect or a page.
+- **`safeRedirect(target, fallback)`** from `@kayjs/kay/server`: `target` when it is a path on this site, otherwise `fallback`.
