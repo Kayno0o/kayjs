@@ -377,6 +377,29 @@ describe('a running kay start serves the build kay build swaps in (#3660)', () =
     }
   })
 
+  it('serves the new export once kay build --static swaps one in under a running kay start (#3667)', async () => {
+    const dir = appWith(PAGES('v1'))
+    await build({ root: dir, static: true })
+    const { url, proc } = await kayStart(dir)
+    try {
+      for (const [file, text] of Object.entries(PAGES('v2')))
+        write(dir, file, text)
+      await build({ root: dir, static: true })
+
+      await untilServes(url, '<h1>v2</h1>')
+      expect((await get(`${url}/about`)).body).toContain('about v2')
+      expect((await get(`${url}/robots.txt`)).body).toBe('robots v2')
+    }
+    finally {
+      proc.kill('SIGTERM')
+      await proc.exited
+    }
+    let out = ''
+    for await (const chunk of proc.stdout)
+      out += new TextDecoder().decode(chunk)
+    expect(out).toContain('kay start: serving the new build in dist/')
+  })
+
   it('holds a request sent once the swap landed until the new build answers it', async () => {
     const dir = appWith(PAGES('v1'))
     await build({ root: dir })

@@ -2,7 +2,7 @@
 
 import type { FSWatcher } from 'node:fs'
 import type { KayApp, KayServer } from './http'
-import { existsSync, watch } from 'node:fs'
+import { existsSync, readdirSync, watch } from 'node:fs'
 import { basename, dirname, join, relative } from 'node:path'
 import { startBuiltApp } from './loader'
 
@@ -29,17 +29,18 @@ export async function startServer(options: StartOptions): Promise<{ app: KayApp,
       await current.dispose?.()
     },
   }
-  // A `--static` export is read from disk on each request, so it serves the new files with no reload.
-  const watcher = first.entry !== undefined && current.reloadInto !== undefined
-    ? watchSwaps(first.outDir, () => current, next => current = next, options.root, server)
+  const watcher = current.reloadInto !== undefined
+    ? watchSwaps(first.outDir, first.entry === undefined, () => current, next => current = next, options.root, server)
     : undefined
   return { app, server }
 }
 
 /** Watches the folder holding `outDir` for the rename a build's swap makes, then loads the new build and swaps its handlers in. */
-function watchSwaps(outDir: string, current: () => KayApp, setCurrent: (app: KayApp) => void, root: string, server: KayServer): FSWatcher {
+function watchSwaps(outDir: string, isStatic: boolean, current: () => KayApp, setCurrent: (app: KayApp) => void, root: string, server: KayServer): FSWatcher {
   const name = basename(outDir)
   const shown = relative(root, outDir) || '.'
+  // A `--static` export has no manifest: the folder being back with files in it is the sign.
+  const landed = (): boolean => existsSync(join(outDir, 'manifest.json')) || (isStatic && existsSync(outDir) && readdirSync(outDir).length > 0)
   let held: { promise: Promise<KayApp>, resolve: (app: KayApp) => void } | undefined
   let loading = false
   let again = false
@@ -62,8 +63,8 @@ function watchSwaps(outDir: string, current: () => KayApp, setCurrent: (app: Kay
     loading = true
     const prev = current()
     try {
-      if (!existsSync(join(outDir, 'manifest.json')))
-        throw new Error(`${shown}/manifest.json is missing`)
+      if (!landed())
+        throw new Error(isStatic ? `${shown}/ is missing or empty` : `${shown}/manifest.json is missing`)
       setCurrent((await startBuiltApp({ root, outDir })).app)
       console.log(`kay start: serving the new build in ${shown}/`)
     }
@@ -91,7 +92,7 @@ function watchSwaps(outDir: string, current: () => KayApp, setCurrent: (app: Kay
     hold()
     clearTimeout(timer)
     // The swap renames the old folder away, then the stage in: the second rename brings the manifest back.
-    timer = setTimeout(() => void swapIn(), existsSync(join(outDir, 'manifest.json')) ? 0 : SWAP_TIMEOUT_MS)
+    timer = setTimeout(() => void swapIn(), landed() ? 0 : SWAP_TIMEOUT_MS)
   })
   watcher.on('error', err => console.error(`kay start: stopped watching ${shown}/ for new builds: ${err.message}`))
   return watcher

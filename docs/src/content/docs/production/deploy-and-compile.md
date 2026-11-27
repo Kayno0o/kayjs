@@ -52,3 +52,5 @@ Outputs a ready-to-host directory in `dist/` containing:
 - `404.html` (if `src/routes/_404.tsx` exists)
 - Hashed client CSS/JS/font assets under `dist/_kay/`
 - All `public/` files, RSS feeds, `sitemap.xml`, and generated OG `shareCard()` PNGs
+
+`kay start` serves an export too. It lists the files once at startup, so a request reads no directory: `/about` answers `about.html` or `about/index.html`, and a missing path answers `404.html` with status 404. Every file answers an `ETag`, a `304` to a matching `If-None-Match` and its length to a `HEAD`. A file edited or added in place is served a moment later, and a new `kay build --static` is picked up with no restart.

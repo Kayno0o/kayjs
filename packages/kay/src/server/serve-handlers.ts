@@ -1,6 +1,6 @@
 // The handlers `Bun.serve()` runs for an app: its native route table of files and fast pages, its fetch fallback and its error answer. `serve()` starts a server with them, `reloadInto()` swaps them into one already listening.
 
-import type { createAssets } from './assets'
+import type { createAssets, ServedFile } from './assets'
 import type { NotifyError } from './errors'
 import type { KayServer } from './http'
 import type { FastHandler } from './routing'
@@ -10,7 +10,7 @@ import { toBunRouteKey } from './routing'
 
 export interface ServeHandlerSources {
   files: ReturnType<typeof createAssets>
-  fastPrerenderedMap: ReadonlyMap<string, Parameters<ReturnType<typeof createAssets>['serveFile']>[1]>
+  fastPrerenderedMap: ReadonlyMap<string, ServedFile>
   fastStaticPages: ReadonlyMap<string, FastHandler>
   pluginRouter: { match: (path: string) => unknown }
   /** Answers through the app's whole pipeline, with the request's timeout turned off by `disableTimeout` for a long-lived stream. */
@@ -41,11 +41,11 @@ export function serveHandlers(server: () => KayServer | undefined, sources: Serv
   }
 
   for (const [path, asset] of files.assetMap)
-    registerServeRoute(path, req => isRead(req) ? files.serveAsset(req, asset) : fetchReq(req))
+    registerServeRoute(path, req => isRead(req) ? files.serveFile(req, asset) : fetchReq(req))
 
   for (const [path, pub] of files.publicMap) {
     if (pluginRouter.match(path) === undefined)
-      registerServeRoute(path, req => isRead(req) ? files.servePublic(req, pub) : fetchReq(req))
+      registerServeRoute(path, req => isRead(req) ? files.serveFile(req, pub) : fetchReq(req))
   }
 
   for (const [path, pre] of fastPrerenderedMap)

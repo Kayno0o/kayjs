@@ -63,6 +63,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     embeddedPublicEtags.push(`${JSON.stringify(rel)}: ${JSON.stringify(etag)}`)
   }
   const embeddedPrerenderedFiles: string[] = []
+  const embeddedPrerenderedEtags: string[] = []
   let preIdx = 0
   for (const r of manifest.routes) {
     if (r.prerendered) {
@@ -73,6 +74,8 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
         const v = `_r${preIdx++}`
         imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
         embeddedPrerenderedFiles.push(`${JSON.stringify(relHtml)}: ${v}`)
+        // An embedded file has no mtime to version it by.
+        embeddedPrerenderedEtags.push(`${JSON.stringify(relHtml)}: ${JSON.stringify(`W/"${Bun.hash(readFileSync(abs)).toString(36)}"`)}`)
       }
     }
   }
@@ -85,11 +88,12 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     `const publicAssets = { ${embeddedPublic.join(', ')} };`,
     `const publicEtags = { ${embeddedPublicEtags.join(', ')} };`,
     `const prerenderedFiles = { ${embeddedPrerenderedFiles.join(', ')} };`,
+    `const prerenderedEtags = { ${embeddedPrerenderedEtags.join(', ')} };`,
     `const port = Number(process.env.PORT || kayConfig.port || 3000);`,
     `const hostname = process.env.HOST || undefined;`,
     `const formatHost = (h: string) => h.includes(':') && !h.startsWith('[') ? \`[\${h}]\` : h;`,
     `if (Bun.argv.includes('--health')) { const rawHost = !hostname || hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname; const r = await fetch(\`http://\${formatHost(rawHost)}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
-    `const app = await createApp({ assetPrefix: ${JSON.stringify(assetPrefix)},${siteProp} manifest, assets, publicAssets, publicEtags, prerenderedFiles });`,
+    `const app = await createApp({ assetPrefix: ${JSON.stringify(assetPrefix)},${siteProp} manifest, assets, publicAssets, publicEtags, prerenderedFiles, prerenderedEtags });`,
     `const server = app.serve(port, hostname);`,
     `handleSignals(app, server);`,
     `console.log(\`kay server listening on http://\${formatHost(hostname ?? 'localhost')}:\${server.port}\`);`,

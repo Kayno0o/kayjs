@@ -383,11 +383,52 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
       expect(zstdRes.headers.get('vary')).toContain('Accept-Encoding')
       const body = new TextDecoder().decode(Bun.zstdDecompressSync(new Uint8Array(await zstdRes.arrayBuffer())))
       expect(body).toContain('Compiled Prerender')
+
+      // The build hashed the embedded page, so the binary answers a 304 to its ETag.
+      const etag = zstdRes.headers.get('etag')!
+      expect(etag).toMatch(/^W\/"/)
+      const notModified = await fetch(`http://127.0.0.1:${port}/`, { headers: { 'if-none-match': etag } })
+      expect(notModified.status).toBe(304)
     }
     finally {
       proc.kill()
       await proc.exited
     }
+  })
+})
+
+describe('files served as they are (#3667)', () => {
+  it('answers a prerendered page, an asset and a public file with an ETag, a 304 to it, and their length to HEAD', async () => {
+    const dir = makeTemp('kay-served-file-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'public'), { recursive: true })
+    writeFileSync(join(dir, 'public/notes.txt'), 'twelve bytes')
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      export const prerender = true
+      export default function Home() { return <main><h1>Prerendered</h1></main> }
+    `)
+    await build({ root: dir })
+    const manifest = await Bun.file(join(dir, 'dist/manifest.json')).json() as { runtimeScript: string }
+    const app = await createServer({ root: dir })
+
+    const page = await app.handle(new Request('http://localhost/'))
+    const html = await page.text()
+    const etag = page.headers.get('etag')!
+    expect(etag).toMatch(/^W\/"/)
+    const notModified = await app.handle(new Request('http://localhost/', { headers: { 'if-none-match': etag } }))
+    expect(notModified.status).toBe(304)
+    expect(await notModified.text()).toBe('')
+
+    const pageHead = await app.handle(new Request('http://localhost/', { method: 'HEAD' }))
+    expect(pageHead.headers.get('content-length')).toBe(String(Buffer.byteLength(html)))
+    expect(await pageHead.text()).toBe('')
+
+    const script = await (await app.handle(new Request(`http://localhost${manifest.runtimeScript}`))).arrayBuffer()
+    const scriptHead = await app.handle(new Request(`http://localhost${manifest.runtimeScript}`, { method: 'HEAD' }))
+    expect(scriptHead.headers.get('content-length')).toBe(String(script.byteLength))
+
+    const publicHead = await app.handle(new Request('http://localhost/notes.txt', { method: 'HEAD' }))
+    expect(publicHead.headers.get('content-length')).toBe('12')
   })
 })
 

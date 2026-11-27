@@ -17,6 +17,17 @@ function makeTemp(prefix: string): string {
   return dir
 }
 
+// A file rewritten in place is listed again a moment later: waits for the answer whose ETag moved off `etag`.
+async function answerOnceChanged(app: { handle: (r: Request) => Promise<Response> }, request: Request, etag: string | null): Promise<Response> {
+  const deadline = Date.now() + 5000
+  while (true) {
+    const res = await app.handle(request.clone())
+    if (res.headers.get('etag') !== etag || Date.now() > deadline)
+      return res
+    await Bun.sleep(10)
+  }
+}
+
 afterAll(() => {
   for (const d of tempDirs)
     rmSync(d, { recursive: true, force: true })
@@ -175,9 +186,29 @@ describe('createStaticDirServer boundary tests & ServerRuntimeConfig / rootLayou
     expect(missing.headers.get('content-security-policy')).toContain(`'sha256-QRQPRLGyxt3RJiKpYNjpkgHcmHU2PywsfL2e8oI0LQA='`)
 
     writeFileSync(join(outDir, 'index.html'), '<!DOCTYPE html><style>p{margin:0}</style><main>Home, edited</main>')
-    const edited = await app.handle(new Request('http://localhost/'))
+    const edited = await answerOnceChanged(app, new Request('http://localhost/'), home.headers.get('etag'))
+    expect(await edited.text()).toContain('Home, edited')
     expect(edited.headers.get('content-security-policy')).toContain(`'sha256-QRQPRLGyxt3RJiKpYNjpkgHcmHU2PywsfL2e8oI0LQA='`)
     expect(edited.headers.get('content-security-policy')).not.toContain(`'sha256-ac1R1kU5izDDnXGpZrb2k+Dct4jThB3/YH1VfglrT3I='`)
+  })
+
+  it('answers HEAD with a file\'s length and serves a page added after startup (#3667)', async () => {
+    const outDir = makeTemp('kay-static-table-')
+    mkdirSync(join(outDir, '_kay'), { recursive: true })
+    writeFileSync(join(outDir, 'index.html'), '<!DOCTYPE html><main>Home</main>')
+    writeFileSync(join(outDir, '_kay/app-abc.js'), 'export const a = 1\n')
+    const app = createStaticDirServer(outDir, '/_kay', undefined, false, false)
+
+    const pageHead = await app.handle(new Request('http://localhost/', { method: 'HEAD' }))
+    expect(pageHead.headers.get('content-length')).toBe('32')
+    const assetHead = await app.handle(new Request('http://localhost/_kay/app-abc.js', { method: 'HEAD' }))
+    expect(assetHead.headers.get('content-length')).toBe('19')
+
+    expect((await app.handle(new Request('http://localhost/later'))).status).toBe(404)
+    writeFileSync(join(outDir, 'later.html'), '<!DOCTYPE html><main>Later</main>')
+    const later = await answerOnceChanged(app, new Request('http://localhost/later'), null)
+    expect(later.status).toBe(200)
+    expect(await later.text()).toContain('Later')
   })
 
   it('stores rootLayoutFile explicitly: never leaks a subdirectory _layout.tsx into 404, and loads root _layout.tsx even with zero page routes', async () => {

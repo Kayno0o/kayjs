@@ -5,15 +5,14 @@
 // - <Head> collection + cancel-safe streaming <Suspense> (0-overhead fast path when unused)
 // - Hybrid prerendered HTML serving + embedded single-executable mode
 
-import type { BuildManifest, RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
-import type { DocumentOptions } from '../ssr/index'
 import type { ActionRegistry, RegisteredAction } from './action-registry'
 import type { NormalizedConsentConfig } from './consent'
 import type { CookieStore } from './cookies'
 import type { NotifyError } from './errors'
 import type { EmbeddedServerConfig, KayApp, KayServer, Middleware, RequestContext } from './http'
-import type { LoadedLayoutModule, LoadedMiddlewareModule, LoadedPageModule } from './page'
+import type { LoadedMiddlewareModule } from './page'
+import type { CompiledRoute } from './route-table'
 import type { FastHandler } from './routing'
 import type { TrustProxy } from './security'
 import { join } from 'node:path'
@@ -26,14 +25,14 @@ import { createActionRegistry } from './action-registry'
 import { createAssets } from './assets'
 import { CompressionCache, compressedHtmlResponse, markCompressionHandled, maybeCompressResponse } from './compress'
 import { normalizeConsentConfig } from './consent'
-import { addedInlineStyleHashes, createDocumentHooks, createHtmlHeaders, headTagStyleHashes, mergeStyleHashes, resolveRenderedIslands, revivePreload, withPluginHtmlCsp } from './document'
+import { addedInlineStyleHashes, createDocumentHooks, createHtmlHeaders, mergeStyleHashes, resolveRenderedIslands, revivePreload, withPluginHtmlCsp } from './document'
 import { createErrorNotifier, createFallbackPages, devErrorResponse } from './errors'
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
-import { allowedMethodsHeader, mergedHeadTags, pickPageIslandProps, stripHeadBody } from './page'
+import { allowedMethodsHeader, pickPageIslandProps, stripHeadBody } from './page'
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
-import { hasRegionHeader, invalidRegionResponse, markPrerenderedRegionVary, requestedRegion, respondRegion, withRegionVary } from './region'
-import { Router } from './router'
-import { actionRoutePrefix, createAncestorMiddlewareLookup, createFastStaticPageHandler, decodeRequestPathname, inferRoutesServerPrefix, methodNotAllowed } from './routing'
+import { hasRegionHeader, invalidRegionResponse, prerenderedHasRegion, requestedRegion, respondRegion, withRegionVary } from './region'
+import { compileRouteTable } from './route-table'
+import { actionRoutePrefix, createAncestorMiddlewareLookup, decodeRequestPathname, inferRoutesServerPrefix, methodNotAllowed } from './routing'
 import { hasActionErrorCookie, isPlainRead, isRead, serveHandlers } from './serve-handlers'
 import { buildSecurityHeaderEntries, resolveHstsValue, styleHashesOf, verifyOrigin } from './security'
 import { createStreamTracker, STREAM_TAIL_MARK, streamDocument } from './stream'
@@ -64,19 +63,6 @@ export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, Va
 // Matches Bun.serve's 30 s idle timeout, which a streamed page turns off.
 const DEFAULT_STREAM_TIMEOUT = 30_000
 
-interface CompiledRoute {
-  entry: RouteManifestEntry
-  mod: LoadedPageModule
-  layouts: LoadedLayoutModule[]
-  dirMiddlewares: Middleware[]
-  /** Precomputed plugin + directory middlewares for non-rewritten static paths. */
-  middlewares: Middleware[]
-  /** Dynamic segments (`:param` / `*rest`), so the path names no single URL. */
-  dynamic: boolean
-  /** Options every document of this route shares; a request adds its body, head and islands. */
-  doc: DocumentOptions
-  headStyleHashes: string[]
-}
 
 const isEventStream = (res: Response): boolean => (res.headers.get('content-type') ?? '').toLowerCase().includes('text/event-stream')
 const makeServerError = (securityRecord: Record<string, string>) => (): Response => new Response('Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8', ...securityRecord } })
@@ -110,19 +96,6 @@ async function renderRouteBody(route: CompiledRoute, data: unknown, pageProps: R
   return inner
 }
 
-function routeDocument(manifest: BuildManifest, entry: RouteManifestEntry, lang: string, alwaysLoadRuntime: boolean, navigation: DocumentOptions['navigation']): DocumentOptions {
-  return {
-    body: '',
-    headTags: mergedHeadTags(manifest, entry),
-    lang,
-    runtimeScript: manifest.runtimeScript,
-    chunkImports: manifest.chunkImports,
-    alwaysLoadRuntime,
-    navigation,
-    regionScript: entry.usesRegion === true ? manifest.regionScript : undefined,
-    styles: entry.styles ?? manifest.styles,
-  }
-}
 
 interface ActionDispatcherDeps {
   actions: ActionRegistry
@@ -205,7 +178,7 @@ function registerManifestActions({ manifest, modules, actions, routesPrefix, rou
 }
 
 export async function createServerFromEmbedded(config: EmbeddedServerConfig): Promise<KayApp> {
-  const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered = {}, prerenderedFiles = {}, lang = 'en', security } = config
+  const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered = {}, prerenderedFiles = {}, prerenderedEtags = {}, lang = 'en', security } = config
   const plugins = resolvePlugins(config.plugins)
   const assetPrefix = (config.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const site = config.site?.replace(/\/$/, '') || undefined
@@ -243,7 +216,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const compressCache = compressEnabled ? new CompressionCache() : undefined
 
   const files = createAssets({ assets, assetPrefix, isDev, compressEnabled, compressCache, nosniffHeader, securityRecord, withHsts })
-  const { assetMap, publicMap, serveFile, serveAsset, servePublic } = files
+  const { assetMap, publicMap, serveFile } = files
   for (const [rel, body] of Object.entries(publicAssets))
     files.registerPublic(rel, body, publicEtags[rel])
 
@@ -290,13 +263,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const { all: prerenderedMap, fast: fastPrerenderedMap } = files.collectPrerendered(manifest.routes, {
     prerendered,
     prerenderedFiles,
-    htmlHeaders: (route, urlPath) => htmlHeaders(route.islandChunks.length > 0, false, false, route.prerenderedStyleHashes?.[urlPath]),
+    prerenderedEtags,
+    htmlHeaders: (route, urlPath, relHtml) => withRegionVary(
+      htmlHeaders(route.islandChunks.length > 0, false, false, route.prerenderedStyleHashes?.[urlPath]),
+      prerenderedHasRegion(route, relHtml, prerendered, prerenderedFiles),
+    ),
     isFast: (urlPath, route) => route.middlewares.length === 0 && middlewaresFor(urlPath, true).length === 0 && !hasPluginRewrites && pluginRouter.match(urlPath) === undefined,
   })
-  markPrerenderedRegionVary(manifest.routes, prerenderedMap, prerendered, prerenderedFiles)
-
-  const router = new Router<CompiledRoute>()
-  const fastStaticPages = new Map<string, FastHandler>()
 
   const { buildNotFoundResponse, renderError } = createFallbackPages({ manifest, modules, lang, alwaysLoadRuntime, navigation: navigation.html, dev: isDev, document, htmlHeaders, notifyError, finish })
 
@@ -338,34 +311,11 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       : new Response('Payload Too Large', { status: 413, headers: { 'content-type': 'text/plain; charset=utf-8' } }), request, cookieStore)
   }
 
-  for (const entry of manifest.routes) {
-    const mod = modules[entry.file] as LoadedPageModule
-    const layouts = entry.layouts.map(l => modules[l] as LoadedLayoutModule)
-    const dirMiddlewares = entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default)
-    const routePluginMiddlewares = middlewaresFor(entry.path)
-    const hasLoad = Boolean(entry.hasLoad && typeof mod.load === 'function')
-    const fastPluginMiddlewares = middlewaresFor(entry.path, !hasLoad)
-    const dynamic = entry.path.includes(':') || entry.path.includes('*')
-    const hasIslands = entry.islandChunks.length > 0
-    const doc = routeDocument(manifest, entry, lang, alwaysLoadRuntime, navigation.html)
-    const headStyleHashes = headTagStyleHashes(doc.headTags)
-
-    // Zero-overhead path for a static route with no middleware, no <Head>/<Suspense>, and no intercepting plugin hook
-    const canFastPath = fastPluginMiddlewares.length === 0
-      && !hasPluginRewrites && !hasHeadHooks && !hasHtmlTransformers
-      && pluginRouter.match(entry.path) === undefined && !dynamic
-      && dirMiddlewares.length === 0 && !entry.usesRenderContext
-      && typeof mod.default === 'function' && mod.GET === undefined
-
-    if (canFastPath) {
-      fastStaticPages.set(entry.path, createFastStaticPageHandler({
-        entry, mod, layouts, doc, reviveScript: manifest.reviveScript, hasIslands, hasLoad, trustProxy, consent, htmlHeaders, compressCache,
-        actions, buildNotFoundResponse, renderError, notifyError, finish, withHsts,
-      }))
-    }
-
-    router.add(entry.path, { entry, mod, layouts, dirMiddlewares, middlewares: [...routePluginMiddlewares, ...dirMiddlewares], dynamic, doc, headStyleHashes })
-  }
+  const { router, fastStaticPages } = compileRouteTable({
+    manifest, modules, lang, alwaysLoadRuntime, navigation: navigation.html, middlewaresFor,
+    pluginIntercepts: path => hasPluginRewrites || hasHeadHooks || hasHtmlTransformers || pluginRouter.match(path) !== undefined,
+    fast: { trustProxy, consent, htmlHeaders, compressCache, actions, buildNotFoundResponse, renderError, notifyError, finish, withHsts },
+  })
 
   async function renderCompiledRoute(
     route: CompiledRoute,
@@ -486,7 +436,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       if (read && staticPath !== undefined) {
         const asset = assetMap.get(staticPath)
         if (asset !== undefined)
-          return serveAsset(request, asset)
+          return serveFile(request, asset)
         const pub = publicMap.get(staticPath)
         if (pub !== undefined) {
           const matchedPlugin = pluginRouter.match(rawPathname)
@@ -494,7 +444,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           const shadowedByPlugin = matchedPlugin !== undefined
             && (matchedPlugin.data.has(reqMethod) || (reqMethod === 'HEAD' && matchedPlugin.data.has('GET')) || matchedPlugin.data.has('ALL'))
           if (!shadowedByPlugin)
-            return servePublic(request, pub)
+            return serveFile(request, pub)
         }
       }
 
@@ -573,7 +523,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       if (read && effectivePath !== rawPathname && effectiveStaticPath !== undefined) {
         const pub = publicMap.get(effectiveStaticPath)
         if (pub !== undefined)
-          return servePublic(request, pub)
+          return serveFile(request, pub)
       }
 
       const matched = router.match(effectivePath)

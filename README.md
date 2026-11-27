@@ -125,7 +125,7 @@ kay dev [--port 3000] [--host [addr]]  # Fast rebuild + live reload, the app in 
 kay build [--analyze] [--max-js 40kb] # Production build; per-route islands, fonts and first-load report, or a JS budget
 kay build --static                     # Pure static HTML export
 kay build --compile [out]              # Single standalone executable
-kay start [--port 3000] [--host [addr]] # Serve built production app
+kay start [--port 3000] [--host [addr]] # Serve the built app or static export, reloading each new build
 kay upgrade [--no-install]             # Move an app onto the current kay APIs
 kay ui-eject <grammar> [dest]          # Eject a standalone @kayjs/ui CSS Grammar
 kay mcp-footprint                      # Inspect @kayjs/mcp tool byte & token budgets

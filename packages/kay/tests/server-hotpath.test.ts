@@ -77,7 +77,7 @@ describe('#3637 item 3 — avoid double compression and unhandled pendingRead re
       })
       files.registerPublic('noise.txt', noise)
       const pub = files.publicMap.get('/noise.txt')!
-      const served = await files.serveFile(req, pub.file)
+      const served = await files.serveFile(req, pub)
       const callsAfterServe = spy.mock.calls.length
       expect(await maybeCompressResponse(served, req, cache)).toBe(served)
       expect(spy.mock.calls.length).toBe(callsAfterServe)
@@ -165,9 +165,14 @@ describe('#3637 item 4 — static-dir.ts async I/O and CompressionCache reuse', 
       expect(body2).toBe(body1)
       expect(spy).toHaveBeenCalledTimes(1)
 
-      // 2. Updating the file changes size/ETag -> cache key changes -> serves updated content
+      // 2. Updating the file changes size/ETag -> cache key changes -> serves updated content, once the folder is listed again
       writeFileSync(pagePath, `<!DOCTYPE html><main>${'updated static directory content! '.repeat(45)}</main>`)
-      const r3 = await app.handle(new Request('http://localhost/', { headers: { 'accept-encoding': 'zstd' } }))
+      let r3: Response
+      const deadline = Date.now() + 5000
+      do {
+        await Bun.sleep(10)
+        r3 = await app.handle(new Request('http://localhost/', { headers: { 'accept-encoding': 'zstd' } }))
+      } while (r3.headers.get('etag') === r1.headers.get('etag') && Date.now() < deadline)
       expect(r3.status).toBe(200)
       expect(r3.headers.get('content-encoding')).toBe('zstd')
       const body3 = new TextDecoder().decode(Bun.zstdDecompressSync(new Uint8Array(await r3.arrayBuffer())))

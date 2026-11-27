@@ -147,6 +147,8 @@ export interface EmbeddedServerConfig extends ServerRuntimeConfig {
   publicEtags?: Record<string, string> | undefined
   prerendered?: Record<string, string> | undefined
   prerenderedFiles?: Record<string, string> | undefined
+  /** ETags of the prerendered HTML files, by the same key; a missing one comes from the file's size and mtime. */
+  prerenderedEtags?: Record<string, string> | undefined
   root?: string | undefined
   outDir?: string | undefined
   publicDir?: string | undefined

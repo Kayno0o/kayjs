@@ -3,7 +3,7 @@
 import type { RouteManifestEntry } from '../build/index'
 import type { Html } from '../jsx-runtime'
 import type { RenderContext } from '../ssr/context'
-import type { ServedFile } from './assets'
+
 import type { HtmlHeaders } from './document'
 import type { LoadedPageModule } from './page'
 import { existsSync, readFileSync } from 'node:fs'
@@ -51,30 +51,22 @@ export function withRegionVary(headers: Record<string, string>, hasRegions: bool
   return { ...headers, vary: mergeVaryValue(headers.vary ?? headers.Vary, REGION_HEADER) }
 }
 
-/** Stamps `Vary: x-kay-region` on prerendered routes whose HTML contains a `<Region>`. */
-export function markPrerenderedRegionVary(
-  routes: readonly RouteManifestEntry[],
-  prerenderedMap: ReadonlyMap<string, ServedFile>,
+/** Whether a prerendered page's HTML holds a `<Region>`, so its answer varies on `x-kay-region`. */
+export function prerenderedHasRegion(
+  route: RouteManifestEntry,
+  relHtml: string,
   prerendered: Record<string, string>,
   prerenderedFiles: Record<string, string>,
-): void {
-  for (const route of routes) {
-    if (route.prerendered === undefined || !route.usesRenderContext)
-      continue
-    for (const [urlPath, relHtml] of Object.entries(route.prerendered)) {
-      const served = prerenderedMap.get(urlPath)
-      if (served === undefined)
-        continue
-      let html = prerendered[relHtml]
-      if (html === undefined) {
-        const filePath = prerenderedFiles[relHtml]
-        if (filePath !== undefined && existsSync(filePath))
-          html = readFileSync(filePath, 'utf8')
-      }
-      if (html !== undefined && html.includes('data-kay-region="'))
-        served.headers.vary = mergeVaryValue(served.headers.vary, REGION_HEADER)
-    }
+): boolean {
+  if (!route.usesRenderContext)
+    return false
+  let html = prerendered[relHtml]
+  if (html === undefined) {
+    const filePath = prerenderedFiles[relHtml]
+    if (filePath !== undefined && existsSync(filePath))
+      html = readFileSync(filePath, 'utf8')
   }
+  return html !== undefined && html.includes('data-kay-region="')
 }
 
 const TITLE_INNER_RE = /<title\b[^>]*>([\s\S]*?)<\/title>/i
