@@ -3,7 +3,7 @@
 // over a bearer-authenticated endpoint via `KayPlugin.server`, keeping core free of MCP code.
 
 import type { KayPlugin } from '@kayjs/kay/config'
-import type { ActionContext, InferOutput, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
+import type { ActionContext, InferOutput, RateLimit, RequestContext, ServerAction, StandardSchemaV1 } from '@kayjs/kay/server'
 import type { McpBudgetOptions, McpFootprint } from './footprint'
 import type { McpPruneMode, McpToolResult } from './format'
 import type { ListedTool, McpToolAnnotations, ResolvedResource, ResolvedToolEntry } from './rpc'
@@ -178,6 +178,8 @@ export interface McpOptions {
   formatResult?: ((output: unknown, toolName: string, input: unknown) => unknown) | undefined
   /** Tool & catalog byte budget checked in dev startup and `kay check` (default: `{ maxToolBytes: 2048 }`; `false` disables). */
   budget?: McpBudgetOptions | false | undefined
+  /** Calls one client may make to the endpoint, each method counted apart (default: 120 per minute per address; `false` disables). */
+  rateLimit?: RateLimit<RequestContext> | false | undefined
 }
 
 function cleanAnnotations(annotations: McpToolAnnotations | undefined): McpToolAnnotations | undefined {
@@ -434,6 +436,7 @@ export function mcp(options: McpOptions): KayPlugin
 export function mcp(options: McpOptions): KayPlugin {
   const rawPath = options.path ?? '/mcp/tools'
   const endpoint = rawPath === '/' ? '/' : `/${rawPath.replace(/^\/+|\/+$/g, '')}`
+  const rateLimit = options.rateLimit === false ? undefined : options.rateLimit ?? { max: 120, windowMs: 60_000 }
   const serverName = options.name ?? 'kay-mcp'
   const serverVersion = options.version ?? '1.0.0'
 
@@ -491,21 +494,21 @@ export function mcp(options: McpOptions): KayPlugin {
         if (denied !== undefined)
           return denied
         return rpc.handlePost(ctx, api.dev)
-      }, { csrf: false })
+      }, { csrf: false, rateLimit })
 
       api.route('GET', endpoint, async (ctx) => {
         const denied = await authorize(ctx.request)
         if (denied !== undefined)
           return denied
         return new Response('Method Not Allowed', { status: 405, headers: { allow: 'POST, DELETE' } })
-      })
+      }, { rateLimit })
 
       api.route('DELETE', endpoint, async (ctx) => {
         const denied = await authorize(ctx.request)
         if (denied !== undefined)
           return denied
         return new Response(null, { status: 204 })
-      }, { csrf: false })
+      }, { csrf: false, rateLimit })
     },
 
     check(ctx) {

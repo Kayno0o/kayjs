@@ -5,6 +5,7 @@ import type { RouteManifestEntry } from '../build/index'
 import type { ComplianceConfig } from '../compiler/compliance'
 import type { ConsentConfig } from '../server/consent'
 import type { Middleware, RequestContext } from '../server/index'
+import type { RateLimit, RateLimiter } from '../server/rate-limit'
 import type { SecurityHeadersOptions, TrustProxy } from '../server/security'
 import type { NavigationConfig } from '../ssr/navigation'
 import type { ServiceKey } from './services'
@@ -80,6 +81,8 @@ export interface PluginRouteOptions {
   trustedOrigins?: readonly string[] | undefined
   /** Override `KayConfig.trustProxy` for this route's CSRF check. */
   trustProxy?: TrustProxy | undefined
+  /** How often one client may call the route: past `max` per `windowMs`, it answers 429 with `Retry-After` before the handler runs. */
+  rateLimit?: RateLimit<RequestContext> | undefined
 }
 
 export interface MiddlewareOptions {
@@ -107,6 +110,8 @@ export interface ServerPluginAPI {
   use(middleware: Middleware, options?: MiddlewareOptions): void
   /** Register a custom HTTP route (e.g. GET /sitemap.xml, POST /auth/callback). */
   route(method: string, path: string, handler: (ctx: RequestContext) => Response | Promise<Response>, options?: PluginRouteOptions): void
+  /** A limiter counting in this server's store, for limits a route option cannot express (per account, per email): `hit(key)` returns 0, or the seconds to wait. */
+  rateLimiter(limit: Pick<RateLimit, 'max' | 'windowMs'>): RateLimiter
   /** Rewrite an incoming pathname before route matching (e.g. strip /fr locale prefix). */
   rewrite(fn: (pathname: string, ctx: RequestContext) => string | undefined): void
   /** Register a server-scoped service for other plugins or render-time helpers (isolated per server instance). */

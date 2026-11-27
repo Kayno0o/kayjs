@@ -1,7 +1,8 @@
 // Request parsing and client-address helpers shared by the auth routes.
 
-import type { RequestContext, TrustProxy } from '@kayjs/kay/server'
+import type { RateLimiter, RequestContext, TrustProxy } from '@kayjs/kay/server'
 import { getClientIp, readStringFields, wantsJson } from '@kayjs/kay/server'
+import { normalizeEmail } from './store'
 
 export function fail(ctx: RequestContext, status: number, error: string): Response {
   return ctx.json({ ok: false, error }, { status })
@@ -57,6 +58,31 @@ export function isValidEmail(email: string): boolean {
 
 export function resolveClientIp(ctx: RequestContext, trustProxy: TrustProxy): string {
   return ctx.ip?.trim() || getClientIp(ctx.request, trustProxy) || 'unknown'
+}
+
+export interface AuthLimits {
+  /** The 429 to answer when this address is past the limit of `scope`, else `undefined`. */
+  limitIp: (ctx: RequestContext, scope: string) => Response | undefined
+  /** The same per email, for the forms that send one; nothing is counted without an email. */
+  limitEmail: (ctx: RequestContext, scope: string, email: string | undefined) => Response | undefined
+}
+
+export function authLimits(limiter: RateLimiter | undefined, getTrustProxy: () => TrustProxy): AuthLimits {
+  const limitKey = (ctx: RequestContext, key: string): Response | undefined => {
+    const retryAfter = limiter?.hit(key) ?? 0
+    if (retryAfter === 0)
+      return undefined
+    const refused = fail(ctx, 429, 'Too many requests')
+    refused.headers.set('retry-after', String(retryAfter))
+    return refused
+  }
+  return {
+    limitIp: (ctx, scope) => limitKey(ctx, `${scope}:ip:${resolveClientIp(ctx, getTrustProxy())}`),
+    limitEmail(ctx, scope, email) {
+      const normalized = normalizeEmail(email ?? '')
+      return normalized ? limitKey(ctx, `${scope}:email:${normalized}`) : undefined
+    },
+  }
 }
 
 export function formatSessionIp(ip: string, mode: boolean | 'truncate'): string | undefined {

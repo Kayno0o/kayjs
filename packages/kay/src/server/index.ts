@@ -11,6 +11,7 @@ import type { NormalizedConsentConfig } from './consent'
 import type { CookieStore } from './cookies'
 import type { NotifyError } from './errors'
 import type { EmbeddedServerConfig, KayApp, KayServer, Middleware, RequestContext } from './http'
+import type { RateLimiter, RateLimitStore } from './rate-limit'
 import type { LoadedMiddlewareModule } from './page'
 import type { RequestPath } from './request-path'
 import type { CompiledRoute } from './route-table'
@@ -31,6 +32,7 @@ import { createErrorNotifier, createFallbackPages, devErrorResponse } from './er
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
 import { allowedMethodsHeader, pickPageIslandProps, stripHeadBody } from './page'
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
+
 import { hasRegionHeader, invalidRegionResponse, requestedRegion, respondRegion, withRegionVary } from './region'
 import { decodeRequestPath, literalPath } from './request-path'
 import { nativePrerenderedCheck } from './prerendered'
@@ -107,6 +109,7 @@ interface ActionDispatcherDeps {
   trustedOrigins: Set<string> | undefined
   trustProxy: TrustProxy
   consent: NormalizedConsentConfig | undefined
+  rateLimits: RateLimitStore
   refuseCrossSite: (request: Request, reason: string, cookieStore?: CookieStore) => Response
   checkBodyLimit: (request: Request, bodyLimited: boolean, cookieStore?: CookieStore) => Promise<Request | Response>
   finish: (res: Response, request: Request, cookieStore?: CookieStore) => Response
@@ -115,7 +118,18 @@ interface ActionDispatcherDeps {
 }
 
 function createActionDispatcher(deps: ActionDispatcherDeps) {
-  const { actions, rewrites, trustedOrigins, trustProxy, consent, refuseCrossSite, checkBodyLimit, finish, notifyError, renderError } = deps
+  const { actions, rewrites, trustedOrigins, trustProxy, consent, rateLimits, refuseCrossSite, checkBodyLimit, finish, notifyError, renderError } = deps
+  const limiters = new WeakMap<RegisteredAction['act'], RateLimiter>()
+  const limiterFor = (act: RegisteredAction['act']): RateLimiter | undefined => {
+    if (act.rateLimit === undefined)
+      return undefined
+    let limiter = limiters.get(act)
+    if (limiter === undefined) {
+      limiter = rateLimits.limiter(act.rateLimit)
+      limiters.set(act, limiter)
+    }
+    return limiter
+  }
   return async (
     registeredAction: RegisteredAction,
     request: Request,
@@ -146,7 +160,7 @@ function createActionDispatcher(deps: ActionDispatcherDeps) {
     try {
       const res = await actions.run(ctx, () => runChain(ctx, middlewares, () =>
         actionHandler !== undefined
-          ? executeAction(act, req, ctx, trustedOrigins, trustProxy)
+          ? executeAction(act, req, ctx, trustedOrigins, trustProxy, limiterFor(act))
           : methodNotAllowed('POST'),
       ))
       return finish(actionHandler !== undefined ? finishActionRedirect(res, req) : res, req, cookieStore)
@@ -419,7 +433,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   }
 
   const dispatchAction = createActionDispatcher({
-    actions, rewrites: pluginHost.rewrites, trustedOrigins, trustProxy, consent, refuseCrossSite, checkBodyLimit, finish, notifyError, renderError,
+    actions, rewrites: pluginHost.rewrites, trustedOrigins, trustProxy, consent, rateLimits: pluginHost.rateLimits, refuseCrossSite, checkBodyLimit, finish, notifyError, renderError,
   })
 
   // `bodyLimited` is set under `serve()`, where Bun.serve already enforces maxRequestBodySize on every body, chunked ones included.

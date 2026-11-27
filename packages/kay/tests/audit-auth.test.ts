@@ -357,6 +357,7 @@ describe('Audit #3526 Batch 4 — Auth, Scaffold & RGPD', () => {
         expect(r1.status).toBe(401)
         expect(r2.status).toBe(401)
         expect(r3.status).toBe(429)
+        expect(r3.headers.get('retry-after')).toBe('60')
       }
       finally {
         auth.dispose()

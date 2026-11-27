@@ -99,6 +99,7 @@ async function discoverPluginRoutes(
             else if (!methods.includes(upper))
               methods.push(upper)
           },
+          rateLimiter: () => ({ hit: () => 0 }),
           rewrite: () => {},
           provide: (key, value) => {
             services.set(key.name, value)

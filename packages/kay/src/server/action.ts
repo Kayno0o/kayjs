@@ -2,9 +2,11 @@
 
 import type { Cookies } from './cookies'
 import type { KayLocals } from './index'
+import type { RateLimit, RateLimiter } from './rate-limit'
 import type { TrustProxy } from './security'
 import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult } from './standard-schema'
 import { wantsJson } from './http'
+import { assertRateLimit, hitFor, tooManyRequests } from './rate-limit'
 import { currentRequest } from './request-scope'
 import { isTrustedOrigin } from './security'
 import { validateSchema } from './standard-schema'
@@ -65,6 +67,8 @@ export function finishActionRedirect(res: Response, request: Request): Response 
 export interface ActionOptions {
   /** Explicit allowlist of form field names permitted in the progressive-form validation error flash cookie. */
   flashFields?: readonly string[] | undefined
+  /** How often one client may submit it: past `max` per `windowMs`, a call from script gets a 429 with `Retry-After` and a form comes back with the error. */
+  rateLimit?: RateLimit<ActionContext> | undefined
 }
 
 export interface ActionErrorFlash {
@@ -98,6 +102,7 @@ export interface ServerAction<Input, Output> {
   readonly url: string
   readonly schema: StandardSchemaV1 | undefined
   readonly flashFields: readonly string[] | undefined
+  readonly rateLimit: RateLimit<ActionContext> | undefined
   readonly handler: (input: never, ctx: ActionContext) => Output | Response | Promise<Output | Response>
   toString(): string
 }
@@ -127,6 +132,8 @@ export function action(
     ? (maybeHandlerOrOpts as (input: never, ctx: ActionContext) => unknown)
     : ((_input: never, ctx: ActionContext) => (schemaOrHandler as (c: ActionContext) => unknown)(ctx))
   const options = hasSchema ? maybeOpts : (maybeHandlerOrOpts as ActionOptions | undefined)
+  if (options?.rateLimit !== undefined)
+    assertRateLimit(options.rateLimit, 'an action')
 
   const fn = (async (input: unknown) => {
     const scope = currentRequest()
@@ -141,6 +148,7 @@ export function action(
     __kayAction: { value: true, enumerable: false },
     schema: { value: schema, enumerable: false },
     flashFields: { value: options?.flashFields, enumerable: false },
+    rateLimit: { value: options?.rateLimit, enumerable: false },
     handler: { value: handler, enumerable: false },
     url: { value: '', writable: true, enumerable: true },
     toString: {
@@ -384,6 +392,7 @@ export async function executeAction(
   ctx: ActionContext,
   trustedOrigins?: ReadonlySet<string>,
   trustProxy: TrustProxy = false,
+  limiter?: RateLimiter,
 ): Promise<Response> {
   const json = wantsJson(request)
   const flashAndRedirect = (error: string, fieldErrors: Record<string, string> | undefined, rawBody: unknown): Response | undefined => {
@@ -422,6 +431,16 @@ export async function executeAction(
       )
     }
     input = checked.value
+  }
+
+  // Counted once the body is read, so a refused form comes back with what was typed in it.
+  const retryAfter = limiter !== undefined && act.rateLimit !== undefined ? hitFor(limiter, act.rateLimit, ctx) : 0
+  if (retryAfter > 0) {
+    const redirected = flashAndRedirect('Too many requests', undefined, rawBody)
+    if (redirected === undefined)
+      return tooManyRequests(retryAfter)
+    redirected.headers.set('retry-after', String(retryAfter))
+    return redirected
   }
 
   // Track exact Response instances produced by `ctx.deny()` so zero-JS form submits flash & 303-redirect while custom Responses (redirects, downloads, custom JSON) pass through untouched.

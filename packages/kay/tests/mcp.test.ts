@@ -224,6 +224,30 @@ describe('@kayjs/mcp — Streamable HTTP (2025-03-26) plugin', () => {
     expect(getMethod.status).toBe(405)
   })
 
+  test('limits calls to 120 a minute per client by default, overridable and off with rateLimit: false (#3673)', async () => {
+    const key = 'secret-mcp-token-123456'
+    const ping = (app: Awaited<ReturnType<typeof testApp>>) => app.fetch('/mcp/tools', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'authorization': `Bearer ${key}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping', params: {} }),
+    })
+    const tools = { list: { action: listNotes, description: 'List notes' } }
+    const byDefault = await testApp({ root: fixtureDir, outDir: 'dist-rate-limit', plugins: [mcp({ token: key, tools })] })
+    const statuses: number[] = []
+    for (let i = 0; i < 121; i++)
+      statuses.push((await ping(byDefault)).status)
+    expect(statuses.filter(s => s === 200)).toHaveLength(120)
+    expect(statuses[120]).toBe(429)
+
+    const tight = await testApp({ root: fixtureDir, outDir: 'dist-rate-limit', prebuilt: true, plugins: [mcp({ token: key, tools, rateLimit: { max: 1, windowMs: 60_000 } })] })
+    expect((await ping(tight)).status).toBe(200)
+    expect((await ping(tight)).status).toBe(429)
+
+    const off = await testApp({ root: fixtureDir, outDir: 'dist-rate-limit', prebuilt: true, plugins: [mcp({ token: key, tools, rateLimit: false })] })
+    for (let i = 0; i < 121; i++)
+      expect((await ping(off)).status).toBe(200)
+  })
+
   test('supports env var and key file bearer token sources', async () => {
     const envVar = 'KAY_TEST_MCP_TOKEN'
     const prev = process.env[envVar]

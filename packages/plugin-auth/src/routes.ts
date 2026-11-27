@@ -4,7 +4,8 @@ import type { PluginRouteOptions, ServerPluginAPI } from '@kayjs/kay/config'
 import type { RequestContext } from '@kayjs/kay/server'
 import { safeRedirect, wantsJson } from '@kayjs/kay/server'
 import type { CreateUserInput } from './index'
-import type { RateLimiter } from './ratelimit'
+
+import type { AuthLimits } from './http'
 import type { SessionManager } from './session'
 import type { AuthStore, AuthUser, PublicUser } from './store'
 import { verifyPassword } from './crypto'
@@ -20,8 +21,8 @@ export interface AuthRoutesDeps<TUser extends AuthUser = AuthUser> {
   api: ServerPluginAPI
   store: AuthStore<TUser>
   sessions: SessionManager<TUser>
-  rateLimiter: RateLimiter
-  limitIp: (ctx: RequestContext, scope: string) => Response | undefined
+  limitIp: AuthLimits['limitIp']
+  limitEmail: AuthLimits['limitEmail']
   basePath: string
   authRouteOpts: PluginRouteOptions
   minPasswordLength: number
@@ -42,7 +43,7 @@ export function registerAuthRoutes<TUser extends AuthUser = AuthUser>(deps: Auth
     api,
     store,
     sessions,
-    rateLimiter,
+    limitEmail,
     limitIp,
     basePath,
     authRouteOpts,
@@ -79,9 +80,9 @@ export function registerAuthRoutes<TUser extends AuthUser = AuthUser>(deps: Auth
         body = parsed
       }
       if (routeCfg.emailLimit !== undefined) {
-        const email = normalizeEmail(body.email ?? '')
-        if (email && !rateLimiter.allow(`${routeCfg.emailLimit}:email:${email}`))
-          return withNoStore(fail(ctx, 429, 'Too many requests'))
+        const limited = limitEmail(ctx, routeCfg.emailLimit, body.email)
+        if (limited)
+          return withNoStore(limited)
       }
       return withNoStore(await handler(ctx, body))
     }, method === 'POST' ? authRouteOpts : undefined)

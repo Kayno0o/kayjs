@@ -6,14 +6,14 @@
 import type { KayPlugin } from '@kayjs/kay/config'
 import type { KayLocals, Middleware, RequestContext, TrustProxy } from '@kayjs/kay/server'
 import type { OAuthProvider } from './oauth'
-import type { RateLimitOptions } from './ratelimit'
+
 import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
 import { definePlugin } from '@kayjs/kay/config'
-import { isHttpsRequest, nodeEnv, safeRedirect, wantsJson } from '@kayjs/kay/server'
+import { createRateLimitStore, isHttpsRequest, nodeEnv, safeRedirect, wantsJson } from '@kayjs/kay/server'
 import { hashPassword, randomToken, sha256Hex } from './crypto'
-import { fail, isValidEmail, resolveClientIp } from './http'
+import { authLimits, fail, isValidEmail } from './http'
 import { registerOAuthRoutes } from './oauth-routes'
-import { createRateLimiter } from './ratelimit'
+
 import { registerAuthRoutes } from './routes'
 import { createSessionManager } from './session'
 import { memoryAuthStore, normalizeEmail, toPublicUser } from './store'
@@ -25,8 +25,30 @@ declare module '@kayjs/kay/server' {
   }
 }
 
-export { createRateLimiter } from './ratelimit'
-export type { RateLimiter, RateLimitOptions } from './ratelimit'
+export interface RateLimitOptions {
+  /** Attempts per window, per scope and address and per scope and email (default: 15). */
+  max?: number | undefined
+  /** Window duration in ms (default: 60_000). */
+  windowMs?: number | undefined
+  /** @deprecated Read by `createRateLimiter` only: the server's store bounds the auth limits. Removed in the next release. */
+  maxKeys?: number | undefined
+}
+
+/** @deprecated Use `api.rateLimiter()` in a plugin, or `rateLimit` on `api.route` and `action()`. Removed in the next release. */
+export interface RateLimiter {
+  allow(key: string): boolean
+  sweep(now?: number): number
+  size(): number
+}
+
+/** @deprecated Use `api.rateLimiter()` in a plugin, or `rateLimit` on `api.route` and `action()`. Removed in the next release. */
+export function createRateLimiter(opts: RateLimitOptions | false | undefined): RateLimiter {
+  if (opts === false)
+    return { allow: () => true, sweep: () => 0, size: () => 0 }
+  const store = createRateLimitStore({ maxKeys: opts?.maxKeys })
+  const limiter = store.limiter({ max: opts?.max ?? 15, windowMs: opts?.windowMs ?? 60_000 })
+  return { allow: key => limiter.hit(key) === 0, sweep: now => store.sweep(now), size: () => store.size }
+}
 
 export { safeRedirect } from '@kayjs/kay/server'
 export { discord, github, google, oauthProvider } from './oauth'
@@ -128,7 +150,7 @@ export interface AuthOptions<TUser extends AuthUser = AuthUser> {
   trustProxy?: TrustProxy | undefined
   /** Optional per-key rate limit on auth endpoints (`false` disables). */
   rateLimit?: RateLimitOptions | false | undefined
-  /** Periodic interval in ms to purge expired sessions, tokens, and rate-limit buckets (default: 15 minutes; `false` disables). */
+  /** Periodic interval in ms to purge expired sessions and tokens (default: 15 minutes; `false` disables). */
   pruneIntervalMs?: number | false | undefined
   /**
    * Control recording of client IP addresses on sessions (RGPD data minimization):
@@ -217,9 +239,6 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
       : undefined)
   const requireEmailVerification = options.requireEmailVerification !== false
   let trustProxy = options.trustProxy ?? false
-  const rateLimiter = createRateLimiter(options.rateLimit)
-  const limitIp = (ctx: RequestContext, scope: string): Response | undefined =>
-    rateLimiter.allow(`${scope}:ip:${resolveClientIp(ctx, trustProxy)}`) ? undefined : fail(ctx, 429, 'Too many requests')
 
   const pruneIntervalMs = options.pruneIntervalMs === false
     ? undefined
@@ -254,7 +273,6 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     const timer = setInterval(() => {
       try {
         void Promise.resolve(store.pruneExpired?.()).catch(() => {})
-        rateLimiter.sweep()
         sessions.sweepRenewedAt()
       }
       catch {
@@ -453,11 +471,14 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
         return next()
       }, { scope: 'rendered' })
 
+      // Counted in this server's store, so a `kay dev` restart or a test's new server starts from zero.
+      const limits = options.rateLimit === false ? undefined : api.rateLimiter({ max: options.rateLimit?.max ?? 15, windowMs: options.rateLimit?.windowMs ?? 60_000 })
+      const { limitIp, limitEmail } = authLimits(limits, () => trustProxy)
       registerAuthRoutes({
         api,
         store,
         sessions,
-        rateLimiter,
+        limitEmail,
         limitIp,
         basePath,
         authRouteOpts,
@@ -521,7 +542,6 @@ export function createAuth<TUser extends AuthUser = AuthUser>(options: AuthOptio
     },
     async pruneExpired() {
       await store.pruneExpired?.()
-      rateLimiter.sweep()
       sessions.sweepRenewedAt()
     },
     dispose,

@@ -4,9 +4,11 @@ import type { BuildManifest } from '../build/index'
 import type { AppRuntimeContext } from '../plugins/context'
 import type { KayPlugin, MiddlewareOptions, PluginRouteOptions, ServerPluginAPI } from '../plugins/index'
 import type { EmbeddedServerConfig, Middleware, RequestContext } from './http'
+
 import type { TrustProxy } from './security'
 import { runWithAppContext } from '../plugins/context'
 import { normalizeConsentConfig, registerConsentRoute } from './consent'
+import { assertRateLimit, createRateLimitStore, hitFor, tooManyRequests } from './rate-limit'
 import { Router } from './router'
 
 export interface PluginRouteDef {
@@ -70,6 +72,8 @@ export function allowedPluginMethodsHeader(methods: ReadonlyMap<string, PluginRo
 
 export async function createServerPluginHost(options: ServerPluginHostOptions) {
   const { plugins, config, manifest, appCtx, trustedOrigins, trustProxy } = options
+  // The counters of every limited route and action of this server, dropped with it.
+  const rateLimits = createRateLimitStore()
   const scopedMiddlewares: ScopedMiddleware[] = []
   const shutdownHooks: { plugin: string, hook: () => void | Promise<void> }[] = []
   const rewrites: ((pathname: string, ctx: RequestContext) => string | undefined)[] = []
@@ -108,9 +112,19 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
     if (routeOptions?.trustedOrigins !== undefined && routeOptions.trustedOrigins.length > 0) {
       routeTrustedOrigins = new Set([...(trustedOrigins ?? []), ...routeOptions.trustedOrigins])
     }
+    const limit = routeOptions?.rateLimit
+    let limited = handler
+    if (limit !== undefined) {
+      assertRateLimit(limit, `${upperMethod} ${normPath} from "${pluginName}"`)
+      const limiter = rateLimits.limiter(limit)
+      limited = (ctx) => {
+        const retryAfter = hitFor(limiter, limit, ctx)
+        return retryAfter > 0 ? tooManyRequests(retryAfter) : handler(ctx)
+      }
+    }
     byMethod.set(upperMethod, {
       plugin: pluginName,
-      handler,
+      handler: limited,
       csrf: routeOptions?.csrf ?? true,
       trustedOrigins: routeTrustedOrigins,
       trustProxy: routeOptions?.trustProxy ?? trustProxy,
@@ -148,6 +162,10 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
           scopedMiddlewares.push({ mw, scope: middlewareOptions?.scope ?? 'all' })
         },
         route: registerRouteFor(plugin.name),
+        rateLimiter(limit) {
+          assertRateLimit(limit, `the rateLimiter of "${plugin.name}"`)
+          return rateLimits.limiter(limit)
+        },
         rewrite(fn) {
           rewrites.push(fn)
         },
@@ -190,6 +208,7 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
     if (disposed)
       return
     disposed = true
+    rateLimits.close()
     for (const { plugin, hook } of shutdownHooks) {
       try {
         await hook()
@@ -200,7 +219,7 @@ export async function createServerPluginHost(options: ServerPluginHostOptions) {
     }
   }
 
-  return { router, rewrites, allMiddlewares, hasPathScopedMiddlewares, middlewaresFor, middlewaresForPaths, dispose }
+  return { router, rewrites, allMiddlewares, hasPathScopedMiddlewares, middlewaresFor, middlewaresForPaths, rateLimits, dispose }
 }
 
 export type ServerPluginHost = Awaited<ReturnType<typeof createServerPluginHost>>
