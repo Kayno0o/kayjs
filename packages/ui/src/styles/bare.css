@@ -141,6 +141,10 @@
   dialog[data-ui="drawer"] > [data-part="panel"] {
     min-block-size: 100%;
   }
+  /* The page behind a modal does not scroll */
+  html:has(dialog[data-ui]:modal) {
+    overflow: hidden;
+  }
   dialog[data-ui="dialog"],
   dialog[data-ui="command"] {
     margin: auto;

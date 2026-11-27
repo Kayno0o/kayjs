@@ -81,8 +81,17 @@ describe('Dialog and Drawer on the platform (#3686)', () => {
         await page.click('#confirm [data-part="close"]')
         expect(await isOpen(page, '#confirm')).toBe(false)
         await page.click('[data-ui="dialog-root"] [data-part="trigger"]')
+        expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe('hidden')
+        // A text selection pressed in the panel and released on the backdrop keeps the dialog open.
+        const body = (await page.locator('#confirm [data-part="body"]').boundingBox())!
+        await page.mouse.move(body.x + 2, body.y + 2)
+        await page.mouse.down()
+        await page.mouse.move(5, 5)
+        await page.mouse.up()
+        expect(await isOpen(page, '#confirm')).toBe(true)
         await page.mouse.click(5, 5)
         expect(await isOpen(page, '#confirm')).toBe(false)
+        expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe('visible')
         await page.click('[data-ui="drawer-root"] [data-part="trigger"]')
         expect(await isOpen(page, '#inspector')).toBe(true)
         await page.keyboard.press('Escape')

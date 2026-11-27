@@ -30,7 +30,7 @@ Available grammars: `'orbit'` · `'editorial'` · `'workshop'` · `'console'` ·
 - **0 KB JS static & layout primitives**: `Stack`, `Cluster`, `Grid`, `Sidebar`, `Split`, `Button`, `Card` (`CardHeader`/`CardBody`/`CardFooter`), `Badge`, `Notice`, `Field`, `Switch`, `Checkbox`, `RadioGroup`, `Accordion` (`AccordionItem`), `Popover`, `Dialog`, `Drawer`.
 - **Auto-hydrated interactive islands**: `ControlledDialog` and `ControlledDrawer` (a `Dialog` or `Drawer` your code opens and closes through an `open` signal), `Tabs`, `Menu`, `Select`, `CommandPalette` (`⌘K`), `DataTable` (sort, filter, select, paginate), `Toaster` + `toast()`.
 
-`Dialog` and `Drawer` ship no JavaScript. Their trigger opens them with the browser's invoker commands (`commandfor` and `command="show-modal"`), and the browser closes them on Esc, on the close button and on a click on the backdrop (`closedby="any"`).
+`Dialog` and `Drawer` ship no JavaScript. Their trigger opens them with the browser's invoker commands (`commandfor` and `command="show-modal"`), and the browser closes them on Esc, on the close button and on a click on the backdrop (`closedby="any"`). The page behind an open one does not scroll.
 
 `Menu`, `Select` and `Popover` open in the browser's top layer, so a parent with `overflow: hidden` never clips them. CSS anchor positioning places each one below its trigger, and above it or on its other side when the viewport has no room there. An outside click closes them.
 

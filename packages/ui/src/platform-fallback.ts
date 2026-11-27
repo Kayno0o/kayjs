@@ -8,13 +8,14 @@ const PLACE_POPUP = 'const S=["[data-ui=menu] [role=menu]","[data-ui=select] [ro
   + 'A&&(document.addEventListener("toggle",e=>e.newState==="open"&&e.target.matches(S.join())&&P(e.target),true),'
   + 'addEventListener("scroll",()=>document.querySelectorAll(S.map(s=>`${s}:popover-open`).join()).forEach(P),{capture:true,passive:true}));'
 
-/** Opens and closes what a `commandfor` button names, closes a `closedby="any"` dialog on a backdrop click, and places the popups against their trigger. */
-export const FALLBACK_JS = 'const C=!("command"in HTMLButtonElement.prototype),B=!("closedBy"in HTMLDialogElement.prototype),A=!CSS.supports("position-area:block-end");'
+/** Opens and closes what a `commandfor` button names, closes a `closedby="any"` dialog on a click pressed and released on its backdrop, and places the popups against their trigger. */
+export const FALLBACK_JS = 'const C=!("command"in HTMLButtonElement.prototype),B=!("closedBy"in HTMLDialogElement.prototype),A=!CSS.supports("position-area:block-end");let D;'
   + PLACE_POPUP
+  + 'document.addEventListener("pointerdown",e=>D=e.target,true);'
   + 'document.addEventListener("click",e=>{const t=e.target;'
   + 'if(C){const b=t.closest&&t.closest("button[commandfor]"),d=b&&document.getElementById(b.getAttribute("commandfor"));'
   + 'if(d){const c=b.getAttribute("command");c==="show-modal"?d.open||d.showModal():c==="close"||c==="request-close"?d.close():c==="toggle-popover"?d.togglePopover():c==="show-popover"?d.showPopover():c==="hide-popover"&&d.hidePopover();return}}'
-  + 'if(B&&t instanceof HTMLDialogElement&&t.open&&t.getAttribute("closedby")==="any"){const r=t.getBoundingClientRect();'
+  + 'if(B&&t===D&&t instanceof HTMLDialogElement&&t.open&&t.getAttribute("closedby")==="any"){const r=t.getBoundingClientRect();'
   + '(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)&&t.close()}})'
 
 /** The fallback's file under the asset prefix, named by its content so a browser keeps it for good. */
