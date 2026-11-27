@@ -41,7 +41,6 @@
     "packages/kay/src/compiler/ssr-helpers.ts::emitSsrElementAttrs": 71,
     "packages/kay/src/dom/loop.ts::loop.effect().untrack()": 42,
     "packages/kay/src/server/index.ts::createServerFromEmbedded.handleInternal": 54,
-    "packages/plugin-images/src/plugin.ts::readImageDimensions": 69,
     "packages/plugin-mcp/src/schema.ts::compactSchemaNode": 63
   }
 }

@@ -2,7 +2,7 @@
 // fail `kay check`, and images always report real dimensions or fail the build.
 
 import { describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { images, optimizeImageFile, readImageDimensions } from '@kayjs/images'
@@ -42,6 +42,126 @@ WEBP_300X200[24] = 299 & 0xFF
 WEBP_300X200[25] = (299 >> 8) & 0xFF
 WEBP_300X200[27] = 199 & 0xFF
 WEBP_300X200[28] = (199 >> 8) & 0xFF
+
+// A JPEG header as a phone writes it: SOI, an optional JFIF APP0, an Exif APP1 holding only Orientation, then SOF0 at 640x480.
+function jpegWithOrientation(orientation: number, { endian = 'MM', jfif = false, truncated = false, xmp = false }: { endian?: 'MM' | 'II', jfif?: boolean, truncated?: boolean, xmp?: boolean } = {}): Uint8Array {
+  const u16 = (n: number) => endian === 'MM' ? [n >> 8, n & 0xFF] : [n & 0xFF, n >> 8]
+  const u32 = (n: number) => endian === 'MM' ? [0, 0, ...u16(n)] : [...u16(n), 0, 0]
+  const tiff = [...Buffer.from(endian), ...u16(0x2A), ...u32(8), ...u16(1), ...u16(0x0112), ...u16(3), ...u32(1), ...u16(orientation), 0, 0, ...u32(0)]
+  const body = [...Buffer.from('Exif\0\0'), ...(truncated ? tiff.slice(0, 10) : tiff)]
+  const xmpBody = [...Buffer.from('http://ns.adobe.com/xap/1.0/\0<x:xmpmeta/>')]
+  return new Uint8Array([
+    0xFF, 0xD8,
+    ...(jfif ? [0xFF, 0xE0, 0x00, 0x10, ...Buffer.from('JFIF\0'), 1, 1, 0, 0, 1, 0, 1, 0, 0] : []),
+    0xFF, 0xE1, (body.length + 2) >> 8, (body.length + 2) & 0xFF, ...body,
+    ...(xmp ? [0xFF, 0xE1, (xmpBody.length + 2) >> 8, (xmpBody.length + 2) & 0xFF, ...xmpBody] : []),
+    ...JPEG_640X480.slice(2),
+  ])
+}
+
+describe('@kayjs/images sizes a photo as it is displayed, after its EXIF orientation (#3676)', () => {
+  test('swaps width and height for orientations 5 to 8, in either byte order and after a JFIF segment', () => {
+    expect(readImageDimensions(jpegWithOrientation(6))).toEqual({ width: 480, height: 640 })
+    expect(readImageDimensions(jpegWithOrientation(8))).toEqual({ width: 480, height: 640 })
+    expect(readImageDimensions(jpegWithOrientation(5))).toEqual({ width: 480, height: 640 })
+    expect(readImageDimensions(jpegWithOrientation(7))).toEqual({ width: 480, height: 640 })
+    expect(readImageDimensions(jpegWithOrientation(6, { endian: 'II' }))).toEqual({ width: 480, height: 640 })
+    expect(readImageDimensions(jpegWithOrientation(6, { jfif: true }))).toEqual({ width: 480, height: 640 })
+    expect(readImageDimensions(jpegWithOrientation(6, { xmp: true }))).toEqual({ width: 480, height: 640 })
+  })
+
+  test('keeps the stored size for orientations 1 to 4 and for a cut-off Exif segment', () => {
+    expect(readImageDimensions(jpegWithOrientation(1))).toEqual({ width: 640, height: 480 })
+    expect(readImageDimensions(jpegWithOrientation(3))).toEqual({ width: 640, height: 480 })
+    expect(readImageDimensions(jpegWithOrientation(4))).toEqual({ width: 640, height: 480 })
+    expect(readImageDimensions(jpegWithOrientation(6, { truncated: true }))).toEqual({ width: 640, height: 480 })
+    // A TIFF header that is neither II nor MM: magick ignores the block, so the photo is not turned.
+    const badOrder = jpegWithOrientation(6)
+    badOrder.set([0x58, 0x58], 12)
+    expect(readImageDimensions(badOrder)).toEqual({ width: 640, height: 480 })
+  })
+
+  test('a file that ends inside its Exif entry gives no size instead of throwing', () => {
+    const cut = jpegWithOrientation(6)
+    // SOI, the APP1 marker and length, "Exif\0\0", the TIFF header and the entry up to its value: the segment length says 14 bytes of TIFF.
+    const file = cut.slice(0, 12 + 14)
+    file.set([0x00, 2 + 6 + 14], 4)
+    expect(readImageDimensions(file)).toBeUndefined()
+  })
+
+  test('the build labels and reports a rotated photo by its displayed size', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3676-'))
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/assets'), { recursive: true })
+      // Stored 200 wide and 300 tall, displayed 300 by 200 once turned by Orientation 6.
+      const stored = Bun.spawnSync(['magick', '-size', '200x300', 'gradient:#c2593f-#2b5876', 'jpg:-']).stdout
+      const withExif = jpegWithOrientation(6)
+      const app1 = withExif.slice(2, withExif.length - JPEG_640X480.length + 2)
+      const photo = new Uint8Array([...stored.subarray(0, 2), ...app1, ...stored.subarray(2)])
+      writeFileSync(join(dir, 'src/assets/photo.jpg'), photo)
+      // What a build before #3676 left in the cache, under its key of the time: the stored size.
+      const oldHash = Bun.hash(`${Bun.hash(photo)}:320:webp:80:55`).toString(36)
+      mkdirSync(join(dir, '.kay-cache/images'), { recursive: true })
+      writeFileSync(join(dir, `.kay-cache/images/photo-${oldHash}-200w.webp`), 'old')
+      writeFileSync(join(dir, `.kay-cache/images/photo-${oldHash}.json`), JSON.stringify({ width: 200, height: 300, files: [{ rel: `img/photo-${oldHash}-200w.webp`, width: 200, format: 'webp' }] }))
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+import { image } from ${JSON.stringify(IMAGES_MOD)}
+import photo from '../assets/photo.jpg'
+export default function Home() {
+  return <img {...image(photo, { sizes: '100vw' })} alt="p" />
+}
+`)
+      const plugin = images({ widths: [320], formats: ['webp'], quality: 80, avifQuality: 55, cacheDir: join(dir, '.kay-cache/images') })
+      await build({ root: dir, plugins: [plugin] })
+      const app = await createServer({ root: dir, plugins: [plugin] })
+      const html = await (await app.handle(new Request('http://localhost/'))).text()
+      expect(html).toContain('width="300"')
+      expect(html).toContain('height="200"')
+      const variant = /\/(img\/photo-[^ "]+-300w\.webp) 300w/.exec(html)
+      expect(variant).not.toBeNull()
+      const file = await (await app.handle(new Request(`http://localhost/_kay/${variant![1]}`))).arrayBuffer()
+      expect(readImageDimensions(new Uint8Array(file))).toEqual({ width: 300, height: 200 })
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a photo whose header kay cannot read takes its turned size from magick identify', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-3676-identify-'))
+    const prevPath = process.env.PATH
+    try {
+      mkdirSync(join(dir, 'bin'))
+      writeFileSync(join(dir, 'bin/magick'), `#!/bin/sh
+case "$*" in *identify*) printf '200 300 RightTop'; exit 0;; esac
+for last; do :; done
+printf 'x' > "$last"
+`)
+      chmodSync(join(dir, 'bin/magick'), 0o755)
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      mkdirSync(join(dir, 'src/assets'), { recursive: true })
+      writeFileSync(join(dir, 'src/assets/odd.jpg'), 'bytes only magick reads')
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `
+import odd from '../assets/odd.jpg'
+export default function Home() {
+  return <img src={odd.src} width={odd.width} height={odd.height} alt="p" />
+}
+`)
+      process.env.PATH = `${join(dir, 'bin')}:${prevPath}`
+      const plugin = images({ formats: ['webp'], cacheDir: join(dir, '.kay-cache/images') })
+      await build({ root: dir, plugins: [plugin] })
+      const app = await createServer({ root: dir, plugins: [plugin] })
+      const html = await (await app.handle(new Request('http://localhost/'))).text()
+      expect(html).toContain('width="300"')
+      expect(html).toContain('height="200"')
+    }
+    finally {
+      process.env.PATH = prevPath
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
 
 describe('#3553 plugin tooling checks & real image dimensions', () => {
   test('readImageDimensions parses PNG, GIF, JPEG, and WebP headers accurately', () => {

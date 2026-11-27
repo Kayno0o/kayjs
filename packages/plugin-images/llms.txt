@@ -21,6 +21,7 @@
 - `image(asset, { sizes?, priority? })`: returns `ImgSpreadProps` (`src`, `srcset`, `sizes`, `width`, `height`, `loading`, `decoding`, `fetchpriority`) for `<img {...image(hero)} alt="..." />`.
 - `shareCard({ title, subtitle?, badge?, image?, background?, color?, accent? })`: renders and caches a PNG card under `public/og/*.png` (via `rsvg-convert` or `magick`) and returns its URL (prefixed with `site` when configured).
 - `optimizeImageFile(absPath, options?)`: synchronously optimizes a local file into `dist/public/img/`.
+- `readImageDimensions(bytes)`: `{ width, height }` from a PNG, GIF, WebP, JPEG or AVIF header, with no process, as the image is displayed: a JPEG whose EXIF Orientation is 5 to 8 has them swapped, as its variants and every imported asset do.
 
 ## Snippets
 

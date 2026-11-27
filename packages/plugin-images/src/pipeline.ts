@@ -103,17 +103,21 @@ export interface VariantPipelineConfig {
 }
 
 
+// EXIF orientations 5 to 8, which `-auto-orient` turns a quarter.
+const QUARTER_TURNS = new Set(['LeftTop', 'RightTop', 'RightBottom', 'LeftBottom'])
+
 function parseMagickDimensions(stdout: string): { width: number, height: number } | undefined {
   const parts = stdout.trim().split(/\s+/)
   const w = Number(parts[0])
   const h = Number(parts[1])
   if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
     return undefined
-  return { width: w, height: h }
+  return QUARTER_TURNS.has(parts[2] ?? '') ? { width: h, height: w } : { width: w, height: h }
 }
 
+/** The size the variants will have, after `-auto-orient`, for a file whose header kay cannot read. */
 export async function identifyImageAsync(filePath: string): Promise<{ width: number, height: number } | undefined> {
-  const result = await runMagick(['identify', '-ping', '-format', '%w %h', `${filePath}[0]`])
+  const result = await runMagick(['identify', '-ping', '-format', '%w %h %[orientation]', `${filePath}[0]`])
   if (!result.ok)
     return undefined
   return parseMagickDimensions(new TextDecoder().decode(result.stdout))
@@ -167,9 +171,12 @@ export async function encodeVariantAsync(srcPath: string, dstPath: string, width
   return false
 }
 
+// Bumped when the same source and options give other variants or sizes, so a cache from before is not reused: 2 sizes photos after their EXIF orientation (#3676).
+const VARIANT_CACHE_VERSION = 2
+
 export function computeImageKey(srcPath: string, rawBytes: Uint8Array, cfg: VariantPipelineConfig): { hash: string, stem: string, rawFileName: string } {
   const ext = extname(srcPath).toLowerCase()
-  const hash = Bun.hash(`${Bun.hash(rawBytes)}:${cfg.widths.join(',')}:${cfg.formats.join(',')}:${cfg.quality}:${cfg.avifQuality}`).toString(36)
+  const hash = Bun.hash(`${VARIANT_CACHE_VERSION}:${Bun.hash(rawBytes)}:${cfg.widths.join(',')}:${cfg.formats.join(',')}:${cfg.quality}:${cfg.avifQuality}`).toString(36)
   const stem = basename(srcPath, extname(srcPath)).toLowerCase().replace(/[^a-z0-9-_]/g, '-')
   return { hash, stem, rawFileName: `${stem}-${hash}${ext}` }
 }
