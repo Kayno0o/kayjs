@@ -1,5 +1,7 @@
 # Kay v2
 
+Kay v2 continues as [prunelle](https://git.kaynooo.fr/kaynooo/prunelle) (mirror: [github.com/Kayno0o/prunelle](https://github.com/Kayno0o/prunelle)), and this branch is frozen. An app on kay v2 moves over with `bunx prunelle upgrade`.
+
 **Write standard TypeScript & JSX. Zero `'use client'`, zero `client:load`.**
 Static UI compiles to `0 KB` HTML strings; interactive components automatically become `~3.9 KB` fine-grained signal islands. Built natively on Bun with single-binary production deploys and a strict `KayPlugin` boundary.
 
