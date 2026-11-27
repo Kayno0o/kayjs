@@ -25,6 +25,7 @@ import { renderProblems } from './render-rules'
 import { planIslands } from './islands'
 import { buildActionEntries, buildRouteEntries } from './manifest'
 import { createPluginHost, createPublicFiles } from './plugin-host'
+import { carryPreviousAssets } from './carry'
 import { assertOwnOutDir, processSuffix, removeDeadProcessDirs, removeStaleStages, stageDirFor, swapStage } from './output'
 import { prerender } from './prerender'
 import { analyzeBundleWeights, checkJsBudget, formatBundleReport, formatBundleReportJson, islandOrigins } from './report'
@@ -455,8 +456,29 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
       checkJsBudget(report, options.maxJs)
   }
 
+  await landBuild(run, { manifest, writeManifest, host, env, assets, builtClientAssets, hasNotFoundFile })
+  return manifest
+}
+
+interface BuiltOutput {
+  manifest: BuildManifest
+  writeManifest: () => void
+  host: ReturnType<typeof createPluginHost>
+  env: Parameters<typeof pluginBunPlugins>[0]
+  assets: string[]
+  builtClientAssets: ReadonlySet<string>
+  hasNotFoundFile: boolean
+}
+
+/** Prerenders, runs the plugins' after-prerender hooks, exports or carries the previous build's dropped files, compiles, then swaps the stage in. */
+async function landBuild(run: BuildRun, built: BuiltOutput): Promise<void> {
+  const { options, root, plugins, outDir, assetPrefix, isDev, publicFiles } = run
+  const { manifest, writeManifest, host, env, assets, builtClientAssets, hasNotFoundFile } = built
+  const clientDir = join(outDir, 'client')
+  const isStatic = options.static === true
+
   // Hybrid prerendering / static export (skipped in `kay dev`, where routes render on-demand)
-  const prerenderRoutes = options.prerender !== false || isStatic ? routes.filter(r => r.prerender) : []
+  const prerenderRoutes = options.prerender !== false || isStatic ? manifest.routes.filter(r => r.prerender) : []
   const prerenderDir = isStatic ? run.stageDir : join(outDir, 'prerendered')
   const prerendered = prerenderRoutes.length > 0 || isStatic
     ? await prerender({ root, outDir, assetPrefix, site: run.site, plugins, pluginOverride: options.plugins, isDev, nodeEnv: run.nodeEnv, isStatic, prerenderDir, routes: prerenderRoutes })
@@ -496,6 +518,14 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     await prerendered?.app?.dispose?.()
   }
 
+  if (!isStatic && !isDev) {
+    const carried = carryPreviousAssets(run.finalOutDir, outDir, 'client', manifest.assets)
+    if (carried.length > 0) {
+      manifest.carriedAssets = carried
+      writeManifest()
+    }
+  }
+
   if (options.compile) {
     await compileExecutable({
       root,
@@ -515,7 +545,6 @@ async function runBuild(run: BuildRun): Promise<BuildManifest> {
     swapStage(outDir, run.finalOutDir, run.stageSuffix)
     relocateCache(options.cache, outDir, run.finalOutDir)
   }
-  return manifest
 }
 
 /** Where `--compile` writes the binary: a path inside the output folder goes into the stage, so the swap keeps it. */

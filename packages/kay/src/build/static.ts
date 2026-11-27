@@ -11,6 +11,7 @@ import { createDocumentHooks, createHtmlHeaders } from '../server/document'
 import { createNavigation } from '../ssr/navigation'
 import { createFallbackPages } from '../server/errors'
 import { precompressFile, walkAllFiles } from './files'
+import { carryPreviousAssets } from './carry'
 import { swapStage } from './output'
 import { prerenderOrigin } from '../server/prerendered'
 import { pageFailure } from './prerender'
@@ -98,6 +99,8 @@ export async function exportStatic(options: StaticExportOptions): Promise<void> 
     copyInto(stageDir, rel, join(outPublicDir, rel))
   for (const abs of walkAllFiles(stageDir))
     precompressFile(abs, 128)
+  if (!options.isDev)
+    carryPreviousAssets(finalOutDir, stageDir, relative(stageDir, assetDir), options.assets)
 
   // Swap the stage in only after every page and asset succeeded.
   swapStage(stageDir, finalOutDir, options.stageSuffix)

@@ -42,7 +42,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     }
   }
   const embeddedAssets: string[] = []
-  for (const rel of manifest.assets) {
+  for (const rel of [...manifest.assets, ...(manifest.carriedAssets ?? [])]) {
     const abs = join(clientDir, rel)
     if (existsSync(abs))
       embed(embeddedAssets, rel, abs)

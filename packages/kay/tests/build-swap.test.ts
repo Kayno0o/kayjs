@@ -3,11 +3,14 @@
 import type { Subprocess } from 'bun'
 import type { KayPlugin } from '../src/plugins/types'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
+import { linkOrCopyFile } from '../src/build/bundle'
+import { ASSET_RECORD, carryPreviousAssets } from '../src/build/carry'
 import { build } from '../src/build/index'
 import { startBuiltApp } from '../src/server/loader'
+import { createStaticDirServer } from '../src/server/static-dir'
 import { testApp } from '../src/test/index'
 
 const tempDirs: string[] = []
@@ -344,7 +347,7 @@ const PAGES = (version: string): Record<string, string> => ({
 })
 
 describe('a running kay start serves the build kay build swaps in (#3660)', () => {
-  it('reloads the new build in-process: its pages, island chunks and public files, and none of the old chunks', async () => {
+  it('reloads the new build in-process: its pages, island chunks and public files, and the old chunks for one more deploy (#3663)', async () => {
     const dir = appWith(PAGES('v1'))
     const first = await build({ root: dir })
     const { url, proc } = await kayStart(dir)
@@ -369,7 +372,7 @@ describe('a running kay start serves the build kay build swaps in (#3660)', () =
       for (const rel of second.assets)
         expect(answers[`/_kay/${rel}`]).toStartWith('200')
       for (const rel of gone)
-        expect(answers[`/_kay/${rel}`]).toBe('404')
+        expect(answers[`/_kay/${rel}`]).toStartWith('200')
     }
     finally {
       proc.kill('SIGTERM')
@@ -493,3 +496,141 @@ async function untilServes(url: string, text: string): Promise<void> {
     await Bun.sleep(20)
   }
 }
+
+describe('a page loaded before a deploy still finds the client files it links (#3663)', () => {
+  const counterV = (n: number) => COUNTER.replace('signal(0)', `signal(${n})`)
+  const hashedBytes = (dir: string, rel: string) => readFileSync(join(dir, rel), 'latin1')
+
+  it('serves the previous build\'s dropped files from kay start for one deploy, then drops them', async () => {
+    const dir = appWith({})
+    const first = await build({ root: dir, minify: false })
+    const before = Object.fromEntries(first.assets.map(rel => [rel, hashedBytes(join(dir, 'dist/client'), rel)]))
+    const inode = Object.fromEntries(first.assets.map(rel => [rel, statSync(join(dir, 'dist/client', rel)).ino]))
+
+    write(dir, 'src/components/Counter.tsx', counterV(1))
+    const second = await build({ root: dir, minify: false })
+    const droppedBySecond = first.assets.filter(rel => !second.assets.includes(rel))
+    expect(droppedBySecond.length).toBeGreaterThan(0)
+    expect(second.carriedAssets).toEqual(droppedBySecond)
+    // Routes and preloads name only the new build's files.
+    expect(JSON.stringify(second.routes)).not.toContain(droppedBySecond[0]!)
+
+    const { app } = await startBuiltApp({ root: dir, outDir: 'dist' })
+    try {
+      for (const rel of droppedBySecond) {
+        const res = await app.handle(new Request(`http://localhost/_kay/${rel}`))
+        expect(res.status).toBe(200)
+        expect(res.headers.get('cache-control')).toContain('immutable')
+        expect(await res.text()).toBe(Buffer.from(before[rel]!, 'latin1').toString())
+        // A hard link, not a copy.
+        expect(statSync(join(dir, 'dist/client', rel)).ino).toBe(inode[rel]!)
+      }
+    }
+    finally {
+      await app.dispose?.()
+    }
+
+    write(dir, 'src/components/Counter.tsx', counterV(2))
+    const third = await build({ root: dir, minify: false })
+    const droppedByThird = second.assets.filter(rel => !third.assets.includes(rel))
+    expect(third.carriedAssets).toEqual(droppedByThird)
+    const { app: next } = await startBuiltApp({ root: dir, outDir: 'dist' })
+    try {
+      for (const rel of droppedBySecond)
+        expect((await next.handle(new Request(`http://localhost/_kay/${rel}`))).status).toBe(404)
+      for (const rel of droppedByThird)
+        expect((await next.handle(new Request(`http://localhost/_kay/${rel}`))).status).toBe(200)
+    }
+    finally {
+      await next.dispose?.()
+    }
+  })
+
+  it('embeds them in a compiled binary for one deploy', async () => {
+    const dir = appWith({})
+    const binPath = join(dir, 'server-bin')
+    const first = await build({ root: dir, minify: false, compile: binPath })
+    write(dir, 'src/components/Counter.tsx', counterV(1))
+    const second = await build({ root: dir, minify: false, compile: binPath })
+    const dropped = first.assets.filter(rel => !second.assets.includes(rel))
+    expect(dropped.length).toBeGreaterThan(0)
+
+    const proc = Bun.spawn([binPath], { cwd: dir, env: { ...process.env, PORT: '0' }, stdout: 'pipe', stderr: 'pipe' })
+    try {
+      const reader = proc.stdout.getReader()
+      let out = ''
+      while (!/http:\/\/\S+/.test(out)) {
+        const { value, done } = await reader.read()
+        if (done)
+          break
+        out += new TextDecoder().decode(value)
+      }
+      reader.releaseLock()
+      const origin = /http:\/\/\S+/.exec(out)![0]
+      for (const rel of dropped)
+        expect((await fetch(`${origin}/_kay/${rel}`)).status).toBe(200)
+    }
+    finally {
+      proc.kill()
+      await proc.exited
+    }
+  })
+
+  it('keeps them in a --static export for one deploy', async () => {
+    const dir = appWith({})
+    const first = await build({ root: dir, minify: false, static: true })
+    write(dir, 'src/components/Counter.tsx', counterV(1))
+    const second = await build({ root: dir, minify: false, static: true })
+    const dropped = first.assets.filter(rel => !second.assets.includes(rel))
+    expect(dropped.length).toBeGreaterThan(0)
+
+    const served = createStaticDirServer(join(dir, 'dist'), '/_kay', undefined, true, false)
+    for (const rel of dropped) {
+      const res = await served.handle(new Request(`http://localhost/_kay/${rel}`))
+      expect(res.status).toBe(200)
+      expect(res.headers.get('cache-control')).toContain('immutable')
+    }
+
+    write(dir, 'src/components/Counter.tsx', counterV(2))
+    await build({ root: dir, minify: false, static: true })
+    for (const rel of dropped)
+      expect(existsSync(join(dir, 'dist/_kay', rel))).toBe(false)
+  })
+})
+
+describe('linkOrCopyFile copies where a hard link is refused (#3663)', () => {
+  it('copies across filesystems', () => {
+    const shm = '/dev/shm'
+    const dst = join(mkdtempSync(join(repoRoot, 'node_modules/.kay-3663-')), 'chunk.js')
+    tempDirs.push(join(dst, '..'))
+    const src = join(mkdtempSync(join(shm, 'kay-3663-')), 'chunk.js')
+    tempDirs.push(join(src, '..'))
+    writeFileSync(src, 'export {}')
+    if (statSync(shm).dev === statSync(join(dst, '..')).dev)
+      return
+    linkOrCopyFile(src, dst)
+    expect(readFileSync(dst, 'utf8')).toBe('export {}')
+    expect(statSync(dst).ino).not.toBe(statSync(src).ino)
+  })
+})
+
+describe('carryPreviousAssets reads only inside the previous output (#3663)', () => {
+  it('carries nothing a record names outside its folder or outside the stage', () => {
+    const base = mkdtempSync(join(tmpdir(), 'kay-3663-carry-'))
+    tempDirs.push(base)
+    write(base, 'secret.txt', 'secret')
+    write(base, 'prev/client/a.js', 'a')
+    writeFileSync(join(base, 'prev', ASSET_RECORD), JSON.stringify({ dir: 'client', assets: ['a.js', '../../secret.txt', '../stage-out.txt'], carried: [] }))
+    write(base, 'prev/stage-out.txt', 'out')
+    mkdirSync(join(base, 'stage/client'), { recursive: true })
+
+    expect(carryPreviousAssets(join(base, 'prev'), join(base, 'stage'), 'client', [])).toEqual(['a.js'])
+    expect(existsSync(join(base, 'secret.txt'))).toBe(true)
+    expect(readdirSync(join(base, 'stage/client'))).toEqual(['a.js'])
+    expect(readdirSync(join(base, 'stage')).sort()).toEqual([ASSET_RECORD, 'client'])
+    mkdirSync(join(base, 'stage2'))
+
+    writeFileSync(join(base, 'prev', ASSET_RECORD), JSON.stringify({ dir: '..', assets: ['secret.txt'], carried: [] }))
+    expect(carryPreviousAssets(join(base, 'prev'), join(base, 'stage2'), 'client', [])).toEqual([])
+  })
+})

@@ -2,7 +2,7 @@
   "files": {},
   "functionLines": {
     "packages/kay/src/build/bundle.ts::buildClient": 164,
-    "packages/kay/src/build/index.ts::runBuild": 212,
+    "packages/kay/src/build/index.ts::runBuild": 159,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys": 192,
     "packages/kay/src/compiler/dom.ts::compileDom": 454,
     "packages/kay/src/compiler/dom.ts::compileDom.compileElementTree": 204,
@@ -26,13 +26,11 @@
     "packages/plugin-auth/src/store.ts::memoryAuthStore": 159,
     "packages/plugin-content/src/collection.ts::defineCollection": 231,
     "packages/plugin-content/src/components.ts::parseLiteralValue": 240,
-    "packages/plugin-images/src/plugin.ts::images": 152,
     "packages/plugin-mcp/src/rpc.ts::createRpcDispatcher": 191,
     "packages/ui/src/CommandPalette.tsx::CommandPalette": 163
   },
   "functionComplexity": {
     "packages/kay/src/build/bundle.ts::buildClient": 54,
-    "packages/kay/src/build/index.ts::runBuild": 50,
     "packages/kay/src/compiler/data-keys.ts::analyzeDefaultDataKeys.walkWithParents": 72,
     "packages/kay/src/compiler/dom-attrs.ts::compileElementAttributes": 59,
     "packages/kay/src/compiler/scope.ts::isSafeLazyJsxRef.visit": 48,

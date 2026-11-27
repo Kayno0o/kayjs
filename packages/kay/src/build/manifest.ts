@@ -66,6 +66,8 @@ export interface BuildManifest {
   actions: ActionManifestEntry[]
   islands: Record<string, string>
   assets: string[]
+  /** The previous build's client files this one dropped, kept one more deploy for pages loaded before it (#3663); never linked from a page. */
+  carriedAssets?: string[] | undefined
   publicFiles: string[]
   /** Serializable build-time metadata persisted by plugins via `ctx.setData()`, read via `api.getBuildData()`. */
   pluginData?: Record<string, Record<string, unknown>> | undefined
