@@ -4,11 +4,12 @@ import type { Middleware } from '../src/server/http'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { brotliDecompressSync } from 'node:zlib'
+import { brotliDecompressSync, createGunzip, createZstdDecompress } from 'node:zlib'
 import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
 import { i18n } from '../../plugin-i18n/src/index'
 import { seo } from '../../plugin-seo/src/index'
 import { build } from '../src/build/index'
+import { maybeCompressResponse } from '../src/server/compress'
 import { CompressionCache, createServer, isCompressibleType, pickEncoding } from '../src/server/index'
 import { nativePrerenderedCheck } from '../src/server/prerendered'
 import { createFileServer, type ServedFile, servedFile } from '../src/server/served-file'
@@ -223,10 +224,7 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     const sseRes = await app.handle(new Request('http://localhost/api/events', { headers: { 'accept-encoding': 'zstd, gzip' } }))
     expect(sseRes.headers.get('content-encoding')).toBeNull()
 
-    // 5. Streaming <Suspense> is never buffered/compressed
-    const streamRes = await app.handle(new Request('http://localhost/stream', { headers: { 'accept-encoding': 'zstd, gzip' } }))
-    expect(streamRes.headers.get('content-encoding')).toBeNull()
-    expect(await streamRes.text()).toContain('streamed-payload')
+    // 5. Streaming <Suspense> is compressed as it streams, never buffered: see 'streamed pages compressed per flush'
 
     // 6. Both fast-path static route & dynamic route emit Set-Cookie ONCE (no missing / double finalizeResponse)
     const cookieRes = await app.handle(new Request('http://localhost/cookie'))
@@ -579,6 +577,131 @@ describe('what kay start loads', () => {
       }
     }
     expect(chains).toEqual([])
+  })
+})
+
+describe('streamed pages compressed per flush (#3668)', () => {
+  it('sends the shell compressed before the suspended part resolves, then the rest', async () => {
+    const dir = makeTemp('kay-stream-compress-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/stream.tsx'), `
+      import { Suspense } from '@kayjs/kay'
+      async function Late() {
+        await (globalThis as { __release?: Promise<void> }).__release
+        return <p id="late">{'late part '.repeat(50)}</p>
+      }
+      export default function Page() {
+        return <main><h1>{'shell '.repeat(50)}</h1><Suspense fallback={<p>loading</p>}><Late /></Suspense></main>
+      }
+    `)
+    // An endpoint streaming its own HTML goes through the same compression, and a text stream, flushed token by token, is left as it is.
+    const held = (type: string) => `
+      export function GET() {
+        const hold = globalThis as { __release?: Promise<void> }
+        return new Response(new ReadableStream({
+          async start(controller) {
+            controller.enqueue(new TextEncoder().encode('<main><p>loading</p>' + 'shell '.repeat(50) + '</main>'))
+            await hold.__release
+            controller.enqueue(new TextEncoder().encode('<p>' + 'late part '.repeat(50) + '</p>'))
+            controller.close()
+          },
+        }), { headers: { 'content-type': '${type}' } })
+      }
+    `
+    writeFileSync(join(dir, 'src/routes/feed.ts'), held('text/html; charset=utf-8'))
+    writeFileSync(join(dir, 'src/routes/tokens.ts'), held('text/plain; charset=utf-8'))
+    await build({ root: dir })
+    const app = await createServer({ root: dir, compress: true })
+    const hold = globalThis as { __release?: Promise<void> }
+    let release!: () => void
+    const holdBack = () => {
+      hold.__release = new Promise<void>((resolve) => {
+        release = resolve
+      })
+    }
+
+    holdBack()
+    const plain = await app.handle(new Request('http://localhost/stream', { headers: { 'accept-encoding': 'identity' } }))
+    expect(plain.headers.get('content-encoding')).toBe(null)
+    expect(plain.headers.get('vary')).toContain('Accept-Encoding')
+    release()
+    expect(await plain.text()).toContain('late part')
+
+    holdBack()
+    const tokens = await app.handle(new Request('http://localhost/tokens', { headers: { 'accept-encoding': 'gzip' } }))
+    expect(tokens.headers.get('content-encoding')).toBe(null)
+    release()
+    expect(await tokens.text()).toContain('late part')
+
+    for (const [path, encoding, decompressor] of [['/stream', 'gzip', createGunzip], ['/stream', 'zstd', createZstdDecompress], ['/feed', 'gzip', createGunzip]] as const) {
+      holdBack()
+      const res = await app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': encoding } }))
+      expect(res.headers.get('content-encoding')).toBe(encoding)
+      expect(res.headers.get('vary')).toContain('Accept-Encoding')
+      const inflate = decompressor()
+      let text = ''
+      inflate.on('data', (chunk: Buffer) => {
+        text += chunk.toString()
+      })
+      const reader = res.body!.getReader()
+      const feed = async (): Promise<boolean> => {
+        const { done, value } = await reader.read()
+        if (!done)
+          await new Promise(resolve => inflate.write(value, resolve))
+        return !done
+      }
+      while (!text.includes('</main>') && await feed()) { /* read until the shell is decoded */ }
+      expect(text).toContain('loading')
+      expect(text).not.toContain('late part')
+      release()
+      while (await feed()) { /* the rest */ }
+      expect(text).toContain('late part')
+    }
+  })
+})
+
+describe('streamed responses compressed with backpressure (#3668)', () => {
+  it.each(['gzip', 'zstd'])('reads no further from the source than the client has read (%s)', async (encoding) => {
+    let pulls = 0
+    let cancelled = false
+    const chunk = new TextEncoder().encode(`<p>${'row '.repeat(250)}</p>`)
+    const source = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls++
+        if (pulls === 10_000)
+          controller.close()
+        else
+          controller.enqueue(chunk)
+      },
+      cancel() {
+        cancelled = true
+      },
+    }, { highWaterMark: 0 })
+    const res = await maybeCompressResponse(new Response(source, { headers: { 'content-type': 'text/html' } }), new Request('http://localhost/', { headers: { 'accept-encoding': encoding } }), new CompressionCache())
+    expect(res.headers.get('content-encoding')).toBe(encoding)
+    // Past the 32 chunks the probe buffered, each chunk the client reads takes one more from the source.
+    const reader = res.body!.getReader()
+    for (let i = 0; i < 60; i++)
+      await reader.read()
+    await Bun.sleep(50)
+    // 32 probed, 28 more for the reads past them, a few in flight; reading ahead would take about twice as many.
+    expect(pulls).toBeLessThanOrEqual(64)
+    // A client that goes away stops the render.
+    await reader.cancel()
+    expect(cancelled).toBe(true)
+  })
+
+  it.each(['gzip', 'zstd'])('fails the response when the source fails mid-stream (%s)', async (encoding) => {
+    const source = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(new TextEncoder().encode(`<main>${'shell '.repeat(100)}</main>`))
+        await Bun.sleep(5)
+        controller.error(new Error('boundary failed'))
+      },
+    })
+    const res = await maybeCompressResponse(new Response(source, { headers: { 'content-type': 'text/html' } }), new Request('http://localhost/', { headers: { 'accept-encoding': encoding } }), new CompressionCache())
+    expect(res.headers.get('content-encoding')).toBe(encoding)
+    await expect(res.arrayBuffer()).rejects.toThrow('boundary failed')
   })
 })
 

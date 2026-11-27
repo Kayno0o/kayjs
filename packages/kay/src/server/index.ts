@@ -24,7 +24,7 @@ import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
 import { ACTION_ERROR_COOKIE, executeAction, finishActionRedirect, hydrateActionErrorFlash, isServerAction } from './action'
 import { createActionRegistry } from './action-registry'
 import { createAssets } from './assets'
-import { CompressionCache, compressedHtmlResponse, markCompressionHandled, maybeCompressResponse } from './compress'
+import { CompressionCache, compressedHtmlResponse, compressedHtmlStream, markCompressionHandled, maybeCompressResponse } from './compress'
 import { normalizeConsentConfig } from './consent'
 import { addedInlineStyleHashes, createDocumentHooks, createHtmlHeaders, mergeStyleHashes, resolveRenderedIslands, revivePreload, withPluginHtmlCsp } from './document'
 import { createErrorNotifier, createFallbackPages, devErrorResponse } from './errors'
@@ -399,7 +399,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
     const trustedStyleHashes = mergeStyleHashes(route.headStyleHashes, docHead.styleHashes, styleHashesOf(rctx.inlineStyles))
 
-    // Streaming SSR when <Suspense> boundaries are pending (never buffered for compression)
+    // Streaming SSR when <Suspense> boundaries are pending, compressed per flush, never buffered
     if (isStreamed) {
       if (ctx.request.method === 'HEAD')
         return markCompressionHandled(new Response(null, { status: 200, headers: withRegionVary(htmlHeaders(hasIslands, true, true, trustedStyleHashes), hasRegions) }))
@@ -408,7 +408,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       // Transforms see the document with its initial body; boundaries resolved later stream as they render.
       const shell = hasHtmlTransformers ? await applyHtmlTransforms(docShell, ctx.url, ctx.request, ctx) : docShell
       const streamStyleHashes = mergeStyleHashes(trustedStyleHashes, addedInlineStyleHashes(docShell, shell))
-      return markCompressionHandled(new Response(streamDocument(shell, rctx, streamTimeout, error => notifyError(error, ctx.request, 'route')), { status: 200, headers: withRegionVary(htmlHeaders(hasIslands, true, true, streamStyleHashes), hasRegions) }))
+      return compressedHtmlStream(streamDocument(shell, rctx, streamTimeout, error => notifyError(error, ctx.request, 'route')), 200, withRegionVary(htmlHeaders(hasIslands, true, true, streamStyleHashes), hasRegions), ctx.request, compressCache)
     }
 
     const docHtml = renderDocument({ ...doc, body, head: docHead.head, lang: docHead.lang, htmlAttrs: docHead.htmlAttrs, preloadChunks, hasIslands })

@@ -43,7 +43,7 @@ A key kay does not read fails the build, `kay check` and `kay dev`, naming the k
 | `consent` | `undefined` | One-declaration CNIL/RGPD consent categories, cookie name (`'kay_consent'`), retention (`15552000` s = 180 days), and `POST` endpoint (`'/_kay/consent'`). |
 | `compliance` | `undefined` | French web law check overrides: `{ ignore?, publicBody?, legalNotice? }`. |
 | `streamTimeout` | `30000` | Milliseconds a `<Suspense>` boundary may wait before failing. |
-| `compress` | `true` in prod, `false` in dev | Sends the `.br` and `.gz` files `kay build` wrote beside assets, `public/` files and prerendered pages, and compresses the rest on the fly (zstd, gzip). |
+| `compress` | `true` in prod, `false` in dev | Sends the `.br` and `.gz` files `kay build` wrote beside assets, `public/` files and prerendered pages, and compresses the rest on the fly (zstd, gzip), streamed pages included. |
 | `onError` | `undefined` | Hook called on unhandled errors in routes, actions, or plugins (`source: 'route' \| 'action' \| 'plugin'`). A hook that throws is logged with its owner, and the other hooks still run. |
 | `plugins` | `[]` | Array of `KayPlugin` instances. |
 

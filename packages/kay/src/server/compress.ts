@@ -1,5 +1,5 @@
 // Zero-dependency native HTTP compression (Bun.zstdCompressSync / Bun.gzipSync) with bounded byte-budget LRU.
-// Never imports `node:zlib` so server RSS stays minimal.
+// `node:zlib` (3 MB of RSS) loads only with the first page streamed to a client taking gzip and not zstd, as Bun has no streaming gzip of its own that flushes.
 
 export type CompressionEncoding = 'zstd' | 'gzip'
 export type PrecompressedEncoding = 'br' | 'gzip'
@@ -402,7 +402,7 @@ export function compressedHtmlResponse(
   }))
 }
 
-function compressedResponseFrom(res: Response, compressed: Uint8Array<ArrayBuffer>, enc: CompressionEncoding): Response {
+function compressedHeaders(res: Response, enc: CompressionEncoding): Headers {
   const headers = new Headers(res.headers)
   appendVaryAcceptEncoding(headers)
   headers.set('content-encoding', enc)
@@ -410,8 +410,89 @@ function compressedResponseFrom(res: Response, compressed: Uint8Array<ArrayBuffe
   const etag = headers.get('etag')
   if (etag !== null)
     headers.set('etag', toWeakEtag(etag))
-  return markCompressionHandled(new Response(compressed, { status: res.status, statusText: res.statusText, headers }))
+  return headers
 }
+
+function compressedResponseFrom(res: Response, compressed: Uint8Array<ArrayBuffer>, enc: CompressionEncoding): Response {
+  return markCompressionHandled(new Response(compressed, { status: res.status, statusText: res.statusText, headers: compressedHeaders(res, enc) }))
+}
+
+let zlib: Promise<typeof import('node:zlib')> | undefined
+
+/**
+ * Each chunk as a zstd frame of its own. A zstd body is one or more frames (RFC 8878, section 3), so the browser decodes each one as it arrives,
+ * and a frame costs a few microseconds where a zstd stream from `node:zlib` costs over 100 to set up per response.
+ */
+function zstdFrames(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  // Pulled by hand: Bun's pipeThrough does not pass a client's cancel back to the renderer.
+  const reader = body.getReader()
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const next = await reader.read()
+      if (next.done)
+        controller.close()
+      else
+        controller.enqueue(Bun.zstdCompressSync(next.value, { level: 3 }))
+    },
+    cancel: reason => reader.cancel(reason),
+  }, { highWaterMark: 0 })
+}
+
+/** One gzip stream flushed after each chunk: concatenated gzip members would stop a browser after the first. */
+async function gzipFlushed(body: ReadableStream<Uint8Array>): Promise<ReadableStream<Uint8Array>> {
+  const { constants, createGzip } = await (zlib ??= import('node:zlib'))
+  const compressor = createGzip({ level: GZIP_PER_RESPONSE, flush: constants.Z_SYNC_FLUSH })
+  const reader = body.getReader()
+  let ended: Promise<void> | undefined
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      compressor.on('data', (chunk: Uint8Array) => controller.enqueue(chunk))
+      compressor.once('end', () => controller.close())
+      compressor.once('error', error => controller.error(error))
+    },
+    async pull() {
+      if (ended !== undefined)
+        return ended
+      const next = await reader.read().catch((error: unknown) => {
+        compressor.destroy()
+        throw error
+      })
+      if (next.done) {
+        ended = new Promise(resolve => compressor.once('end', resolve))
+        compressor.end()
+        return ended
+      }
+      // The compressor emits the flushed bytes before it calls back, so each chunk leaves before the next one is read.
+      await new Promise<void>((resolve, reject) => compressor.write(next.value, error => error ? reject(error) : resolve()))
+    },
+    cancel(reason) {
+      compressor.destroy()
+      return reader.cancel(reason)
+    },
+  })
+}
+
+/** An open HTML stream compressed as it goes, flushed after each chunk the renderer sends, so the shell still reaches the browser before the suspended parts. */
+async function compressedStream(res: Response, body: ReadableStream<Uint8Array>, enc: CompressionEncoding): Promise<Response> {
+  const compressed = enc === 'zstd' ? zstdFrames(body) : await gzipFlushed(body)
+  return markCompressionHandled(new Response(compressed, { status: res.status, statusText: res.statusText, headers: compressedHeaders(res, enc) }))
+}
+
+/** A page streamed past its `<Suspense>` boundaries, compressed per flush for a client taking zstd or gzip. */
+export async function compressedHtmlStream(
+  stream: ReadableStream<Uint8Array>,
+  status: number,
+  baseHeaders: Record<string, string>,
+  request: Request,
+  cache: CompressionCache | undefined,
+): Promise<Response> {
+  const enc = cache !== undefined ? pickEncoding(request.headers.get('accept-encoding')) : undefined
+  if (enc !== undefined)
+    return compressedStream(new Response(null, { status, headers: baseHeaders }), stream, enc)
+  return markCompressionHandled(new Response(stream, { status, headers: cache !== undefined ? withVaryAcceptEncoding(baseHeaders) : baseHeaders }))
+}
+
+const isHtml = (res: Response): boolean => (res.headers.get('content-type') ?? '').trimStart().toLowerCase().startsWith('text/html')
 
 export async function maybeCompressResponse(
   res: Response,
@@ -463,8 +544,10 @@ export async function maybeCompressResponse(
   }
   else {
     const probe = await readBufferedOrPassThrough(res)
-    if ('passthrough' in probe)
-      return markCompressionHandled(probe.passthrough)
+    if ('passthrough' in probe) {
+      const { body } = probe.passthrough
+      return isHtml(res) && body !== null ? compressedStream(res, body, enc) : markCompressionHandled(probe.passthrough)
+    }
     raw = probe.buffered
   }
   const compressed = cache.compress(raw, enc)
