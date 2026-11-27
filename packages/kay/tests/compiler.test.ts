@@ -209,8 +209,8 @@ describe('TSX compiler', () => {
     expect(out.code).toContain('<\\\\/script>')
 
     // Dynamic expressions call ssrRawText, not esc
-    expect(out.code).toContain('__ssrRawText("style", css)')
-    expect(out.code).toContain('__ssrRawText("script", data)')
+    expect(out.code).toMatch(/__ssrRawText\("style", \n*css\)/)
+    expect(out.code).toMatch(/__ssrRawText\("script", \n*data\)/)
     expect(out.code).not.toContain('__esc(css)')
     expect(out.code).not.toContain('__esc(data)')
 
@@ -574,5 +574,19 @@ describe('#3629 compiler correctness: slots, raw text, and aliased Suspense', ()
     `
     const outNs = compileSsr('Page.tsx', namespaced).code
     expect(outNs).toContain('children: Slow({})')
+  })
+})
+
+describe('SSR output keeps source lines, so a stack trace names them (#3666)', () => {
+  const lineOf = (code: string, needle: string): number => code.slice(0, code.indexOf(needle)).split('\n').length
+
+  test('a component tag at the start of its line', () => {
+    const out = compileSsr('Page.tsx', `import { Badge } from './Badge'\nexport default function Page() {\n  return (\n<main>\n<Badge />\n</main>\n  )\n}\n`)
+    expect(lineOf(out.code, 'Badge(')).toBe(5)
+  })
+
+  test('code after a JSX root nested inside an expression', () => {
+    const src = `export default function Table({ rows }: { rows: string[] }) {\n  return <table>{rows.map((row) => {\n    const cell = (\n      <td>\n        {row}\n      </td>\n    )\n    return check(row) && cell\n  })}</table>\n}\n`
+    expect(lineOf(compileSsr('Table.tsx', src).code, 'check(row)')).toBe(8)
   })
 })

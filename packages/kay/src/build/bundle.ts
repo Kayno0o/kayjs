@@ -581,6 +581,8 @@ export async function buildServer(env: BundleEnv, entries: string[], serverRoot:
     splitting: true,
     packages: 'external',
     minify: false,
+    // A stack trace names the source file and line: Bun reads the map beside each chunk.
+    sourcemap: 'linked',
     metafile: cache !== undefined,
     define: {
       'process.env.NODE_ENV': 'process.env.NODE_ENV',

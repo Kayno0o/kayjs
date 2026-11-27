@@ -91,6 +91,8 @@ An error that no `onError` hook and no `_error.tsx` handled answers with a bare 
 
 With `dev: true` in `testApp()`, and always under `kay dev`, the response carries the real error instead. A request that asks for JSON gets `{ ok: false, status: 500, error, stack }`, and any other request gets the stack as plain text. An app with an `_error.tsx` still renders that page. The error is also logged with `console.error`, unless the app has an `onError` hook, which is then the one that hears it.
 
+Each frame of the stack names the file under `src/` and the line it was written on, for a `.tsx` page or component as for a `.ts` route. That also holds for the `error.stack` an `onError` hook gets under `kay start`, since `kay build` writes a source map beside each server file. A `--compile` binary is the exception: its frames point into the binary's own code.
+
 When a build fails, `kay dev` answers every request with the build error: JSON for `Accept: application/json`, plain text for `Accept: text/plain`, and the error page with live reload for a browser.
 
 When an island fails to hydrate, the browser console names its component in dev, for instance `<CartButton>`, next to the chunk URL that is a hash.

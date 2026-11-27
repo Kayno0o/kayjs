@@ -13,13 +13,12 @@ import type { KayTagEmitter } from './ssr-kay-tags'
 import { analyzeModule, parseTsx } from './analyze'
 import { walk } from './ast'
 import { mistake } from './mistakes'
-import { SourceEditor } from './patch'
+import { alignLines, lineMarker, SourceEditor } from './patch'
 import {
   containsJsx,
   createExprContext,
   decodeHtmlEntities,
   escapeRawText,
-  escapeStaticAttr,
   escapeStaticText,
   filterMeaningfulChildren,
   isComponentTag,
@@ -37,6 +36,7 @@ import {
   serializeComponentProps,
   StringParts,
 } from './ssr-helpers'
+import { emitIsland } from './ssr-island'
 import { emitCatch, emitSuspense } from './ssr-kay-tags'
 
 export interface IslandBinding {
@@ -70,6 +70,8 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     return { code, analysis }
 
   const editor = new SourceEditor(code)
+  // Generated code keeps each expression on its source line: Bun maps a stack trace by the code this compiler hands it, not by a source map of its own.
+  const mark = lineMarker(code)
   const used = new Set<string>()
   let loopCounter = 0
   let activeSelectValue: SelectValueBinding | undefined
@@ -88,18 +90,18 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
   function compileSubExpression(node: Node): string {
     if (!containsJsx(node, jsxNodes))
-      return code.slice(node.start, node.end)
+      return mark(node.start) + code.slice(node.start, node.end)
 
     const sub = new SourceEditor(code.slice(node.start, node.end))
     const offset = node.start
     walk(node, (child) => {
       if (isJsxNode(child)) {
-        sub.replace(child.start - offset, child.end - offset, compileRootJsx(child))
+        sub.replace(child.start - offset, child.end - offset, compileRootJsx(child) + mark(child.end))
         return false
       }
       return undefined
     })
-    return sub.toString()
+    return mark(node.start) + sub.toString()
   }
 
   function compileChildrenListToStringExpr(children: readonly JSXChild[], slotMarkers = markersAt(children[0]?.start ?? 0), inFragment = false, rawTextTag?: 'style' | 'script'): string {
@@ -307,6 +309,8 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     const childNodes = node.children
     const meaningfulChildren = filterMeaningfulChildren(childNodes)
     const hasChildren = meaningfulChildren.length > 0
+    // The call sits on the line of its tag, so a component that throws names that line in the caller's frame.
+    const call = `${mark(node.start)}${tag}`
 
     const kayTag = resolveKayTag(tag, analysis.imports)
     if (kayTag === 'Suspense' || kayTag === 'Catch') {
@@ -323,63 +327,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     const childExpr = hasChildren ? compileChildrenListToStringExpr(childNodes, childMarkers, childMarkers && meaningfulChildren.length > 1) : '""'
 
     if (islandInfo !== undefined) {
-      const propsCode = `{ ${propEntries.join(', ')} }`
-      // The server children an island is handed render before it, outside its contexts and ids, as the browser never re-renders them.
-      const slotVar = hasChildren ? `_c${loopCounter++}` : undefined
-      const slotProp = slotVar === undefined ? '' : `children: ${slotVar}.prop`
-      const callPropsCode = slotVar === undefined ? propsCode : `{ ${[...propEntries, slotProp].join(', ')} }`
-      const withSlot = (expr: string): string => slotVar === undefined ? expr : `((${slotVar}) => ${expr})(${use('ssrSlot')}(${childExpr}))`
-      const slotArg = slotVar === undefined ? '' : `, ${slotVar}`
-      const resolvedHydrate = staticHydrate ?? (hydrateExpr === undefined ? islandInfo.defaultHydrate : undefined)
-      const safeStaticProps = allStaticProps
-        && !Object.hasOwn(staticPropsObj, '__k')
-        && !Object.values(staticPropsObj).some(v => Object.is(v, -0))
-
-      // Compile-time static island props fast path (only when not inside an island-reachable component and children don't contain direct `await`):
-      // 0 JSON.stringify / Object.keys / escAttr at runtime, while still recording rendered islands & island ID scope!
-      if (!markersAt(node.start) && !childrenHaveAwait && safeStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
-        const pAttr = Object.keys(staticPropsObj).length > 0
-          ? ` p="${escapeStaticAttr(JSON.stringify(staticPropsObj))}"`
-          : ''
-        const hAttr = resolvedHydrate !== undefined && resolvedHydrate !== 'load'
-          ? ` h="${escapeStaticAttr(resolvedHydrate)}"`
-          : ''
-        const openTag = `<kay-island c="${escapeStaticAttr(islandInfo.chunk)}"${pAttr}${hAttr}>`
-        const hydrateArg = resolvedHydrate !== undefined ? JSON.stringify(resolvedHydrate) : 'undefined'
-        const renderArg = resolvedHydrate === 'client'
-          ? 'undefined'
-          : `() => ${use('ssrChild')}(${tag}(${callPropsCode}))`
-        const expr = `${use('ssrIslandStatic')}(${JSON.stringify(islandInfo.chunk)}, ${JSON.stringify(openTag)}, ${renderArg}, ${hydrateArg}, ${JSON.stringify(tag)}${slotArg})`
-        parts.pushExpr(withSlot(expr))
-        return
-      }
-
-      const hydrateArg = hydrateExpr ?? (islandInfo.defaultHydrate !== undefined ? JSON.stringify(islandInfo.defaultHydrate) : 'undefined')
-      if (!childrenHaveAwait && safeStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
-        parts.pushExpr(withSlot(`${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg}, false, ${JSON.stringify(tag)}${slotArg})`))
-        return
-      }
-
-      // Hoist dynamic island props / awaited children into a single binding so expressions evaluate once!
-      const pVar = `_p${loopCounter++}`
-      const argNames = [pVar]
-      const argExprs = [propsCode]
-      let callArg = pVar
-      if (slotVar !== undefined) {
-        argNames.push(slotVar)
-        argExprs.push(`${use('ssrSlot')}(${childExpr})`)
-        callArg = `{ ...${pVar}, ${slotProp} }`
-      }
-      let hArg = hydrateArg
-      if (hydrateExpr !== undefined && staticHydrate === undefined) {
-        const hVar = `_h${loopCounter++}`
-        argNames.push(hVar)
-        argExprs.push(hydrateExpr)
-        hArg = hVar
-      }
-      parts.pushExpr(
-        `((${argNames.join(', ')}) => ${use('ssrIsland')}(${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callArg})), ${pVar}, ${hArg}, false, ${JSON.stringify(tag)}${slotArg}))(${argExprs.join(', ')})`,
-      )
+      emitIsland({ use, nextId: () => loopCounter++, markersAt }, { island: islandInfo, tag, call, start: node.start, propEntries, allStaticProps, staticPropsObj, hydrateExpr, staticHydrate, hasChildren, childExpr, childrenHaveAwait }, parts)
       return
     }
 
@@ -389,7 +337,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     if (childrenHaveDynamic && !childrenHaveAwait) {
       const cVar = `_c${loopCounter++}`
       const propsWithGetter = [...propEntries, `get children() { return ${cVar} === undefined ? (${cVar} = ${use('raw')}(${childExpr})) : ${cVar} }`].join(', ')
-      parts.pushExpr(`${use('ssrChild')}(${tag}((() => { let ${cVar}; return { ${propsWithGetter} }; })()))`)
+      parts.pushExpr(`${use('ssrChild')}(${call}((() => { let ${cVar}; return { ${propsWithGetter} }; })()))`)
       return
     }
 
@@ -397,7 +345,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       propEntries.push(`children: ${use('raw')}(${childExpr})`)
 
     const propsObj = propEntries.length > 0 ? `{ ${propEntries.join(', ')} }` : '{}'
-    parts.pushExpr(`${use('ssrChild')}(${tag}(${propsObj}))`)
+    parts.pushExpr(`${use('ssrChild')}(${call}(${propsObj}))`)
   }
 
   function compileJsxToStringExpr(node: JSXElement | JSXFragment): string {
@@ -430,7 +378,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
   walk(program, (node) => {
     if (isJsxNode(node)) {
-      editor.replace(node.start, node.end, compileRootJsx(node))
+      editor.replace(node.start, node.end, compileRootJsx(node) + mark(node.end))
       return false
     }
     return undefined
@@ -438,8 +386,9 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
   if (used.size > 0) {
     const specifiers = [...used].sort().map(name => `${name} as __${name}`).join(', ')
-    editor.prepend(`import { ${specifiers} } from '@kayjs/kay/internal/ssr';\n`)
+    // Last, where it moves no line: an import is hoisted wherever it is written.
+    editor.append(`\nimport { ${specifiers} } from '@kayjs/kay/internal/ssr';\n`)
   }
 
-  return { code: editor.toString(), analysis }
+  return { code: alignLines(editor.toString()), analysis }
 }

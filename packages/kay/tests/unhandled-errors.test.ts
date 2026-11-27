@@ -2,7 +2,9 @@ import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { build } from '../src/build/index'
 import { devServer } from '../src/dev/index'
+import { createServer } from '../src/server/index'
 import { testApp } from '../src/test/index'
 
 const KAY_PKG_DIR = join(import.meta.dir, '..')
@@ -125,6 +127,72 @@ describe('unhandled runtime errors (#3607)', () => {
     finally {
       log.mockRestore()
       srv.stop()
+    }
+  })
+})
+
+// Each throw sits a few lines down, below a multi-line JSX root, so a shifted line shows.
+const traced = {
+  'src/routes/api/boom.ts': `export function GET(): Response {\n  const reason = 'api exploded'\n  throw new Error(reason)\n}\n`,
+  'src/components/Badge.tsx': `export function Badge() {\n  const icon = (\n    <i>\n      x\n    </i>\n  )\n  if (icon)\n    throw new Error('badge exploded')\n  return <span>{icon}</span>\n}\n`,
+  'src/routes/list.tsx': `function check(i: number): number {\n  if (i > 1)\n    throw new Error('list exploded')\n  return i\n}\n\nexport default function List() {\n  return (\n    <ul>\n      <li>first</li>\n      {[1, 2].map(i => <li>{check(i)}</li>)}\n    </ul>\n  )\n}\n`,
+  'src/routes/index.tsx': `import { Badge } from '../components/Badge'\n\nexport default function Page() {\n  const items = [1, 2]\n  return (\n    <main>\n      <h1>Title</h1>\n      {items.map(i => <p>{i}</p>)}\n      <Badge />\n    </main>\n  )\n}\n`,
+}
+
+const tracedPaths = ['/api/boom', '/', '/list']
+
+function expectSourceLines([route, page, list]: string[]): void {
+  expect(route).toContain('/src/routes/api/boom.ts:3:')
+  expect(page).toContain('/src/components/Badge.tsx:8:')
+  expect(page).toContain('/src/routes/index.tsx:9:')
+  expect(list).toContain('/src/routes/list.tsx:3:')
+  expect(list).toContain('/src/routes/list.tsx:11:')
+}
+
+describe('stack traces name the source line (#3666)', () => {
+  it('testApp', async () => {
+    const t = await testApp({ root: appWith(traced), dev: true })
+    const log = spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const stacks: string[] = []
+      for (const path of tracedPaths)
+        stacks.push((await (await t.get(path, { accept: 'application/json' })).json() as { stack: string }).stack)
+      expectSourceLines(stacks)
+    }
+    finally {
+      log.mockRestore()
+    }
+  })
+
+  it('kay dev', async () => {
+    const srv = await devServer({ root: appWith(traced), port: 0 })
+    const log = spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const stacks: string[] = []
+      for (const path of tracedPaths)
+        stacks.push((await (await fetch(`${srv.url}${path}`, { headers: { accept: 'application/json' } })).json() as { stack: string }).stack)
+      expectSourceLines(stacks)
+    }
+    finally {
+      log.mockRestore()
+      srv.stop()
+    }
+  })
+
+  it('a built app under kay start', async () => {
+    const dir = appWith(traced)
+    await build({ root: dir })
+    const stacks: string[] = []
+    const app = await createServer({ root: dir, errorSink: info => stacks.push((info.error as Error).stack ?? '') })
+    const quiet = spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      for (const path of tracedPaths)
+        await app.handle(new Request(`http://localhost${path}`))
+      expectSourceLines(stacks)
+    }
+    finally {
+      quiet.mockRestore()
+      await app.dispose?.()
     }
   })
 })

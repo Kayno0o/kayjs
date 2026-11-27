@@ -129,7 +129,7 @@ describe('Audit #3526 Batch 2 — Compiler, SSR & DOM', () => {
     const ssrFavicon = compileSsr('Favicon.tsx', faviconSrc).code
     expect(ssrFavicon).toContain('data:image/svg+xml')
     expect(ssrFavicon).toContain('DATA:Image/SVG+xml')
-    expect(ssrFavicon).toContain('__ssrAttr("href", dyn, "link")')
+    expect(ssrFavicon).toMatch(/__ssrAttr\("href", \n*dyn, "link"\)/)
     expect(ssrFavicon).not.toContain('data:text/html')
 
     const domFavicon = compileDom('Favicon.tsx', faviconSrc).code
