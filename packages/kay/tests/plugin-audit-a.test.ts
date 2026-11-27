@@ -447,6 +447,32 @@ describe('Issue #3635 Part 1 — Cross-plugin audit fixes', () => {
       expect(enAncien.status).toBe(200)
       expect(await enAncien.text()).toContain('English Ancien Page')
     })
+
+    function seoApp(): string {
+      const dir = makeTemp('kay-seo-image-')
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `export default function Home() { return <h1>Home</h1> }`)
+      return dir
+    }
+
+    it('prefixes a relative og:image with the site, even one whose name starts with http, and keeps an absolute or protocol-relative one', async () => {
+      const ogImage = async (image: string): Promise<string | undefined> => {
+        const app = await testApp({ root: seoApp(), plugins: [seo({ site: 'https://example.test', image })] })
+        try {
+          return /<meta property="og:image" content="([^"]*)">/.exec(await (await app.fetch('/')).text())?.[1]
+        }
+        finally {
+          await app.app.dispose?.()
+        }
+      }
+      expect(await ogImage('httpfoo.png')).toBe('https://example.test/httpfoo.png')
+      expect(await ogImage('https://cdn.example/og.png')).toBe('https://cdn.example/og.png')
+      expect(await ogImage('//cdn.example/og.png')).toBe('//cdn.example/og.png')
+    })
+
+    it('fails the build on a favicon path that resolves to no file', async () => {
+      await expect(build({ root: seoApp(), plugins: [seo({ favicon: 'src/assets/missing.png' })] })).rejects.toThrow('@kayjs/seo: favicon "src/assets/missing.png" is neither a file under the app root nor a package file: fix the path given to `seo({ favicon })`.')
+    })
   })
 
   describe('3. @kayjs/tailwind + @kayjs/ui cascade layer order', () => {

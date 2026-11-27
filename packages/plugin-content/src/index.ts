@@ -112,6 +112,11 @@ export function content(options: { feeds?: readonly ContentFeed[] | undefined, c
         dirs.add(dir)
       return [...dirs]
     },
+    requires(ctx) {
+      return feeds
+        .filter(feed => (feed.site ?? ctx.site) === undefined)
+        .map(feed => `the feed at ${feed.path ?? '/rss.xml'} has no \`site\`, so its links are relative and feed readers cannot open them: set \`site\` in \`kay.config.ts\` (or on the feed).`)
+    },
     async check(ctx) {
       await discoverAppCollections(ctx.root)
       const seen = new Set<string>()

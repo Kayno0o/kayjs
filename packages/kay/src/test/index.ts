@@ -11,6 +11,7 @@ import { resolveServerConfig } from '../server/index'
 import { startBuiltApp } from '../server/loader'
 
 const TEST_DIR_PREFIX = 'test-'
+const ABSOLUTE_URL_RE = /^https?:\/\//
 
 export interface TestAppOptions extends Omit<BuildOptions, 'compile' | 'static'>, Partial<ServerRuntimeConfig> {
   prebuilt?: boolean | undefined
@@ -108,7 +109,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
 
   async function doFetch(pathOrReq: string | Request, init?: RequestInit): Promise<Response> {
     const req = typeof pathOrReq === 'string'
-      ? new Request(pathOrReq.startsWith('http') ? pathOrReq : `http://localhost${pathOrReq}`, init)
+      ? new Request(ABSOLUTE_URL_RE.test(pathOrReq) ? pathOrReq : `http://localhost${pathOrReq}`, init)
       : pathOrReq
 
     const headers = new Headers(req.headers)

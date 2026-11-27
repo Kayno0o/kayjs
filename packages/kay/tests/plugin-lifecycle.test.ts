@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAuth, memoryAuthStore } from '../../plugin-auth/src/index'
-import { content } from '../../plugin-content/src/index'
+import { content, defineCollection } from '../../plugin-content/src/index'
 import { i18n } from '../../plugin-i18n/src/index'
 import { images } from '../../plugin-images/src/plugin'
 import { createMailer } from '../../plugin-mail/src/index'
@@ -588,5 +588,16 @@ describe('KayPlugin.requires: what a plugin needs to run in production (#3674)',
     expect(await seo().requires!(ctx)).toEqual(['no `site`, so pages go out with no canonical link, no absolute `og:image` and no sitemap: set `site` in `kay.config.ts` (or pass it to `seo()`).'])
     expect(await seo().requires!({ ...ctx, site: 'https://example.test' })).toEqual([])
     expect(await seo({ site: 'https://example.test' }).requires!(ctx)).toEqual([])
+  })
+
+  it('@kayjs/content requires a site for each feed that has none of its own', async () => {
+    const posts = defineCollection({ dir: makeTemp('kay-feed-') })
+    const feed = { collection: posts, title: 'Posts', description: 'All posts' }
+    const plugin = content({ feeds: [feed, { ...feed, path: '/fr/rss.xml' }, { ...feed, path: '/own.xml', site: 'https://own.example' }] })
+    expect(await plugin.requires!(ctx)).toEqual([
+      'the feed at /rss.xml has no `site`, so its links are relative and feed readers cannot open them: set `site` in `kay.config.ts` (or on the feed).',
+      'the feed at /fr/rss.xml has no `site`, so its links are relative and feed readers cannot open them: set `site` in `kay.config.ts` (or on the feed).',
+    ])
+    expect(await plugin.requires!({ ...ctx, site: 'https://example.test' })).toEqual([])
   })
 })

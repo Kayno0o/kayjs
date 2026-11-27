@@ -26,7 +26,7 @@
 ## Plugin Setup (`content({ feeds?, collections? })`)
 
 - Register `content(...)` in `kay.config.ts` to auto-discover collections for `kay check` frontmatter validation and `kay dev` file watching.
-- `feeds`: array of `RssFeedConfig` (`{ path? ('/rss.xml'), title, description, site? (inherits KayConfig.site), collection, locale?, linkPrefix?, mapItem? }`). Emitted as static public files in `build()` and served with `ETag`/`304` on `GET <path>` in `server()`.
+- `feeds`: array of `RssFeedConfig` (`{ path? ('/rss.xml'), title, description, site? (inherits KayConfig.site), collection, locale?, linkPrefix?, mapItem? }`). Emitted as static public files in `build()` and served with `ETag`/`304` on `GET <path>` in `server()`. A feed with no `site` of its own or in `KayConfig` refuses a production start (`requires`).
 
 ## Snippets
 

@@ -17,7 +17,7 @@
 - `jsonLd`: array of Schema.org objects injected globally (`@context: 'https://schema.org'` auto-added).
 - `sitemap`: `boolean` (default `true`, emitted in `afterPrerender` as `/sitemap.xml` with `xhtml:link` alternates when `@kayjs/i18n` is active). `sitemapExclude`: `string[]`. `extraUrls`: `() => string[]`.
 - `redirects`: `Record<fromPath, string | { to: string, status?: 301 | 302 | 307 | 308 }>` (mounted as `GET` routes, default `301`).
-- `favicon`: `string | string[]` (relative path or package specifier; emits `favicon.{svg,png,ico}` and `<link rel="icon">`).
+- `favicon`: `string | string[]` (relative path or package specifier; emits `favicon.{svg,png,ico}` and `<link rel="icon">`; a path that resolves to no file fails the build). `image` is prefixed with `site` unless it starts with `http://`, `https://` or `//`.
 - `manifest`: `{ name?, shortName?, description?, themeColor?, backgroundColor?, display?, startUrl? }` (emits `/manifest.webmanifest`).
 - `fonts`: `Array<{ family, src, weight?, style?, display?, preload? }>` (resolves local paths or `@fontsource/*` specifiers, emits content-hashed assets + `@font-face` stylesheet + `<link rel="preload">`).
 

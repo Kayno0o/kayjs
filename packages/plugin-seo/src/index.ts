@@ -51,6 +51,7 @@ export interface SeoPluginOptions {
 
 const JS_SCANNER = new Bun.Transpiler({ loader: 'js' })
 const CANONICAL_LINK_RE = /<link rel="canonical" href="[^"]*">/
+const ABSOLUTE_URL_RE = /^(?:https?:)?\/\//i
 
 function serializeJsonLd(schema: Record<string, unknown>): string {
   const payload = '@context' in schema ? schema : { '@context': 'https://schema.org', ...schema }
@@ -150,7 +151,7 @@ function emitFavicons(ctx: BuildPluginContext, favicon: string | string[]): void
   for (const fav of favicons) {
     const abs = resolveFileOrPkg(ctx.root, fav)
     if (abs === undefined)
-      continue
+      throw new Error(`@kayjs/seo: favicon "${fav}" is neither a file under the app root nor a package file: fix the path given to \`seo({ favicon })\`.`)
     const ext = extname(abs).toLowerCase()
     const key = ext === '.svg' ? '.svg' : ext === '.png' ? '.png' : '.ico'
     extCounts.set(key, (extCounts.get(key) ?? 0) + 1)
@@ -377,7 +378,7 @@ function applySeoHead(
   }
 
   if (options.image && !head.headHtml.includes('property="og:image"')) {
-    const imgUrl = options.image.startsWith('http') || !activeSite
+    const imgUrl = ABSOLUTE_URL_RE.test(options.image) || !activeSite
       ? options.image
       : `${activeSite}${options.image.startsWith('/') ? '' : '/'}${options.image}`
     head.add(`<meta property="og:image" content="${escAttr(imgUrl)}">`)
