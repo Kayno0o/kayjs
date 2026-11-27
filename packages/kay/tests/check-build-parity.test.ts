@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -530,5 +530,51 @@ describe('kay check and kay build share island planning and reachability checks 
     expect(dynCheck.errors.some(e => e.includes('node:perf_hooks'))).toBe(true)
     expect(dynCheck.errors.some(e => e.includes('node:zlib'))).toBe(false)
     await expect(build({ root: dynDir, minify: false })).rejects.toThrow(/node:perf_hooks/)
+  })
+})
+
+describe('process.env.NODE_ENV read by server code (#3681)', () => {
+  it('warns where the server reads it, in kay check and kay build alike, and not in the code an island ships', async () => {
+    const dir = appWith('kay-3681-', {
+      'kay.config.ts': 'export const mode = process.env.NODE_ENV\nexport default { compliance: { legalNotice: false } }\n',
+      'src/lib/mode.ts': 'export const isDev = process.env.NODE_ENV !== \'production\'\nexport const env = globalThis.process.env[\'NODE_ENV\']\n',
+      'src/lib/own.ts': 'const process = { env: { NODE_ENV: \'test\' } }\nexport const mine = process.env.NODE_ENV\n',
+      'src/lib/client.ts': 'export const label = process.env.NODE_ENV ?? \'unset\'\n',
+      'src/components/Live.tsx': 'import { signal } from \'@kayjs/kay\'\nimport { label } from \'../lib/client\'\nexport function Live() { const n = signal(process.env.NODE_ENV); return <button onClick={() => { n.value = label }}>{n.value}</button> }\n',
+      'src/routes/index.tsx': [
+        'import { signal } from \'@kayjs/kay\'',
+        'import { Live } from \'../components/Live\'',
+        'import { env, isDev } from \'../lib/mode\'',
+        'import { mine } from \'../lib/own\'',
+        'export const prerender = true',
+        'function Badge() { const on = signal(process.env.NODE_ENV === \'production\'); return <b onClick={() => { on.value = !on.value }}>{String(on.value)}</b> }',
+        'export default function Home() {',
+        '  const { NODE_ENV: mode } = process.env',
+        '  return <main><p>{process.env.NODE_ENV}{mode}{String(isDev)}{env}{mine}</p><Live /><Badge /></main>',
+        '}',
+      ].join('\n'),
+    })
+    const expected = [
+      'src/lib/mode.ts:1:22',
+      'src/lib/mode.ts:2:20',
+      'src/routes/index.tsx:8:11',
+      'src/routes/index.tsx:9:20',
+    ]
+    const atOf = (lines: string[]) => lines.filter(l => l.includes('process.env.NODE_ENV read in')).map(l => l.split(': warning: ')[0]).sort()
+
+    const checked = await checkProject(dir, { skipTypecheck: true })
+    expect(checked.errors).toEqual([])
+    expect(atOf(checked.warnings)).toEqual(expected)
+    expect(checked.warnings).toContain('src/lib/mode.ts:1:22: warning: kay compiler: process.env.NODE_ENV read in src/lib/mode.ts: kay build does not set it, so a page it prerenders renders it unset; call nodeEnv() from @kayjs/kay/server, which returns the mode of the build or the server.')
+
+    const printed: string[] = []
+    const warn = spyOn(console, 'warn').mockImplementation((line: string) => { printed.push(line) })
+    try {
+      await build({ root: dir, minify: false })
+    }
+    finally {
+      warn.mockRestore()
+    }
+    expect(atOf(printed)).toEqual(expected)
   })
 })

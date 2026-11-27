@@ -187,4 +187,4 @@ export const env = defineEnv(z.object({
 const isProd = nodeEnv() === 'production'
 ```
 
-Use `nodeEnv()` instead of reading `process.env.NODE_ENV` directly when writing reusable modules or plugins. In `--compile` binaries, `Bun.build` can inline `process.env.NODE_ENV` at build time, while `nodeEnv()` always reads the runtime value.
+Read `nodeEnv()` instead of `process.env.NODE_ENV` in server code. `kay build` does not set `NODE_ENV`, so a page it prerenders would read it unset, while `nodeEnv()` returns the mode of the build or of the running server. In `--compile` binaries, `Bun.build` can also inline `process.env.NODE_ENV` at build time. `kay build` and `kay check` warn on a `process.env.NODE_ENV` read the server runs. An island may read it: its bundle inlines the value.

@@ -21,7 +21,7 @@ import { compileExecutable } from './compile'
 import { assertSafeOutDir, fileSize, isInNodeModules, relPosix, walkAllFiles, walkRoutes } from './files'
 import { isInside } from './is-inside'
 import { ModuleGraph } from './graph'
-import { renderProblems } from './render-rules'
+import { nodeEnvWarning, renderProblems, serverNodeEnvReads } from './render-rules'
 import { planIslands } from './islands'
 import { buildActionEntries, buildRouteEntries } from './manifest'
 import { createPluginHost, createPublicFiles } from './plugin-host'
@@ -231,10 +231,14 @@ function planCheckedIslands(root: string, routesDir: string, graph: ModuleGraph,
     const source = graph.source(file)
     placed.push(`${formatDiagnostic(formatLoc(relPosix(root, file), source, offset), message)}\n${formatCodeFrame(source, offset)}`)
   }
+  const configFile = join(root, 'kay.config.ts')
   for (const [file, analysis] of graph.analyses) {
+    const rel = relPosix(root, file)
+    for (const offset of file === configFile ? [] : serverNodeEnvReads(analysis, islands, file))
+      console.warn(formatDiagnostic(formatLoc(rel, graph.source(file), offset), nodeEnvWarning(rel), 'warning'))
     if (!file.endsWith('.tsx') || isInNodeModules(file))
       continue
-    for (const problem of renderProblems(analysis, islands, file, relPosix(root, file), 'kay build'))
+    for (const problem of renderProblems(analysis, islands, file, rel, 'kay build'))
       place(file, problem.offset, problem.message)
   }
   for (const file of pageFiles) {

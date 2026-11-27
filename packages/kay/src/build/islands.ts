@@ -47,6 +47,8 @@ export interface IslandPlan {
   cssFiles: Set<string>
   /** Modules island code imports from another module, whose SSR emits hydration markers everywhere. */
   reach: Set<string>
+  /** Every module the browser loads for an island, the island roots included. */
+  clientFiles: Set<string>
   /** Per module the browser loads only for the islands declared in it, the top-level names its client copy keeps (`pruneForClient`). */
   clientKeep: Map<string, Set<string>>
   /** Island and reachability issues found during analysis. */
@@ -467,7 +469,7 @@ function walkIslandReach(
   clientKeep: Map<string, Set<string>>,
   checkLeaks: boolean,
   issues: IslandIssue[],
-): { reach: Set<string>, cssFiles: Set<string> } {
+): { reach: Set<string>, clientFiles: Set<string>, cssFiles: Set<string> } {
   const reach = new Set<string>()
   const cssFiles = new Set<string>()
   const visited = new Set<string>()
@@ -515,7 +517,7 @@ function walkIslandReach(
     }
   }
 
-  return { reach, cssFiles }
+  return { reach, clientFiles: visited, cssFiles }
 }
 
 /** Shared island planning and reachability analyzer used by both `kay build` and `kay check`. */
@@ -589,8 +591,8 @@ export function analyzeIslands(options: AnalyzeIslandsOptions): IslandPlan {
     }
   }
 
-  const { reach, cssFiles } = walkIslandReach(graph, load, [...rootFiles], clientKeep, options.checkLeaks === true, issues)
-  return { targets, pageBindings, staticTags, cssFiles, reach, clientKeep, issues }
+  const { reach, clientFiles, cssFiles } = walkIslandReach(graph, load, [...rootFiles], clientKeep, options.checkLeaks === true, issues)
+  return { targets, pageBindings, staticTags, cssFiles, reach, clientFiles, clientKeep, issues }
 }
 
 function clientKeepOf(targets: Iterable<IslandTarget>, load: LoadModule): Map<string, Set<string>> {

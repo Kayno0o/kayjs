@@ -43,7 +43,7 @@ function topLevelFunctions(program: Program): Map<string, FunctionNode> {
 }
 
 // Names the module binds at its top level, which shadow a global of the same name everywhere in it.
-function topLevelNames(program: Program): Set<string> {
+export function topLevelNames(program: Program): Set<string> {
   const names = new Set<string>()
   for (const stmt of program.body) {
     const decl = (stmt.type === 'ExportNamedDeclaration' || stmt.type === 'ExportDefaultDeclaration') ? stmt.declaration : stmt

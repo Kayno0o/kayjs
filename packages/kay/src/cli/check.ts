@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve } from 'node:path'
 import { isInNodeModules, isNotSourceDir, isTsFile, relPosix, walkFiles, walkRoutes } from '../build/files'
 import { ModuleGraph } from '../build/graph'
-import { renderProblems } from '../build/render-rules'
+import { nodeEnvWarning, renderProblems, serverNodeEnvReads } from '../build/render-rules'
 import { analyzeIslands } from '../build/islands'
 import { fileToRoutePath, hasRouteHandlerExport, missingPathsProblem, normalizeRoutePattern, routeExportProblemLocation, routeFileProblem, SPECIAL_ROUTE_FILES } from '../build/routes'
 import { analyzeModule } from '../compiler/analyze'
@@ -284,6 +284,8 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
     if (isInNodeModules(file))
       continue
     const rel = relPosix(root, file)
+    for (const offset of serverNodeEnvReads(analysis, islands, file))
+      warnings.push(formatDiagnostic(locOf(root, file, sources, offset), nodeEnvWarning(rel), 'warning'))
 
     if (file.endsWith('.tsx')) {
       for (const problem of renderProblems(analysis, islands, file, rel, 'kay check'))

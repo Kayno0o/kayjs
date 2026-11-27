@@ -9,6 +9,7 @@ import { checkBrowserGlobals } from './browser-globals'
 import { analyzeDefaultDataKeys } from './data-keys'
 import { checkCompliance } from './compliance'
 import { resolveInteractivity } from './interactivity'
+import { findNodeEnvReads } from './node-env'
 import { assertScopedKayImport, checkExportHydrate, checkHabits, checkHydrateMode, checkMistakes, guarded, islandRemoved, KayMistake, mistake, serverOnlyTagError, staticStringValue } from './mistakes'
 import { walkScoped } from './scope'
 import { calleeName, decodeHtmlEntities, EVENT_ATTR, formatCodeFrame, formatDiagnostic, formatLoc, isComponentTag, isJsxNode, jsxTagName, resolveKayTag, unwrapTsExpr } from './shared'
@@ -74,6 +75,8 @@ export interface ModuleAnalysis extends Interactivity {
   exportLocals: Map<string, string>
   /** Code that compiles but usually means something else, worded for build and `kay check` to print. */
   warnings: CompilerWarning[]
+  /** Offsets of the `process.env.NODE_ENV` reads, warned about once the island plan says which run on the server only. */
+  nodeEnvReads: number[]
 }
 
 function exportedName(node: { type: string, name?: string, value?: string }): string | undefined {
@@ -608,6 +611,7 @@ export function analyzeModule(filename: string, code: string, program: Program =
     exportedNames: decls.exportedNames,
     bindings: body.bindings,
     exportLocals: decls.exportLocals,
+    nodeEnvReads: findNodeEnvReads(program, code),
   }
 }
 

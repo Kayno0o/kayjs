@@ -3,6 +3,7 @@
 import type { Node } from 'oxc-parser'
 import type { ModuleAnalysis } from '../compiler/analyze'
 import type { IslandPlan, StaticTag } from './islands'
+import { isInNodeModules } from './files'
 import { visitorKeys } from 'oxc-parser'
 import { walk } from '../compiler/ast'
 import { mistake } from '../compiler/mistakes'
@@ -184,4 +185,21 @@ export function renderProblems(analysis: ModuleAnalysis, islands: Pick<IslandPla
   }
   walk(analysis.program, visit)
   return problems
+}
+
+/** Offsets of the `process.env.NODE_ENV` reads of `file` the server runs: island code is left out, since its bundle inlines the value (#3681). */
+export function serverNodeEnvReads(analysis: ModuleAnalysis, islands: Pick<IslandPlan, 'clientFiles' | 'clientKeep'>, file: string): number[] {
+  if (analysis.nodeEnvReads.length === 0 || isInNodeModules(file))
+    return []
+  if (!islands.clientFiles.has(file))
+    return analysis.nodeEnvReads
+  const keep = islands.clientKeep.get(file)
+  if (keep === undefined)
+    return []
+  const kept = analysis.bindings.filter(b => b.name === '' || keep.has(b.name))
+  return analysis.nodeEnvReads.filter(offset => !kept.some(b => offset >= b.start && offset < b.end))
+}
+
+export function nodeEnvWarning(rel: string): string {
+  return `kay compiler: process.env.NODE_ENV read in ${rel}: kay build does not set it, so a page it prerenders renders it unset; call nodeEnv() from @kayjs/kay/server, which returns the mode of the build or the server.`
 }
