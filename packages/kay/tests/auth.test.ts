@@ -22,6 +22,21 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     expect(safeRedirect('/ok\r\nSet-Cookie: bad=1')).toBe('/')
   })
 
+  test('safeRedirect refuses every control character and backslash, which a browser can read as another site (#3671)', () => {
+    expect(safeRedirect('/\t/evil.com')).toBe('/')
+    expect(safeRedirect('/\n/evil.com')).toBe('/')
+    expect(safeRedirect('/a\0')).toBe('/')
+    expect(safeRedirect('/a\u001F')).toBe('/')
+    expect(safeRedirect('/a\u007F')).toBe('/')
+    expect(safeRedirect('/a\\b')).toBe('/')
+    expect(safeRedirect('javascript:alert(1)')).toBe('/')
+    expect(safeRedirect('   ', '/home')).toBe('/home')
+    expect(safeRedirect(undefined, '/home')).toBe('/home')
+    expect(safeRedirect('  /dashboard  ')).toBe('/dashboard')
+    expect(safeRedirect('/a b')).toBe('/a b')
+    expect(safeRedirect('/dashboard?tab=1#top')).toBe('/dashboard?tab=1#top')
+  })
+
   test('full password signup/signin/signout, CSRF, guards, server action ctx.locals.user, magic link + @kayjs/mail, SQLite persistence, and OAuth2 + PKCE', async () => {
     const appDir = join(TMP, 'auth-app')
     const routesDir = join(appDir, 'src', 'routes')

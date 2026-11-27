@@ -4,7 +4,7 @@
 
 ## Imports
 
-- `@kayjs/auth`: `createAuth`, `memoryAuthStore`, `normalizeEmail`, `toPublicUser`, `safeRedirect`, `createRateLimiter`, `github`, `discord`, `google`, `oauthProvider`; types `Auth`, `AuthOptions`, `GuardOptions`, `AuthStore`, `AuthUser`, `PublicUser`, `AuthSession`, `OAuthAccount`, `TokenKind`, `VerificationToken`, `UserExport`, `AuthMailPayload`, `AuthMailer`, `CreateUserInput`, `OAuthProvider`, `OAuthPresetConfig`, `OAuthProfile`, `RateLimiter`, `RateLimitOptions`.
+- `@kayjs/auth`: `createAuth`, `memoryAuthStore`, `normalizeEmail`, `toPublicUser`, `safeRedirect` (re-exported from `@kayjs/kay/server`), `createRateLimiter`, `github`, `discord`, `google`, `oauthProvider`; types `Auth`, `AuthOptions`, `GuardOptions`, `AuthStore`, `AuthUser`, `PublicUser`, `AuthSession`, `OAuthAccount`, `TokenKind`, `VerificationToken`, `UserExport`, `AuthMailPayload`, `AuthMailer`, `CreateUserInput`, `OAuthProvider`, `OAuthPresetConfig`, `OAuthProfile`, `RateLimiter`, `RateLimitOptions`.
 - `@kayjs/auth/sqlite`: `sqliteAuthStore(dbOrPath?: string | Database)` (returns `AuthStore & { readonly db: Database }`, uses `bun:sqlite` in WAL mode).
 - `@kayjs/auth/oauth`: `github`, `discord`, `google`, `oauthProvider`.
 

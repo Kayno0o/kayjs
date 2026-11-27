@@ -4,7 +4,7 @@ import type { PluginRouteOptions } from '../plugins/types'
 import type { RequestContext } from './http'
 import type { TrustProxy } from './security'
 import { wantsJson } from './http'
-import { isTrustedOrigin } from './security'
+import { isTrustedOrigin, safeRedirect } from './security'
 
 export const DEFAULT_CONSENT_COOKIE = 'kay_consent'
 /** 180 days in seconds (CNIL 6-month guideline for consent retention). */
@@ -121,13 +121,6 @@ function isTruthyFormValue(value: FormDataEntryValue | null): boolean {
   return norm !== '' && norm !== 'false' && norm !== '0' && norm !== 'off' && norm !== 'no'
 }
 
-// A browser reads `//host` and `/\host` as another site, and CR, LF or NUL would split the Location header.
-const OFF_SITE_OR_SPLIT_RE = /^\/[/\\]|[\r\n\0]/
-
-function isSafeRelativeRedirect(target: string): boolean {
-  return target.startsWith('/') && !OFF_SITE_OR_SPLIT_RE.test(target)
-}
-
 function resolveConsentRedirect(
   request: Request,
   url: URL,
@@ -135,15 +128,15 @@ function resolveConsentRedirect(
   trustedOrigins: ReadonlySet<string> | undefined,
   trustProxy: TrustProxy,
 ): string {
-  if (formRedirect !== undefined && isSafeRelativeRedirect(formRedirect))
-    return formRedirect
+  const fromForm = safeRedirect(formRedirect, '')
+  if (fromForm !== '')
+    return fromForm
   const referer = request.headers.get('referer')
   if (referer !== null) {
     try {
       const refUrl = new URL(referer)
-      const target = `${refUrl.pathname}${refUrl.search}`
-      if (isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy, url) && isSafeRelativeRedirect(target))
-        return target
+      if (isTrustedOrigin(refUrl.origin, request, trustedOrigins, trustProxy, url))
+        return safeRedirect(`${refUrl.pathname}${refUrl.search}`)
     }
     catch {
       return '/'

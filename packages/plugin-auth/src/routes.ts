@@ -2,11 +2,12 @@
 
 import type { PluginRouteOptions, ServerPluginAPI } from '@kayjs/kay/config'
 import type { RequestContext } from '@kayjs/kay/server'
+import { safeRedirect } from '@kayjs/kay/server'
 import type { CreateUserInput } from './index'
 import type { RateLimiter } from './ratelimit'
 import type { SessionManager } from './session'
 import type { AuthStore, AuthUser, PublicUser } from './store'
-import { safeRedirect, verifyPassword } from './crypto'
+import { verifyPassword } from './crypto'
 import { fail, isValidEmail, linkConfirmPage, parseBody, respondAuthError, wantsJson, withNoStore } from './http'
 import { normalizeEmail, toPublicUser } from './store'
 

@@ -78,13 +78,3 @@ export async function verifyPassword(password: string, storedHash: string | unde
     return false
   }
 }
-
-/** Rejects open redirects (protocol-relative //, absolute URLs, backslashes, control chars). */
-export function safeRedirect(target: string | null | undefined, fallback = '/'): string {
-  if (!target)
-    return fallback
-  const trimmed = target.trim()
-  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\') || /[\r\n\0]/.test(trimmed))
-    return fallback
-  return trimmed
-}

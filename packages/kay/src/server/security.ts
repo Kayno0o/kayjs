@@ -223,6 +223,20 @@ export function getClientIp(request: Request, trustProxy: TrustProxy = false, re
   return remoteIp || undefined
 }
 
+/** `target` trimmed when it is a path on this site, else `fallback`: an absolute or protocol-relative URL, a backslash or a control character is refused. */
+export function safeRedirect(target: string | null | undefined, fallback = '/'): string {
+  const path = target?.trim()
+  if (path === undefined || !path.startsWith('/') || path.startsWith('//') || path.includes('\\'))
+    return fallback
+  // CR, LF and NUL split the Location header, and a browser drops a tab or newline from a URL, which turns `/\t/host` into `//host`.
+  for (let i = 0; i < path.length; i++) {
+    const code = path.charCodeAt(i)
+    if (code < 0x20 || code === 0x7F)
+      return fallback
+  }
+  return path
+}
+
 /** Returns true when `origin` matches the request's direct (or trusted forwarded) origin or `trustedOrigins`. */
 export function isTrustedOrigin(
   origin: string,
