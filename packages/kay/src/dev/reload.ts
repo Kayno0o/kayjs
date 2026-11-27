@@ -3,12 +3,13 @@
 import { wantsJson } from '../server/http'
 import { withCspHashes } from '../server/security'
 import { REGION_HEADER } from '../server/region'
+import { cspSha256 } from '../ssr/navigation'
 
 export function makeDevReloadAssets(assetPrefix: string): { script: string, hash: string, eventsPath: string } {
   const prefix = assetPrefix.replace(/\/$/, '')
   const eventsPath = `${prefix}/dev-events`
   const js = `(()=>{const stem=u=>u.replace(/-[a-z0-9]+\\.css$/i,'');const s=new EventSource(${JSON.stringify(eventsPath)});s.onmessage=(e)=>{if(e.data.startsWith('css:')){const urls=JSON.parse(e.data.slice(4));const byStem=new Map(urls.map(u=>[stem(u),u]));const old=[...document.querySelectorAll('link[rel="stylesheet"][href^=${JSON.stringify(`${prefix}/`)}]')];if(old.length===0){location.reload();return;}const next=[];for(const o of old){const m=byStem.get(stem(o.getAttribute('href')||''));if(m)next.push(m);}if(next.length===0){location.reload();return;}let left=next.length;for(const u of next){const l=document.createElement('link');l.rel='stylesheet';l.href=u;const done=()=>{if(--left===0)for(const o of old)o.remove();};l.onload=done;l.onerror=done;document.head.appendChild(l);}}else{location.reload();}};})();`
-  const hash = `'sha256-${new Bun.CryptoHasher('sha256').update(js).digest('base64')}'`
+  const hash = cspSha256(js)
   return { script: `<script>${js}</script>`, hash, eventsPath }
 }
 

@@ -29,9 +29,11 @@ export const VIEW_TRANSITION_STYLE = '@media (prefers-reduced-motion:no-preferen
 export const KEEP_SCROLL_SCRIPT = `{try{const A="${KEEP_SCROLL_ATTR}",S=sessionStorage,s=history.state,o=s&&typeof s=="object"?s:{},own=o.kayScroll,id=own||Math.random().toString(36).slice(2),read=k=>JSON.parse(S.getItem(k)||"{}"),saved=own?read("kay-scroll:"+id):document.referrer.startsWith(location.origin+"/")?read("kay-scroll"):{};own||history.replaceState({...o,kayScroll:id},"");for(const e of document.querySelectorAll("["+A+"]"))saved[e.getAttribute(A)]>0&&(e.scrollTop=saved[e.getAttribute(A)]);addEventListener("pagehide",()=>{try{const m={};for(const e of document.querySelectorAll("["+A+"]"))m[e.getAttribute(A)]=e.scrollTop;const j=JSON.stringify(m);S.setItem("kay-scroll:"+id,j);S.setItem("kay-scroll",j)}catch{}})}catch{}}`
 export const KEEP_SCROLL_TAG = `<script>${KEEP_SCROLL_SCRIPT}</script>`
 
-function sha256(text: string): string {
+/** The CSP source allowing exactly this inline script or style. */
+export function cspSha256(text: string): string {
   return `'sha256-${new Bun.CryptoHasher('sha256').update(text).digest('base64')}'`
 }
+
 
 const EAGERNESS = new Set<unknown>(['conservative', 'moderate', 'eager'])
 
@@ -56,11 +58,11 @@ function rulesWhere(): object {
 export function createNavigation(config: NavigationConfig | undefined): Navigation {
   checkNavigationConfig(config)
   const styleHashes: string[] = []
-  const scriptHashes = [sha256(KEEP_SCROLL_SCRIPT)]
+  const scriptHashes = [cspSha256(KEEP_SCROLL_SCRIPT)]
   let html = ''
   if (config?.viewTransitions !== false) {
     html += `<style>${VIEW_TRANSITION_STYLE}</style>`
-    styleHashes.push(sha256(VIEW_TRANSITION_STYLE))
+    styleHashes.push(cspSha256(VIEW_TRANSITION_STYLE))
   }
   const prefetch = config?.prefetch === undefined ? 'moderate' : config.prefetch
   const prerender = config?.prerender === true ? 'moderate' : config?.prerender || undefined
@@ -73,7 +75,7 @@ export function createNavigation(config: NavigationConfig | undefined): Navigati
       rules.prerender = [{ source: 'document', where, eagerness: prerender }]
     const json = escJson(JSON.stringify(rules))
     html += `<script type="speculationrules">${json}</script>`
-    scriptHashes.push(sha256(json))
+    scriptHashes.push(cspSha256(json))
   }
   return { html, styleHashes, scriptHashes }
 }

@@ -3,11 +3,7 @@
 
 import { KAY_STREAM_SCRIPT } from '../ssr/context'
 import { KAY_ISLAND_STYLE, KAY_SUSPENSE_STYLE } from '../ssr/index'
-
-function cspSha256(content: string): string {
-  const digest = new Bun.CryptoHasher('sha256').update(content).digest('base64')
-  return `'sha256-${digest}'`
-}
+import { cspSha256 } from '../ssr/navigation'
 
 export const KAY_ISLAND_STYLE_HASH = cspSha256(KAY_ISLAND_STYLE)
 export const KAY_SUSPENSE_STYLE_HASH = cspSha256(KAY_SUSPENSE_STYLE)
