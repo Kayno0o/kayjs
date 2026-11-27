@@ -102,6 +102,31 @@ describe('regions: the server renders only the requested region (#3597)', () => 
   })
 })
 
+describe('a prerendered page varies on x-kay-region only when it can render a region', () => {
+  it('adds the header to Vary for a page whose component renders a <Region>, and leaves it out for a page with none', async () => {
+    const dir = appWith({
+      'src/components/Pane.tsx': `
+        import { Region } from '@kayjs/kay'
+        export function Pane() { return <Region name="pane"><p>pane</p></Region> }
+      `,
+      'src/routes/with-region.tsx': `
+        import { Pane } from '../components/Pane'
+        export const prerender = true
+        export default function WithRegion() { return <main><Pane /></main> }
+      `,
+      'src/routes/plain.tsx': `
+        import { Head } from '@kayjs/kay'
+        export const prerender = true
+        export default function Plain() { return <main><Head><title>Plain</title></Head><p>plain</p></main> }
+      `,
+    })
+    const app = await testApp({ root: dir })
+
+    expect((await app.get('/with-region')).headers.get('vary')).toContain('x-kay-region')
+    expect((await app.get('/plain')).headers.get('vary') ?? '').not.toContain('x-kay-region')
+  })
+})
+
 describe('kay check names a region link that targets no region (#3597)', () => {
   it('reports the file and the name, and stays quiet when every target exists or a region name is computed', async () => {
     const config = `

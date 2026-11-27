@@ -18,7 +18,7 @@
     "packages/kay/src/dom/island.ts::defineIslandElement": 162,
     "packages/kay/src/dom/loop.ts::loop": 223,
     "packages/kay/src/dom/loop.ts::loop.effect()": 163,
-    "packages/kay/src/server/index.ts::createServerFromEmbedded": 361,
+    "packages/kay/src/server/index.ts::createServerFromEmbedded": 358,
     "packages/plugin-auth/src/index.ts::createAuth": 309,
     "packages/plugin-auth/src/routes.ts::registerAuthRoutes": 198,
     "packages/plugin-auth/src/session.ts::createSessionManager": 249,

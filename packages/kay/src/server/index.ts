@@ -30,7 +30,7 @@ import { createErrorNotifier, createFallbackPages, devErrorResponse } from './er
 import { applyHstsHeader, DEFAULT_MAX_REQUEST_BODY_SIZE, enforceRequestBodyLimit, finalizeResponse, isNotFound, makeRequestContext, runChain, wantsJson } from './http'
 import { allowedMethodsHeader, pickPageIslandProps, stripHeadBody } from './page'
 import { allowedPluginMethodsHeader, createServerPluginHost } from './plugin-host'
-import { hasRegionHeader, invalidRegionResponse, prerenderedHasRegion, requestedRegion, respondRegion, withRegionVary } from './region'
+import { hasRegionHeader, invalidRegionResponse, requestedRegion, respondRegion, withRegionVary } from './region'
 import { compileRouteTable } from './route-table'
 import { actionRoutePrefix, createAncestorMiddlewareLookup, decodeRequestPathname, inferRoutesServerPrefix, methodNotAllowed } from './routing'
 import { hasActionErrorCookie, isPlainRead, isRead, serveHandlers } from './serve-handlers'
@@ -264,10 +264,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     prerendered,
     prerenderedFiles,
     prerenderedEtags,
-    htmlHeaders: (route, urlPath, relHtml) => withRegionVary(
-      htmlHeaders(route.islandChunks.length > 0, false, false, route.prerenderedStyleHashes?.[urlPath]),
-      prerenderedHasRegion(route, relHtml, prerendered, prerenderedFiles),
-    ),
+    // The route's region script is what sends `x-kay-region`, so a page without one never varies on it.
+    htmlHeaders: (route, urlPath) => withRegionVary(htmlHeaders(route.islandChunks.length > 0, false, false, route.prerenderedStyleHashes?.[urlPath]), route.usesRegion === true),
     isFast: (urlPath, route) => route.middlewares.length === 0 && middlewaresFor(urlPath, true).length === 0 && !hasPluginRewrites && pluginRouter.match(urlPath) === undefined,
   })
 

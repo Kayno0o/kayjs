@@ -1,12 +1,11 @@
 // A request with `x-kay-region` gets that region's HTML alone: no layouts, no document, and the page's other regions never build their children.
 
-import type { RouteManifestEntry } from '../build/index'
 import type { Html } from '../jsx-runtime'
 import type { RenderContext } from '../ssr/context'
 
 import type { HtmlHeaders } from './document'
 import type { LoadedPageModule } from './page'
-import { existsSync, readFileSync } from 'node:fs'
+
 import { getAppContext, runWithAppContext } from '../plugins/index'
 import { createRenderContext, runWithRenderContext } from '../ssr/context'
 import { ssrChild } from '../ssr/index'
@@ -51,23 +50,6 @@ export function withRegionVary(headers: Record<string, string>, hasRegions: bool
   return { ...headers, vary: mergeVaryValue(headers.vary ?? headers.Vary, REGION_HEADER) }
 }
 
-/** Whether a prerendered page's HTML holds a `<Region>`, so its answer varies on `x-kay-region`. */
-export function prerenderedHasRegion(
-  route: RouteManifestEntry,
-  relHtml: string,
-  prerendered: Record<string, string>,
-  prerenderedFiles: Record<string, string>,
-): boolean {
-  if (!route.usesRenderContext)
-    return false
-  let html = prerendered[relHtml]
-  if (html === undefined) {
-    const filePath = prerenderedFiles[relHtml]
-    if (filePath !== undefined && existsSync(filePath))
-      html = readFileSync(filePath, 'utf8')
-  }
-  return html !== undefined && html.includes('data-kay-region="')
-}
 
 const TITLE_INNER_RE = /<title\b[^>]*>([\s\S]*?)<\/title>/i
 

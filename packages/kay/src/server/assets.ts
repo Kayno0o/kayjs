@@ -29,7 +29,7 @@ export interface PrerenderedSources {
   /** ETags the build computed, by HTML file; a missing one comes from the file's size and mtime. */
   prerenderedEtags: Record<string, string>
   /** HTML headers of a prerendered page, before the `Vary` header compression adds. */
-  htmlHeaders: (route: RouteManifestEntry, urlPath: string, relHtml: string) => Record<string, string>
+  htmlHeaders: (route: RouteManifestEntry, urlPath: string) => Record<string, string>
   /** Whether a prerendered URL may be answered before any middleware, rewrite or plugin route. */
   isFast: (urlPath: string, route: RouteManifestEntry) => boolean
 }
@@ -104,7 +104,7 @@ export function createAssets(options: AssetsOptions) {
           key: `pre:${urlPath}`,
           source,
           etag: sources.prerenderedEtags[relHtml],
-          headers: sources.htmlHeaders(route, urlPath, relHtml),
+          headers: sources.htmlHeaders(route, urlPath),
           compressible: compressCache !== undefined,
         })
         all.set(urlPath, entry)
