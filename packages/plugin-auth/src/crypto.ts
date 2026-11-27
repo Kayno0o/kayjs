@@ -1,7 +1,7 @@
 // Zero-dependency Bun-native crypto helpers for @kayjs/auth.
 // Uses crypto.getRandomValues, Bun.CryptoHasher (SHA-256 / HMAC-SHA256), and Bun.password (Argon2id).
 
-import { timingSafeEqual } from 'node:crypto'
+import { safeEqual } from '@kayjs/kay/server'
 
 export function toBase64Url(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('base64url')
@@ -25,13 +25,6 @@ export function pkceChallenge(verifier: string): string {
   return hasher.digest().toString('base64url')
 }
 
-export function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a)
-  const bufB = Buffer.from(b)
-  if (bufA.length !== bufB.length)
-    return false
-  return timingSafeEqual(bufA, bufB)
-}
 
 export function signPayload(secret: string, payload: unknown): string {
   const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')

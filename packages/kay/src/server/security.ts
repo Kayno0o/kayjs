@@ -1,5 +1,6 @@
 // Built-in security basics: CSRF/Origin verification on state-changing requests + safe default headers + strict CSP hashes.
 
+import { timingSafeEqual } from 'node:crypto'
 import { KAY_STREAM_SCRIPT } from '../ssr/context'
 import { KAY_ISLAND_STYLE, KAY_SUSPENSE_STYLE } from '../ssr/index'
 
@@ -224,6 +225,13 @@ export function getClientIp(request: Request, trustProxy: TrustProxy = false, re
 }
 
 /** `target` trimmed when it is a path on this site, else `fallback`: an absolute or protocol-relative URL, a backslash or a control character is refused. */
+const sha256 = (text: string): Buffer => new Bun.CryptoHasher('sha256').update(text).digest()
+
+/** Compares two secrets (tokens, MACs, OAuth states) in constant time: both are hashed first, so neither their content nor their length shows in the timing. */
+export function safeEqual(a: string, b: string): boolean {
+  return timingSafeEqual(sha256(a), sha256(b))
+}
+
 export function safeRedirect(target: string | null | undefined, fallback = '/'): string {
   const path = target?.trim()
   if (path === undefined || !path.startsWith('/') || path.startsWith('//') || path.includes('\\'))

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { isInside } from '../src/plugins/public'
-import { readStringFields } from '../src/server/public'
+import { readStringFields, safeEqual } from '../src/server/public'
 
 function post(body: BodyInit, contentType?: string): Request {
   return new Request('http://app.test/x', { method: 'POST', body, headers: contentType === undefined ? {} : { 'content-type': contentType } })
@@ -69,5 +69,20 @@ describe('readStringFields: a request body as string fields (#3672)', () => {
 
   test('a malformed JSON body throws, for the caller to answer 400', async () => {
     expect(readStringFields(post('{', 'application/json'))).rejects.toThrow()
+  })
+})
+
+describe('safeEqual: a constant-time compare of two secrets (#3672)', () => {
+  test('equal strings match, the empty ones and non-ASCII ones included', () => {
+    expect(safeEqual('s3cret-token', 's3cret-token')).toBe(true)
+    expect(safeEqual('', '')).toBe(true)
+    expect(safeEqual('clé-été', 'clé-été')).toBe(true)
+  })
+
+  test('strings differing by a character, by length or by accent do not match', () => {
+    expect(safeEqual('s3cret-token', 's3cret-tokem')).toBe(false)
+    expect(safeEqual('s3cret-token', 's3cret-token2')).toBe(false)
+    expect(safeEqual('', 'x')).toBe(false)
+    expect(safeEqual('clé', 'cle')).toBe(false)
   })
 })

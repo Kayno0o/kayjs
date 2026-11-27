@@ -8,10 +8,10 @@ import type { McpBudgetOptions, McpFootprint } from './footprint'
 import type { McpPruneMode, McpToolResult } from './format'
 import type { ListedTool, McpToolAnnotations, ResolvedResource, ResolvedToolEntry } from './rpc'
 import type { CompactSchemaOptions, JsonSchemaObject } from './schema'
-import { createHash, timingSafeEqual } from 'node:crypto'
+
 import { readFile, stat } from 'node:fs/promises'
 import { definePlugin } from '@kayjs/kay/config'
-import { nodeEnv } from '@kayjs/kay/server'
+import { nodeEnv, safeEqual } from '@kayjs/kay/server'
 import { collectBudgetViolations, computeFootprint, formatMcpFootprint } from './footprint'
 import { createRpcDispatcher } from './rpc'
 import { isPlainRecord, isStandardSchema, normalizeObjectSchema, schemaToJsonSchema } from './schema'
@@ -415,11 +415,6 @@ async function resolveToken(
   return undefined
 }
 
-function tokensEqual(provided: string, expected: string): boolean {
-  const a = createHash('sha256').update(provided).digest()
-  const b = createHash('sha256').update(expected).digest()
-  return timingSafeEqual(a, b)
-}
 
 function extractBearerToken(request: Request): string | undefined {
   const header = request.headers.get('authorization')
@@ -473,7 +468,7 @@ export function mcp(options: McpOptions): KayPlugin {
       return new Response('Not Found', { status: 404 })
 
     const provided = extractBearerToken(request)
-    if (provided === undefined || !tokensEqual(provided, configured)) {
+    if (provided === undefined || !safeEqual(provided, configured)) {
       return Response.json(
         { error: 'Unauthorized' },
         { status: 401, headers: { 'www-authenticate': 'Bearer' } },

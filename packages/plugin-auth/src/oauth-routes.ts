@@ -1,10 +1,10 @@
 // OAuth 2.0 authorization-code + PKCE routes: provider redirect and callback with a signed, short-lived state cookie.
 
 import type { RequestContext } from '@kayjs/kay/server'
-import { safeRedirect } from '@kayjs/kay/server'
+import { safeEqual, safeRedirect } from '@kayjs/kay/server'
 import type { OAuthProfile, OAuthProvider } from './oauth'
 import type { AuthStore, AuthUser, PublicUser } from './store'
-import { pkceChallenge, randomToken, safeEqual, signPayload, verifyPayload } from './crypto'
+import { pkceChallenge, randomToken, signPayload, verifyPayload } from './crypto'
 import { fail, withNoStore } from './http'
 import { OAUTH_FETCH_TIMEOUT_MS } from './oauth'
 import { toPublicUser } from './store'

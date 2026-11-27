@@ -10,7 +10,7 @@ export type { ExtractRouteParams, KayApp, LayoutProps, LoaderData, LoaderFn, Mid
 export type { KayLocals } from './index'
 export { createServer } from './loader'
 export { readStringFields } from './request-body'
-export { getClientIp, isHttpsRequest, isTrustedOrigin, safeRedirect, verifyOrigin } from './security'
+export { getClientIp, isHttpsRequest, isTrustedOrigin, safeEqual, safeRedirect, verifyOrigin } from './security'
 export type { SecurityHeadersOptions, TrustProxy } from './security'
 export { formatIssuePath, formatSchemaIssues, validateSchema, validateSchemaSync } from './standard-schema'
 export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1, ValidationFailure, ValidationResult, ValidationSuccess } from './standard-schema'
