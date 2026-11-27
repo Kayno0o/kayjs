@@ -5,6 +5,7 @@ import type { KayPlugin } from '@kayjs/kay/config'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { definePlugin, serviceKey } from '@kayjs/kay/config'
+import { FALLBACK_FILE, FALLBACK_GUARD, FALLBACK_JS, withPlatformFallback } from './platform-fallback'
 
 const UI_KUI_LAYER_SERVICE = serviceKey<boolean>('kay.ui.kuiLayer')
 
@@ -68,23 +69,26 @@ function resolveEmitGrammars(opt: UiPluginOptions['emitGrammars']): { dir: strin
 export function ui(options: UiPluginOptions = {}): KayPlugin {
   const grammar = options.grammar === undefined ? 'editorial' : options.grammar
   const emit = resolveEmitGrammars(options.emitGrammars)
+  let assetPrefix = '/_kay'
   return definePlugin({
     name: '@kayjs/ui',
     css: grammar === false ? undefined : [grammarCssPath(grammar)],
-    ...(emit === undefined && grammar === false
-      ? {}
-      : {
-          build(ctx) {
-            if (grammar !== false)
-              ctx.provide?.(UI_KUI_LAYER_SERVICE, true)
-            if (emit !== undefined) {
-              const bare = readFileSync(join(STYLES_DIR, 'bare.css'), 'utf8')
-              const prefix = emit.dir ? `${emit.dir}/` : ''
-              for (const g of emit.grammars)
-                ctx.emitPublic(`${prefix}${g}.css`, renderGrammarCss(g, bare))
-            }
-          },
-        }),
+    inlineScripts: [FALLBACK_GUARD],
+    build(ctx) {
+      ctx.emitAsset(FALLBACK_FILE, FALLBACK_JS)
+      if (grammar !== false)
+        ctx.provide?.(UI_KUI_LAYER_SERVICE, true)
+      if (emit !== undefined) {
+        const bare = readFileSync(join(STYLES_DIR, 'bare.css'), 'utf8')
+        const prefix = emit.dir ? `${emit.dir}/` : ''
+        for (const g of emit.grammars)
+          ctx.emitPublic(`${prefix}${g}.css`, renderGrammarCss(g, bare))
+      }
+    },
+    server(api) {
+      assetPrefix = api.assetPrefix
+    },
+    transformHtml: html => withPlatformFallback(html, assetPrefix),
     commands: {
       'ui-eject': (args, root) => {
         const name = (args[0] ?? 'editorial') as GrammarName

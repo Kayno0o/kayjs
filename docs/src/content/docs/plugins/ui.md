@@ -27,8 +27,10 @@ Available grammars: `'orbit'` · `'editorial'` · `'workshop'` · `'console'` ·
 
 ## Primitives
 
-- **0 KB JS static & layout primitives**: `Stack`, `Cluster`, `Grid`, `Sidebar`, `Split`, `Button`, `Card` (`CardHeader`/`CardBody`/`CardFooter`), `Badge`, `Notice`, `Field`, `Switch`, `Checkbox`, `RadioGroup`, `Accordion` (`AccordionItem`), `Popover`.
-- **Auto-hydrated interactive islands**: `Dialog`, `Drawer`, `Tabs`, `Menu`, `Select`, `CommandPalette` (`⌘K`), `DataTable` (sort, filter, select, paginate), `Toaster` + `toast()`.
+- **0 KB JS static & layout primitives**: `Stack`, `Cluster`, `Grid`, `Sidebar`, `Split`, `Button`, `Card` (`CardHeader`/`CardBody`/`CardFooter`), `Badge`, `Notice`, `Field`, `Switch`, `Checkbox`, `RadioGroup`, `Accordion` (`AccordionItem`), `Popover`, `Dialog`, `Drawer`.
+- **Auto-hydrated interactive islands**: `ControlledDialog` and `ControlledDrawer` (a `Dialog` or `Drawer` your code opens and closes through an `open` signal), `Tabs`, `Menu`, `Select`, `CommandPalette` (`⌘K`), `DataTable` (sort, filter, select, paginate), `Toaster` + `toast()`.
+
+`Dialog` and `Drawer` ship no JavaScript. Their trigger opens them with the browser's invoker commands (`commandfor` and `command="show-modal"`), and the browser closes them on Esc, on the close button and on a click on the backdrop (`closedby="any"`). A browser that lacks one of these, such as Safari before 26.2, loads a fallback of about 400 bytes that does their work; other browsers fetch nothing. The `ui()` plugin adds that check to pages with a `commandfor` button, so your own buttons get it too.
 
 ```tsx
 import { Button, Card, CardBody, CardHeader, Switch } from '@kayjs/ui'

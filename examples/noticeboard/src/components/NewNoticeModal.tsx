@@ -1,4 +1,4 @@
-import { Button, Cluster, Dialog, Field, Notice, Stack, toast } from '@kayjs/ui'
+import { Button, Cluster, ControlledDialog, Field, Notice, Stack, toast } from '@kayjs/ui'
 import { signal, useAction } from '@kayjs/kay'
 import { pinNotice } from '../actions/notices'
 
@@ -13,7 +13,7 @@ export function NewNoticeModal() {
   })
 
   return (
-    <Dialog open={open} title="Pin a notice" triggerLabel="Pin a notice" triggerVariant="solid">
+    <ControlledDialog open={open} title="Pin a notice" triggerLabel="Pin a notice" triggerVariant="solid">
       <form action={pinNotice} method="post" onSubmit={form.onSubmit}>
         <Stack gap="0.9rem">
           {form.error.value && <Notice tone="danger" role="alert">{form.error.value}</Notice>}
@@ -30,6 +30,6 @@ export function NewNoticeModal() {
           </Cluster>
         </Stack>
       </form>
-    </Dialog>
+    </ControlledDialog>
   )
 }

@@ -6,8 +6,8 @@
 
 - `@kayjs/ui`:
   - Static layout primitives (`0 KB` JS): `Stack`, `Cluster`, `Grid`, `Sidebar`, `Split`
-  - Static & native-platform primitives (`0 KB` JS): `Button`, `Card`, `CardHeader`, `CardBody`, `CardFooter`, `Badge`, `Notice`, `Field`, `FieldContext`, `useFieldContext`, `Checkbox`, `Switch`, `RadioGroup`, `Accordion`, `AccordionItem`, `Popover`
-  - Interactive island primitives: `Dialog`, `Drawer`, `Tabs`, `Menu`, `Select`, `CommandPalette`, `DataTable`, `Toaster`
+  - Static & native-platform primitives (`0 KB` JS): `Button`, `Card`, `CardHeader`, `CardBody`, `CardFooter`, `Badge`, `Notice`, `Field`, `FieldContext`, `useFieldContext`, `Checkbox`, `Switch`, `RadioGroup`, `Accordion`, `AccordionItem`, `Popover`, `Dialog`, `Drawer` (opened by `commandfor`/`command` buttons and closed by Esc or a backdrop click, with no JS; `ui()` adds a fallback that only a browser without invoker commands or `closedby` loads)
+  - Interactive island primitives: `ControlledDialog`, `ControlledDrawer`, `Tabs`, `Menu`, `Select`, `CommandPalette`, `DataTable`, `Toaster`
   - Headless signal behaviors & helpers: `createDialog`, `createTabs`, `createDataTable`, `toast`, `handleListKeyDown`, `findFirstEnabledIndex`, `findLastEnabledIndex`, `findNextEnabledIndex`, `isDialogBackdropClick`, `syncDialogOpen`, `nextUiId`
 - `@kayjs/ui/plugin`: `ui(options?)`, `GRAMMAR_NAMES`, `grammarCssPath`, `renderGrammarCss`, `ejectGrammar`
 - CSS subpaths: `@kayjs/ui/bare.css`, `@kayjs/ui/grammars/{editorial,workshop,console,soft,orbit}.css`
@@ -36,7 +36,7 @@ export default defineConfig({
 - `Checkbox` / `Switch`: `{ id?, name?, value?, label, checked?, disabled? }`; `RadioGroup`: `{ name, legend?, options: RadioOption[], defaultValue? }`.
 - `Accordion` + `AccordionItem`: `{ title, group?, open?, children? }` (native `<details name={group}>`).
 - `Popover`: `{ id, triggerLabel, triggerVariant?, children? }` (native Popover API).
-- `Dialog` / `Drawer`: `{ id?, title?, ariaLabel?, description?, triggerLabel?, triggerVariant?, closeLabel?, open?: Signal<boolean>, side?: 'right' | 'left' | 'bottom', children? }`.
+- `Dialog` / `Drawer`: `{ id?, title?, ariaLabel?, description?, triggerLabel?, triggerVariant?, closeLabel?, side?: 'right' | 'left' | 'bottom', children? }`; another button opens one with `commandfor={id} command="show-modal"`. `ControlledDialog` / `ControlledDrawer` take the same props plus `open: Signal<boolean>`, which the browser closing it sets back to `false`.
 - `Tabs`: `{ id?, items: Array<{ id, label, content }>, defaultValue?, label? }`.
 - `Menu`: `{ id?, label, items: Array<{ id, label, href?, disabled?, onSelect? }>, variant?, onSelect? }`.
 - `Select`: `{ id?, options: Array<{ value, label, disabled? }>, value?: Signal<string>, defaultValue?, name?, placeholder?, ariaLabel?, onChange? }`.

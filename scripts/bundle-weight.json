@@ -10,13 +10,13 @@
     "/table": 10846
   },
   "examples/noticeboard": {
-    "/": 16173,
+    "/": 16167,
     "/login": 9957,
     "/notices/:id": 9957
   },
   "examples/showcase": {
-    "/account": 10264,
-    "/": 20067
+    "/account": 10248,
+    "/": 18942
   },
   "docs": {
     "/docs/*slug": 3992,

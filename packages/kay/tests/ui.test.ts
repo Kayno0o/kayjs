@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { Page } from 'playwright-core'
 import { chromium } from 'playwright-core'
 import { createDataTable } from '../../ui/src/behaviors'
 import { ejectGrammar, grammarCssPath, ui } from '../../ui/src/plugin'
@@ -19,6 +20,132 @@ function makeTemp(prefix: string): string {
 afterAll(() => {
   for (const d of tempDirs)
     rmSync(d, { recursive: true, force: true })
+})
+
+function findChrome(): string | undefined {
+  return [process.env.BUN_CHROME_PATH, chromium.executablePath(), '/usr/bin/chromium', '/usr/bin/google-chrome']
+    .find((p): p is string => typeof p === 'string' && p.length > 0 && existsSync(p))
+}
+
+const isOpen = (page: Page, selector: string): Promise<boolean> => page.locator(selector).evaluate(el => (el as HTMLDialogElement).open)
+
+describe('Dialog and Drawer on the platform (#3686)', () => {
+  it('open and close with no JS: commandfor triggers, Esc, the close button and a backdrop click, under the strict CSP', async () => {
+    const dir = makeTemp('kay-3686-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { Dialog, Drawer } from ${JSON.stringify(UI_ENTRY)}
+      export const prerender = true
+      export default function Home() {
+        return (
+          <main>
+            <Dialog id="confirm" title="Confirm" triggerLabel="Open dialog"><p>Sure?</p></Dialog>
+            <Drawer id="inspector" title="Inspector" triggerLabel="Open drawer" side="left"><p>Details</p></Drawer>
+          </main>
+        )
+      }
+    `)
+    const app = await testApp({ root: dir, plugins: [ui()] })
+    const html = await (await app.get('/')).text()
+
+    expect(html.match(/<script\b[^>]*\bsrc=/g)).toBeNull()
+    expect(html).toMatch(/<script type="module" data-kui-fallback="\/_kay\/kui-fallback-[0-9a-f]{8}\.js">/)
+    expect(html).toContain('<dialog id="confirm" closedby="any"')
+
+    const chromePath = findChrome()
+    if (chromePath === undefined)
+      return
+    const server = app.app.serve(0)
+    const browser = await chromium.launch({ headless: true, executablePath: chromePath })
+    try {
+      for (const fallback of [false, true]) {
+        const page = await browser.newPage()
+        const problems: string[] = []
+        const fetched: string[] = []
+        page.on('pageerror', err => problems.push(err.message))
+        page.on('console', msg => msg.type() === 'error' && !msg.text().includes('status of 404') && problems.push(msg.text()))
+        page.on('response', res => res.status() >= 400 && !res.url().endsWith('/favicon.ico') && problems.push(`${res.status()} ${res.url()}`))
+        page.on('request', req => fetched.push(new URL(req.url()).pathname))
+        if (fallback) {
+          // What Safari before 26.2 does: no command property, and the click opens nothing by itself.
+          await page.addInitScript(() => {
+            delete (HTMLButtonElement.prototype as { command?: unknown }).command
+            delete (HTMLDialogElement.prototype as { closedBy?: unknown }).closedBy
+            addEventListener('click', e => (e.target as Element).closest?.('[commandfor]') && e.preventDefault(), true)
+          })
+        }
+        await page.goto(`http://localhost:${server.port}/`)
+
+        await page.click('[data-ui="dialog-root"] [data-part="trigger"]')
+        expect(await isOpen(page, '#confirm')).toBe(true)
+        await page.click('#confirm [data-part="close"]')
+        expect(await isOpen(page, '#confirm')).toBe(false)
+        await page.click('[data-ui="dialog-root"] [data-part="trigger"]')
+        await page.mouse.click(5, 5)
+        expect(await isOpen(page, '#confirm')).toBe(false)
+        await page.click('[data-ui="drawer-root"] [data-part="trigger"]')
+        expect(await isOpen(page, '#inspector')).toBe(true)
+        await page.keyboard.press('Escape')
+        expect(await isOpen(page, '#inspector')).toBe(false)
+
+        expect(problems).toEqual([])
+        expect(fetched.some(path => path.includes('kui-fallback-'))).toBe(fallback)
+        await page.close()
+      }
+    }
+    finally {
+      await browser.close()
+      server.stop(true)
+    }
+  })
+
+  it('ControlledDialog follows its open signal, and the browser closing it sets the signal back', async () => {
+    const dir = makeTemp('kay-3686-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'src/components'), { recursive: true })
+    writeFileSync(join(dir, 'src/components/Pinned.tsx'), `
+      import { signal } from '@kayjs/kay'
+      import { ControlledDialog } from ${JSON.stringify(UI_ENTRY)}
+      export function Pinned() {
+        const open = signal(false)
+        return (
+          <div>
+            <button id="from-code" type="button" onClick={() => { open.value = true }}>Open from code</button>
+            <output id="state">{open.value ? 'open' : 'closed'}</output>
+            <ControlledDialog id="pin" open={open} title="Pin"><p>Pin it</p></ControlledDialog>
+          </div>
+        )
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { Pinned } from '../components/Pinned'
+      export default function Home() { return <main><Pinned /></main> }
+    `)
+    const app = await testApp({ root: dir, plugins: [ui()] })
+    const chromePath = findChrome()
+    if (chromePath === undefined)
+      return
+    const server = app.app.serve(0)
+    const browser = await chromium.launch({ headless: true, executablePath: chromePath })
+    try {
+      const page = await browser.newPage()
+      await page.goto(`http://localhost:${server.port}/`)
+      await page.click('#from-code')
+      expect(await isOpen(page, '#pin')).toBe(true)
+      await page.mouse.click(5, 5)
+      expect(await isOpen(page, '#pin')).toBe(false)
+      await page.waitForFunction(() => document.getElementById('state')!.textContent === 'closed', undefined, { timeout: 2000 })
+      await page.click('#from-code')
+      expect(await page.textContent('#state')).toBe('open')
+      await page.click('#pin [data-part="close"]')
+      await page.waitForFunction(() => document.getElementById('state')!.textContent === 'closed', undefined, { timeout: 2000 })
+      expect(await isOpen(page, '#pin')).toBe(false)
+    }
+    finally {
+      await browser.close()
+      server.stop(true)
+    }
+  })
 })
 
 describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars', () => {
@@ -236,13 +363,7 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
     const app = await testApp({ root: dir, plugins: [ui({ grammar: false })] })
     const server = app.app.serve(0)
 
-    const chromePath = [
-      process.env.BUN_CHROME_PATH,
-      chromium.executablePath(),
-      '/usr/bin/chromium',
-      '/usr/bin/google-chrome',
-    ].find((p): p is string => typeof p === 'string' && p.length > 0 && existsSync(p))
-
+    const chromePath = findChrome()
     if (chromePath === undefined) {
       server.stop(true)
       return
@@ -407,6 +528,7 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
     expect(plugin.css).toBeUndefined()
     expect(plugin.build).toBeDefined()
     plugin.build!({
+      emitAsset: () => '',
       emitPublic(relPath: string, content: string | Uint8Array) {
         emitted.set(relPath, typeof content === 'string' ? content : new TextDecoder().decode(content))
         return `/${relPath}`
@@ -422,6 +544,7 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
 
     const custom = new Map<string, string>()
     ui({ emitGrammars: { dir: 'themes', grammars: ['orbit', 'bare'] } }).build!({
+      emitAsset: () => '',
       emitPublic(relPath: string, content: string | Uint8Array) {
         custom.set(relPath, typeof content === 'string' ? content : new TextDecoder().decode(content))
         return `/${relPath}`
