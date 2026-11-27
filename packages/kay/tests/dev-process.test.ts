@@ -1,7 +1,7 @@
 // #3665: `kay dev` serves the app from a child process behind a parent that keeps the port and the browsers' reload stream.
 
 import { afterAll, describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { devSupervisor } from '../src/dev/supervisor'
@@ -173,10 +173,19 @@ describe('#3665 kay dev runs the app in a child process', () => {
     const { pid } = await home(url)
     cli.kill('SIGKILL')
     await cli.exited
+    // It removes .kay-dev before it exits, and once orphaned it may stay a zombie where the container's PID 1 reaps nothing.
+    const running = (): boolean => {
+      try {
+        return readFileSync(`/proc/${pid}/stat`, 'utf8').split(') ')[1]?.[0] !== 'Z'
+      }
+      catch {
+        return false
+      }
+    }
     const deadline = Date.now() + 10_000
-    while (existsSync(join(dir, '.kay-dev')) && Date.now() < deadline)
+    while ((existsSync(join(dir, '.kay-dev')) || running()) && Date.now() < deadline)
       await Bun.sleep(50)
     expect(existsSync(join(dir, '.kay-dev'))).toBe(false)
-    expect(() => process.kill(Number(pid), 0)).toThrow()
+    expect(running()).toBe(false)
   })
 })
