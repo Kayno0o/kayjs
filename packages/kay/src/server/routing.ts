@@ -345,7 +345,7 @@ export function createFastStaticPageHandler(options: FastStaticPageOptions): Fas
         }
       })
     }
-    const rctx = createRenderContext(undefined, undefined, ctx.consent)
+    const rctx = createRenderContext(undefined, undefined, ctx.consent, error => notifyError(error, request, 'route'))
     try {
       if (!hasLoad)
         return actions.run(ctx, () => runWithRenderContext(rctx, () => renderPage(undefined, request, url, ctx.locals, rctx, cookieStore, ctx)))

@@ -9,12 +9,12 @@ import type {
 } from 'oxc-parser'
 import type { ModuleAnalysis } from './analyze'
 import type { SelectValueBinding } from './ssr-helpers'
+import type { KayTagEmitter } from './ssr-kay-tags'
 import { analyzeModule, parseTsx } from './analyze'
 import { walk } from './ast'
 import { mistake } from './mistakes'
 import { SourceEditor } from './patch'
 import {
-  cleanJsxText,
   containsJsx,
   createExprContext,
   decodeHtmlEntities,
@@ -37,6 +37,7 @@ import {
   serializeComponentProps,
   StringParts,
 } from './ssr-helpers'
+import { emitCatch, emitSuspense } from './ssr-kay-tags'
 
 export interface IslandBinding {
   id: string
@@ -83,6 +84,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   const jsxNodes = analysis.jsxNodes
   const exprContext = createExprContext(program, jsxNodes)
   const { directAwaitNodes, dynamicChildNodes } = precomputeSsrSubtreeFlags(program)
+  const kayTags: KayTagEmitter = { use, compileSubExpression, compileChildren: compileChildrenListToStringExpr, compileJsx: compileJsxToStringExpr, markersAt, directAwaitNodes }
 
   function compileSubExpression(node: Node): string {
     if (!containsJsx(node, jsxNodes))
@@ -306,33 +308,9 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     const meaningfulChildren = filterMeaningfulChildren(childNodes)
     const hasChildren = meaningfulChildren.length > 0
 
-    // Special case: <Suspense fallback={...}><AsyncComp .../></Suspense> (including aliased/namespaced imports) passes the raw component call/Promise!
-    if (resolveKayTag(tag, analysis.imports) === 'Suspense') {
-      if (meaningfulChildren.length === 1) {
-        const only = meaningfulChildren[0]!
-        if (only.type === 'JSXElement' && isComponentTag(jsxTagName(only.openingElement.name))) {
-          const innerTag = jsxTagName(only.openingElement.name)
-          const inner = serializeComponentProps(only.openingElement.attributes, compileSubExpression)
-          const innerMeaningful = filterMeaningfulChildren(only.children)
-          if (innerMeaningful.length > 0) {
-            const innerChildExpr = compileChildrenListToStringExpr(only.children)
-            inner.propEntries.push(`children: ${use('raw')}(${innerChildExpr})`)
-          }
-          const innerObj = inner.propEntries.length > 0 ? `{ ${inner.propEntries.join(', ')} }` : '{}'
-          propEntries.push(`children: ${innerTag}(${innerObj})`)
-        }
-        else if (only.type === 'JSXExpressionContainer' && only.expression.type !== 'JSXEmptyExpression') {
-          propEntries.push(`children: ${compileSubExpression(only.expression)}`)
-        }
-        else if (only.type === 'JSXText') {
-          propEntries.push(`children: ${JSON.stringify(decodeHtmlEntities(cleanJsxText(only.value)))}`)
-        }
-        else if (isJsxNode(only)) {
-          propEntries.push(`children: ${use('raw')}(${compileJsxToStringExpr(only)})`)
-        }
-      }
-      const propsObj = propEntries.length > 0 ? `{ ${propEntries.join(', ')} }` : '{}'
-      parts.pushExpr(`${use('ssrChild')}(${tag}(${propsObj}))`)
+    const kayTag = resolveKayTag(tag, analysis.imports)
+    if (kayTag === 'Suspense' || kayTag === 'Catch') {
+      ;(kayTag === 'Suspense' ? emitSuspense : emitCatch)(kayTags, node, tag, propEntries, parts)
       return
     }
 

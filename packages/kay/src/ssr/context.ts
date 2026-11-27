@@ -1,7 +1,7 @@
 // Per-request SSR context for <Head> metadata, streaming <Suspense>, rendered island tracking,
 // universal createContext/useContext, and deterministic hydration-safe useId().
 
-import type { ConsentGateProps } from '../context'
+import type { CatchProps, ConsentGateProps } from '../context'
 import type { Html, KayChild } from '../jsx-runtime'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { registerServerContextBridge } from '../context'
@@ -53,6 +53,8 @@ export interface RenderContext {
   inlineStyles: string[] | undefined
   /** Request consent state used by `<ConsentGate>`. */
   consent: { has(category: string): boolean } | undefined
+  /** Reports an error a `<Catch>` rendered its fallback for, to the app's error hook. */
+  onCaught: ((error: unknown) => void) | undefined
 }
 
 interface RenderScope {
@@ -128,12 +130,16 @@ registerServerContextBridge({
   suspense(props) {
     return Suspense(props)
   },
+  catch(props) {
+    return Catch(props)
+  },
 })
 
 export function createRenderContext(
   region?: string,
   ancestors: ReadonlySet<string> = new Set(),
   consent?: { has(category: string): boolean },
+  onCaught?: (error: unknown) => void,
 ): RenderContext {
   return {
     headParts: [],
@@ -158,6 +164,7 @@ export function createRenderContext(
     inTarget: false,
     inlineStyles: undefined,
     consent,
+    onCaught,
   }
 }
 
@@ -194,6 +201,28 @@ export function currentRenderContext(): RenderContext | undefined {
 }
 
 const TITLE_RE = /<title\b[^>]*>([\s\S]*?)<\/title>/gi
+
+/** Renders `children`, or `fallback` when they throw or reject; the compiler hands it `children` as a getter, so they render inside the try. */
+export function Catch(props: CatchProps): Html | Promise<Html> {
+  const ctx = renderStorage.getStore()
+  const fail = (error: unknown): Html => {
+    if (ctx?.onCaught !== undefined)
+      ctx.onCaught(error)
+    else
+      console.error(error)
+    const fallback = props.fallback
+    return raw(ssrChild(typeof fallback === 'function' ? fallback(error, () => {}) : fallback))
+  }
+  try {
+    const children = props.children as KayChild | Promise<KayChild>
+    if (children instanceof Promise)
+      return children.then(resolved => raw(ssrChild(resolved)), fail)
+    return raw(ssrChild(children))
+  }
+  catch (error) {
+    return fail(error)
+  }
+}
 
 /** Renders `children` only when consent for `category` is granted; otherwise renders `fallback`. */
 export function ConsentGate(props: ConsentGateProps): Html {

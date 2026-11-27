@@ -1,14 +1,15 @@
 // Optional DOM helpers (spread, omit, insert, show, setInnerHtml) split into a separate module
 // so Bun.build({ splitting: true }) keeps them out of minimal islands that don't use them.
 
+import type { Owned } from '../reactivity/graph'
 import type { Owner } from '../reactivity/index'
 import { DOM_PROPS } from '../attrs'
-import { batch, createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, untrack } from '../reactivity/index'
+import { batch, createOwner, disposeOwner, effect, getOwner, onCleanup, onEffectError, runOwned, runWithOwner, signal, untrack } from '../reactivity/index'
 import { assertRenderable } from '../unrenderable'
 import { isBlockedAttr } from '../attrs'
 import { setAttr, setClass, setProp, setStyle } from './attrs'
 import { claimInsert } from './claim'
-import { claimRange, delegate, skipRange } from './index'
+import { claimRange, delegate, hydrateCursor, isHydrating, moveCursor, skipRange } from './index'
 
 const DELEGATED_EVENTS = new Set('beforeinput,click,dblclick,focusin,focusout,input,keydown,keyup,mousedown,mouseup,pointerdown,pointerup,touchstart,touchend'.split(','))
 
@@ -379,6 +380,52 @@ export function fragInsert(value: () => unknown): Node | null {
   f.appendChild(document.createComment(''))
   insert(f, value, f.appendChild(document.createComment('')))
   return f
+}
+
+// The nearest <Catch> around an effect that threw takes its error.
+function catchInOwners(node: Owned, err: unknown): boolean {
+  for (let o = node.o; o !== undefined; o = o.o) {
+    if (o.eh !== undefined) {
+      o.eh(err)
+      return true
+    }
+  }
+  return false
+}
+
+// `<Catch>` in the browser: an error of `children`, while they render or in a later effect, swaps in `fallback` until `retry()`.
+export function catchBoundary(children: () => unknown, fallback: (error: unknown, retry: () => void) => unknown): Node | null {
+  onEffectError(catchInOwners)
+  const tries = signal(0)
+  let failed: { error: unknown } | undefined
+  const fail = (error: unknown): void => {
+    failed = { error }
+    tries.value++
+  }
+  const retry = (): void => {
+    failed = undefined
+    tries.value++
+  }
+  return fragInsert(() => {
+    void tries.value
+    if (failed === undefined) {
+      const owner = createOwner(getOwner())
+      owner.eh = fail
+      const from = isHydrating() ? hydrateCursor() : undefined
+      try {
+        return runOwned(owner, children)
+      }
+      catch (error) {
+        disposeOwner(owner)
+        failed = { error }
+        // The fallback hydrates from where the children started: the server rendered it in their place.
+        if (from !== undefined)
+          moveCursor(true, from)
+      }
+    }
+    const { error } = failed
+    return untrack(() => fallback(error, retry))
+  })
 }
 
 export function show(

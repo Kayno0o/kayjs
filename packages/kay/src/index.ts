@@ -1,5 +1,5 @@
-export { ConsentGate, createContext, Head, provideContext, Region, Suspense, useContext, useId } from './context'
-export type { ConsentGateProps, Context, RegionProps } from './context'
+export { Catch, ConsentGate, createContext, Head, provideContext, Region, Suspense, useContext, useId } from './context'
+export type { CatchProps, ConsentGateProps, Context, RegionProps } from './context'
 export {
   batch,
   computed,

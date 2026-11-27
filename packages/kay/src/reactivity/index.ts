@@ -99,7 +99,8 @@ function flush(): void {
             runParentFirst(node)
           }
           catch (err) {
-            errors.push(err)
+            if (!catchEffectError?.(node, err))
+              errors.push(err)
           }
         }
       }
@@ -115,6 +116,13 @@ function flush(): void {
       propWave++
   }
   throwErrors(errors)
+}
+
+// Installed by the first <Catch>, so an island without one carries no owner walk.
+let catchEffectError: ((node: Owned, err: unknown) => boolean) | undefined
+
+export function onEffectError(fn: (node: Owned, err: unknown) => boolean): void {
+  catchEffectError = fn
 }
 
 function shouldRun(sub: SubNode): boolean {
@@ -381,6 +389,18 @@ export function runWithOwner<T>(owner: Owner | undefined, fn: () => T): T {
   finally {
     currentOwner = prevOwner
     currentSub = prevSub
+  }
+}
+
+// Like runWithOwner, but the running computation still tracks what fn reads.
+export function runOwned<T>(owner: Owner, fn: () => T): T {
+  const prev = currentOwner
+  currentOwner = owner
+  try {
+    return fn()
+  }
+  finally {
+    currentOwner = prev
   }
 }
 

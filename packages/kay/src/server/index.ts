@@ -434,7 +434,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       )
     }
 
-    const rctx = createRenderContext(undefined, undefined, ctx.consent)
+    const rctx = createRenderContext(undefined, undefined, ctx.consent, error => notifyError(error, ctx.request, 'route'))
     const body = await runWithRenderContext(rctx, () => renderRouteBody(route, data, pageProps, ctx))
     if (hasFlash)
       ctx.cookies.delete(ACTION_ERROR_COOKIE)

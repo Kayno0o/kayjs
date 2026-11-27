@@ -52,6 +52,7 @@ export interface Owner extends Owned {
   cl?: (() => void)[] | undefined // cleanups
   cx?: Map<symbol, unknown> | undefined // context values provided at this owner
   id?: IdScope | undefined // deterministic useId() scope
+  eh?: ((error: unknown) => void) | undefined // error handler of a <Catch>
 }
 
 export interface Signal<T> {

@@ -12,8 +12,8 @@ Static UI compiles to `0 KB` HTML strings; interactive components automatically 
 | **Clean build** | **18.8 ms** | 460 ms | 140 ms | 90 ms | 1,190 ms | 2,180 ms | 2,580 ms |
 | **Build output (gzip)** | **5.18 KB** | 65.9 KB | 8.2 KB | 22.5 KB | 137.8 KB | 328.6 KB | 614.7 KB |
 | **SSR throughput (500 products)** | **7,017 req/s** | 3,983 req/s | 1,712 req/s | 3,861 req/s | 1,898 req/s | — | 583 req/s |
-| **Products JS shipped (gzip)** | **3.85 KB** | 9.9 KB | 8.2 KB | 22.5 KB | 8.6 KB | 133.4 KB | 76.4 KB |
-| **Table JS shipped (gzip)** | **6.94 KB** | 12.5 KB | 8.2 KB | 22.5 KB | 9.6 KB | 134.3 KB | 72.3 KB |
+| **Products JS shipped (gzip)** | **3.86 KB** | 9.9 KB | 8.2 KB | 22.5 KB | 8.6 KB | 133.4 KB | 76.4 KB |
+| **Table JS shipped (gzip)** | **7.02 KB** | 12.5 KB | 8.2 KB | 22.5 KB | 9.6 KB | 134.3 KB | 72.3 KB |
 | **Table: create 10,000 rows** | **219.1 ms** | 262.0 ms | 226.0 ms | 232.0 ms | 234.0 ms | 360.0 ms | 266.0 ms |
 | **Table: replace 1,000 rows** | **23.9 ms** | 25.5 ms | 24.3 ms | 25.9 ms | 24.5 ms | 29.9 ms | 27.4 ms |
 | **Table: select row** | **0.20 ms** | **0.20 ms** | 0.30 ms | 1.00 ms | 0.30 ms | 1.20 ms | 0.70 ms |

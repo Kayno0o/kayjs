@@ -3,6 +3,7 @@
 
 import type { KayChild } from './jsx-runtime'
 import type { IdScope, Owner } from './reactivity/index'
+import { catchBoundary } from './dom/extras'
 import { createOwner, getOwner, runWithOwner } from './reactivity/index'
 
 export interface RegionProps {
@@ -21,6 +22,12 @@ export interface ConsentGateProps {
   children?: KayChild
 }
 
+export interface CatchProps {
+  /** Rendered in place of `children` when they throw; a function gets the error and a `retry` that renders the children again (a no-op on the server). */
+  fallback?: KayChild | ((error: unknown, retry: () => void) => KayChild)
+  children?: KayChild
+}
+
 export interface ServerContextBridge {
   region(props: RegionProps): KayChild
   consentGate(props: ConsentGateProps): KayChild
@@ -29,6 +36,7 @@ export interface ServerContextBridge {
   nextId(): string | undefined
   head(props: { children?: KayChild }): KayChild
   suspense(props: { fallback?: KayChild, error?: KayChild | ((error: unknown) => KayChild), children?: KayChild | Promise<KayChild> }): KayChild
+  catch(props: CatchProps): KayChild | Promise<KayChild>
 }
 
 const BRIDGE_KEY = Symbol.for('kay.server.context.bridge')
@@ -54,6 +62,17 @@ export function Suspense(props: { fallback?: KayChild, error?: KayChild | ((erro
   if (bridge !== undefined)
     return bridge.suspense(props)
   return props.children instanceof Promise ? (props.fallback ?? null) : (props.children ?? null)
+}
+
+/** Renders `fallback` in place of `children` when they throw, on the server and in an island; the app's `onError` hook still gets the error. */
+export function Catch(props: CatchProps): KayChild | Promise<KayChild> {
+  const bridge = getOwner() === undefined ? getServerBridge() : undefined
+  if (bridge !== undefined)
+    return bridge.catch(props)
+  return catchBoundary(() => props.children, (error, retry) => {
+    const fallback = props.fallback
+    return typeof fallback === 'function' ? fallback(error, retry) : fallback
+  }) as KayChild
 }
 
 /** A part of the page that a link or form with `data-kay-target` swaps alone: a request for it renders only its children. Server-only, like `Head`. */

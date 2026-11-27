@@ -106,7 +106,7 @@ export function createFallbackPages(options: FallbackPagesOptions) {
     if (renderInner !== undefined) {
       try {
         const effUrl = url ?? new URL(`http://localhost/${status}`)
-        const rctx = createRenderContext(undefined, undefined, ctx?.consent)
+        const rctx = createRenderContext(undefined, undefined, ctx?.consent, req !== undefined ? error => notifyError(error, req, 'route') : undefined)
         const body = await runWithRenderContext(rctx, async () => {
           let inner = ssrChild(await renderInner() as Html)
           if (rootLayoutMod !== undefined)

@@ -101,7 +101,7 @@ export async function respondRegion(
     const inner = reqScope !== undefined ? () => runInRequest(reqScope, fn) : fn
     return appCtx !== undefined ? runWithAppContext(appCtx, inner) : inner()
   }
-  const rctx = createRenderContext(name, new Set(path.slice(0, -1)), reqScope?.ctx.consent)
+  const rctx = createRenderContext(name, new Set(path.slice(0, -1)), reqScope?.ctx.consent, onError)
   const html = await runWithRenderContext(rctx, async () => {
     ssrChild(await mod.default!(pageProps) as Html)
     return await finishRegion(rctx, { streamTimeout, onError, runInScope })

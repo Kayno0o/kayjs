@@ -90,7 +90,7 @@ A browser extension or a password manager sometimes adds its own element inside 
 
 The browser renders an island without the page around it, so kay refuses what would differ there:
 
-- `<Head>` and `<Suspense>` run during server rendering only. In an island they fail compilation: render them in the page or a layout.
+- `<Head>` and `<Suspense>` run during server rendering only. In an island they fail compilation: render them in the page or a layout. `<Catch>` works in both.
 - A context provided outside the island reaches it on the server only. Reading one throws `kay: <Counter> reads a context provided outside the island`: pass the value as a prop. A context the island provides itself works on both sides.
 
 ## Server-only `async` routes and layouts
